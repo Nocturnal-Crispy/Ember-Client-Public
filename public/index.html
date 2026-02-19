@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ember</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Custom Title Bar -->
+  <div class="title-bar">
+    <div class="title-bar-drag-region"></div>
+    <div class="title-bar-title">Ember</div>
+    <div class="title-bar-drag-region"></div>
+    <div class="window-controls">
+      <button class="window-control minimize" id="minimize-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect fill="currentColor" width="10" height="1" x="1" y="6"/>
+        </svg>
+      </button>
+      <button class="window-control maximize" id="maximize-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect fill="currentColor" width="9" height="9" x="1.5" y="1.5" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </button>
+      <button class="window-control close" id="close-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <path fill="currentColor" d="M6.8,6l3.6-3.6L9.6,1.6L6,5.2L2.4,1.6L1.6,2.4L5.2,6L1.6,9.6l0.8,0.8L6,6.8l3.6,3.6l0.8-0.8L6.8,6z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Server List (Left Sidebar) -->
+    <div class="server-list">
+      <div class="server-icon active">
+        <span>H</span>
+      </div>
+      <div class="server-icon">
+        <span>T</span>
+      </div>
+      <div class="server-icon">
+        <span>G</span>
+      </div>
+      <div class="server-separator"></div>
+      <div class="server-icon add-server">
+        <span>+</span>
+      </div>
+    </div>
+
+    <!-- Channel List -->
+    <div class="channel-list">
+      <div class="server-header">
+        <h3>Hello World Server</h3>
+        <span class="dropdown-icon">▼</span>
+      </div>
+      
+      <div class="channels">
+        <div class="channel-category">
+          <span class="category-arrow">▼</span>
+          <span class="category-name">TEXT CHANNELS</span>
+        </div>
+        
+        <div class="channel active">
+          <span class="channel-icon">#</span>
+          <span class="channel-name">general</span>
+        </div>
+        
+        <div class="channel">
+          <span class="channel-icon">#</span>
+          <span class="channel-name">random</span>
+        </div>
+        
+        <div class="channel">
+          <span class="channel-icon">#</span>
+          <span class="channel-name">announcements</span>
+        </div>
+
+        <div class="channel-category">
+          <span class="category-arrow">▼</span>
+          <span class="category-name">VOICE CHANNELS</span>
+        </div>
+        
+        <div class="channel">
+          <span class="channel-icon">🔊</span>
+          <span class="channel-name">General Voice</span>
+        </div>
+      </div>
+
+      <div class="user-panel">
+        <div class="user-info">
+          <div class="user-avatar">U</div>
+          <div class="user-details">
+            <div class="username">User#0001</div>
+            <div class="user-status">Online</div>
+          </div>
+        </div>
+        <div class="user-controls">
+          <button class="user-control-btn">🎤</button>
+          <button class="user-control-btn">🎧</button>
+          <button class="user-control-btn">⚙️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-container">
+      <div class="chat-header">
+        <span class="channel-icon">#</span>
+        <span class="channel-title">general</span>
+        <div class="chat-header-divider"></div>
+        <span class="channel-description">General discussion</span>
+      </div>
+
+      <div class="messages-container" id="messages">
+        <div class="welcome-message">
+          <h1>Welcome to #general!</h1>
+          <p>This is the beginning of the #general channel.</p>
+        </div>
+
+        <div class="message">
+          <div class="message-avatar">S</div>
+          <div class="message-content">
+            <div class="message-header">
+              <span class="message-author">System</span>
+              <span class="message-timestamp">Today at 12:00 PM</span>
+            </div>
+            <div class="message-text">Hello, World! 👋 Welcome to Ember built with TypeScript!</div>
+          </div>
+        </div>
+
+        <div class="message">
+          <div class="message-avatar">U</div>
+          <div class="message-content">
+            <div class="message-header">
+              <span class="message-author">User</span>
+              <span class="message-timestamp">Today at 12:01 PM</span>
+            </div>
+            <div class="message-text">This looks awesome! 🎉</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="message-input-container">
+        <div class="message-input-wrapper">
+          <button class="attachment-btn">+</button>
+          <input 
+            type="text" 
+            class="message-input" 
+            placeholder="Message #general"
+            id="messageInput"
+          >
+          <div class="input-actions">
+            <button class="input-action-btn">😊</button>
+            <button class="input-action-btn">GIF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Member List (Right Sidebar) -->
+    <div class="member-list">
+      <div class="member-category">ONLINE — 3</div>
+      <div class="member">
+        <div class="member-avatar online">S</div>
+        <span class="member-name">System</span>
+      </div>
+      <div class="member">
+        <div class="member-avatar online">U</div>
+        <span class="member-name">User</span>
+      </div>
+      <div class="member">
+        <div class="member-avatar online">A</div>
+        <span class="member-name">Admin</span>
+      </div>
+      
+      <div class="member-category">OFFLINE — 1</div>
+      <div class="member offline">
+        <div class="member-avatar">G</div>
+        <span class="member-name">Guest</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
