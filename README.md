@@ -1,3 +1,3 @@
 # Ember-Client-Public
 
-https://ember-chat.com/#download
+https://ember-chat.com
