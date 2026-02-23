@@ -2152,6 +2152,16 @@ if (channelModalConfirmBtn) {
 async function joinVoiceChannel(channelId, channelName) {
   if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) return;
 
+  // If already in a voice channel, silently leave it before joining the new one
+  if (activeVoiceChannelId && activeVoiceChannelId !== channelId && voiceManager) {
+    await voiceManager.leaveChannel();
+    activeVoiceChannelId = null;
+    voiceParticipants.clear();
+    hideVoiceControls();
+    renderVoiceParticipants(null);
+    document.querySelectorAll('.voice-avatar.speaking').forEach(el => el.classList.remove('speaking'));
+  }
+
   const auth = await ipcRenderer.invoke('get-auth');
   if (!auth) return;
 
