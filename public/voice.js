@@ -22,6 +22,12 @@ class VoiceManager {
     this.iceServers = [];
     this._iceQueue = []; // ICE candidates queued before remote description
     this._remoteDescSet = false;
+    this.localVideoStream = null;
+    this.remoteVideoStreams = new Map(); // streamId → MediaStream (video tracks)
+    this.isCameraOn = false;
+    this.onCameraStateChanged = null; // callback(userId, isOn)
+    this.onVideoStreamAdded = null;   // callback(streamId, stream)
+    this._lastAudioSettings = {};
   }
 
   async fetchICEServers() {
@@ -44,7 +50,7 @@ class VoiceManager {
     }
   }
 
-  async joinChannel(channelId, audioSettings) {
+  async joinChannel(channelId, audioSettings, withVideo = false, cameraDeviceId = null) {
     if (this.channelId === channelId) {
       _voiceLog.debug('joinChannel: already in this channel', { channel_id: channelId });
       return;
@@ -59,6 +65,7 @@ class VoiceManager {
     await this.fetchICEServers();
 
     const s = audioSettings || {};
+    this._lastAudioSettings = audioSettings || {};
     this._sensitivityThreshold = (s.autoSensitivity === false)
       ? (s.sensitivityThreshold != null ? s.sensitivityThreshold / 100 : 0.08)
       : 0.08;
@@ -73,9 +80,15 @@ class VoiceManager {
           autoGainControl: s.autoGainControl !== false,
           ...(s.inputDevice && s.inputDevice !== 'default' ? { deviceId: { exact: s.inputDevice } } : {}),
         },
-        video: false
+        video: withVideo
+          ? (cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true)
+          : false
       });
       _voiceLog.info('Microphone access granted');
+      if (withVideo) {
+        this.localVideoStream = this.localStream;
+        this.isCameraOn = true;
+      }
     } catch (e) {
       _voiceLog.error('Microphone access denied', { error: String(e) });
       console.error('[Voice] Microphone access denied:', e);
@@ -136,6 +149,14 @@ class VoiceManager {
 
     this.speakingStates.clear();
 
+    if (this.localVideoStream) {
+      this.localVideoStream.getTracks().forEach(t => t.stop());
+      this.localVideoStream = null;
+    }
+    this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    this.remoteVideoStreams.clear();
+    this.isCameraOn = false;
+
     if (this._audioCtx) {
       this._audioCtx.close().catch(() => {});
       this._audioCtx = null;
@@ -158,16 +179,21 @@ class VoiceManager {
       });
     }
 
-    // Handle incoming audio tracks from SFU
+    // Handle incoming tracks from SFU (audio and video)
     this.peerConnection.ontrack = (event) => {
       const stream = event.streams[0];
       if (!stream) return;
-      const streamId = stream.id;
-      if (!this.remoteStreams.has(streamId)) {
-        this.remoteStreams.set(streamId, stream);
-        if (!this.isDeafened) {
-          this._playRemoteStream(streamId, stream);
+      if (event.track.kind === 'audio') {
+        const streamId = stream.id;
+        if (!this.remoteStreams.has(streamId)) {
+          this.remoteStreams.set(streamId, stream);
+          if (!this.isDeafened) {
+            this._playRemoteStream(streamId, stream);
+          }
         }
+      } else if (event.track.kind === 'video') {
+        this.remoteVideoStreams.set(stream.id, stream);
+        if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
       }
     };
 
@@ -326,6 +352,52 @@ class VoiceManager {
     }
   }
 
+  // Partial cleanup (no voice_leave) then rejoin with camera enabled
+  async enableCamera(cameraDeviceId) {
+    if (!this.channelId) return false;
+    const channelId = this.channelId;
+    _voiceLog.info('Enabling camera, rejoining channel', { channel_id: channelId });
+    this._partialCleanup();
+    return await this.joinChannel(channelId, this._lastAudioSettings, true, cameraDeviceId);
+  }
+
+  // Partial cleanup (no voice_leave) then rejoin without camera
+  async disableCamera() {
+    if (!this.channelId) return false;
+    const channelId = this.channelId;
+    _voiceLog.info('Disabling camera, rejoining channel', { channel_id: channelId });
+    this._partialCleanup();
+    return await this.joinChannel(channelId, this._lastAudioSettings, false);
+  }
+
+  // Close WebRTC and streams without sending voice_leave
+  _partialCleanup() {
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(t => t.stop());
+      this.localStream = null;
+    }
+    if (this.localVideoStream) {
+      this.localVideoStream.getTracks().forEach(t => t.stop());
+      this.localVideoStream = null;
+    }
+    this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    this.remoteVideoStreams.clear();
+    this.remoteStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    this.remoteStreams.clear();
+    this.audioElements.forEach(el => { el.pause(); el.srcObject = null; el.remove(); });
+    this.audioElements.clear();
+    this._remoteDescSet = false;
+    this._iceQueue = [];
+    this.isCameraOn = false;
+    const channelId = this.channelId;
+    this.channelId = null; // allow joinChannel to re-run
+    return channelId;
+  }
+
   // Handle incoming WS messages related to voice
   handleMessage(msg) {
     _voiceLog.debug('WebSocket voice message received', { type: msg.type });
@@ -342,6 +414,12 @@ class VoiceManager {
       case 'voice_participants':
         _voiceLog.debug('Voice participants update', { count: (msg.payload.participants || []).length });
         this.handleParticipants(msg.payload.participants);
+        break;
+      case 'voice_camera_on':
+        if (this.onCameraStateChanged) this.onCameraStateChanged(msg.payload.user_id, true);
+        break;
+      case 'voice_camera_off':
+        if (this.onCameraStateChanged) this.onCameraStateChanged(msg.payload.user_id, false);
         break;
     }
   }

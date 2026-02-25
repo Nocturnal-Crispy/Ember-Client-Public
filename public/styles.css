@@ -2149,6 +2149,64 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ─── Video Grid ────────────────────────────────────────────────────────────── */
+.video-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.video-tile {
+  position: relative;
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--rgb-highlight), 0.15);
+}
+
+.video-tile video { width: 100%; height: 100%; object-fit: cover; }
+
+.video-tile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--highlight);
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-tile-label {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-camera-btn.active {
+  opacity: 1;
+  background-color: rgba(var(--rgb-highlight), 0.25);
+  color: var(--highlight);
+}
+
 /* ─── User Settings Modal ──────────────────────────────────────────────────── */
 .settings-overlay {
   position: fixed;

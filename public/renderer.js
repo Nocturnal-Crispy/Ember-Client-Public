@@ -32,6 +32,11 @@ let voiceManager = null;
 let activeVoiceChannelId = null;
 let voiceParticipants = new Map(); // userID → username
 
+// Camera / video state
+let videoParticipants = new Set(); // userIDs with camera on
+let localCameraOn = false;
+let videoGridVisible = false;
+
 // Window Controls
 document.getElementById('minimize-btn').addEventListener('click', () => {
   ipcRenderer.send('window-minimize');
@@ -1870,7 +1875,8 @@ async function connectWebSocket() {
           log.debug('WebSocket: presence_update', { user_id: data.payload.user_id, status: data.payload.status });
           handlePresenceUpdate(data.payload);
         } else if (data.type === 'voice_offer' || data.type === 'voice_ice_candidate' ||
-                   data.type === 'voice_speaking' || data.type === 'voice_participants') {
+                   data.type === 'voice_speaking' || data.type === 'voice_participants' ||
+                   data.type === 'voice_camera_on' || data.type === 'voice_camera_off') {
           if (voiceManager) voiceManager.handleMessage(data);
         } else if (data.type === 'voice_user_joined' && data.payload) {
           log.debug('WebSocket: voice_user_joined', { channel_id: data.payload.channel_id, user_id: data.payload.user_id });
@@ -2271,6 +2277,14 @@ async function joinVoiceChannel(channelId, channelName) {
 
   // If already in a voice channel, silently leave it before joining the new one
   if (activeVoiceChannelId && activeVoiceChannelId !== channelId && voiceManager) {
+    if (localCameraOn && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
+    }
+    localCameraOn = false;
+    videoParticipants.clear();
+    updateVideoGridVisibility();
+    const cameraBtn = document.getElementById('voice-camera-btn');
+    if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '📷'; }
     await voiceManager.leaveChannel();
     activeVoiceChannelId = null;
     voiceParticipants.clear();
@@ -2293,6 +2307,8 @@ async function joinVoiceChannel(channelId, channelName) {
       participants.forEach(p => voiceParticipants.set(p.user_id, p.username));
       renderVoiceParticipants(activeVoiceChannelId);
     };
+    voiceManager.onCameraStateChanged = (userId, isOn) => handleRemoteCameraStateChanged(userId, isOn);
+    voiceManager.onVideoStreamAdded   = (streamId, stream) => handleRemoteVideoStream(streamId, stream);
   } else {
     voiceManager.ws = wsConnection;
     voiceManager.auth = auth;
@@ -2314,6 +2330,14 @@ async function joinVoiceChannel(channelId, channelName) {
 async function leaveVoiceChannel() {
   if (!voiceManager) return;
   log.info('Leaving voice channel', { channel_id: activeVoiceChannelId });
+  if (localCameraOn && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+    wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
+  }
+  localCameraOn = false;
+  videoParticipants.clear();
+  updateVideoGridVisibility();
+  const cameraBtn = document.getElementById('voice-camera-btn');
+  if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '📷'; cameraBtn.disabled = false; }
   await voiceManager.leaveChannel();
   activeVoiceChannelId = null;
   voiceParticipants.clear();
@@ -2334,6 +2358,9 @@ function handleVoiceUserLeft(payload) {
   const { channel_id, user_id } = payload;
   log.info('Voice user left', { channel_id, user_id });
   voiceParticipants.delete(user_id);
+  videoParticipants.delete(user_id);
+  removeVideoTile(user_id);
+  updateVideoGridVisibility();
   renderVoiceParticipants(channel_id);
   updateSpeakingIndicator(user_id, false);
   const selfId = voiceManager && voiceManager.auth && voiceManager.auth.user_id;
@@ -2413,6 +2440,166 @@ document.getElementById('voice-disconnect-btn')?.addEventListener('click', () =>
   leaveVoiceChannel();
   document.querySelectorAll('.channel').forEach(el => el.classList.remove('active'));
 });
+
+document.getElementById('voice-camera-btn')?.addEventListener('click', () => {
+  toggleCamera();
+});
+
+// ─── Camera / Video Functions ─────────────────────────────────────────────
+
+async function toggleCamera() {
+  if (!voiceManager || !activeVoiceChannelId) return;
+  const btn = document.getElementById('voice-camera-btn');
+  if (btn) btn.disabled = true;
+  try {
+    if (!localCameraOn) {
+      const voiceSettings = await ipcRenderer.invoke('get-voice-video-settings').catch(() => null);
+      const cameraDeviceId = voiceSettings && voiceSettings.cameraDevice && voiceSettings.cameraDevice !== 'default'
+        ? voiceSettings.cameraDevice : null;
+      let testStream;
+      try {
+        testStream = await navigator.mediaDevices.getUserMedia({
+          video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true
+        });
+        testStream.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        log.warn('Camera permission denied or no device found', { error: String(e) });
+        return;
+      }
+      const joined = await voiceManager.enableCamera(cameraDeviceId);
+      if (!joined) return;
+      localCameraOn = true;
+      videoParticipants.add('__self__');
+      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+        wsConnection.send(JSON.stringify({ type: 'voice_camera_on' }));
+      }
+      if (btn) { btn.classList.add('active'); btn.title = 'Stop Camera'; btn.textContent = '\u{1F3A5}'; }
+    } else {
+      await voiceManager.disableCamera();
+      localCameraOn = false;
+      videoParticipants.delete('__self__');
+      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+        wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
+      }
+      if (btn) { btn.classList.remove('active'); btn.title = 'Start Camera'; btn.textContent = '\u{1F4F7}'; }
+    }
+    updateVideoGridVisibility();
+    renderVideoGrid();
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function updateVideoGridVisibility() {
+  const grid = document.getElementById('video-grid');
+  const messages = document.getElementById('messages');
+  const inputContainer = document.querySelector('.message-input-container');
+  if (!grid || !messages) return;
+  const shouldShow = localCameraOn || videoParticipants.size > 0;
+  if (shouldShow && !videoGridVisible) {
+    videoGridVisible = true;
+    grid.style.display = '';
+    messages.style.display = 'none';
+    if (inputContainer) inputContainer.style.display = 'none';
+  } else if (!shouldShow && videoGridVisible) {
+    videoGridVisible = false;
+    grid.style.display = 'none';
+    messages.style.display = '';
+    if (inputContainer) inputContainer.style.display = '';
+  }
+}
+
+function renderVideoGrid() {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  grid.replaceChildren();
+
+  const auth = voiceManager && voiceManager.auth;
+  const selfId = auth && auth.user_id;
+  const selfUsername = auth && auth.username;
+
+  if (localCameraOn) {
+    const selfTile = createVideoTile('__self__', selfUsername || 'You',
+      voiceManager && voiceManager.localVideoStream ? voiceManager.localVideoStream : null,
+      true);
+    grid.appendChild(selfTile);
+  }
+
+  voiceParticipants.forEach((username, userId) => {
+    if (userId === selfId) return;
+    const hasCamera = videoParticipants.has(userId);
+    let stream = null;
+    if (hasCamera && voiceManager) {
+      voiceManager.remoteVideoStreams.forEach((s) => { if (!stream) stream = s; });
+    }
+    grid.appendChild(createVideoTile(userId, username, hasCamera ? stream : null, false));
+  });
+}
+
+function createVideoTile(userId, username, stream, isSelf) {
+  const tile = document.createElement('div');
+  tile.className = 'video-tile';
+  tile.dataset.userId = userId;
+
+  if (stream) {
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    if (isSelf) video.muted = true;
+    video.srcObject = stream;
+    tile.appendChild(video);
+  } else {
+    const avatar = document.createElement('div');
+    avatar.className = 'video-tile-avatar';
+    avatar.textContent = (username || '?').charAt(0).toUpperCase();
+    tile.appendChild(avatar);
+  }
+
+  const label = document.createElement('div');
+  label.className = 'video-tile-label';
+  label.textContent = isSelf ? (username ? username + ' (You)' : 'You') : (username || userId);
+  tile.appendChild(label);
+  return tile;
+}
+
+function removeVideoTile(userId) {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  const tile = grid.querySelector('.video-tile[data-user-id="' + userId + '"]');
+  if (tile) tile.remove();
+}
+
+function handleRemoteCameraStateChanged(userId, isOn) {
+  log.info('Remote camera state changed', { user_id: userId, camera_on: isOn });
+  if (isOn) {
+    videoParticipants.add(userId);
+  } else {
+    videoParticipants.delete(userId);
+    removeVideoTile(userId);
+  }
+  updateVideoGridVisibility();
+  if (isOn || videoGridVisible) renderVideoGrid();
+}
+
+function handleRemoteVideoStream(streamId, stream) {
+  log.debug('Remote video stream added', { stream_id: streamId });
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  for (const userId of videoParticipants) {
+    if (userId === '__self__') continue;
+    const tile = grid.querySelector('.video-tile[data-user-id="' + userId + '"]');
+    if (tile && !tile.querySelector('video')) {
+      const avatar = tile.querySelector('.video-tile-avatar');
+      if (avatar) avatar.remove();
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      tile.insertBefore(video, tile.firstChild);
+      return;
+    }
+  }
+}
 
 // ─── End Voice Channel Functions ──────────────────────────────────────────
 
