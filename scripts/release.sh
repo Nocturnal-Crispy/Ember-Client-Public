@@ -90,6 +90,7 @@ echo "Committing version bump..."
 git add package.json
 git add package-lock.json
 git commit -m "Bump version to $NEW_VERSION"
+git push
 
 echo ""
 echo "=== Release v$NEW_VERSION published successfully! ==="
