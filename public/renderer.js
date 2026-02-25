@@ -1,5 +1,7 @@
 // Compatibility shim: reconstruct original variable shapes from the contextBridge API
 const ipcRenderer = window.electronAPI.ipc;
+
+const log = window.emberLog.createLogger('Renderer');
 const _n = window.electronAPI.nacl;
 const nacl = {
   randomBytes: _n.randomBytes,
@@ -88,9 +90,11 @@ async function sendEncryptedMessage(plaintext) {
   if (!activeChannelId || !activeEmberId) return;
   const emberKey = emberKeyCache.get(activeEmberId);
   if (!emberKey) {
+    log.error('Cannot send message: no ember key in cache', { ember_id: activeEmberId });
     console.error('No ember key available for encryption');
     return;
   }
+  log.debug('Sending encrypted message', { channel_id: activeChannelId });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) return;
@@ -105,11 +109,14 @@ async function sendEncryptedMessage(plaintext) {
     });
     if (response.ok) {
       const msgData = await response.json();
+      log.debug('Message sent successfully', { channel_id: activeChannelId, message_id: msgData.id });
       displayDecryptedMessage(msgData);
     } else {
+      log.error('Failed to send message', { status: response.status, channel_id: activeChannelId });
       console.error('Failed to send message');
     }
   } catch (error) {
+    log.error('Error sending message', { channel_id: activeChannelId, error: error.message });
     console.error('Error sending message:', error);
   }
 }
@@ -148,11 +155,13 @@ function displayDecryptedMessage(msg) {
   if (!activeEmberId) return;
   const emberKey = emberKeyCache.get(activeEmberId);
   if (!emberKey) {
+    log.warn('Cannot decrypt message: ember key not in cache', { ember_id: activeEmberId, message_id: msg.id });
     addMessage(msg.username || 'Unknown', '[Encrypted message - key unavailable]', msg.created_at);
     return;
   }
   const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
   if (plaintext === null) {
+    log.warn('Message decryption failed', { message_id: msg.id });
     addMessage(msg.username || 'Unknown', '[Failed to decrypt message]', msg.created_at);
     return;
   }
@@ -256,6 +265,7 @@ function updateReconnectionTimer() {
 }
 
 function forceLogout() {
+  log.info('Force logout initiated, clearing session state');
   hideReconnectionOverlay();
   disconnectWebSocket();
   emberKeyCache.clear();
@@ -264,6 +274,7 @@ function forceLogout() {
     clearInterval(healthcheckInterval);
     healthcheckInterval = null;
   }
+  log.info('Session cleared, sending auth-logout signal');
   ipcRenderer.send('auth-logout');
 }
 
@@ -346,6 +357,7 @@ if (statusSubmenu) {
 }
 
 async function updateUserStatus(apiStatus, displayStatus) {
+  log.debug('Updating user status', { status: apiStatus });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) return;
@@ -358,11 +370,15 @@ async function updateUserStatus(apiStatus, displayStatus) {
       body: JSON.stringify({ status: apiStatus })
     });
     if (response.ok) {
+      log.info('User status updated', { status: apiStatus, user_id: auth.user_id });
       if (userStatusText) userStatusText.textContent = displayStatus;
       updateUserPanelStatusColor(apiStatus);
       handlePresenceUpdate({ user_id: auth.user_id, username: auth.username, status: apiStatus });
+    } else {
+      log.warn('Failed to update user status', { status: response.status, api_status: apiStatus });
     }
   } catch (error) {
+    log.error('Error updating user status', { error: error.message });
     console.error('Error updating status:', error);
   }
 }
@@ -404,16 +420,18 @@ if (menuLogout) {
   });
 }
 
-console.log('Ember app initialized!');
+log.info('Ember renderer initialized');
 
 // Server Management
 let currentEmbers = [];
 let activeEmberId = null;
 
 async function fetchEmbers() {
+  log.debug('Fetching embers list');
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) {
+      log.error('Cannot fetch embers: not authenticated');
       console.error('Not authenticated');
       return [];
     }
@@ -426,13 +444,17 @@ async function fetchEmbers() {
     });
 
     if (!response.ok) {
+      log.error('Failed to fetch embers', { status: response.status });
       console.error('Failed to fetch embers');
       return [];
     }
 
     const data = await response.json();
-    return data.embers || [];
+    const embers = data.embers || [];
+    log.info('Embers fetched', { count: embers.length });
+    return embers;
   } catch (error) {
+    log.error('Error fetching embers', { error: error.message });
     console.error('Error fetching embers:', error);
     return [];
   }
@@ -456,9 +478,11 @@ async function fetchCategories(emberId) {
 }
 
 async function fetchChannels(emberId) {
+  log.debug('Fetching channels', { ember_id: emberId });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) {
+      log.error('Cannot fetch channels: not authenticated');
       console.error('Not authenticated');
       return [];
     }
@@ -471,13 +495,17 @@ async function fetchChannels(emberId) {
     });
 
     if (!response.ok) {
+      log.error('Failed to fetch channels', { status: response.status, ember_id: emberId });
       console.error('Failed to fetch channels');
       return [];
     }
 
     const data = await response.json();
-    return data.channels || [];
+    const channels = data.channels || [];
+    log.debug('Channels fetched', { ember_id: emberId, count: channels.length });
+    return channels;
   } catch (error) {
+    log.error('Error fetching channels', { ember_id: emberId, error: error.message });
     console.error('Error fetching channels:', error);
     return [];
   }
@@ -535,6 +563,7 @@ function renderServerList(embers) {
 }
 
 function switchToServer(emberId, emberName) {
+  log.info('Switching to server', { ember_id: emberId, name: emberName });
   const serverIcons = document.querySelectorAll('.server-icon');
   serverIcons.forEach(icon => {
     if (icon.dataset.emberId === emberId) {
@@ -549,31 +578,46 @@ function switchToServer(emberId, emberName) {
 }
 
 async function fetchEmberKey(emberId) {
-  if (emberKeyCache.has(emberId)) return emberKeyCache.get(emberId);
+  if (emberKeyCache.has(emberId)) {
+    log.debug('Ember key cache hit', { ember_id: emberId });
+    return emberKeyCache.get(emberId);
+  }
+  log.debug('Fetching ember key from server', { ember_id: emberId });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     const device = await ipcRenderer.invoke('get-device-identity');
-    if (!auth || !auth.token || !auth.hostname || !device) return null;
+    if (!auth || !auth.token || !auth.hostname || !device) {
+      log.error('Cannot fetch ember key: missing auth or device identity');
+      return null;
+    }
     const response = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${auth.token}` }
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      log.error('Failed to fetch ember key', { status: response.status, ember_id: emberId });
+      return null;
+    }
     const data = await response.json();
     const privateKey = naclUtil.decodeBase64(device.private_key);
     const publicKey = naclUtil.decodeBase64(device.public_key);
     const emberKey = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, publicKey, privateKey);
     if (emberKey) {
       emberKeyCache.set(emberId, emberKey);
+      log.info('Ember key fetched and cached', { ember_id: emberId });
+    } else {
+      log.error('Ember key decryption failed', { ember_id: emberId });
     }
     return emberKey;
   } catch (error) {
+    log.error('Error fetching ember key', { ember_id: emberId, error: error.message });
     console.error('Error fetching ember key:', error);
     return null;
   }
 }
 
 async function fetchMessages(channelId) {
+  log.debug('Fetching messages', { channel_id: channelId });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) return [];
@@ -581,10 +625,16 @@ async function fetchMessages(channelId) {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${auth.token}` }
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.error('Failed to fetch messages', { status: response.status, channel_id: channelId });
+      return [];
+    }
     const data = await response.json();
-    return data.messages || [];
+    const messages = data.messages || [];
+    log.debug('Messages fetched', { channel_id: channelId, count: messages.length });
+    return messages;
   } catch (error) {
+    log.error('Error fetching messages', { channel_id: channelId, error: error.message });
     console.error('Error fetching messages:', error);
     return [];
   }
@@ -592,10 +642,12 @@ async function fetchMessages(channelId) {
 
 async function loadChannelMessages(channelId) {
   if (!messagesContainer) return;
-  messagesContainer.innerHTML = '';
+  log.info('Loading channel messages', { channel_id: channelId });
+  while (messagesContainer.firstChild) messagesContainer.removeChild(messagesContainer.firstChild);
   activeChannelId = channelId;
   wsSubscribeToChannel(channelId);
   const messages = await fetchMessages(channelId);
+  log.debug('Rendering messages', { channel_id: channelId, count: messages.length });
   messages.forEach(msg => displayDecryptedMessage(msg));
 }
 
@@ -616,6 +668,7 @@ async function loadServerContent(emberId, emberName) {
 }
 
 async function fetchMembers(emberId) {
+  log.debug('Fetching members', { ember_id: emberId });
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) return [];
@@ -623,10 +676,16 @@ async function fetchMembers(emberId) {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${auth.token}` }
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.error('Failed to fetch members', { status: response.status, ember_id: emberId });
+      return [];
+    }
     const data = await response.json();
-    return data.members || [];
+    const members = data.members || [];
+    log.debug('Members fetched', { ember_id: emberId, count: members.length });
+    return members;
   } catch (error) {
+    log.error('Error fetching members', { ember_id: emberId, error: error.message });
     console.error('Error fetching members:', error);
     return [];
   }
@@ -863,6 +922,7 @@ function clearDragHighlights() {
 }
 
 async function reorderChannels(draggedId, beforeChannelId, newCategoryId) {
+  log.debug('Reordering channels', { dragged_id: draggedId });
   const auth = await ipcRenderer.invoke('get-auth');
   if (!auth || !auth.token || !auth.hostname || !activeEmberId) return;
 
@@ -894,6 +954,7 @@ async function reorderChannels(draggedId, beforeChannelId, newCategoryId) {
     const [channels, categories] = await Promise.all([fetchChannels(activeEmberId), fetchCategories(activeEmberId)]);
     renderChannels(channels, categories);
   } catch (e) {
+    log.error('Failed to reorder channels', { error: String(e) });
     console.error('Failed to reorder channels:', e);
   }
 }
@@ -929,6 +990,7 @@ async function reorderCategories(draggedId, beforeCategoryId) {
     const [channels, categories] = await Promise.all([fetchChannels(activeEmberId), fetchCategories(activeEmberId)]);
     renderChannels(channels, categories);
   } catch (e) {
+    log.error('Failed to reorder categories', { error: String(e) });
     console.error('Failed to reorder categories:', e);
   }
 }
@@ -970,9 +1032,11 @@ function hideWelcomeScreen() {
 }
 
 async function verifyUserExists() {
+  log.debug('Verifying user session via /me endpoint');
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) {
+      log.warn('Session verification failed: no auth data in store');
       forceLogout();
       return false;
     }
@@ -985,11 +1049,14 @@ async function verifyUserExists() {
     });
     clearTimeout(timeoutId);
     if (!response.ok) {
+      log.warn('Session verification failed: server rejected token', { status: response.status });
       forceLogout();
       return false;
     }
+    log.info('Session verified', { user_id: auth.user_id, username: auth.username });
     return true;
   } catch (error) {
+    log.error('User verification error', { error: error.message });
     console.error('User verification failed:', error);
     forceLogout();
     return false;
@@ -997,18 +1064,22 @@ async function verifyUserExists() {
 }
 
 async function initializeApp() {
+  log.info('Initializing application');
   const isValid = await verifyUserExists();
   if (!isValid) return;
   const auth = await ipcRenderer.invoke('get-auth');
   if (auth && auth.username) {
     const usernameEl = document.querySelector('.user-panel .username');
     if (usernameEl) usernameEl.textContent = auth.username;
+    log.info('User panel populated', { username: auth.username });
   }
   const embers = await fetchEmbers();
   if (embers.length > 0) {
+    log.info('Rendering server list', { count: embers.length });
     hideWelcomeScreen();
     renderServerList(embers);
   } else {
+    log.info('No embers found, showing welcome screen');
     showWelcomeScreen();
   }
 }
@@ -1273,15 +1344,18 @@ async function handleCreateServer() {
   const serverName = serverNameInput?.value.trim();
 
   if (!serverName) {
+    log.warn('Create server validation failed: name required');
     showCreateServerError('Server name is required');
     return;
   }
 
   if (serverName.length > 100) {
+    log.warn('Create server validation failed: name too long', { length: serverName.length });
     showCreateServerError('Server name must be 100 characters or less');
     return;
   }
 
+  log.info('Creating new server', { name: serverName });
   try {
     createServerBtn.disabled = true;
     createServerBtn.textContent = 'Creating...';
@@ -1333,8 +1407,7 @@ async function handleCreateServer() {
     }
 
     closeCreateServerModal();
-    
-    console.log('Server created successfully:', newEmber);
+    log.info('Server created successfully', { ember_id: newEmber.id, name: newEmber.name });
 
     hideWelcomeScreen();
     const embers = await fetchEmbers();
@@ -1345,6 +1418,7 @@ async function handleCreateServer() {
     }
 
   } catch (error) {
+    log.error('Failed to create server', { error: error.message });
     showCreateServerError(error.message || 'Failed to create server');
     console.error('Create server error:', error);
   } finally {
@@ -1548,14 +1622,17 @@ if (inviteCopyBtn) {
 
 async function handleCreateInvite() {
   if (!activeEmberId) {
+    log.warn('Cannot create invite: no active ember');
     showCreateInviteError('No server selected');
     return;
   }
   const emberKey = emberKeyCache.get(activeEmberId);
   if (!emberKey) {
+    log.error('Cannot create invite: ember key not in cache', { ember_id: activeEmberId });
     showCreateInviteError('Ember key not available');
     return;
   }
+  log.info('Creating invite', { ember_id: activeEmberId });
   try {
     createInviteBtn.disabled = true;
     createInviteBtn.textContent = 'Generating...';
@@ -1591,7 +1668,9 @@ async function handleCreateInvite() {
     const data = await response.json();
     if (inviteLinkInput) inviteLinkInput.value = data.invite_url;
     if (inviteLinkResult) inviteLinkResult.classList.remove('hidden');
+    log.info('Invite created successfully', { ember_id: activeEmberId });
   } catch (error) {
+    log.error('Failed to create invite', { ember_id: activeEmberId, error: error.message });
     showCreateInviteError(error.message || 'Failed to create invite');
     console.error('Create invite error:', error);
   } finally {
@@ -1661,6 +1740,7 @@ if (acceptInviteJoinBtn) {
 
 async function handleAcceptInvite() {
   if (!pendingInvite) return;
+  log.info('Accepting invite');
   try {
     acceptInviteJoinBtn.disabled = true;
     acceptInviteJoinBtn.textContent = 'Joining...';
@@ -1677,9 +1757,11 @@ async function handleAcceptInvite() {
       pendingInvite.key_salt
     );
     if (!emberKey) {
+      log.error('Failed to decrypt ember key from invite');
       showAcceptInviteError('Failed to decrypt ember key from invite');
       return;
     }
+    log.debug('Ember key decrypted from invite successfully');
     const publicKeyBytes = naclUtil.decodeBase64(device.public_key);
     const privateKeyBytes = naclUtil.decodeBase64(device.private_key);
     const encryptedEmberKey = emberCrypto.encryptEmberKeyForUser(emberKey, publicKeyBytes, privateKeyBytes);
@@ -1698,6 +1780,7 @@ async function handleAcceptInvite() {
     const data = await response.json();
     if (data.ember_id) {
       emberKeyCache.set(data.ember_id, emberKey);
+      log.info('Joined server via invite', { ember_id: data.ember_id, name: data.ember_name });
     }
     closeAcceptInviteModal();
     hideWelcomeScreen();
@@ -1707,6 +1790,7 @@ async function handleAcceptInvite() {
       switchToServer(data.ember_id, data.ember_name);
     }
   } catch (error) {
+    log.error('Failed to accept invite', { error: error.message });
     showAcceptInviteError(error.message || 'Failed to join server');
     console.error('Accept invite error:', error);
   } finally {
@@ -1718,9 +1802,11 @@ async function handleAcceptInvite() {
 }
 
 async function processInviteLink(code, hostname) {
+  log.info('Processing invite link');
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token) {
+      log.error('Cannot process invite link: not authenticated');
       console.error('Not authenticated, cannot process invite');
       return;
     }
@@ -1731,35 +1817,46 @@ async function processInviteLink(code, hostname) {
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      log.error('Failed to fetch invite info', { status: response.status });
       console.error('Failed to fetch invite info:', errorData.error || response.status);
       return;
     }
     const inviteInfo = await response.json();
     inviteInfo.hostname = targetHostname;
+    log.info('Invite info retrieved, opening accept modal', { ember_name: inviteInfo.ember_name });
     openAcceptInviteModal(inviteInfo);
   } catch (error) {
+    log.error('Error processing invite link', { error: error.message });
     console.error('Error processing invite link:', error);
   }
 }
 
 ipcRenderer.on('handle-invite-link', (_event, invite) => {
+  log.info('Received invite link from main process');
   processInviteLink(invite.code, invite.hostname);
 });
 
 // WebSocket Connection
 async function connectWebSocket() {
   if (wsConnection && wsConnection.readyState === WebSocket.OPEN) return;
+  log.debug('Connecting WebSocket');
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth || !auth.token || !auth.hostname) return;
-    const wsUrl = auth.hostname.replace(/^http/, 'ws').replace(/:8085\b/, ':8086') + '/ws?token=' + encodeURIComponent(auth.token);
+    // Build URL without token in the log
+    const wsBaseUrl = auth.hostname.replace(/^http/, 'ws').replace(/:8085\b/, ':8086') + '/ws';
+    log.info('WebSocket connecting', { url: wsBaseUrl });
+    const wsUrl = wsBaseUrl + '?token=' + encodeURIComponent(auth.token);
     wsConnection = new WebSocket(wsUrl);
     wsConnection.onopen = () => {
+      log.info('WebSocket connected');
       console.log('WebSocket connected');
       if (activeChannelId) {
+        log.debug('Re-subscribing to active channel', { channel_id: activeChannelId });
         wsSubscribeToChannel(activeChannelId);
       }
       if (activeEmberId) {
+        log.debug('Re-subscribing to active ember', { ember_id: activeEmberId });
         wsSubscribeToEmber(activeEmberId);
       }
     };
@@ -1767,46 +1864,57 @@ async function connectWebSocket() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'new_message' && data.payload) {
+          log.debug('WebSocket: new_message received', { channel_id: data.payload.channel_id });
           handleIncomingMessage(data.payload);
         } else if (data.type === 'presence_update' && data.payload) {
+          log.debug('WebSocket: presence_update', { user_id: data.payload.user_id, status: data.payload.status });
           handlePresenceUpdate(data.payload);
         } else if (data.type === 'voice_offer' || data.type === 'voice_ice_candidate' ||
                    data.type === 'voice_speaking' || data.type === 'voice_participants') {
           if (voiceManager) voiceManager.handleMessage(data);
         } else if (data.type === 'voice_user_joined' && data.payload) {
+          log.debug('WebSocket: voice_user_joined', { channel_id: data.payload.channel_id, user_id: data.payload.user_id });
           handleVoiceUserJoined(data.payload);
         } else if (data.type === 'voice_user_left' && data.payload) {
+          log.debug('WebSocket: voice_user_left', { channel_id: data.payload.channel_id, user_id: data.payload.user_id });
           handleVoiceUserLeft(data.payload);
         }
       } catch (err) {
+        log.error('WebSocket message parse error', { error: String(err) });
         console.error('WebSocket message parse error:', err);
       }
     };
     wsConnection.onclose = () => {
+      log.warn('WebSocket disconnected, scheduling reconnect in 3s');
       console.log('WebSocket disconnected');
       wsConnection = null;
       if (!wsReconnectTimer) {
         wsReconnectTimer = setTimeout(() => {
           wsReconnectTimer = null;
+          log.debug('Attempting WebSocket reconnect');
           connectWebSocket();
         }, 3000);
       }
     };
     wsConnection.onerror = (err) => {
+      log.error('WebSocket error', { error: String(err) });
       console.error('WebSocket error:', err);
     };
   } catch (error) {
+    log.error('Failed to connect WebSocket', { error: error.message });
     console.error('Failed to connect WebSocket:', error);
   }
 }
 
 function wsSubscribeToChannel(channelId) {
   if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) return;
+  log.debug('Subscribing to channel', { channel_id: channelId });
   wsConnection.send(JSON.stringify({ type: 'subscribe', channel_id: channelId }));
 }
 
 function wsSubscribeToEmber(emberId) {
   if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) return;
+  log.debug('Subscribing to ember', { ember_id: emberId });
   wsConnection.send(JSON.stringify({ type: 'subscribe_ember', ember_id: emberId }));
 }
 
@@ -1973,10 +2081,11 @@ document.getElementById('delete-modal-confirm-btn')?.addEventListener('click', a
       });
     }
     if (res.ok) {
+      log.info('Channel/category deleted', { type: target.type, id: target.id, name: target.name });
       if (target.type === 'channel' && target.id === activeChannelId) {
         activeChannelId = null;
         updateChatHeader('', '');
-        if (messagesContainer) messagesContainer.innerHTML = '';
+        if (messagesContainer) while (messagesContainer.firstChild) messagesContainer.removeChild(messagesContainer.firstChild);
       }
       document.getElementById('delete-confirm-modal')?.classList.add('hidden');
       const [channels, categories] = await Promise.all([
@@ -1986,9 +2095,11 @@ document.getElementById('delete-modal-confirm-btn')?.addEventListener('click', a
       renderChannels(channels, categories);
     } else {
       const err = await res.json().catch(() => ({}));
+      log.error('Delete failed', { type: target.type, id: target.id, error: err.error });
       console.error('Delete failed:', err.error);
     }
   } catch (err) {
+    log.error('Delete error', { error: String(err) });
     console.error('Delete error:', err);
   } finally {
     if (btn) btn.disabled = false;
@@ -2133,6 +2244,7 @@ if (channelModalConfirmBtn) {
         }
       }
 
+      log.info('Channel/category operation completed', { mode: channelModalMode, name });
       closeChannelNameModal();
       const [channels, categories] = await Promise.all([
         fetchChannels(activeEmberId),
@@ -2140,6 +2252,7 @@ if (channelModalConfirmBtn) {
       ]);
       renderChannels(channels, categories);
     } catch (error) {
+      log.error('Channel/category operation failed', { mode: channelModalMode, error: error.message });
       showChannelModalError(error.message || 'Something went wrong');
     } finally {
       if (channelModalConfirmBtn) channelModalConfirmBtn.disabled = false;
@@ -2150,7 +2263,11 @@ if (channelModalConfirmBtn) {
 // ─── Voice Channel Functions ───────────────────────────────────────────────
 
 async function joinVoiceChannel(channelId, channelName) {
-  if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) return;
+  if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+    log.warn('Cannot join voice channel: WebSocket not connected');
+    return;
+  }
+  log.info('Joining voice channel', { channel_id: channelId, name: channelName });
 
   // If already in a voice channel, silently leave it before joining the new one
   if (activeVoiceChannelId && activeVoiceChannelId !== channelId && voiceManager) {
@@ -2183,8 +2300,12 @@ async function joinVoiceChannel(channelId, channelName) {
 
   const voiceSettings = await ipcRenderer.invoke('get-voice-video-settings').catch(() => null);
   const joined = await voiceManager.joinChannel(channelId, voiceSettings);
-  if (!joined) return;
+  if (!joined) {
+    log.error('Failed to join voice channel', { channel_id: channelId });
+    return;
+  }
 
+  log.info('Voice channel joined successfully', { channel_id: channelId });
   playVoiceSound('userJoin');
   activeVoiceChannelId = channelId;
   showVoiceControls(channelName);
@@ -2192,6 +2313,7 @@ async function joinVoiceChannel(channelId, channelName) {
 
 async function leaveVoiceChannel() {
   if (!voiceManager) return;
+  log.info('Leaving voice channel', { channel_id: activeVoiceChannelId });
   await voiceManager.leaveChannel();
   activeVoiceChannelId = null;
   voiceParticipants.clear();
@@ -2202,6 +2324,7 @@ async function leaveVoiceChannel() {
 
 function handleVoiceUserJoined(payload) {
   const { channel_id, user_id, username } = payload;
+  log.info('Voice user joined', { channel_id, user_id, username });
   voiceParticipants.set(user_id, username);
   renderVoiceParticipants(channel_id);
   playVoiceSound('userJoin');
@@ -2209,6 +2332,7 @@ function handleVoiceUserJoined(payload) {
 
 function handleVoiceUserLeft(payload) {
   const { channel_id, user_id } = payload;
+  log.info('Voice user left', { channel_id, user_id });
   voiceParticipants.delete(user_id);
   renderVoiceParticipants(channel_id);
   updateSpeakingIndicator(user_id, false);
@@ -2295,8 +2419,11 @@ document.getElementById('voice-disconnect-btn')?.addEventListener('click', () =>
 // Update initializeApp to connect WebSocket
 const originalInitializeApp = initializeApp;
 async function initializeAppWithWS() {
+  log.info('Starting application initialization with WebSocket');
   await originalInitializeApp();
+  log.debug('App initialized, connecting WebSocket');
   await connectWebSocket();
+  log.info('Application startup complete');
 }
 initializeAppWithWS();
 
@@ -2336,6 +2463,7 @@ function switchSettingsPage(page) {
 }
 
 async function populateSettingsAccount() {
+  log.debug('Populating settings account panel');
   try {
     const auth = await ipcRenderer.invoke('get-auth');
     if (!auth) return;
@@ -2351,6 +2479,7 @@ async function populateSettingsAccount() {
     if (accountUsername) accountUsername.textContent = username;
     if (displayName) displayName.textContent = username;
   } catch (e) {
+    log.error('Failed to populate settings account', { error: String(e) });
     console.error('Failed to populate settings account:', e);
   }
 }
@@ -2634,6 +2763,7 @@ async function populateVoiceVideoSettings() {
 }
 
 async function saveVoiceVideoSettings() {
+  log.info('Saving voice/video settings');
   const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
   const getChecked = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
   const getInt = (id) => { const v = parseInt(getVal(id), 10); return isNaN(v) ? 0 : v; };
@@ -2668,7 +2798,9 @@ async function saveVoiceVideoSettings() {
   try {
     await ipcRenderer.invoke('save-voice-video-settings', settings);
     _vvSounds = settings.sounds;
+    log.info('Voice/video settings saved successfully');
     if (typeof voiceManager !== 'undefined' && voiceManager) {
+      log.debug('Applying new voice/video settings to active voice session');
       voiceManager.applySettings(settings);
     }
     const statusEl = document.getElementById('vv-save-status');
@@ -2677,6 +2809,7 @@ async function saveVoiceVideoSettings() {
       setTimeout(() => { statusEl.textContent = ''; }, 2000);
     }
   } catch (e) {
+    log.error('Failed to save voice/video settings', { error: String(e) });
     console.error('[VV] saveVoiceVideoSettings failed:', e);
   }
 }

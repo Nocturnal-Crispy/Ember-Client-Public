@@ -4,12 +4,27 @@ const nacl = require('tweetnacl');
 const naclUtil = require('tweetnacl-util');
 const emberCrypto = require('../public/crypto');
 
+// Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
+function preloadLog(level: string, message: string, data?: Record<string, unknown>) {
+  try {
+    ipcRenderer.send('log-to-console', {
+      level: level.toUpperCase(),
+      context: 'Preload',
+      message,
+      data: data || null,
+    });
+  } catch (_) { /* ignore if IPC unavailable */ }
+}
+
+preloadLog('info', 'Preload script initializing');
+
 const ALLOWED_SEND: readonly string[] = [
   'window-minimize',
   'window-maximize',
   'window-close',
   'auth-success',
   'auth-logout',
+  'log-to-console',
 ];
 
 const ALLOWED_INVOKE: readonly string[] = [
@@ -24,22 +39,29 @@ const ALLOWED_INVOKE: readonly string[] = [
 
 const ALLOWED_ON: readonly string[] = ['handle-invite-link'];
 
+preloadLog('debug', 'Setting up contextBridge API');
+
 contextBridge.exposeInMainWorld('electronAPI', {
   ipc: {
     send(channel: string, ...args: unknown[]) {
       if (ALLOWED_SEND.includes(channel)) {
         ipcRenderer.send(channel, ...args);
+      } else {
+        preloadLog('warn', `Blocked IPC send on unlisted channel: ${channel}`);
       }
     },
     invoke(channel: string, ...args: unknown[]) {
       if (ALLOWED_INVOKE.includes(channel)) {
         return ipcRenderer.invoke(channel, ...args);
       }
+      preloadLog('warn', `Blocked IPC invoke on unlisted channel: ${channel}`);
       return Promise.reject(new Error(`Blocked IPC channel: ${channel}`));
     },
     on(channel: string, listener: (...args: unknown[]) => void) {
       if (ALLOWED_ON.includes(channel)) {
         ipcRenderer.on(channel, (_event, ...args) => listener(...args));
+      } else {
+        preloadLog('warn', `Blocked IPC on-listener for unlisted channel: ${channel}`);
       }
     },
   },
@@ -68,25 +90,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   crypto: {
-    generateRecoveryCode: () =>
-      emberCrypto.generateRecoveryCode(),
-    encryptPrivateKeyWithRecoveryCode: (privateKey: Uint8Array, recoveryCode: string) =>
-      emberCrypto.encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode),
-    decryptPrivateKeyWithRecoveryCode: (encryptedBase64: string, recoveryCode: string, saltBase64: string) =>
-      emberCrypto.decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, saltBase64),
-    generateEmberKey: () =>
-      emberCrypto.generateEmberKey(),
-    encryptEmberKeyForUser: (emberKey: Uint8Array, recipientPublicKey: Uint8Array, senderPrivateKey: Uint8Array) =>
-      emberCrypto.encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey),
-    decryptEmberKeyForUser: (encryptedBase64: string, senderPublicKey: Uint8Array, recipientPrivateKey: Uint8Array) =>
-      emberCrypto.decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPrivateKey),
-    encryptMessage: (plaintext: string, emberKey: Uint8Array) =>
-      emberCrypto.encryptMessage(plaintext, emberKey),
-    decryptMessage: (ciphertextBase64: string, emberKey: Uint8Array) =>
-      emberCrypto.decryptMessage(ciphertextBase64, emberKey),
-    encryptEmberKeyForInvite: (emberKey: Uint8Array, inviteCode: string) =>
-      emberCrypto.encryptEmberKeyForInvite(emberKey, inviteCode),
-    decryptEmberKeyFromInvite: (encryptedBase64: string, inviteCode: string, saltBase64: string) =>
-      emberCrypto.decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64),
+    generateRecoveryCode: () => {
+      preloadLog('debug', 'Crypto: generateRecoveryCode');
+      return emberCrypto.generateRecoveryCode();
+    },
+    encryptPrivateKeyWithRecoveryCode: (privateKey: Uint8Array, recoveryCode: string) => {
+      preloadLog('debug', 'Crypto: encryptPrivateKeyWithRecoveryCode');
+      return emberCrypto.encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode);
+    },
+    decryptPrivateKeyWithRecoveryCode: (encryptedBase64: string, recoveryCode: string, saltBase64: string) => {
+      preloadLog('debug', 'Crypto: decryptPrivateKeyWithRecoveryCode');
+      return emberCrypto.decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, saltBase64);
+    },
+    generateEmberKey: () => {
+      preloadLog('debug', 'Crypto: generateEmberKey');
+      return emberCrypto.generateEmberKey();
+    },
+    encryptEmberKeyForUser: (emberKey: Uint8Array, recipientPublicKey: Uint8Array, senderPrivateKey: Uint8Array) => {
+      preloadLog('debug', 'Crypto: encryptEmberKeyForUser');
+      return emberCrypto.encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey);
+    },
+    decryptEmberKeyForUser: (encryptedBase64: string, senderPublicKey: Uint8Array, recipientPrivateKey: Uint8Array) => {
+      preloadLog('debug', 'Crypto: decryptEmberKeyForUser');
+      return emberCrypto.decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPrivateKey);
+    },
+    encryptMessage: (plaintext: string, emberKey: Uint8Array) => {
+      preloadLog('debug', 'Crypto: encryptMessage');
+      return emberCrypto.encryptMessage(plaintext, emberKey);
+    },
+    decryptMessage: (ciphertextBase64: string, emberKey: Uint8Array) => {
+      preloadLog('debug', 'Crypto: decryptMessage');
+      return emberCrypto.decryptMessage(ciphertextBase64, emberKey);
+    },
+    encryptEmberKeyForInvite: (emberKey: Uint8Array, inviteCode: string) => {
+      preloadLog('debug', 'Crypto: encryptEmberKeyForInvite');
+      return emberCrypto.encryptEmberKeyForInvite(emberKey, inviteCode);
+    },
+    decryptEmberKeyFromInvite: (encryptedBase64: string, inviteCode: string, saltBase64: string) => {
+      preloadLog('debug', 'Crypto: decryptEmberKeyFromInvite');
+      return emberCrypto.decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64);
+    },
   },
 });
+
+preloadLog('info', 'Preload script ready, contextBridge API exposed');

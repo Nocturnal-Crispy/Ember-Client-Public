@@ -1,7 +1,12 @@
 'use strict';
 
+const _voiceLog = window.emberLog ? window.emberLog.createLogger('Voice') : {
+  debug: () => {}, info: () => {}, warn: (m, d) => console.warn('[Voice]', m, d || ''), error: (m, d) => console.error('[Voice]', m, d || ''),
+};
+
 class VoiceManager {
   constructor(wsConnection, authObj) {
+    _voiceLog.info('VoiceManager created');
     this.ws = wsConnection;
     this.auth = authObj;
     this.channelId = null;
@@ -20,6 +25,7 @@ class VoiceManager {
   }
 
   async fetchICEServers() {
+    _voiceLog.debug('Fetching ICE servers');
     try {
       const res = await fetch(`${this.auth.hostname}/api/v1/voice/ice-servers`, {
         headers: { 'Authorization': `Bearer ${this.auth.token}` }
@@ -27,17 +33,28 @@ class VoiceManager {
       if (res.ok) {
         const data = await res.json();
         this.iceServers = data.ice_servers || [];
+        _voiceLog.debug('ICE servers fetched', { count: this.iceServers.length });
+      } else {
+        _voiceLog.warn('ICE server fetch returned non-OK status', { status: res.status });
       }
     } catch (e) {
+      _voiceLog.warn('Failed to fetch ICE servers, using STUN fallback');
       console.warn('[Voice] Failed to fetch ICE servers, using defaults:', e);
       this.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
     }
   }
 
   async joinChannel(channelId, audioSettings) {
-    if (this.channelId === channelId) return;
-    if (this.channelId) await this.leaveChannel();
+    if (this.channelId === channelId) {
+      _voiceLog.debug('joinChannel: already in this channel', { channel_id: channelId });
+      return;
+    }
+    if (this.channelId) {
+      _voiceLog.info('Leaving current voice channel before joining new one', { channel_id: this.channelId });
+      await this.leaveChannel();
+    }
 
+    _voiceLog.info('Joining voice channel', { channel_id: channelId });
     this.channelId = channelId;
     await this.fetchICEServers();
 
@@ -48,6 +65,7 @@ class VoiceManager {
 
     // Request microphone access
     try {
+      _voiceLog.debug('Requesting microphone access');
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: s.echoCancellation !== false,
@@ -57,7 +75,9 @@ class VoiceManager {
         },
         video: false
       });
+      _voiceLog.info('Microphone access granted');
     } catch (e) {
+      _voiceLog.error('Microphone access denied', { error: String(e) });
       console.error('[Voice] Microphone access denied:', e);
       this.channelId = null;
       return false;
@@ -67,20 +87,24 @@ class VoiceManager {
     this._setupLocalAudioMonitor();
 
     // Tell server we're joining
+    _voiceLog.debug('Sending voice_join to server', { channel_id: channelId });
     this.ws.send(JSON.stringify({
       type: 'voice_join',
       channel_id: channelId
     }));
 
+    _voiceLog.info('Voice channel join complete', { channel_id: channelId });
     return true;
   }
 
   async leaveChannel() {
     if (!this.channelId) return;
 
+    _voiceLog.info('Leaving voice channel', { channel_id: this.channelId });
     this.ws.send(JSON.stringify({ type: 'voice_leave' }));
 
     this._cleanup();
+    _voiceLog.info('Voice channel left and resources cleaned up');
   }
 
   _cleanup() {
@@ -124,6 +148,7 @@ class VoiceManager {
   async handleOffer(sdp) {
     if (!this.channelId) return;
 
+    _voiceLog.info('Received WebRTC offer from server, creating peer connection');
     this.peerConnection = new RTCPeerConnection({ iceServers: this.iceServers });
 
     // Add local audio tracks
@@ -158,23 +183,31 @@ class VoiceManager {
     };
 
     this.peerConnection.onconnectionstatechange = () => {
-      console.log('[Voice] Connection state:', this.peerConnection?.connectionState);
+      const state = this.peerConnection?.connectionState;
+      _voiceLog.info('Peer connection state changed', { state });
+      console.log('[Voice] Connection state:', state);
     };
 
     // Set remote description (SFU's offer)
+    _voiceLog.debug('Setting remote description from SFU offer');
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
     this._remoteDescSet = true;
 
     // Flush queued ICE candidates
-    for (const c of this._iceQueue) {
-      await this.peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(console.warn);
+    if (this._iceQueue.length > 0) {
+      _voiceLog.debug('Flushing queued ICE candidates', { count: this._iceQueue.length });
+      for (const c of this._iceQueue) {
+        await this.peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(console.warn);
+      }
     }
     this._iceQueue = [];
 
     // Create and send answer
+    _voiceLog.debug('Creating WebRTC answer');
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
 
+    _voiceLog.info('WebRTC answer created and sent to server');
     this.ws.send(JSON.stringify({
       type: 'voice_answer',
       channel_id: this.channelId,
@@ -186,12 +219,15 @@ class VoiceManager {
   async handleRemoteICECandidate(candidate) {
     if (!this.peerConnection) return;
     if (!this._remoteDescSet) {
+      _voiceLog.debug('Queuing ICE candidate (remote description not yet set)');
       this._iceQueue.push(candidate);
       return;
     }
     try {
       await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      _voiceLog.debug('Remote ICE candidate added');
     } catch (e) {
+      _voiceLog.warn('Failed to add remote ICE candidate', { error: String(e) });
       console.warn('[Voice] Failed to add ICE candidate:', e);
     }
   }
@@ -216,6 +252,7 @@ class VoiceManager {
 
   toggleMute() {
     this.isMuted = !this.isMuted;
+    _voiceLog.info('Microphone toggled', { muted: this.isMuted });
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach(t => {
         t.enabled = !this.isMuted;
@@ -226,6 +263,7 @@ class VoiceManager {
 
   toggleDeafen() {
     this.isDeafened = !this.isDeafened;
+    _voiceLog.info('Deafen toggled', { deafened: this.isDeafened });
     // Mute all remote audio elements
     this.audioElements.forEach(el => {
       el.muted = this.isDeafened;
@@ -235,16 +273,21 @@ class VoiceManager {
 
   _playRemoteStream(id, stream) {
     if (this.audioElements.has(id)) return;
+    _voiceLog.debug('Playing remote audio stream', { stream_id: id });
     const audio = new Audio();
     audio.srcObject = stream;
     audio.autoplay = true;
     audio.muted = this.isDeafened;
-    audio.play().catch(e => console.warn('[Voice] Audio play failed:', e));
+    audio.play().catch(e => {
+      _voiceLog.warn('Remote audio play failed', { stream_id: id, error: String(e) });
+      console.warn('[Voice] Audio play failed:', e);
+    });
     this.audioElements.set(id, audio);
   }
 
   // Monitor local mic audio level and emit speaking events locally
   _setupLocalAudioMonitor() {
+    _voiceLog.debug('Setting up local audio monitor');
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const source = ctx.createMediaStreamSource(this.localStream);
@@ -278,12 +321,14 @@ class VoiceManager {
       };
       requestAnimationFrame(check);
     } catch (e) {
+      _voiceLog.warn('Local audio monitor setup failed', { error: String(e) });
       console.warn('[Voice] Audio monitor setup failed:', e);
     }
   }
 
   // Handle incoming WS messages related to voice
   handleMessage(msg) {
+    _voiceLog.debug('WebSocket voice message received', { type: msg.type });
     switch (msg.type) {
       case 'voice_offer':
         this.handleOffer(msg.payload.sdp);
@@ -295,6 +340,7 @@ class VoiceManager {
         this.handleSpeakingEvent(msg.payload.user_id, msg.payload.level, msg.payload.is_speaking);
         break;
       case 'voice_participants':
+        _voiceLog.debug('Voice participants update', { count: (msg.payload.participants || []).length });
         this.handleParticipants(msg.payload.participants);
         break;
     }

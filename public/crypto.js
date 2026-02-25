@@ -9,6 +9,7 @@ function generateRecoveryCode() {
   const digits = new Uint8Array(16);
   crypto.getRandomValues(digits);
   const code = Array.from(digits).map(b => b % 10).join('');
+  console.debug('[Crypto] Recovery code generated');
   return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}-${code.slice(12, 16)}`;
 }
 
@@ -47,6 +48,7 @@ async function deriveKeyFromRecoveryCode(recoveryCode, salt) {
  * @returns {Promise<{encrypted: string, salt: string}>} Base64 encoded encrypted key and salt.
  */
 async function encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode) {
+  console.debug('[Crypto] Encrypting private key with recovery code');
   const salt = nacl.randomBytes(32);
   const derivedKey = await deriveKeyFromRecoveryCode(recoveryCode, salt);
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
@@ -54,6 +56,7 @@ async function encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode) {
   const combined = new Uint8Array(nonce.length + encrypted.length);
   combined.set(nonce);
   combined.set(encrypted, nonce.length);
+  console.debug('[Crypto] Private key encryption complete');
   return {
     encrypted: naclUtil.encodeBase64(combined),
     salt: naclUtil.encodeBase64(salt)
@@ -68,12 +71,18 @@ async function encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode) {
  * @returns {Promise<Uint8Array|null>} The decrypted private key bytes, or null on failure.
  */
 async function decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, saltBase64) {
+  console.debug('[Crypto] Decrypting private key with recovery code');
   const combined = naclUtil.decodeBase64(encryptedBase64);
   const salt = naclUtil.decodeBase64(saltBase64);
   const derivedKey = await deriveKeyFromRecoveryCode(recoveryCode, salt);
   const nonce = combined.slice(0, nacl.secretbox.nonceLength);
   const ciphertext = combined.slice(nacl.secretbox.nonceLength);
   const decrypted = nacl.secretbox.open(ciphertext, nonce, derivedKey);
+  if (!decrypted) {
+    console.error('[Crypto] Private key decryption failed: invalid recovery code or corrupted data');
+  } else {
+    console.debug('[Crypto] Private key decryption successful');
+  }
   return decrypted || null;
 }
 
@@ -82,6 +91,7 @@ async function decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, 
  * @returns {Uint8Array} The ember key bytes.
  */
 function generateEmberKey() {
+  console.debug('[Crypto] Generating ember symmetric key');
   return nacl.randomBytes(nacl.secretbox.keyLength);
 }
 
@@ -93,6 +103,7 @@ function generateEmberKey() {
  * @returns {string} Base64 encoded nonce + ciphertext.
  */
 function encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey) {
+  console.debug('[Crypto] Encrypting ember key for user (NaCl box)');
   const nonce = nacl.randomBytes(nacl.box.nonceLength);
   const encrypted = nacl.box(emberKey, nonce, recipientPublicKey, senderPrivateKey);
   const combined = new Uint8Array(nonce.length + encrypted.length);
@@ -109,10 +120,14 @@ function encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey) 
  * @returns {Uint8Array|null} The decrypted ember key bytes, or null on failure.
  */
 function decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPrivateKey) {
+  console.debug('[Crypto] Decrypting ember key for user (NaCl box)');
   const combined = naclUtil.decodeBase64(encryptedBase64);
   const nonce = combined.slice(0, nacl.box.nonceLength);
   const ciphertext = combined.slice(nacl.box.nonceLength);
   const decrypted = nacl.box.open(ciphertext, nonce, senderPublicKey, recipientPrivateKey);
+  if (!decrypted) {
+    console.error('[Crypto] Ember key decryption failed: authentication failed');
+  }
   return decrypted || null;
 }
 
@@ -123,6 +138,7 @@ function decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPriva
  * @returns {string} Base64 encoded nonce + ciphertext.
  */
 function encryptMessage(plaintext, emberKey) {
+  console.debug('[Crypto] Encrypting message (NaCl secretbox)');
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
   const messageBytes = naclUtil.decodeUTF8(plaintext);
   const encrypted = nacl.secretbox(messageBytes, nonce, emberKey);
@@ -140,16 +156,18 @@ function encryptMessage(plaintext, emberKey) {
  */
 function decryptMessage(ciphertextBase64, emberKey) {
   try {
+    console.debug('[Crypto] Decrypting message (NaCl secretbox)');
     const combined = naclUtil.decodeBase64(ciphertextBase64);
     const nonce = combined.slice(0, nacl.secretbox.nonceLength);
     const ciphertext = combined.slice(nacl.secretbox.nonceLength);
     const decrypted = nacl.secretbox.open(ciphertext, nonce, emberKey);
     if (!decrypted) {
+      console.warn('[Crypto] Message decryption returned null: authentication failed or wrong key');
       return null;
     }
     return naclUtil.encodeUTF8(decrypted);
   } catch (err) {
-    console.error('Failed to decrypt message:', err);
+    console.error('[Crypto] Message decryption threw an error:', err);
     return null;
   }
 }
@@ -189,6 +207,7 @@ async function deriveKeyFromInviteCode(inviteCode, salt) {
  * @returns {Promise<{encrypted: string, salt: string}>} Base64 encoded encrypted key and salt.
  */
 async function encryptEmberKeyForInvite(emberKey, inviteCode) {
+  console.debug('[Crypto] Encrypting ember key for invite (PBKDF2 + NaCl secretbox)');
   const salt = nacl.randomBytes(32);
   const derivedKey = await deriveKeyFromInviteCode(inviteCode, salt);
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
@@ -196,6 +215,7 @@ async function encryptEmberKeyForInvite(emberKey, inviteCode) {
   const combined = new Uint8Array(nonce.length + encrypted.length);
   combined.set(nonce);
   combined.set(encrypted, nonce.length);
+  console.debug('[Crypto] Ember key encrypted for invite');
   return {
     encrypted: naclUtil.encodeBase64(combined),
     salt: naclUtil.encodeBase64(salt)
@@ -211,15 +231,21 @@ async function encryptEmberKeyForInvite(emberKey, inviteCode) {
  */
 async function decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64) {
   try {
+    console.debug('[Crypto] Decrypting ember key from invite (PBKDF2 + NaCl secretbox)');
     const combined = naclUtil.decodeBase64(encryptedBase64);
     const salt = naclUtil.decodeBase64(saltBase64);
     const derivedKey = await deriveKeyFromInviteCode(inviteCode, salt);
     const nonce = combined.slice(0, nacl.secretbox.nonceLength);
     const ciphertext = combined.slice(nacl.secretbox.nonceLength);
     const decrypted = nacl.secretbox.open(ciphertext, nonce, derivedKey);
+    if (!decrypted) {
+      console.error('[Crypto] Ember key from invite decryption failed: invalid invite code or corrupted data');
+    } else {
+      console.debug('[Crypto] Ember key from invite decrypted successfully');
+    }
     return decrypted || null;
   } catch (err) {
-    console.error('Failed to decrypt ember key from invite:', err);
+    console.error('[Crypto] Ember key from invite decryption threw an error:', err);
     return null;
   }
 }
