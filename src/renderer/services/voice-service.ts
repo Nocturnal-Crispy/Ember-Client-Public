@@ -1,44 +1,93 @@
+/**
+ * Voice service — TypeScript conversion of public/voice.js.
+ * Provides the VoiceManager class and notification sound generation.
+ */
 'use strict';
 
-const _voiceLog = window.emberLog ? window.emberLog.createLogger('Voice') : {
-  debug: () => {}, info: () => {}, warn: (m, d) => console.warn('[Voice]', m, d || ''), error: (m, d) => console.error('[Voice]', m, d || ''),
-};
+const _voiceLog: EmberLogger = window.emberLog
+  ? window.emberLog.createLogger('Voice')
+  : {
+      debug: () => { /* noop */ },
+      info:  () => { /* noop */ },
+      warn:  (m: string, d?: Record<string, unknown>) => console.warn('[Voice]', m, d ?? ''),
+      error: (m: string, d?: Record<string, unknown>) => console.error('[Voice]', m, d ?? ''),
+    };
 
 class VoiceManager {
-  constructor(wsConnection, authObj) {
+  ws: WebSocket;
+  auth: AuthForVoice;
+  channelId: string | null;
+  peerConnection: RTCPeerConnection | null;
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+  audioElements: Map<string, HTMLAudioElement>;
+  isMuted: boolean;
+  isDeafened: boolean;
+  speakingStates: Map<string, boolean>;
+  onSpeakingChanged: ((userId: string, isSpeaking: boolean) => void) | null;
+  onParticipantsChanged: ((participants: { user_id: string; username: string }[]) => void) | null;
+  iceServers: ICEServer[];
+  _iceQueue: RTCIceCandidateInit[];
+  _remoteDescSet: boolean;
+  localVideoStream: MediaStream | null;
+  remoteVideoStreams: Map<string, MediaStream>;
+  isCameraOn: boolean;
+  onCameraStateChanged: ((userId: string, isOn: boolean) => void) | null;
+  onVideoStreamAdded: ((streamId: string, stream: MediaStream) => void) | null;
+  _lastAudioSettings: VoiceSettings;
+  _sensitivityThreshold: number;
+  _audioCtx: AudioContext | null;
+  _analyser: AnalyserNode | null;
+  _localMonitorInterval: number | null;
+  _gainNode: GainNode | null;
+  _pttEnabled: boolean;
+  _pttKey: string;
+  _pttKeydownHandler: ((e: KeyboardEvent) => void) | null;
+  _pttKeyupHandler: ((e: KeyboardEvent) => void) | null;
+
+  constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
     _voiceLog.info('VoiceManager created');
     this.ws = wsConnection;
     this.auth = authObj;
     this.channelId = null;
     this.peerConnection = null;
     this.localStream = null;
-    this.remoteStreams = new Map(); // userID → MediaStream
-    this.audioElements = new Map(); // userID → HTMLAudioElement
+    this.remoteStreams = new Map();
+    this.audioElements = new Map();
     this.isMuted = false;
     this.isDeafened = false;
-    this.speakingStates = new Map(); // userID → bool
-    this.onSpeakingChanged = null; // callback(userId, isSpeaking)
-    this.onParticipantsChanged = null; // callback(participants)
+    this.speakingStates = new Map();
+    this.onSpeakingChanged = null;
+    this.onParticipantsChanged = null;
     this.iceServers = [];
-    this._iceQueue = []; // ICE candidates queued before remote description
+    this._iceQueue = [];
     this._remoteDescSet = false;
     this.localVideoStream = null;
-    this.remoteVideoStreams = new Map(); // streamId → MediaStream (video tracks)
+    this.remoteVideoStreams = new Map();
     this.isCameraOn = false;
-    this.onCameraStateChanged = null; // callback(userId, isOn)
-    this.onVideoStreamAdded = null;   // callback(streamId, stream)
+    this.onCameraStateChanged = null;
+    this.onVideoStreamAdded = null;
     this._lastAudioSettings = {};
+    this._sensitivityThreshold = 0.08;
+    this._audioCtx = null;
+    this._analyser = null;
+    this._localMonitorInterval = null;
+    this._gainNode = null;
+    this._pttEnabled = false;
+    this._pttKey = 'Backquote';
+    this._pttKeydownHandler = null;
+    this._pttKeyupHandler = null;
   }
 
-  async fetchICEServers() {
+  async fetchICEServers(): Promise<void> {
     _voiceLog.debug('Fetching ICE servers');
     try {
       const res = await fetch(`${this.auth.hostname}/api/v1/voice/ice-servers`, {
         headers: { 'Authorization': `Bearer ${this.auth.token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        this.iceServers = data.ice_servers || [];
+        const data = await res.json() as { ice_servers?: ICEServer[] };
+        this.iceServers = data.ice_servers ?? [];
         _voiceLog.debug('ICE servers fetched', { count: this.iceServers.length });
       } else {
         _voiceLog.warn('ICE server fetch returned non-OK status', { status: res.status });
@@ -50,10 +99,10 @@ class VoiceManager {
     }
   }
 
-  async joinChannel(channelId, audioSettings, withVideo = false, cameraDeviceId = null) {
+  async joinChannel(channelId: string, audioSettings?: VoiceSettings | null, withVideo = false, cameraDeviceId: string | null = null): Promise<boolean> {
     if (this.channelId === channelId) {
       _voiceLog.debug('joinChannel: already in this channel', { channel_id: channelId });
-      return;
+      return false;
     }
     if (this.channelId) {
       _voiceLog.info('Leaving current voice channel before joining new one', { channel_id: this.channelId });
@@ -64,13 +113,12 @@ class VoiceManager {
     this.channelId = channelId;
     await this.fetchICEServers();
 
-    const s = audioSettings || {};
-    this._lastAudioSettings = audioSettings || {};
+    const s = audioSettings ?? {};
+    this._lastAudioSettings = audioSettings ?? {};
     this._sensitivityThreshold = (s.autoSensitivity === false)
       ? (s.sensitivityThreshold != null ? s.sensitivityThreshold / 100 : 0.08)
       : 0.08;
 
-    // Request microphone access
     try {
       _voiceLog.debug('Requesting microphone access');
       this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -96,100 +144,70 @@ class VoiceManager {
       return false;
     }
 
-    // Set up local audio level detection
     this._setupLocalAudioMonitor();
 
-    // Tell server we're joining
     _voiceLog.debug('Sending voice_join to server', { channel_id: channelId });
-    this.ws.send(JSON.stringify({
-      type: 'voice_join',
-      channel_id: channelId
-    }));
+    this.ws.send(JSON.stringify({ type: 'voice_join', channel_id: channelId }));
 
     _voiceLog.info('Voice channel join complete', { channel_id: channelId });
     return true;
   }
 
-  async leaveChannel() {
+  async leaveChannel(): Promise<void> {
     if (!this.channelId) return;
-
     _voiceLog.info('Leaving voice channel', { channel_id: this.channelId });
     this.ws.send(JSON.stringify({ type: 'voice_leave' }));
-
     this._cleanup();
     _voiceLog.info('Voice channel left and resources cleaned up');
   }
 
-  _cleanup() {
+  _cleanup(): void {
     this.channelId = null;
     this._remoteDescSet = false;
     this._iceQueue = [];
 
-    if (this.peerConnection) {
-      this.peerConnection.close();
-      this.peerConnection = null;
-    }
+    if (this.peerConnection) { this.peerConnection.close(); this.peerConnection = null; }
+    if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
 
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(t => t.stop());
-      this.localStream = null;
-    }
-
-    this.remoteStreams.forEach((stream, uid) => {
-      stream.getTracks().forEach(t => t.stop());
-    });
+    this.remoteStreams.forEach(stream => stream.getTracks().forEach(t => t.stop()));
     this.remoteStreams.clear();
 
-    this.audioElements.forEach(el => {
-      el.pause();
-      el.srcObject = null;
-      el.remove();
-    });
+    this.audioElements.forEach(el => { el.pause(); el.srcObject = null; el.remove(); });
     this.audioElements.clear();
-
     this.speakingStates.clear();
 
-    if (this.localVideoStream) {
-      this.localVideoStream.getTracks().forEach(t => t.stop());
-      this.localVideoStream = null;
-    }
+    if (this.localVideoStream) { this.localVideoStream.getTracks().forEach(t => t.stop()); this.localVideoStream = null; }
     this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
     this.remoteVideoStreams.clear();
     this.isCameraOn = false;
 
     if (this._audioCtx) {
-      this._audioCtx.close().catch(() => {});
+      this._audioCtx.close().catch(() => { /* ignore */ });
       this._audioCtx = null;
       this._analyser = null;
       this._localMonitorInterval = null;
     }
   }
 
-  // Called when the server sends a voice_offer (SFU → server → client)
-  async handleOffer(sdp) {
+  async handleOffer(sdp: RTCSessionDescriptionInit): Promise<void> {
     if (!this.channelId) return;
 
     _voiceLog.info('Received WebRTC offer from server, creating peer connection');
     this.peerConnection = new RTCPeerConnection({ iceServers: this.iceServers });
 
-    // Add local audio tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
-        this.peerConnection.addTrack(track, this.localStream);
+        this.peerConnection!.addTrack(track, this.localStream!);
       });
     }
 
-    // Handle incoming tracks from SFU (audio and video)
-    this.peerConnection.ontrack = (event) => {
+    this.peerConnection.ontrack = (event: RTCTrackEvent) => {
       const stream = event.streams[0];
       if (!stream) return;
       if (event.track.kind === 'audio') {
-        const streamId = stream.id;
-        if (!this.remoteStreams.has(streamId)) {
-          this.remoteStreams.set(streamId, stream);
-          if (!this.isDeafened) {
-            this._playRemoteStream(streamId, stream);
-          }
+        if (!this.remoteStreams.has(stream.id)) {
+          this.remoteStreams.set(stream.id, stream);
+          if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
         }
       } else if (event.track.kind === 'video') {
         this.remoteVideoStreams.set(stream.id, stream);
@@ -197,29 +215,22 @@ class VoiceManager {
       }
     };
 
-    // ICE candidate handler - send to server → ion-sfu
-    this.peerConnection.onicecandidate = (event) => {
+    this.peerConnection.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
       if (event.candidate) {
-        this.ws.send(JSON.stringify({
-          type: 'voice_ice_candidate',
-          channel_id: this.channelId,
-          candidate: event.candidate
-        }));
+        this.ws.send(JSON.stringify({ type: 'voice_ice_candidate', channel_id: this.channelId, candidate: event.candidate }));
       }
     };
 
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
-      _voiceLog.info('Peer connection state changed', { state });
+      _voiceLog.info('Peer connection state changed', { state: state ?? 'unknown' });
       console.log('[Voice] Connection state:', state);
     };
 
-    // Set remote description (SFU's offer)
     _voiceLog.debug('Setting remote description from SFU offer');
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
     this._remoteDescSet = true;
 
-    // Flush queued ICE candidates
     if (this._iceQueue.length > 0) {
       _voiceLog.debug('Flushing queued ICE candidates', { count: this._iceQueue.length });
       for (const c of this._iceQueue) {
@@ -228,21 +239,15 @@ class VoiceManager {
     }
     this._iceQueue = [];
 
-    // Create and send answer
     _voiceLog.debug('Creating WebRTC answer');
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
 
     _voiceLog.info('WebRTC answer created and sent to server');
-    this.ws.send(JSON.stringify({
-      type: 'voice_answer',
-      channel_id: this.channelId,
-      sdp: answer
-    }));
+    this.ws.send(JSON.stringify({ type: 'voice_answer', channel_id: this.channelId, sdp: answer }));
   }
 
-  // Called when the server sends a voice_ice_candidate (SFU → server → client)
-  async handleRemoteICECandidate(candidate) {
+  async handleRemoteICECandidate(candidate: RTCIceCandidateInit): Promise<void> {
     if (!this.peerConnection) return;
     if (!this._remoteDescSet) {
       _voiceLog.debug('Queuing ICE candidate (remote description not yet set)');
@@ -258,46 +263,33 @@ class VoiceManager {
     }
   }
 
-  // Called when server sends voice_speaking
-  handleSpeakingEvent(userId, level, isSpeaking) {
-    const was = this.speakingStates.get(userId) || false;
+  handleSpeakingEvent(userId: string, _level: number, isSpeaking: boolean): void {
+    const was = this.speakingStates.get(userId) ?? false;
     if (was !== isSpeaking) {
       this.speakingStates.set(userId, isSpeaking);
-      if (this.onSpeakingChanged) {
-        this.onSpeakingChanged(userId, isSpeaking);
-      }
+      if (this.onSpeakingChanged) this.onSpeakingChanged(userId, isSpeaking);
     }
   }
 
-  // Called when server sends voice_participants
-  handleParticipants(participants) {
-    if (this.onParticipantsChanged) {
-      this.onParticipantsChanged(participants);
-    }
+  handleParticipants(participants: { user_id: string; username: string }[]): void {
+    if (this.onParticipantsChanged) this.onParticipantsChanged(participants);
   }
 
-  toggleMute() {
+  toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     _voiceLog.info('Microphone toggled', { muted: this.isMuted });
-    if (this.localStream) {
-      this.localStream.getAudioTracks().forEach(t => {
-        t.enabled = !this.isMuted;
-      });
-    }
+    if (this.localStream) this.localStream.getAudioTracks().forEach(t => { t.enabled = !this.isMuted; });
     return this.isMuted;
   }
 
-  toggleDeafen() {
+  toggleDeafen(): boolean {
     this.isDeafened = !this.isDeafened;
     _voiceLog.info('Deafen toggled', { deafened: this.isDeafened });
-    // Mute all remote audio elements
-    this.audioElements.forEach(el => {
-      el.muted = this.isDeafened;
-    });
+    this.audioElements.forEach(el => { el.muted = this.isDeafened; });
     return this.isDeafened;
   }
 
-  _playRemoteStream(id, stream) {
+  _playRemoteStream(id: string, stream: MediaStream): void {
     if (this.audioElements.has(id)) return;
     _voiceLog.debug('Playing remote audio stream', { stream_id: id });
     const audio = new Audio();
@@ -311,12 +303,11 @@ class VoiceManager {
     this.audioElements.set(id, audio);
   }
 
-  // Monitor local mic audio level and emit speaking events locally
-  _setupLocalAudioMonitor() {
+  _setupLocalAudioMonitor(): void {
     _voiceLog.debug('Setting up local audio monitor');
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = ctx.createMediaStreamSource(this.localStream);
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const source = ctx.createMediaStreamSource(this.localStream!);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.3;
@@ -336,14 +327,11 @@ class VoiceManager {
         const speaking = level > (this._sensitivityThreshold || 0.08) && !this.isMuted;
         if (speaking !== isSpeakingLocal) {
           isSpeakingLocal = speaking;
-          // Emit local speaking indicator immediately (don't wait for server)
           if (this.onSpeakingChanged && this.auth) {
-            this.onSpeakingChanged(this.auth.userId, speaking);
+            this.onSpeakingChanged(this.auth.user_id, speaking);
           }
         }
-        if (this.channelId) {
-          requestAnimationFrame(check);
-        }
+        if (this.channelId) requestAnimationFrame(check);
       };
       requestAnimationFrame(check);
     } catch (e) {
@@ -352,38 +340,26 @@ class VoiceManager {
     }
   }
 
-  // Partial cleanup (no voice_leave) then rejoin with camera enabled
-  async enableCamera(cameraDeviceId) {
+  async enableCamera(cameraDeviceId: string | null): Promise<boolean> {
     if (!this.channelId) return false;
     const channelId = this.channelId;
     _voiceLog.info('Enabling camera, rejoining channel', { channel_id: channelId });
     this._partialCleanup();
-    return await this.joinChannel(channelId, this._lastAudioSettings, true, cameraDeviceId);
+    return this.joinChannel(channelId, this._lastAudioSettings, true, cameraDeviceId);
   }
 
-  // Partial cleanup (no voice_leave) then rejoin without camera
-  async disableCamera() {
+  async disableCamera(): Promise<boolean> {
     if (!this.channelId) return false;
     const channelId = this.channelId;
     _voiceLog.info('Disabling camera, rejoining channel', { channel_id: channelId });
     this._partialCleanup();
-    return await this.joinChannel(channelId, this._lastAudioSettings, false);
+    return this.joinChannel(channelId, this._lastAudioSettings, false);
   }
 
-  // Close WebRTC and streams without sending voice_leave
-  _partialCleanup() {
-    if (this.peerConnection) {
-      this.peerConnection.close();
-      this.peerConnection = null;
-    }
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(t => t.stop());
-      this.localStream = null;
-    }
-    if (this.localVideoStream) {
-      this.localVideoStream.getTracks().forEach(t => t.stop());
-      this.localVideoStream = null;
-    }
+  _partialCleanup(): string | null {
+    if (this.peerConnection) { this.peerConnection.close(); this.peerConnection = null; }
+    if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
+    if (this.localVideoStream) { this.localVideoStream.getTracks().forEach(t => t.stop()); this.localVideoStream = null; }
     this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
     this.remoteVideoStreams.clear();
     this.remoteStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
@@ -394,52 +370,51 @@ class VoiceManager {
     this._iceQueue = [];
     this.isCameraOn = false;
     const channelId = this.channelId;
-    this.channelId = null; // allow joinChannel to re-run
+    this.channelId = null;
     return channelId;
   }
 
-  // Handle incoming WS messages related to voice
-  handleMessage(msg) {
+  handleMessage(msg: { type: string; payload: Record<string, unknown> }): void {
     _voiceLog.debug('WebSocket voice message received', { type: msg.type });
     switch (msg.type) {
       case 'voice_offer':
-        this.handleOffer(msg.payload.sdp);
+        this.handleOffer(msg.payload['sdp'] as RTCSessionDescriptionInit);
         break;
       case 'voice_ice_candidate':
-        this.handleRemoteICECandidate(msg.payload.candidate);
+        this.handleRemoteICECandidate(msg.payload['candidate'] as RTCIceCandidateInit);
         break;
       case 'voice_speaking':
-        this.handleSpeakingEvent(msg.payload.user_id, msg.payload.level, msg.payload.is_speaking);
+        this.handleSpeakingEvent(
+          String(msg.payload['user_id'] ?? ''),
+          Number(msg.payload['level'] ?? 0),
+          Boolean(msg.payload['is_speaking'])
+        );
         break;
       case 'voice_participants':
-        _voiceLog.debug('Voice participants update', { count: (msg.payload.participants || []).length });
-        this.handleParticipants(msg.payload.participants);
+        _voiceLog.debug('Voice participants update', { count: ((msg.payload['participants'] as unknown[]) ?? []).length });
+        this.handleParticipants(msg.payload['participants'] as { user_id: string; username: string }[]);
         break;
       case 'voice_camera_on':
-        if (this.onCameraStateChanged) this.onCameraStateChanged(msg.payload.user_id, true);
+        if (this.onCameraStateChanged) this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), true);
         break;
       case 'voice_camera_off':
-        if (this.onCameraStateChanged) this.onCameraStateChanged(msg.payload.user_id, false);
+        if (this.onCameraStateChanged) this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), false);
         break;
     }
   }
 
-  // Apply saved Voice & Video settings to an active session
-  applySettings(settings) {
+  applySettings(settings: VoiceSettings): void {
     if (!settings) return;
 
-    // Output volume
     if (typeof settings.outputVolume === 'number') {
       const vol = settings.outputVolume / 100;
       this.audioElements.forEach(el => { el.volume = vol; });
     }
 
-    // Input gain via Web Audio (if monitor context exists)
     if (this._gainNode && typeof settings.inputVolume === 'number') {
       this._gainNode.gain.value = settings.inputVolume / 100;
     }
 
-    // Audio processing constraints on the live mic track
     if (this.localStream) {
       const constraints = {
         echoCancellation: settings.echoCancellation !== false,
@@ -451,57 +426,46 @@ class VoiceManager {
       });
     }
 
-    // Input sensitivity threshold
     this._sensitivityThreshold = (settings.autoSensitivity === false)
       ? (settings.sensitivityThreshold != null ? settings.sensitivityThreshold / 100 : 0.08)
       : 0.08;
 
-    // Push-to-talk
     if (typeof settings.pushToTalk === 'boolean') {
-      this.setPushToTalk(settings.pushToTalk, settings.pttKey || 'Backquote');
+      this.setPushToTalk(settings.pushToTalk, settings.pttKey ?? 'Backquote');
     }
   }
 
-  // Set the output device on all current audio elements
-  setSpeakerDevice(deviceId) {
+  setSpeakerDevice(deviceId: string): void {
     if (!deviceId || deviceId === 'default') return;
     this.audioElements.forEach(el => {
-      if (typeof el.setSinkId === 'function') {
-        el.setSinkId(deviceId).catch(e => console.warn('[Voice] setSinkId failed:', e));
+      if (typeof (el as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId === 'function') {
+        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId)
+          .catch(e => console.warn('[Voice] setSinkId failed:', e));
       }
     });
   }
 
-  // Configure push-to-talk mode
-  setPushToTalk(enabled, key) {
-    // Remove existing PTT listeners
-    if (this._pttKeydownHandler) {
-      document.removeEventListener('keydown', this._pttKeydownHandler, true);
-      this._pttKeydownHandler = null;
-    }
-    if (this._pttKeyupHandler) {
-      document.removeEventListener('keyup', this._pttKeyupHandler, true);
-      this._pttKeyupHandler = null;
-    }
+  setPushToTalk(enabled: boolean, key: string): void {
+    if (this._pttKeydownHandler) { document.removeEventListener('keydown', this._pttKeydownHandler, true); this._pttKeydownHandler = null; }
+    if (this._pttKeyupHandler) { document.removeEventListener('keyup', this._pttKeyupHandler, true); this._pttKeyupHandler = null; }
 
     this._pttEnabled = enabled;
     this._pttKey = key || 'Backquote';
 
     if (!enabled) return;
 
-    // When PTT is active, mute mic until key is held
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach(t => { t.enabled = false; });
       this.isMuted = true;
     }
 
-    this._pttKeydownHandler = (e) => {
+    this._pttKeydownHandler = (e: KeyboardEvent) => {
       if (e.code === this._pttKey && this.localStream) {
         this.localStream.getAudioTracks().forEach(t => { t.enabled = true; });
         this.isMuted = false;
       }
     };
-    this._pttKeyupHandler = (e) => {
+    this._pttKeyupHandler = (e: KeyboardEvent) => {
       if (e.code === this._pttKey && this.localStream) {
         this.localStream.getAudioTracks().forEach(t => { t.enabled = false; });
         this.isMuted = true;
@@ -517,27 +481,27 @@ class VoiceManager {
 // Notification Sound Generation
 // =====================================================
 
-const _soundDefs = {
-  mute: { type: 'sine', freq: [440, 330], dur: [0.08, 0.12], vol: 0.25 },
-  unmute: { type: 'sine', freq: [330, 440], dur: [0.08, 0.12], vol: 0.25 },
-  deafen: { type: 'sine', freq: [880, 660, 440], dur: [0.07, 0.07, 0.1], vol: 0.22 },
-  undeafen: { type: 'sine', freq: [440, 660, 880], dur: [0.07, 0.07, 0.1], vol: 0.22 },
-  userJoin: { type: 'triangle', freq: [523, 659, 784], dur: [0.06, 0.06, 0.12], vol: 0.2 },
-  userLeave: { type: 'triangle', freq: [784, 523], dur: [0.07, 0.13], vol: 0.18 },
-  disconnect: { type: 'sawtooth', freq: [300, 200], dur: [0.1, 0.15], vol: 0.2 },
+const _soundDefs: Record<string, SoundDef> = {
+  mute:      { type: 'sine',     freq: [440, 330],         dur: [0.08, 0.12],       vol: 0.25 },
+  unmute:    { type: 'sine',     freq: [330, 440],         dur: [0.08, 0.12],       vol: 0.25 },
+  deafen:    { type: 'sine',     freq: [880, 660, 440],    dur: [0.07, 0.07, 0.1],  vol: 0.22 },
+  undeafen:  { type: 'sine',     freq: [440, 660, 880],    dur: [0.07, 0.07, 0.1],  vol: 0.22 },
+  userJoin:  { type: 'triangle', freq: [523, 659, 784],    dur: [0.06, 0.06, 0.12], vol: 0.2  },
+  userLeave: { type: 'triangle', freq: [784, 523],         dur: [0.07, 0.13],       vol: 0.18 },
+  disconnect:{ type: 'sawtooth', freq: [300, 200],         dur: [0.1,  0.15],       vol: 0.2  },
 };
 
-function generateNotificationSound(type) {
+function generateNotificationSound(type: string): void {
   const def = _soundDefs[type];
   if (!def) return;
 
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     const freqs = def.freq;
     const durs = def.dur;
     let t = ctx.currentTime + 0.01;
 
-    freqs.forEach(function(freq, i) {
+    freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = def.type;
@@ -551,10 +515,13 @@ function generateNotificationSound(type) {
       t += durs[i];
     });
 
-    // Close context after all tones finish
-    const totalDur = durs.reduce(function(a, b) { return a + b; }, 0);
-    setTimeout(function() { ctx.close(); }, (totalDur + 0.1) * 1000);
+    const totalDur = durs.reduce((a, b) => a + b, 0);
+    setTimeout(() => { ctx.close(); }, (totalDur + 0.1) * 1000);
   } catch (e) {
     console.warn('[Voice] generateNotificationSound failed:', e);
   }
 }
+
+// Export to window for use by voice-ui-manager and renderer
+(window as unknown as { VoiceManager: typeof VoiceManager }).VoiceManager = VoiceManager;
+(window as unknown as { generateNotificationSound: typeof generateNotificationSound }).generateNotificationSound = generateNotificationSound;

@@ -1,20 +1,24 @@
-// Renderer-side logger — forwards logs to the main process terminal via IPC.
-// Loaded before other renderer scripts so all modules can call window.emberLog.createLogger().
-(function () {
+/**
+ * Renderer-side logger — forwards logs to the main process terminal via IPC.
+ * Loaded before other renderer scripts so all modules can call window.emberLog.createLogger().
+ */
+(function (): void {
   'use strict';
 
-  const LEVEL_RANKS = { debug: 0, info: 1, warn: 2, error: 3 };
+  type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+  const LEVEL_RANKS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
   const MIN_LEVEL_RANK = 0; // 0 = debug, 1 = info, 2 = warn, 3 = error
 
-  function ts() {
+  function ts(): string {
     const now = new Date();
-    const p2 = n => String(n).padStart(2, '0');
-    const p3 = n => String(n).padStart(3, '0');
+    const p2 = (n: number): string => String(n).padStart(2, '0');
+    const p3 = (n: number): string => String(n).padStart(3, '0');
     return `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ` +
            `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}.${p3(now.getMilliseconds())}`;
   }
 
-  function fmtData(data) {
+  function fmtData(data?: Record<string, unknown> | null): string {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return '';
     const parts = Object.entries(data).map(([k, v]) => {
       const vs = (v === null || v === undefined) ? String(v) :
@@ -24,14 +28,14 @@
     return parts.length ? ` { ${parts.join(', ')} }` : '';
   }
 
-  function sendLog(level, context, message, data) {
-    if ((LEVEL_RANKS[level] || 0) < MIN_LEVEL_RANK) return;
+  function sendLog(level: LogLevel, context: string, message: string, data?: Record<string, unknown>): void {
+    if ((LEVEL_RANKS[level] ?? 0) < MIN_LEVEL_RANK) return;
 
     const payload = {
       level: level.toUpperCase(),
-      context: context,
-      message: message,
-      data: data || null,
+      context,
+      message,
+      data: data ?? null,
     };
 
     // Forward to main process for terminal output
@@ -41,7 +45,7 @@
       }
     } catch (_) { /* silently ignore — IPC not yet available */ }
 
-    // Also mirror to browser DevTools (useful when devTools are enabled in dev builds)
+    // Also mirror to browser DevTools
     const full = `[${ts()}] [${level.toUpperCase().padEnd(5)}] [${context}] ${message}${fmtData(data)}`;
     switch (level) {
       case 'debug': console.debug(full); break;
@@ -52,14 +56,14 @@
     }
   }
 
-  function createLogger(context) {
+  function createLogger(context: string): EmberLogger {
     return {
-      debug: function (msg, data) { sendLog('debug', context, msg, data); },
-      info:  function (msg, data) { sendLog('info',  context, msg, data); },
-      warn:  function (msg, data) { sendLog('warn',  context, msg, data); },
-      error: function (msg, data) { sendLog('error', context, msg, data); },
+      debug: (msg: string, data?: Record<string, unknown>) => sendLog('debug', context, msg, data),
+      info:  (msg: string, data?: Record<string, unknown>) => sendLog('info',  context, msg, data),
+      warn:  (msg: string, data?: Record<string, unknown>) => sendLog('warn',  context, msg, data),
+      error: (msg: string, data?: Record<string, unknown>) => sendLog('error', context, msg, data),
     };
   }
 
-  window.emberLog = { createLogger: createLogger };
-}());
+  window.emberLog = { createLogger };
+})();

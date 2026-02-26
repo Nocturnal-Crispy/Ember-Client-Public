@@ -1,28 +1,29 @@
-// Shared mutable state for the Ember renderer.
-// Loaded before all feature modules so each module can reference App.X.
-// No logic here — just declarations.
-
+/**
+ * App state manager — TypeScript conversion of public/app-state.js.
+ * Shared mutable state for the Ember renderer.
+ * Loaded before all feature modules so each module can reference App.X.
+ */
 window.App = {
   // ── Messaging / channel ──────────────────────────────────────────────────
   activeChannelId: null,
   activeEmberId: null,
-  emberKeyCache: new Map(),     // ember_id → Uint8Array symmetric key
+  emberKeyCache: new Map<string, Uint8Array>(),
 
   // ── Server list ──────────────────────────────────────────────────────────
-  currentEmbers: [],            // [{id, name, icon_data, …}]
-  currentMembers: [],           // [{user_id, username, status, role}]
+  currentEmbers: [],
+  currentMembers: [],
 
   // ── WebSocket ────────────────────────────────────────────────────────────
-  wsConnection: null,           // WebSocket instance
-  wsReconnectTimer: null,       // setTimeout handle
+  wsConnection: null,
+  wsReconnectTimer: null,
 
   // ── Voice ────────────────────────────────────────────────────────────────
-  voiceManager: null,           // VoiceManager instance
+  voiceManager: null,
   activeVoiceChannelId: null,
-  voiceParticipants: new Map(), // user_id → username
+  voiceParticipants: new Map<string, string>(),
 
   // ── Camera / video ───────────────────────────────────────────────────────
-  videoParticipants: new Set(), // user_ids with camera on (+ '__self__')
+  videoParticipants: new Set<string>(),
   localCameraOn: false,
   videoGridVisible: false,
 
@@ -33,23 +34,23 @@ window.App = {
   reconnectionTimerInterval: null,
 
   // ── Channel context menu / modal ─────────────────────────────────────────
-  dragItem: null,               // {type: 'channel'|'category', id}
-  contextMenuTarget: null,      // target object for the context menu
-  channelModalMode: null,       // 'create-text' | 'create-voice' | 'edit-channel' | etc.
+  dragItem: null,
+  contextMenuTarget: null,
+  channelModalMode: null,
   channelModalTargetId: null,
   channelModalCategoryId: null,
 
   // ── Create-server modal ──────────────────────────────────────────────────
-  currentIconData: null,        // base64 data URL or remote URL string
-  currentIconSource: 'upload',  // 'upload' | 'url'
+  currentIconData: null,
+  currentIconSource: 'upload',
 
   // ── Invite ───────────────────────────────────────────────────────────────
-  pendingInvite: null,          // invite info object shown in accept modal
+  pendingInvite: null,
 
   // ── Voice & Video settings ───────────────────────────────────────────────
-  _vvSounds: null,              // sounds config object (cached from store)
-  _micTestStream: null,         // MediaStream for mic test
-  _micTestAnimFrame: null,      // requestAnimationFrame handle
-  _cameraPreviewStream: null,   // MediaStream for camera preview
-  _pttListening: false,         // true while capturing PTT keybind
+  _vvSounds: null,
+  _micTestStream: null,
+  _micTestAnimFrame: null,
+  _cameraPreviewStream: null,
+  _pttListening: false,
 };

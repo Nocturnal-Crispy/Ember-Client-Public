@@ -1,0 +1,48 @@
+"use strict";
+/**
+ * App state manager — TypeScript conversion of public/app-state.js.
+ * Shared mutable state for the Ember renderer.
+ * Loaded before all feature modules so each module can reference App.X.
+ */
+window.App = {
+    // ── Messaging / channel ──────────────────────────────────────────────────
+    activeChannelId: null,
+    activeEmberId: null,
+    emberKeyCache: new Map(),
+    // ── Server list ──────────────────────────────────────────────────────────
+    currentEmbers: [],
+    currentMembers: [],
+    // ── WebSocket ────────────────────────────────────────────────────────────
+    wsConnection: null,
+    wsReconnectTimer: null,
+    // ── Voice ────────────────────────────────────────────────────────────────
+    voiceManager: null,
+    activeVoiceChannelId: null,
+    voiceParticipants: new Map(),
+    // ── Camera / video ───────────────────────────────────────────────────────
+    videoParticipants: new Set(),
+    localCameraOn: false,
+    videoGridVisible: false,
+    // ── Health check / reconnection ──────────────────────────────────────────
+    healthcheckInterval: null,
+    reconnectionTimeout: null,
+    reconnectionStartTime: null,
+    reconnectionTimerInterval: null,
+    // ── Channel context menu / modal ─────────────────────────────────────────
+    dragItem: null,
+    contextMenuTarget: null,
+    channelModalMode: null,
+    channelModalTargetId: null,
+    channelModalCategoryId: null,
+    // ── Create-server modal ──────────────────────────────────────────────────
+    currentIconData: null,
+    currentIconSource: 'upload',
+    // ── Invite ───────────────────────────────────────────────────────────────
+    pendingInvite: null,
+    // ── Voice & Video settings ───────────────────────────────────────────────
+    _vvSounds: null,
+    _micTestStream: null,
+    _micTestAnimFrame: null,
+    _cameraPreviewStream: null,
+    _pttListening: false,
+};

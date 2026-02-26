@@ -1,11 +1,17 @@
-const nacl = require('tweetnacl');
-const naclUtil = require('tweetnacl-util');
+/**
+ * Crypto service — TypeScript implementation of public/crypto.js.
+ * Provides NaCl-based encryption/decryption functions.
+ * This module is intended for use both by the preload script (CommonJS require)
+ * and eventually by the renderer via the compiled output.
+ */
+
+import * as nacl from 'tweetnacl';
+import * as naclUtil from 'tweetnacl-util';
 
 /**
  * Generate a random 16-digit numeric recovery code formatted as XXXX-XXXX-XXXX-XXXX.
- * @returns {string} The recovery code.
  */
-function generateRecoveryCode() {
+export function generateRecoveryCode(): string {
   const digits = new Uint8Array(16);
   crypto.getRandomValues(digits);
   const code = Array.from(digits).map(b => b % 10).join('');
@@ -15,11 +21,8 @@ function generateRecoveryCode() {
 
 /**
  * Derive a 32-byte encryption key from a recovery code using PBKDF2.
- * @param {string} recoveryCode - The 16-digit recovery code.
- * @param {Uint8Array} salt - Random salt bytes.
- * @returns {Promise<Uint8Array>} The derived 32-byte key.
  */
-async function deriveKeyFromRecoveryCode(recoveryCode, salt) {
+async function deriveKeyFromRecoveryCode(recoveryCode: string, salt: Uint8Array): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -29,12 +32,7 @@ async function deriveKeyFromRecoveryCode(recoveryCode, salt) {
     ['deriveBits']
   );
   const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256'
-    },
+    { name: 'PBKDF2', salt: salt as unknown as BufferSource, iterations: 100000, hash: 'SHA-256' },
     keyMaterial,
     256
   );
@@ -43,11 +41,11 @@ async function deriveKeyFromRecoveryCode(recoveryCode, salt) {
 
 /**
  * Encrypt the device private key with the recovery code using PBKDF2 + NaCl secretbox.
- * @param {Uint8Array} privateKey - The device private key bytes.
- * @param {string} recoveryCode - The 16-digit recovery code.
- * @returns {Promise<{encrypted: string, salt: string}>} Base64 encoded encrypted key and salt.
  */
-async function encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode) {
+export async function encryptPrivateKeyWithRecoveryCode(
+  privateKey: Uint8Array,
+  recoveryCode: string
+): Promise<{ encrypted: string; salt: string }> {
   console.debug('[Crypto] Encrypting private key with recovery code');
   const salt = nacl.randomBytes(32);
   const derivedKey = await deriveKeyFromRecoveryCode(recoveryCode, salt);
@@ -65,12 +63,12 @@ async function encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode) {
 
 /**
  * Decrypt the device private key using the recovery code.
- * @param {string} encryptedBase64 - Base64 encoded nonce + ciphertext.
- * @param {string} recoveryCode - The 16-digit recovery code.
- * @param {string} saltBase64 - Base64 encoded salt.
- * @returns {Promise<Uint8Array|null>} The decrypted private key bytes, or null on failure.
  */
-async function decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, saltBase64) {
+export async function decryptPrivateKeyWithRecoveryCode(
+  encryptedBase64: string,
+  recoveryCode: string,
+  saltBase64: string
+): Promise<Uint8Array | null> {
   console.debug('[Crypto] Decrypting private key with recovery code');
   const combined = naclUtil.decodeBase64(encryptedBase64);
   const salt = naclUtil.decodeBase64(saltBase64);
@@ -83,26 +81,25 @@ async function decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, 
   } else {
     console.debug('[Crypto] Private key decryption successful');
   }
-  return decrypted || null;
+  return decrypted ?? null;
 }
 
 /**
  * Generate a random 32-byte symmetric key for an ember.
- * @returns {Uint8Array} The ember key bytes.
  */
-function generateEmberKey() {
+export function generateEmberKey(): Uint8Array {
   console.debug('[Crypto] Generating ember symmetric key');
   return nacl.randomBytes(nacl.secretbox.keyLength);
 }
 
 /**
  * Encrypt an ember key for a specific user using NaCl box (asymmetric encryption).
- * @param {Uint8Array} emberKey - The ember symmetric key.
- * @param {Uint8Array} recipientPublicKey - Recipient's public key.
- * @param {Uint8Array} senderPrivateKey - Sender's private key.
- * @returns {string} Base64 encoded nonce + ciphertext.
  */
-function encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey) {
+export function encryptEmberKeyForUser(
+  emberKey: Uint8Array,
+  recipientPublicKey: Uint8Array,
+  senderPrivateKey: Uint8Array
+): string {
   console.debug('[Crypto] Encrypting ember key for user (NaCl box)');
   const nonce = nacl.randomBytes(nacl.box.nonceLength);
   const encrypted = nacl.box(emberKey, nonce, recipientPublicKey, senderPrivateKey);
@@ -114,12 +111,12 @@ function encryptEmberKeyForUser(emberKey, recipientPublicKey, senderPrivateKey) 
 
 /**
  * Decrypt an ember key that was encrypted for this user.
- * @param {string} encryptedBase64 - Base64 encoded nonce + ciphertext.
- * @param {Uint8Array} senderPublicKey - Sender's public key (the encryptor).
- * @param {Uint8Array} recipientPrivateKey - This user's private key.
- * @returns {Uint8Array|null} The decrypted ember key bytes, or null on failure.
  */
-function decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPrivateKey) {
+export function decryptEmberKeyForUser(
+  encryptedBase64: string,
+  senderPublicKey: Uint8Array,
+  recipientPrivateKey: Uint8Array
+): Uint8Array | null {
   console.debug('[Crypto] Decrypting ember key for user (NaCl box)');
   const combined = naclUtil.decodeBase64(encryptedBase64);
   const nonce = combined.slice(0, nacl.box.nonceLength);
@@ -128,16 +125,13 @@ function decryptEmberKeyForUser(encryptedBase64, senderPublicKey, recipientPriva
   if (!decrypted) {
     console.error('[Crypto] Ember key decryption failed: authentication failed');
   }
-  return decrypted || null;
+  return decrypted ?? null;
 }
 
 /**
  * Encrypt a plaintext message using NaCl secretbox with the ember key.
- * @param {string} plaintext - The message text.
- * @param {Uint8Array} emberKey - The 32-byte ember symmetric key.
- * @returns {string} Base64 encoded nonce + ciphertext.
  */
-function encryptMessage(plaintext, emberKey) {
+export function encryptMessage(plaintext: string, emberKey: Uint8Array): string {
   console.debug('[Crypto] Encrypting message (NaCl secretbox)');
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
   const messageBytes = naclUtil.decodeUTF8(plaintext);
@@ -150,11 +144,8 @@ function encryptMessage(plaintext, emberKey) {
 
 /**
  * Decrypt a ciphertext message using NaCl secretbox with the ember key.
- * @param {string} ciphertextBase64 - Base64 encoded nonce + ciphertext.
- * @param {Uint8Array} emberKey - The 32-byte ember symmetric key.
- * @returns {string|null} The decrypted plaintext, or null on failure.
  */
-function decryptMessage(ciphertextBase64, emberKey) {
+export function decryptMessage(ciphertextBase64: string, emberKey: Uint8Array): string | null {
   try {
     console.debug('[Crypto] Decrypting message (NaCl secretbox)');
     const combined = naclUtil.decodeBase64(ciphertextBase64);
@@ -174,11 +165,8 @@ function decryptMessage(ciphertextBase64, emberKey) {
 
 /**
  * Derive a 32-byte encryption key from an invite code using PBKDF2.
- * @param {string} inviteCode - The invite code string.
- * @param {Uint8Array} salt - Random salt bytes.
- * @returns {Promise<Uint8Array>} The derived 32-byte key.
  */
-async function deriveKeyFromInviteCode(inviteCode, salt) {
+async function deriveKeyFromInviteCode(inviteCode: string, salt: Uint8Array): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -188,12 +176,7 @@ async function deriveKeyFromInviteCode(inviteCode, salt) {
     ['deriveBits']
   );
   const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256'
-    },
+    { name: 'PBKDF2', salt: salt as unknown as BufferSource, iterations: 100000, hash: 'SHA-256' },
     keyMaterial,
     256
   );
@@ -202,11 +185,11 @@ async function deriveKeyFromInviteCode(inviteCode, salt) {
 
 /**
  * Encrypt an ember key for sharing via invite link.
- * @param {Uint8Array} emberKey - The ember symmetric key.
- * @param {string} inviteCode - The invite code string.
- * @returns {Promise<{encrypted: string, salt: string}>} Base64 encoded encrypted key and salt.
  */
-async function encryptEmberKeyForInvite(emberKey, inviteCode) {
+export async function encryptEmberKeyForInvite(
+  emberKey: Uint8Array,
+  inviteCode: string
+): Promise<{ encrypted: string; salt: string }> {
   console.debug('[Crypto] Encrypting ember key for invite (PBKDF2 + NaCl secretbox)');
   const salt = nacl.randomBytes(32);
   const derivedKey = await deriveKeyFromInviteCode(inviteCode, salt);
@@ -224,12 +207,12 @@ async function encryptEmberKeyForInvite(emberKey, inviteCode) {
 
 /**
  * Decrypt an ember key received via invite link.
- * @param {string} encryptedBase64 - Base64 encoded nonce + ciphertext.
- * @param {string} inviteCode - The invite code string.
- * @param {string} saltBase64 - Base64 encoded salt.
- * @returns {Promise<Uint8Array|null>} The decrypted ember key bytes, or null on failure.
  */
-async function decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64) {
+export async function decryptEmberKeyFromInvite(
+  encryptedBase64: string,
+  inviteCode: string,
+  saltBase64: string
+): Promise<Uint8Array | null> {
   try {
     console.debug('[Crypto] Decrypting ember key from invite (PBKDF2 + NaCl secretbox)');
     const combined = naclUtil.decodeBase64(encryptedBase64);
@@ -243,22 +226,9 @@ async function decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64
     } else {
       console.debug('[Crypto] Ember key from invite decrypted successfully');
     }
-    return decrypted || null;
+    return decrypted ?? null;
   } catch (err) {
     console.error('[Crypto] Ember key from invite decryption threw an error:', err);
     return null;
   }
 }
-
-module.exports = {
-  generateRecoveryCode,
-  encryptPrivateKeyWithRecoveryCode,
-  decryptPrivateKeyWithRecoveryCode,
-  generateEmberKey,
-  encryptEmberKeyForUser,
-  decryptEmberKeyForUser,
-  encryptMessage,
-  decryptMessage,
-  encryptEmberKeyForInvite,
-  decryptEmberKeyFromInvite
-};

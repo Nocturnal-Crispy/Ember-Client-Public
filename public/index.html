@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ember</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="src/css/styles.css">
 </head>
 <body>
   <!-- Custom Title Bar -->
@@ -754,8 +754,15 @@
     </div>
   </div>
 
-  <script src="logger.js"></script>
-  <script src="voice.js"></script>
-  <script src="renderer.js"></script>
+  <script src="src/js/utils/logger.js"></script>
+  <script src="src/js/managers/app-state.js"></script>
+  <script src="src/js/services/voice-service.js"></script>
+  <script src="src/js/services/websocket-service.js"></script>
+  <script src="src/js/services/message-service.js"></script>
+  <script src="src/js/managers/channel-manager.js"></script>
+  <script src="src/js/managers/ember-manager.js"></script>
+  <script src="src/js/managers/invite-manager.js"></script>
+  <script src="src/js/managers/voice-ui-manager.js"></script>
+  <script src="src/js/managers/renderer.js"></script>
 </body>
 </html>
