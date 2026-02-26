@@ -98,4 +98,4 @@ echo "View at: https://github.com/$REPO/releases/tag/v$NEW_VERSION"
 
 
 echo "Cleaning up..."
-rm -rf "$RELEASE_DIR/*"
+rm -rf $RELEASE_DIR/*
