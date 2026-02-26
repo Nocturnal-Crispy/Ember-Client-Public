@@ -1,0 +1,60 @@
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  background-color: var(--background);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  min-width: 200px;
+  z-index: 9999;
+  padding: 4px 0;
+  animation: contextMenuFadeIn 0.1s ease-out;
+}
+
+.context-menu.hidden {
+  display: none;
+}
+
+@keyframes contextMenuFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 14px;
+  transition: background-color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: rgba(var(--rgb-highlight), 0.15);
+  color: var(--highlight);
+}
+
+.ctx-icon {
+  font-size: 15px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: rgba(var(--rgb-highlight), 0.15);
+  margin: 4px 0;
+}
+
+/* Danger context menu item */
+.context-menu-item-danger {
+  color: #ed4245;
+}
+
+.context-menu-item-danger:hover {
+  background-color: rgba(237, 66, 69, 0.15);
+  color: #ed4245;
+}

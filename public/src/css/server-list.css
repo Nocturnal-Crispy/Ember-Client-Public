@@ -1,0 +1,60 @@
+/* Server List (Left Sidebar) */
+.server-list {
+  width: 72px;
+  background-color: var(--background);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+}
+
+.server-icon {
+  width: 48px;
+  height: 48px;
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-time) ease;
+  font-weight: bold;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.server-icon:hover {
+  border-radius: 35%;
+  background-color: var(--highlight);
+  color: var(--background);
+}
+
+.server-icon.active {
+  border-radius: 35%;
+  background-color: var(--highlight);
+  color: var(--background);
+}
+
+.server-icon.add-server {
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  color: var(--online-color);
+  font-size: 28px;
+}
+
+.server-icon.add-server:hover {
+  background-color: var(--online-color);
+  color: var(--background);
+}
+
+.server-separator {
+  width: 32px;
+  height: 2px;
+  background-color: var(--highlight);
+  border-radius: 1px;
+  margin: 4px 0;
+}
+
+.server-icon.drag-over-ember {
+  border-top: 2px solid #5865f2;
+}
