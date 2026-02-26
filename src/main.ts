@@ -80,6 +80,9 @@ const store = new Store<StoreSchema>();
 let mainWindow: BrowserWindow | null = null;
 let pendingInviteLink: string | null = null;
 
+
+//To turn on dev tools, change devTools: false to devTools: true in the webPreferences object
+
 function createWindow(isAuthenticated: boolean) {
   log.info('Creating browser window', { authenticated: isAuthenticated });
   mainWindow = new BrowserWindow({
@@ -395,6 +398,7 @@ if (!gotTheLock) {
     log.info('App ready');
     const isAuthenticated = checkAuthentication();
     createWindow(isAuthenticated);
+    
 
     if (pendingInviteLink) {
       log.info('Processing pending invite link after window ready');
