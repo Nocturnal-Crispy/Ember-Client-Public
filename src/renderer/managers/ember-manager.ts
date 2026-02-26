@@ -9,6 +9,35 @@
   const emberCrypto = window.electronAPI.crypto;
   const naclUtil = window.electronAPI.naclUtil;
 
+  // ─── Ember order (localStorage) ───────────────────────────────────────────
+
+  const EMBER_ORDER_KEY = 'ember_order';
+
+  function saveEmberOrder(): void {
+    const icons = document.querySelectorAll<HTMLElement>('.server-icon:not(.add-server)');
+    const order = Array.from(icons).map(el => el.dataset['emberId']);
+    localStorage.setItem(EMBER_ORDER_KEY, JSON.stringify(order));
+  }
+
+  function sortEmbersByOrder(embers: Ember[]): Ember[] {
+    try {
+      const order = JSON.parse(localStorage.getItem(EMBER_ORDER_KEY) || '[]') as string[];
+      if (!order.length) return embers;
+      return [...embers].sort((a, b) => {
+        const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+    } catch { return embers; }
+  }
+
+  function clearEmberDragHighlights(): void {
+    document.querySelectorAll<HTMLElement>('.server-icon.drag-over-ember')
+      .forEach(el => el.classList.remove('drag-over-ember'));
+  }
+
   // ─── Ember fetch, render, switch ──────────────────────────────────────────
 
   async function fetchEmbers(): Promise<Ember[]> {
@@ -38,6 +67,7 @@
   }
 
   function renderServerList(embers: Ember[]): void {
+    embers = sortEmbersByOrder(embers);
     const serverList = document.querySelector('.server-list');
     if (!serverList) return;
 
@@ -74,6 +104,43 @@
       }
 
       serverIcon.addEventListener('click', () => switchToServer(ember.id, ember.name));
+
+      // Drag-and-drop (client-side reorder only)
+      serverIcon.setAttribute('draggable', 'true');
+      serverIcon.addEventListener('dragstart', (e: DragEvent) => {
+        App.dragItem = { type: 'ember', id: ember.id };
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        serverIcon.classList.add('dragging');
+      });
+      serverIcon.addEventListener('dragend', () => {
+        serverIcon.classList.remove('dragging');
+        clearEmberDragHighlights();
+        saveEmberOrder();
+      });
+      serverIcon.addEventListener('dragover', (e: DragEvent) => {
+        if (!App.dragItem || App.dragItem.type !== 'ember') return;
+        e.preventDefault();
+        clearEmberDragHighlights();
+        serverIcon.classList.add('drag-over-ember');
+      });
+      serverIcon.addEventListener('dragleave', () => serverIcon.classList.remove('drag-over-ember'));
+      serverIcon.addEventListener('drop', (e: DragEvent) => {
+        e.preventDefault();
+        clearEmberDragHighlights();
+        if (!App.dragItem || App.dragItem.type !== 'ember' || App.dragItem.id === ember.id) return;
+        const draggedId = App.dragItem.id;
+        App.dragItem = null;
+        const list = document.querySelector('.server-list');
+        const draggedEl = list?.querySelector<HTMLElement>(`.server-icon[data-ember-id="${draggedId}"]`);
+        if (draggedEl) list!.insertBefore(draggedEl, serverIcon);
+        saveEmberOrder();
+      });
+
+      // Right-click context menu (owners only)
+      serverIcon.addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault();
+        if (ember.is_owner) showEmberContextMenu(e.clientX, e.clientY, ember);
+      });
 
       if (separator) {
         serverList.insertBefore(serverIcon, separator);
@@ -377,6 +444,55 @@
 
   function hideCreateServerError(): void {
     createServerError?.classList.add('hidden');
+  }
+
+  // ─── Ember context menu ────────────────────────────────────────────────────
+
+  const emberContextMenu = document.getElementById('ember-context-menu');
+  let contextMenuEmber: Ember | null = null;
+
+  function showEmberContextMenu(x: number, y: number, ember: Ember): void {
+    if (!emberContextMenu) return;
+    contextMenuEmber = ember;
+    emberContextMenu.classList.remove('hidden');
+    // Position off-screen first so getBoundingClientRect returns real dimensions
+    emberContextMenu.style.left = '0px';
+    emberContextMenu.style.top = '0px';
+    const rect = emberContextMenu.getBoundingClientRect();
+    emberContextMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - 5)}px`;
+    emberContextMenu.style.top  = `${Math.min(y, window.innerHeight - rect.height - 5)}px`;
+  }
+
+  document.addEventListener('click', () => {
+    emberContextMenu?.classList.add('hidden');
+  });
+
+  const deleteEmberBtn = document.getElementById('ctx-ember-delete');
+  if (deleteEmberBtn) {
+    deleteEmberBtn.addEventListener('click', async () => {
+      if (!contextMenuEmber) return;
+      emberContextMenu?.classList.add('hidden');
+      if (!confirm(`Delete "${contextMenuEmber.name}"? This cannot be undone.`)) return;
+      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+      if (!auth?.token || !auth?.hostname) return;
+      const res = await fetch(`${auth.hostname}/api/v1/embers/${contextMenuEmber.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${auth.token}` }
+      });
+      if (res.ok) {
+        if (App.activeEmberId === contextMenuEmber.id) App.activeEmberId = null;
+        const embers = await fetchEmbers();
+        if (embers.length === 0) {
+          renderServerList(embers);
+          window.showWelcomeScreen();
+        } else {
+          renderServerList(embers);
+        }
+      } else {
+        alert('Failed to delete ember.');
+      }
+      contextMenuEmber = null;
+    });
   }
 
   window.fetchEmbers            = fetchEmbers;

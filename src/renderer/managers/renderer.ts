@@ -438,6 +438,7 @@ window.fetchMembers = fetchMembers;
 window.renderMemberList = renderMemberList;
 window.updateChatHeader = updateChatHeader;
 window.hideWelcomeScreen = hideWelcomeScreen;
+window.showWelcomeScreen = showWelcomeScreen;
 
 initializeAppWithWS();
 })();

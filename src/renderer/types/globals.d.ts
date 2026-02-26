@@ -12,6 +12,7 @@ interface Ember {
   name: string;
   icon_data?: string | null;
   owner_id?: string;
+  is_owner?: boolean;
 }
 
 interface Channel {
@@ -50,7 +51,7 @@ interface CategoryReorderUpdate {
 }
 
 interface DragItem {
-  type: 'channel' | 'category';
+  type: 'channel' | 'category' | 'ember';
   id: string;
 }
 
@@ -339,4 +340,5 @@ declare interface Window {
   renderMemberList(members: Member[]): void;
   updateChatHeader(name: string, description: string): void;
   hideWelcomeScreen(): void;
+  showWelcomeScreen(): void;
 }
