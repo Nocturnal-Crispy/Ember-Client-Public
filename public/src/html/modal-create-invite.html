@@ -1,0 +1,47 @@
+<!-- Create Invite Modal -->
+<div id="create-invite-modal" class="modal-overlay hidden">
+  <div class="modal-container invite-modal-container">
+    <div class="modal-header">
+      <img src="Icons/ember_1024x1024.png" class="invite-emblem" alt="Ember">
+      <h3>Create Invite Link</h3>
+    </div>
+    <div class="modal-body invite-modal-body">
+      <div class="form-group">
+        <label for="invite-expiration">Expire After</label>
+        <select id="invite-expiration" class="server-input invite-select">
+          <option value="0">Never</option>
+          <option value="1800">30 minutes</option>
+          <option value="3600">1 hour</option>
+          <option value="21600">6 hours</option>
+          <option value="43200">12 hours</option>
+          <option value="86400" selected>24 hours</option>
+          <option value="604800">7 days</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="invite-max-uses">Max Uses</label>
+        <select id="invite-max-uses" class="server-input invite-select">
+          <option value="0" selected>Unlimited</option>
+          <option value="1">1 use</option>
+          <option value="5">5 uses</option>
+          <option value="10">10 uses</option>
+          <option value="25">25 uses</option>
+          <option value="50">50 uses</option>
+          <option value="100">100 uses</option>
+        </select>
+      </div>
+      <div id="invite-link-result" class="invite-link-result hidden">
+        <label>Your Invite Link</label>
+        <div class="invite-link-row">
+          <input type="text" id="invite-link-input" class="server-input invite-link-input" readonly>
+          <button class="modal-btn modal-btn-primary invite-copy-btn" id="invite-copy-btn">Copy</button>
+        </div>
+      </div>
+      <div class="error-message hidden" id="create-invite-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-secondary" id="create-invite-cancel-btn">Close</button>
+      <button class="modal-btn modal-btn-primary" id="create-invite-btn">Generate Link</button>
+    </div>
+  </div>
+</div>

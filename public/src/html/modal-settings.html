@@ -1,0 +1,318 @@
+<!-- User Settings Modal -->
+<div id="settings-modal" class="settings-overlay hidden">
+  <div class="settings-container">
+    <!-- Sidebar -->
+    <div class="settings-sidebar">
+      <div class="settings-sidebar-inner">
+        <div class="settings-section-header">User Settings</div>
+        <div class="settings-nav-item active" data-page="my-account">
+          <span class="settings-nav-icon">👤</span>
+          <span>My Account</span>
+        </div>
+        <div class="settings-nav-item" data-page="devices">
+          <span class="settings-nav-icon">💻</span>
+          <span>Devices</span>
+        </div>
+        <div class="settings-nav-separator"></div>
+        <div class="settings-section-header">App Settings</div>
+        <div class="settings-nav-item" data-page="notifications">
+          <span class="settings-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </div>
+        <div class="settings-nav-item" data-page="themes">
+          <span class="settings-nav-icon">🎨</span>
+          <span>Themes</span>
+        </div>
+        <div class="settings-nav-item" data-page="plugins">
+          <span class="settings-nav-icon">🧩</span>
+          <span>Plugins</span>
+        </div>
+        <div class="settings-nav-item" data-page="voice-video">
+          <span class="settings-nav-icon">🎙️</span>
+          <span>Voice &amp; Video</span>
+        </div>
+        <div class="settings-nav-separator"></div>
+        <div class="settings-nav-item settings-nav-danger" id="settings-logout-btn">
+          <span class="settings-nav-icon">🚪</span>
+          <span>Log Out</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="settings-content">
+      <button class="settings-close-btn" id="settings-close-btn" title="Close">✕</button>
+
+      <!-- My Account -->
+      <div class="settings-page active" id="settings-page-my-account">
+        <h2 class="settings-page-title">My Account</h2>
+        <div class="settings-card">
+          <div class="settings-avatar-row">
+            <div class="settings-avatar" id="settings-avatar-display">U</div>
+            <div class="settings-user-info">
+              <div class="settings-username" id="settings-username-display">Username</div>
+              <div class="settings-user-tag" id="settings-user-tag-display">user@example.com</div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-section-divider"></div>
+        <h3 class="settings-subsection-title">Account Information</h3>
+        <div class="settings-field">
+          <label class="settings-field-label">Display Name</label>
+          <div class="settings-field-value" id="settings-display-name">—</div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-field-label">Username</label>
+          <div class="settings-field-value" id="settings-account-username">—</div>
+        </div>
+      </div>
+
+      <!-- Devices -->
+      <div class="settings-page hidden" id="settings-page-devices">
+        <h2 class="settings-page-title">Devices</h2>
+        <p class="settings-placeholder-text">Your logged-in devices and sessions will appear here.</p>
+        <div class="settings-card settings-placeholder-card">
+          <span class="settings-placeholder-icon">💻</span>
+          <span>No additional devices found.</span>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="settings-page hidden" id="settings-page-notifications">
+        <h2 class="settings-page-title">Notifications</h2>
+        <p class="settings-placeholder-text">Notification preferences will be configurable here.</p>
+        <div class="settings-card settings-placeholder-card">
+          <span class="settings-placeholder-icon">🔔</span>
+          <span>Notification settings coming soon.</span>
+        </div>
+      </div>
+
+      <!-- Themes -->
+      <div class="settings-page hidden" id="settings-page-themes">
+        <h2 class="settings-page-title">Themes</h2>
+        <p class="settings-placeholder-text">Customize the look and feel of the app.</p>
+        <div class="settings-card settings-placeholder-card">
+          <span class="settings-placeholder-icon">🎨</span>
+          <span>Theme customization coming soon.</span>
+        </div>
+      </div>
+
+      <!-- Plugins -->
+      <div class="settings-page hidden" id="settings-page-plugins">
+        <h2 class="settings-page-title">Plugins</h2>
+        <p class="settings-placeholder-text">Manage and install plugins to extend Ember.</p>
+        <div class="settings-card settings-placeholder-card">
+          <span class="settings-placeholder-icon">🧩</span>
+          <span>Plugin management coming soon.</span>
+        </div>
+      </div>
+
+      <!-- Voice & Video -->
+      <div class="settings-page hidden" id="settings-page-voice-video">
+        <h2 class="settings-page-title">Voice &amp; Video</h2>
+
+        <!-- Voice Section -->
+        <h3 class="settings-subsection-title">Voice</h3>
+
+        <div class="vv-row">
+          <label class="vv-label">Input Device</label>
+          <select class="settings-select" id="vv-input-device"></select>
+        </div>
+
+        <div class="vv-row">
+          <label class="vv-label">Output Device</label>
+          <select class="settings-select" id="vv-output-device"></select>
+        </div>
+
+        <div class="vv-row">
+          <label class="vv-label">Input Volume</label>
+          <div class="vv-slider-row">
+            <input type="range" class="settings-range" id="vv-input-volume" min="0" max="100" value="100">
+            <span class="vv-slider-val" id="vv-input-volume-val">100%</span>
+          </div>
+        </div>
+
+        <div class="vv-row">
+          <label class="vv-label">Output Volume</label>
+          <div class="vv-slider-row">
+            <input type="range" class="settings-range" id="vv-output-volume" min="0" max="100" value="100">
+            <span class="vv-slider-val" id="vv-output-volume-val">100%</span>
+          </div>
+        </div>
+
+        <div class="mic-test-container" id="mic-test-container">
+          <button class="vv-test-btn" id="vv-mic-test-btn">Test Microphone</button>
+          <canvas class="mic-visualizer" id="mic-visualizer" width="220" height="40"></canvas>
+        </div>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Echo Cancellation</span>
+            <span class="vv-toggle-desc">Reduce echo during calls</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-echo-cancellation" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Noise Suppression</span>
+            <span class="vv-toggle-desc">Filter background noise</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-noise-suppression" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Auto Gain Control</span>
+            <span class="vv-toggle-desc">Automatically adjust input volume</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-auto-gain" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Automatic Input Sensitivity</span>
+            <span class="vv-toggle-desc">Auto-detect when you start speaking</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-auto-sensitivity" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-row" id="vv-sensitivity-row">
+          <label class="vv-label">Input Sensitivity</label>
+          <div class="vv-slider-row">
+            <input type="range" class="settings-range" id="vv-sensitivity" min="0" max="100" value="50">
+            <span class="vv-slider-val" id="vv-sensitivity-val">50</span>
+          </div>
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <!-- Push to Talk -->
+        <h3 class="settings-subsection-title">Push to Talk</h3>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Enable Push to Talk</span>
+            <span class="vv-toggle-desc">Hold a key to transmit audio</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-ptt-enabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-row" id="vv-ptt-key-row">
+          <label class="vv-label">Keybind</label>
+          <button class="keybind-capture" id="vv-ptt-key-btn">` (Backquote)</button>
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <!-- Camera Section -->
+        <h3 class="settings-subsection-title">Camera</h3>
+
+        <div class="vv-row">
+          <label class="vv-label">Camera</label>
+          <select class="settings-select" id="vv-camera-device"></select>
+        </div>
+
+        <div class="camera-preview-container" id="camera-preview-container">
+          <video class="camera-preview" id="camera-preview" autoplay muted playsinline></video>
+          <div class="camera-preview-placeholder" id="camera-preview-placeholder">No preview</div>
+        </div>
+
+        <button class="vv-test-btn" id="vv-camera-test-btn">Test Video</button>
+
+        <div class="vv-toggle-row" style="margin-top: 12px;">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Always Preview Video</span>
+            <span class="vv-toggle-desc">Show camera preview when joining a channel</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-always-preview">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <!-- Sounds Section -->
+        <h3 class="settings-subsection-title">Sounds</h3>
+
+        <div class="sound-row">
+          <span class="sound-label">Mute</span>
+          <button class="sound-preview-btn" data-sound="mute">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-mute" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">Unmute</span>
+          <button class="sound-preview-btn" data-sound="unmute">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-unmute" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">Deafen</span>
+          <button class="sound-preview-btn" data-sound="deafen">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-deafen" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">Undeafen</span>
+          <button class="sound-preview-btn" data-sound="undeafen">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-undeafen" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">User Join</span>
+          <button class="sound-preview-btn" data-sound="userJoin">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-userJoin" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">User Leave</span>
+          <button class="sound-preview-btn" data-sound="userLeave">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-userLeave" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sound-row">
+          <span class="sound-label">Disconnect</span>
+          <button class="sound-preview-btn" data-sound="disconnect">▶</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="vv-sound-disconnect" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-save-row">
+          <button class="modal-btn modal-btn-primary" id="vv-save-btn">Save Changes</button>
+          <span class="vv-save-status" id="vv-save-status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

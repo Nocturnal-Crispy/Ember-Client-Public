@@ -1,0 +1,67 @@
+<!-- Create Server Modal -->
+<div id="create-server-modal" class="modal-overlay hidden">
+  <div class="modal-container create-server-container">
+    <div class="modal-header">
+      <h3>Create Your Server</h3>
+    </div>
+    <div class="modal-body create-server-body">
+      <div class="form-group">
+        <label for="server-name-input">Server Name</label>
+        <input
+          type="text"
+          id="server-name-input"
+          class="server-input"
+          placeholder="Enter server name"
+          maxlength="100"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label>Server Icon (Optional)</label>
+        <div class="icon-source-toggle">
+          <button class="icon-toggle-btn active" data-source="upload">Upload Image</button>
+          <button class="icon-toggle-btn" data-source="url">Use URL</button>
+        </div>
+      </div>
+
+      <div class="icon-input-container">
+        <div class="icon-input-section" id="upload-section">
+          <input
+            type="file"
+            id="server-icon-upload"
+            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+            style="display: none;"
+          >
+          <button class="upload-icon-btn" id="upload-icon-btn">
+            <span>Choose Image</span>
+          </button>
+          <p class="icon-hint">Recommended: 512x512 pixels</p>
+        </div>
+
+        <div class="icon-input-section hidden" id="url-section">
+          <input
+            type="text"
+            id="server-icon-url"
+            class="server-input"
+            placeholder="https://example.com/icon.png"
+          >
+          <button class="load-url-btn" id="load-url-btn">Load Preview</button>
+        </div>
+      </div>
+
+      <div class="icon-preview-container" id="icon-preview-container">
+        <div class="icon-preview" id="icon-preview">
+          <span class="preview-placeholder">No icon selected</span>
+        </div>
+        <button class="remove-icon-btn hidden" id="remove-icon-btn">Remove Icon</button>
+      </div>
+
+      <div class="error-message hidden" id="create-server-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-secondary" id="create-server-cancel-btn">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="create-server-btn">Create Server</button>
+    </div>
+  </div>
+</div>

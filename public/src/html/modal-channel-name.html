@@ -1,0 +1,23 @@
+<!-- Channel / Category Name Modal -->
+<div id="channel-name-modal" class="modal-overlay hidden">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="channel-modal-title">Create Channel</h3>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="channel-name-input" id="channel-name-label">CHANNEL NAME</label>
+        <input type="text" id="channel-name-input" class="server-input" placeholder="Enter name" maxlength="100">
+      </div>
+      <div class="form-group" id="channel-desc-group" style="display:none;">
+        <label for="channel-desc-input">DESCRIPTION (OPTIONAL)</label>
+        <textarea id="channel-desc-input" class="server-input channel-desc-textarea" placeholder="Add a topic" maxlength="1024"></textarea>
+      </div>
+      <div class="error-message hidden" id="channel-modal-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-secondary" id="channel-modal-cancel-btn">Cancel</button>
+      <button class="modal-btn modal-btn-primary" id="channel-modal-confirm-btn">Create</button>
+    </div>
+  </div>
+</div>

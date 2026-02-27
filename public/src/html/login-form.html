@@ -1,0 +1,88 @@
+<!-- Login / Register Form -->
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <h1 id="form-title">Welcome to Ember</h1>
+      <p id="form-subtitle">Login to continue</p>
+    </div>
+
+    <div id="error-banner" class="error-banner hidden"></div>
+
+    <form id="auth-form" class="auth-form">
+      <div class="form-group">
+        <label for="hostname">Server Hostname</label>
+        <input
+          type="text"
+          id="hostname"
+          name="hostname"
+          placeholder="http://localhost:8080"
+          required
+        >
+        <span class="error-message" id="hostname-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter your username"
+          required
+          autocomplete="username"
+        >
+        <span class="error-message" id="username-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="password-input-wrapper">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          >
+          <button type="button" class="password-toggle" id="password-toggle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+        <span class="error-message" id="password-error"></span>
+      </div>
+
+      <div class="form-group" id="confirm-password-group" style="display: none;">
+        <label for="confirm-password">Confirm Password</label>
+        <div class="password-input-wrapper">
+          <input
+            type="password"
+            id="confirm-password"
+            name="confirm-password"
+            placeholder="Confirm your password"
+            autocomplete="new-password"
+          >
+          <button type="button" class="password-toggle" id="confirm-password-toggle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+        <span class="error-message" id="confirm-password-error"></span>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submit-btn">
+        <span id="submit-btn-text">Login</span>
+      </button>
+    </form>
+
+    <div class="form-footer">
+      <span id="toggle-text">Need an account?</span>
+      <button type="button" class="link-btn" id="toggle-mode">Register</button>
+    </div>
+  </div>
+</div>

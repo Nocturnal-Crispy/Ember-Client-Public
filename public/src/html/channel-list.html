@@ -1,0 +1,72 @@
+<!-- Channel List -->
+<div class="channel-list">
+  <div class="server-header" id="server-header">
+    <h3></h3>
+    <span class="dropdown-icon">▼</span>
+    <div class="server-header-menu hidden" id="server-header-menu">
+      <div class="server-header-menu-item" id="invite-people-btn">
+        <span>Invite People</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="channels"></div>
+
+  <!-- Voice Controls Panel (shown when in a voice channel) -->
+  <div class="voice-controls hidden" id="voice-controls">
+    <div class="voice-channel-name"></div>
+    <div class="voice-buttons">
+      <button class="voice-btn voice-mute-btn" id="voice-mute-btn" title="Mute">🎤</button>
+      <button class="voice-btn voice-deafen-btn" id="voice-deafen-btn" title="Deafen">🎧</button>
+      <button class="voice-btn voice-camera-btn" id="voice-camera-btn" title="Start Camera">📷</button>
+      <button class="voice-btn voice-disconnect-btn" id="voice-disconnect-btn" title="Disconnect">📵</button>
+    </div>
+  </div>
+
+  <div class="user-panel">
+    <div class="user-info" id="user-info">
+      <div class="user-avatar-container">
+        <div class="user-avatar">U</div>
+        <img id="user-status-icon" class="user-status-icon" src="Icons/ember_connected.png" alt="status">
+      </div>
+      <div class="user-details">
+        <div class="username">User#0001</div>
+        <div class="user-status" id="user-status-text">Online</div>
+      </div>
+    </div>
+    <div class="user-menu hidden" id="user-menu">
+      <div class="user-menu-item" id="menu-status">
+        <img id="menu-status-icon" class="status-indicator" src="Icons/ember_connected.png" alt="status">
+        <span>Status</span>
+        <span class="menu-arrow">›</span>
+        <div class="status-submenu hidden" id="status-submenu">
+          <div class="status-option" data-status="Online">
+            <img class="status-indicator" src="Icons/ember_connected.png" alt="online">
+            <span>Online</span>
+          </div>
+          <div class="status-option" data-status="Idle">
+            <img class="status-indicator" src="Icons/ember_idle.gif" alt="idle">
+            <span>Idle</span>
+          </div>
+          <div class="status-option" data-status="Do Not Disturb">
+            <img class="status-indicator" src="Icons/ember_error.png" alt="dnd">
+            <span>Do Not Disturb</span>
+          </div>
+          <div class="status-option" data-status="Invisible">
+            <img class="status-indicator" src="Icons/ember_disconnected.png" alt="invisible">
+            <span>Invisible</span>
+          </div>
+        </div>
+      </div>
+      <div class="user-menu-item" id="menu-edit-profile">
+        <span>✏️</span>
+        <span>Edit Profile</span>
+      </div>
+      <div class="user-menu-separator"></div>
+      <div class="user-menu-item danger" id="menu-logout">
+        <span>🚪</span>
+        <span>Logout</span>
+      </div>
+    </div>
+  </div>
+</div>
