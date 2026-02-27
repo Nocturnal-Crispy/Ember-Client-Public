@@ -2,9 +2,9 @@
   "name": "ember-client",
   "version": "0.0.9",
   "description": "Ember Client",
-  "main": "dist/main.js",
+  "main": "public/src/js/main.js",
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.renderer.json",
+    "build": "tsc",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -47,7 +47,7 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "public/src/js/**/*",
       "public/**/*",
       "node_modules/**/*"
     ],

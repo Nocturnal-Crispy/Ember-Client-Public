@@ -91,7 +91,7 @@ function createWindow(isAuthenticated: boolean) {
     minWidth: 800,
     minHeight: 600,
     backgroundColor: '#36393f',
-    icon: path.join(__dirname, '../public/Icons/ember_1024x1024.png'),
+    icon: path.join(__dirname, '../../Icons/ember_1024x1024.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -105,10 +105,10 @@ function createWindow(isAuthenticated: boolean) {
 
   if (isAuthenticated) {
     log.debug('Loading main app window');
-    mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../index.html'));
   } else {
     log.debug('Loading login window');
-    mainWindow.loadFile(path.join(__dirname, '../public/login.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../login.html'));
   }
 
   mainWindow.on('closed', () => {
@@ -178,7 +178,7 @@ ipcMain.on('window-close', () => {
 ipcMain.on('auth-success', () => {
   log.info('Auth success signal received, loading main window');
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../index.html'));
   }
 });
 
@@ -186,7 +186,7 @@ ipcMain.on('auth-logout', () => {
   log.info('Logout signal received, clearing auth and loading login window');
   (store as any).delete('auth');
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, '../public/login.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../login.html'));
   }
 });
 
