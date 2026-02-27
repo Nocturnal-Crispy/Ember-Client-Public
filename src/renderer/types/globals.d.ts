@@ -291,11 +291,11 @@ declare interface Window {
   handleIncomingMessage(payload: Message): Promise<void>;
   // Globals set by message-service.ts
   sendEncryptedMessage(plaintext: string): Promise<void>;
-  displayDecryptedMessage(msg: Message): void;
+  displayDecryptedMessage(msg: Message, prepend?: boolean): void;
   escapeHtml(text: string): string;
   loadChannelMessages(channelId: string): Promise<void>;
-  fetchMessages(channelId: string): Promise<Message[]>;
-  addMessage(author: string, text: string, timestamp?: number): void;
+  fetchMessages(channelId: string, beforeId?: string | null): Promise<{ messages: Message[]; hasMore: boolean }>;
+  addMessage(author: string, text: string, timestamp?: number, prepend?: boolean): void;
   formatTimestamp(unixSeconds?: number): string;
   // Globals set by ember-manager.ts
   fetchEmbers(): Promise<Ember[]>;

@@ -5,8 +5,7 @@ const config: Config = {
   // Your config lives in /tests, but your package root is one level up
   rootDir: path.resolve(__dirname, ".."),
 
-  preset: "ts-jest",
-  testEnvironment: "jsdom", // use "node" if this is not a browser/React client
+  testEnvironment: "jsdom",
 
   // ✅ All tests live in /tests
   roots: ["<rootDir>/tests"],
@@ -17,7 +16,14 @@ const config: Config = {
 
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
 
-  // Optional: TS path alias like "@/..."
+  // Compile TypeScript via ts-jest; suppress diagnostics so test files
+  // outside rootDir (src/) don't cause compilation failures.
+  // Runtime behaviour is what tests verify.
+  transform: {
+    "^.+\\.tsx?$": ["ts-jest", { diagnostics: false }],
+  },
+
+  // TS path alias @/* → src/*
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },

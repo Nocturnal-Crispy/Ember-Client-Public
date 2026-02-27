@@ -26,18 +26,22 @@ echo "Current version: $CURRENT_VERSION"
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
 NEW_PATCH=$((PATCH + 1))
 NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-echo "New version: $NEW_VERSION"
+echo "New version will be: $NEW_VERSION"
 
-echo "Updating package.json version..."
+echo "Installing dependencies..."
+npm install
+
+echo "Running tests..."
+npm test
+echo "Tests passed."
+
+echo "Bumping version to $NEW_VERSION..."
 node -e "
 const fs = require('fs');
 const pkg = require('$PROJECT_DIR/package.json');
 pkg.version = '$NEW_VERSION';
 fs.writeFileSync('$PROJECT_DIR/package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
-
-echo "Installing dependencies..."
-npm install
 
 echo "Building release artifacts..."
 npm run dist:linux
@@ -95,7 +99,6 @@ git push
 echo ""
 echo "=== Release v$NEW_VERSION published successfully! ==="
 echo "View at: https://github.com/$REPO/releases/tag/v$NEW_VERSION"
-
 
 echo "Cleaning up..."
 rm -rf $RELEASE_DIR/*
