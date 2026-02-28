@@ -3,29 +3,8 @@
  * Handles login/signup/recovery flows on the auth page.
  */
 (function (): void {
-// Compatibility shim: reconstruct original variable shapes from the contextBridge API
 const ipcRenderer = window.electronAPI.ipc;
 const log = window.emberLog.createLogger('Auth');
-const _n = window.electronAPI.nacl;
-const nacl = {
-  randomBytes: (n: number) => _n.randomBytes(n),
-  box: Object.assign(
-    (m: Uint8Array, n: Uint8Array, pk: Uint8Array, sk: Uint8Array) => _n.box(m, n, pk, sk),
-    {
-      open: (b: Uint8Array, n: Uint8Array, pk: Uint8Array, sk: Uint8Array) => _n.boxOpen(b, n, pk, sk),
-      keyPair: () => _n.boxKeyPair(),
-      nonceLength: _n.BOX_NONCE_LENGTH,
-    }
-  ),
-  secretbox: Object.assign(
-    (m: Uint8Array, n: Uint8Array, k: Uint8Array) => _n.secretbox(m, n, k),
-    {
-      open: (b: Uint8Array, n: Uint8Array, k: Uint8Array) => _n.secretboxOpen(b, n, k),
-      nonceLength: _n.SECRETBOX_NONCE_LENGTH,
-      keyLength: _n.SECRETBOX_KEY_LENGTH,
-    }
-  ),
-};
 const naclUtil = window.electronAPI.naclUtil;
 const emberCrypto = window.electronAPI.crypto;
 
@@ -53,12 +32,6 @@ interface AuthElements {
   closeBtn: HTMLElement | null;
 }
 
-function generateUUID(): string {
-  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => {
-    const n = parseInt(c, 10);
-    return (n ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (n / 4)))).toString(16);
-  });
-}
 
 let isLoginMode = true;
 let elements: AuthElements = {
@@ -263,100 +236,24 @@ function validateForm(): boolean {
   return true;
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-interface FetchError extends Error {
-  statusCode?: number;
-}
-
-async function connectWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
-  log.debug('connectWithRetry initiated', { max_retries: maxRetries });
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      log.debug('Connection attempt', { attempt, max_retries: maxRetries });
-      showLoading('Connecting to server...', `Attempt ${attempt} of ${maxRetries}`);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        log.debug('Server responded OK', { status: response.status, attempt });
-        return response;
-      }
-
-      const errorData = await response.json().catch(() => ({})) as { error?: string };
-      const errorMessage = errorData.error ?? `Server returned status ${response.status}`;
-      log.warn('Server returned non-OK response', { status: response.status, attempt });
-
-      if (response.status === 401 || response.status === 409 || response.status === 400) {
-        const error: FetchError = new Error(errorMessage);
-        error.statusCode = response.status;
-        throw error;
-      }
-
-      if (attempt < maxRetries) {
-        log.debug('Retrying after delay', { attempt, delay_ms: 1000 * attempt });
-        await sleep(1000 * attempt);
-      } else {
-        throw new Error('Connection timeout. Server unreachable after 3 attempts.');
-      }
-    } catch (error) {
-      const err = error as FetchError;
-      if (err.name === 'AbortError') {
-        log.warn('Connection attempt timed out', { attempt });
-        if (attempt < maxRetries) { await sleep(1000 * attempt); continue; }
-        throw new Error('Connection timeout. Server unreachable after 3 attempts.');
-      }
-      if (err.statusCode === 401) { log.warn('Authentication rejected by server'); throw new Error('Invalid username or password'); }
-      if (err.statusCode === 409 || err.statusCode === 400) { log.warn('Request rejected by server', { status: err.statusCode }); throw err; }
-      if (attempt < maxRetries) {
-        log.warn('Connection error, retrying', { attempt, error: String(error) });
-        await sleep(1000 * attempt);
-      } else {
-        log.error('All connection attempts exhausted');
-        throw new Error('Server unreachable. Please check the hostname and try again.');
-      }
-    }
-  }
-  throw new Error('Connection failed');
-}
-
 function generateDeviceIdentity(): DeviceIdentity {
   log.info('Generating new device identity (keypair)');
-  const deviceId = generateUUID();
-  const keyPair = nacl.box.keyPair();
-  log.info('Device identity generated', { device_id: deviceId });
-  return {
-    device_id: deviceId,
-    public_key: naclUtil.encodeBase64(keyPair.publicKey),
-    private_key: naclUtil.encodeBase64(keyPair.secretKey)
-  };
+  const identity = window.electronAPI.authService.generateDeviceIdentity();
+  log.info('Device identity generated', { device_id: identity.device_id });
+  return identity;
 }
 
 async function register(
   hostname: string, username: string, password: string,
   deviceId: string, publicKey: string, encryptedDeviceKey: string, salt: string
 ): Promise<AuthResponse> {
-  const response = await connectWithRetry(`${hostname}/api/v1/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, device_id: deviceId, public_key: publicKey, encrypted_device_key: encryptedDeviceKey, salt })
-  });
-  return response.json() as Promise<AuthResponse>;
+  showLoading('Connecting to server...', 'Registering account');
+  return window.electronAPI.authService.register(hostname, username, password, deviceId, publicKey, encryptedDeviceKey, salt);
 }
 
 async function login(hostname: string, username: string, password: string, deviceId: string): Promise<AuthResponse> {
-  const response = await connectWithRetry(`${hostname}/api/v1/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, device_id: deviceId })
-  });
-  return response.json() as Promise<AuthResponse>;
+  showLoading('Connecting to server...', 'Logging in');
+  return window.electronAPI.authService.login(hostname, username, password, deviceId);
 }
 
 function showRecoveryCodeModal(recoveryCode: string): void {

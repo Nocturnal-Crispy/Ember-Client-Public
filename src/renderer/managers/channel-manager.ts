@@ -11,47 +11,31 @@
 
   // ─── Channel / category API fetches ────────────────────────────────────────
 
-  async function fetchCategories(emberId: string): Promise<Category[]> {
+  async function fetchChannelsAndCategories(emberId: string): Promise<{ channels: Channel[]; categories: Category[] }> {
+    log.debug('Fetching channels and categories', { ember_id: emberId });
     try {
-      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
-      if (!auth || !auth.token || !auth.hostname) return [];
-      const response = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/categories`, {
-        method: 'GET', headers: { 'Authorization': `Bearer ${auth.token}` }
-      });
-      if (!response.ok) return [];
-      const data = await response.json() as { categories?: Category[] };
-      return data.categories ?? [];
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      return [];
-    }
-  }
-
-  async function fetchChannels(emberId: string): Promise<Channel[]> {
-    log.debug('Fetching channels', { ember_id: emberId });
-    try {
-      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+      const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) {
         log.error('Cannot fetch channels: not authenticated');
-        return [];
+        return { channels: [], categories: [] };
       }
-      const response = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/channels`, {
-        method: 'GET', headers: { 'Authorization': `Bearer ${auth.token}` }
-      });
-      if (!response.ok) {
-        log.error('Failed to fetch channels', { status: response.status, ember_id: emberId });
-        return [];
-      }
-      const data = await response.json() as { channels?: Channel[] };
-      const channels = data.channels ?? [];
-      log.debug('Channels fetched', { ember_id: emberId, count: channels.length });
-      return channels;
+      const result = await window.electronAPI.channelService.fetchChannels(auth, emberId);
+      log.debug('Channels fetched', { ember_id: emberId, count: result.channels.length });
+      return result;
     } catch (error) {
       const err = error as Error;
       log.error('Error fetching channels', { ember_id: emberId, error: err.message });
       console.error('Error fetching channels:', error);
-      return [];
+      return { channels: [], categories: [] };
     }
+  }
+
+  async function fetchCategories(emberId: string): Promise<Category[]> {
+    return (await fetchChannelsAndCategories(emberId)).categories;
+  }
+
+  async function fetchChannels(emberId: string): Promise<Channel[]> {
+    return (await fetchChannelsAndCategories(emberId)).channels;
   }
 
   // ─── Channel / category rendering ──────────────────────────────────────────
@@ -251,7 +235,7 @@
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
         body: JSON.stringify({ channels: updates })
       });
-      const [channels, cats] = await Promise.all([fetchChannels(App.activeEmberId), fetchCategories(App.activeEmberId)]);
+      const { channels, categories: cats } = await fetchChannelsAndCategories(App.activeEmberId);
       renderChannels(channels, cats);
     } catch (e) {
       log.error('Failed to reorder channels', { error: String(e) });
@@ -282,7 +266,7 @@
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
         body: JSON.stringify({ categories: updates })
       });
-      const [channels, cats] = await Promise.all([fetchChannels(App.activeEmberId), fetchCategories(App.activeEmberId)]);
+      const { channels, categories: cats } = await fetchChannelsAndCategories(App.activeEmberId);
       renderChannels(channels, cats);
     } catch (e) {
       log.error('Failed to reorder categories', { error: String(e) });
@@ -414,7 +398,7 @@
           if (messagesContainer) while (messagesContainer.firstChild) messagesContainer.removeChild(messagesContainer.firstChild);
         }
         document.getElementById('delete-confirm-modal')?.classList.add('hidden');
-        const [channels, cats] = await Promise.all([fetchChannels(App.activeEmberId!), fetchCategories(App.activeEmberId!)]);
+        const { channels, categories: cats } = await fetchChannelsAndCategories(App.activeEmberId!);
         renderChannels(channels, cats);
       } else {
         const err = await res.json().catch(() => ({})) as { error?: string };

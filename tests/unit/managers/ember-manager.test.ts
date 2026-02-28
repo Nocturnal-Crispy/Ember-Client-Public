@@ -15,6 +15,8 @@
 
 let mockIpcInvoke: jest.Mock;
 let mockFetch: jest.Mock;
+let mockEmberServiceFetchEmbers: jest.Mock;
+let mockChannelServiceFetchChannels: jest.Mock;
 
 beforeAll(() => {
   // 1. Populate window.App
@@ -22,6 +24,8 @@ beforeAll(() => {
 
   // 2. Mock window.electronAPI
   mockIpcInvoke = jest.fn().mockResolvedValue(null);
+  mockEmberServiceFetchEmbers = jest.fn().mockResolvedValue([]);
+  mockChannelServiceFetchChannels = jest.fn().mockResolvedValue({ channels: [], categories: [] });
   (window as any).electronAPI = {
     ipc: {
       invoke: mockIpcInvoke,
@@ -39,6 +43,12 @@ beforeAll(() => {
       decodeBase64: jest.fn().mockReturnValue(new Uint8Array(32)),
       encodeBase64: jest.fn().mockReturnValue('base64string'),
     },
+    emberService: {
+      fetchEmbers: mockEmberServiceFetchEmbers,
+    },
+    channelService: {
+      fetchChannels: mockChannelServiceFetchChannels,
+    },
   };
 
   // 3. Mock window.emberLog
@@ -53,8 +63,6 @@ beforeAll(() => {
 
   // 4. Stubs required by ember-manager (called from event handlers / async fns)
   (window as any).openJoinServerModal = jest.fn();
-  (window as any).fetchChannels = jest.fn().mockResolvedValue([]);
-  (window as any).fetchCategories = jest.fn().mockResolvedValue([]);
   (window as any).renderChannels = jest.fn();
   (window as any).fetchMembers = jest.fn().mockResolvedValue([]);
   (window as any).renderMemberList = jest.fn();
@@ -62,7 +70,7 @@ beforeAll(() => {
   (window as any).hideWelcomeScreen = jest.fn();
   (window as any).showWelcomeScreen = jest.fn();
 
-  // 5. Mock global fetch
+  // 5. Mock global fetch (still needed for ember key and other direct fetch calls)
   mockFetch = jest.fn();
   (global as any).fetch = mockFetch;
 
@@ -75,6 +83,8 @@ beforeEach(() => {
   (window as any).App.activeEmberId = null;
   (window as any).App.emberKeyCache.clear();
   (window as any).App.currentEmbers = [];
+  mockEmberServiceFetchEmbers.mockClear();
+  mockChannelServiceFetchChannels.mockClear();
 });
 
 // ─── fetchEmbers ──────────────────────────────────────────────────────────────
@@ -84,19 +94,19 @@ describe('fetchEmbers', () => {
     mockIpcInvoke.mockResolvedValueOnce(null);
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockEmberServiceFetchEmbers).not.toHaveBeenCalled();
   });
 
   it('returns an empty array when get-auth returns an object without a token', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ hostname: 'http://localhost:8085' });
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockEmberServiceFetchEmbers).not.toHaveBeenCalled();
   });
 
-  it('returns an empty array when the server responds with a non-ok status', async () => {
+  it('returns an empty array when the service throws', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+    mockEmberServiceFetchEmbers.mockRejectedValueOnce(new Error('forbidden'));
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
   });
@@ -107,17 +117,14 @@ describe('fetchEmbers', () => {
       { id: 'e-2', name: 'Ember Two' },
     ];
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ embers: mockEmbers }),
-    });
+    mockEmberServiceFetchEmbers.mockResolvedValueOnce(mockEmbers);
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual(mockEmbers);
   });
 
-  it('returns an empty array when fetch throws', async () => {
+  it('returns an empty array when the service rejects', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    mockEmberServiceFetchEmbers.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
   });

@@ -15,7 +15,7 @@
  */
 
 let mockIpcInvoke: jest.Mock;
-let mockFetch: jest.Mock;
+let mockChannelServiceFetchChannels: jest.Mock;
 
 beforeAll(() => {
   // 1. Populate window.App
@@ -23,6 +23,7 @@ beforeAll(() => {
 
   // 2. Mock window.electronAPI
   mockIpcInvoke = jest.fn().mockResolvedValue(null);
+  mockChannelServiceFetchChannels = jest.fn().mockResolvedValue({ channels: [], categories: [] });
   (window as any).electronAPI = {
     ipc: {
       invoke: mockIpcInvoke,
@@ -32,6 +33,9 @@ beforeAll(() => {
     crypto: {},
     nacl: {},
     naclUtil: {},
+    channelService: {
+      fetchChannels: mockChannelServiceFetchChannels,
+    },
   };
 
   // 3. Mock window.emberLog
@@ -49,17 +53,14 @@ beforeAll(() => {
   (window as any).loadChannelMessages = jest.fn();
   (window as any).joinVoiceChannel = jest.fn();
 
-  // 5. Mock global fetch
-  mockFetch = jest.fn();
-  (global as any).fetch = mockFetch;
-
-  // 6. Load the IIFE
+  // 5. Load the IIFE
   require('../../../src/renderer/managers/channel-manager');
 });
 
 beforeEach(() => {
   (window as any).App.activeEmberId = 'e-test';
   (window as any).App.activeChannelId = null;
+  mockChannelServiceFetchChannels.mockClear();
 });
 
 // ─── fetchChannels ────────────────────────────────────────────────────────────
@@ -69,19 +70,19 @@ describe('fetchChannels', () => {
     mockIpcInvoke.mockResolvedValueOnce(null);
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockChannelServiceFetchChannels).not.toHaveBeenCalled();
   });
 
   it('returns an empty array when the auth token is missing', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ hostname: 'http://localhost:8085' });
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockChannelServiceFetchChannels).not.toHaveBeenCalled();
   });
 
-  it('returns an empty array when the server responds with non-ok status', async () => {
+  it('returns an empty array when the service throws', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+    mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('forbidden'));
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
   });
@@ -92,35 +93,24 @@ describe('fetchChannels', () => {
       { id: 'ch-2', ember_id: 'e-1', name: 'voice', type: 'voice' },
     ];
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ channels: mockChannels }),
-    });
+    mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: mockChannels, categories: [] });
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual(mockChannels);
   });
 
-  it('returns an empty array when fetch throws', async () => {
+  it('returns an empty array when the service rejects', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockRejectedValueOnce(new Error('network error'));
+    mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
   });
 
-  it('calls the correct API endpoint with auth header', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ channels: [] }),
-    });
+  it('calls channelService.fetchChannels with auth and emberId', async () => {
+    const auth = { token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' };
+    mockIpcInvoke.mockResolvedValueOnce(auth);
+    mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: [] });
     await (window as any).fetchChannels('e-42');
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:8085/api/v1/embers/e-42/channels',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer tok' }),
-      })
-    );
+    expect(mockChannelServiceFetchChannels).toHaveBeenCalledWith(auth, 'e-42');
   });
 });
 
@@ -136,10 +126,7 @@ describe('fetchCategories', () => {
   it('returns categories from a successful response', async () => {
     const mockCats = [{ id: 'cat-1', ember_id: 'e-1', name: 'Text Channels' }];
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: jest.fn().mockResolvedValue({ categories: mockCats }),
-    });
+    mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: mockCats });
     const result = await (window as any).fetchCategories('e-1');
     expect(result).toEqual(mockCats);
   });

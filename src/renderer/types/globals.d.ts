@@ -98,11 +98,43 @@ declare global {
     on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
   }
 
+  interface AuthServiceAPI {
+    generateDeviceIdentity(): DeviceIdentity;
+    login(hostname: string, username: string, password: string, deviceId: string): Promise<AuthResponse>;
+    register(hostname: string, username: string, password: string, deviceId: string, publicKey: string, encryptedDeviceKey: string, salt: string): Promise<AuthResponse>;
+    registerWithRecovery(hostname: string, username: string, password: string, deviceIdentity: DeviceIdentity): Promise<AuthResponse & { _recoveryCode: string }>;
+    validateLoginForm(hostname: string, username: string, password: string): string | null;
+    validateRegisterForm(hostname: string, username: string, password: string, confirmPassword: string): string | null;
+  }
+
+  interface MessageServiceAPI {
+    fetchMessages(auth: AuthData, channelId: string, beforeId?: string): Promise<{ messages: Message[]; hasMore: boolean }>;
+    sendMessage(auth: AuthData, channelId: string, plaintext: string, emberKey: Uint8Array): Promise<Message>;
+  }
+
+  interface EmberServiceAPI {
+    fetchEmbers(auth: AuthData): Promise<Ember[]>;
+  }
+
+  interface ChannelServiceAPI {
+    fetchChannels(auth: AuthData, emberId: string): Promise<{ channels: Channel[]; categories: Category[] }>;
+    fetchEmberKey(auth: AuthData, emberId: string): Promise<{ encryptedEmberKey: string; senderPublicKey: string } | null>;
+  }
+
+  interface WsServiceAPI {
+    buildWsUrl(hostname: string, token: string): string;
+  }
+
   interface ElectronAPI {
     ipc: IPCRenderer;
     nacl: NaClAPI;
     naclUtil: NaClUtilAPI;
     crypto: EmberCryptoAPI;
+    authService: AuthServiceAPI;
+    messageService: MessageServiceAPI;
+    emberService: EmberServiceAPI;
+    channelService: ChannelServiceAPI;
+    wsService: WsServiceAPI;
   }
 
   // ─── App state ────────────────────────────────────────────────────────────

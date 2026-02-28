@@ -43,20 +43,12 @@
   async function fetchEmbers(): Promise<Ember[]> {
     log.debug('Fetching embers list');
     try {
-      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+      const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) {
         log.error('Cannot fetch embers: not authenticated');
         return [];
       }
-      const response = await fetch(`${auth.hostname}/api/v1/embers`, {
-        method: 'GET', headers: { 'Authorization': `Bearer ${auth.token}` }
-      });
-      if (!response.ok) {
-        log.error('Failed to fetch embers', { status: response.status });
-        return [];
-      }
-      const data = await response.json() as { embers?: Ember[] };
-      const embers = data.embers ?? [];
+      const embers = await window.electronAPI.emberService.fetchEmbers(auth);
       log.info('Embers fetched', { count: embers.length });
       return embers;
     } catch (error) {
@@ -208,10 +200,14 @@
     if (serverHeader) serverHeader.textContent = emberName;
 
     await fetchEmberKey(emberId);
-    const [channels, categories] = await Promise.all([
-      window.fetchChannels(emberId),
-      window.fetchCategories(emberId)
-    ]);
+    const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
+    let channels: Channel[] = [];
+    let categories: Category[] = [];
+    if (auth && auth.token && auth.hostname) {
+      const result = await window.electronAPI.channelService.fetchChannels(auth, emberId);
+      channels = result.channels;
+      categories = result.categories;
+    }
     window.renderChannels(channels, categories);
     const members = await window.fetchMembers(emberId);
     window.renderMemberList(members);

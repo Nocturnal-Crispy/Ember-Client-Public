@@ -13,9 +13,9 @@
     try {
       const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
       if (!auth || !auth.token || !auth.hostname) return;
-      const wsBaseUrl = auth.hostname.replace(/^http/, 'ws').replace(/:8085\b/, ':8086') + '/ws';
+      const wsUrl = window.electronAPI.wsService.buildWsUrl(auth.hostname, auth.token);
+      const wsBaseUrl = wsUrl.split('?')[0];
       log.info('WebSocket connecting', { url: wsBaseUrl });
-      const wsUrl = wsBaseUrl + '?token=' + encodeURIComponent(auth.token);
       App.wsConnection = new WebSocket(wsUrl);
 
       App.wsConnection.onopen = () => {

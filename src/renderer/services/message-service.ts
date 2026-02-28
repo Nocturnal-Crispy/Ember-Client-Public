@@ -25,25 +25,11 @@
     }
     log.debug('Sending encrypted message', { channel_id: App.activeChannelId });
     try {
-      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+      const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) return;
-      const ciphertext = emberCrypto.encryptMessage(plaintext, emberKey);
-      const response = await fetch(`${auth.hostname}/api/v1/channels/${App.activeChannelId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.token}`
-        },
-        body: JSON.stringify({ ciphertext })
-      });
-      if (response.ok) {
-        const msgData = await response.json() as Message;
-        log.debug('Message sent successfully', { channel_id: App.activeChannelId, message_id: msgData.id });
-        displayDecryptedMessage(msgData);
-      } else {
-        log.error('Failed to send message', { status: response.status, channel_id: App.activeChannelId });
-        console.error('Failed to send message');
-      }
+      const msgData = await window.electronAPI.messageService.sendMessage(auth, App.activeChannelId, plaintext, emberKey);
+      log.debug('Message sent successfully', { channel_id: App.activeChannelId, message_id: msgData.id });
+      displayDecryptedMessage(msgData);
     } catch (error) {
       const err = error as Error;
       log.error('Error sending message', { channel_id: App.activeChannelId ?? '', error: err.message });
@@ -130,23 +116,11 @@
   async function fetchMessages(channelId: string, beforeId: string | null = null): Promise<FetchResult> {
     log.debug('Fetching messages', { channel_id: channelId, before: beforeId ?? 'none' });
     try {
-      const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+      const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) return { messages: [], hasMore: false };
-      const params = new URLSearchParams({ limit: '20' });
-      if (beforeId) params.set('before', beforeId);
-      const response = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${auth.token}` }
-      });
-      if (!response.ok) {
-        log.error('Failed to fetch messages', { status: response.status, channel_id: channelId });
-        return { messages: [], hasMore: false };
-      }
-      const data = await response.json() as { messages?: Message[]; has_more?: boolean };
-      const messages = data.messages ?? [];
-      const hasMore = data.has_more ?? false;
-      log.debug('Messages fetched', { channel_id: channelId, count: messages.length, has_more: hasMore });
-      return { messages, hasMore };
+      const result = await window.electronAPI.messageService.fetchMessages(auth, channelId, beforeId ?? undefined);
+      log.debug('Messages fetched', { channel_id: channelId, count: result.messages.length, has_more: result.hasMore });
+      return result;
     } catch (error) {
       const err = error as Error;
       log.error('Error fetching messages', { channel_id: channelId, error: err.message });

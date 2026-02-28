@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 const nacl = require('tweetnacl');
 const naclUtil = require('tweetnacl-util');
 const emberCrypto = require('ember-shared');
+const emberServices = require('ember-shared');
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
 function preloadLog(level: string, message: string, data?: Record<string, unknown>) {
@@ -130,6 +131,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
       preloadLog('debug', 'Crypto: decryptEmberKeyFromInvite');
       return emberCrypto.decryptEmberKeyFromInvite(encryptedBase64, inviteCode, saltBase64);
     },
+  },
+
+  authService: {
+    generateDeviceIdentity: () => emberServices.generateDeviceIdentity(),
+    login: (hostname: string, username: string, password: string, deviceId: string) =>
+      emberServices.login(hostname, username, password, deviceId),
+    register: (hostname: string, username: string, password: string, deviceId: string, publicKey: string, encryptedDeviceKey: string, salt: string) =>
+      emberServices.register(hostname, username, password, deviceId, publicKey, encryptedDeviceKey, salt),
+    registerWithRecovery: (hostname: string, username: string, password: string, deviceIdentity: unknown) =>
+      emberServices.registerWithRecovery(hostname, username, password, deviceIdentity),
+    validateLoginForm: (hostname: string, username: string, password: string) =>
+      emberServices.validateLoginForm(hostname, username, password),
+    validateRegisterForm: (hostname: string, username: string, password: string, confirmPassword: string) =>
+      emberServices.validateRegisterForm(hostname, username, password, confirmPassword),
+  },
+
+  messageService: {
+    fetchMessages: (auth: unknown, channelId: string, beforeId?: string) =>
+      emberServices.fetchMessages(auth, channelId, beforeId),
+    sendMessage: (auth: unknown, channelId: string, plaintext: string, emberKey: Uint8Array) =>
+      emberServices.sendMessage(auth, channelId, plaintext, emberKey),
+  },
+
+  emberService: {
+    fetchEmbers: (auth: unknown) => emberServices.fetchEmbers(auth),
+  },
+
+  channelService: {
+    fetchChannels: (auth: unknown, emberId: string) => emberServices.fetchChannels(auth, emberId),
+    fetchEmberKey: (auth: unknown, emberId: string) => emberServices.fetchEmberKey(auth, emberId),
+  },
+
+  wsService: {
+    buildWsUrl: (hostname: string, token: string) => emberServices.buildWsUrl(hostname, token),
   },
 });
 

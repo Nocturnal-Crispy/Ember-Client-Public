@@ -27,6 +27,10 @@ beforeAll(() => {
     },
     nacl: {},
     naclUtil: {},
+    messageService: {
+      fetchMessages: jest.fn().mockResolvedValue({ messages: [], hasMore: false }),
+      sendMessage: jest.fn().mockResolvedValue({ id: 'msg-1', ciphertext: 'enc' }),
+    },
   };
 
   // 3. Mock window.emberLog (createLogger called at load time)

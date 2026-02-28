@@ -29,6 +29,9 @@ beforeAll(() => {
     crypto: {},
     nacl: {},
     naclUtil: {},
+    wsService: {
+      buildWsUrl: jest.fn().mockReturnValue('ws://localhost:8086/ws?token=tok'),
+    },
   };
 
   // 3. Mock window.emberLog

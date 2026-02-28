@@ -118,6 +118,67 @@ Ember Server (WebSocket/HTTP)
 
 ------------------------------------------------------------------------
 
+## 🏗 Developer Architecture Reference
+
+### Source vs. Compiled Files
+
+**Always edit TypeScript source files, never compiled output:**
+
+| Source (edit these) | Compiled output (auto-generated) |
+|---------------------|----------------------------------|
+| `src/main.ts` | `public/src/js/main.js` |
+| `src/preload.ts` | `public/src/js/preload.js` |
+| `src/renderer/**/*.ts` | `public/src/js/**/*.js` |
+
+### Script Load Order (index.html)
+
+```
+logger.js → app-state.js → voice.js → ws-manager.js → [modules] → renderer.js
+```
+
+### Renderer Module Pattern (IIFE)
+
+Non-module `<script>` tags share the global lexical scope. All split-out modules **must** be wrapped in an IIFE to prevent `SyntaxError: Identifier already declared`:
+
+```javascript
+(function () {
+  const App = window.App;
+  const ipcRenderer = window.electronAPI.ipc;
+  const log = window.emberLog.createLogger('ModuleName');
+  // ... functions ...
+  window.myExportedFunc = myExportedFunc;  // explicit export
+})();
+```
+
+`renderer.js` stays as a plain top-level script (not IIFE); its `function` declarations auto-become globals.
+
+### ember-shared Bridge
+
+Platform-agnostic service logic lives in `ember-shared/`. The preload exposes it via `contextBridge`:
+
+```typescript
+// In renderer (no Node.js access):
+window.electronAPI.authService.login(payload)
+window.electronAPI.channelService.fetchChannels(authData, emberId)
+window.electronAPI.wsService.buildWsUrl(hostname, token)
+```
+
+Build automatically rebuilds `ember-shared` before compiling TypeScript (`build:shared && tsc`).
+
+### Structural Notes
+
+These files exceed the project's <200-instruction guideline and are candidates for future extraction:
+
+| File | Lines |
+|------|-------|
+| `src/renderer/managers/voice-ui-manager.ts` | 686 |
+| `src/renderer/managers/channel-manager.ts` | 542 |
+| `src/renderer/services/voice-service.ts` | 527 |
+| `src/renderer/managers/ember-manager.ts` | 501 |
+| `src/renderer/managers/renderer.ts` | 444 |
+
+------------------------------------------------------------------------
+
 ## 📦 Build & Distribution
 
 ### Development Builds
