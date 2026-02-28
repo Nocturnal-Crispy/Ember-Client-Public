@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 const nacl = require('tweetnacl');
 const naclUtil = require('tweetnacl-util');
-const emberCrypto = require('./renderer/services/crypto-service');
+const emberCrypto = require('ember-shared');
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
 function preloadLog(level: string, message: string, data?: Record<string, unknown>) {

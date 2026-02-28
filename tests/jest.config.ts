@@ -23,9 +23,11 @@ const config: Config = {
     "^.+\\.tsx?$": ["ts-jest", { diagnostics: false }],
   },
 
-  // TS path alias @/* → src/*
+  // TS path alias @/* → src/*; resolve ember-shared to source for fast test compilation
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^ember-shared$": "<rootDir>/../ember-shared/src/index",
+    "^ember-shared/(.*)$": "<rootDir>/../ember-shared/src/$1",
   },
 
   clearMocks: true,

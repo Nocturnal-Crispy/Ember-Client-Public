@@ -4,7 +4,8 @@
   "description": "Ember Client",
   "main": "public/src/js/main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:shared && tsc",
+    "build:shared": "cd ../ember-shared && npm install && npm run build && cd -",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -36,6 +37,7 @@
   },
   "dependencies": {
     "electron-store": "^8.1.0",
+    "ember-shared": "file:../ember-shared",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "uuid": "^13.0.0"

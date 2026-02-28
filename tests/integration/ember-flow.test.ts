@@ -28,7 +28,7 @@ import {
   decryptPrivateKeyWithRecoveryCode,
   encryptMessage,
   decryptMessage,
-} from '../../src/renderer/services/crypto-service';
+} from 'ember-shared';
 
 import * as nacl from 'tweetnacl';
 
