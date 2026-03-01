@@ -264,9 +264,9 @@ ipcMain.handle('save-device-identity', (_event, deviceIdentity) => {
 // ─── IPC: Auth storage ────────────────────────────────────────────────────────
 
 ipcMain.handle('get-auth', () => {
-  log.debug('IPC: get-auth');
+  // log.debug('IPC: get-auth');
   const auth = (store as any).get('auth') || null;
-  log.debug('Auth data retrieved', { has_auth: !!auth, username: auth?.username });
+  // log.debug('Auth data retrieved', { has_auth: !!auth, username: auth?.username });
   return auth;
 });
 
