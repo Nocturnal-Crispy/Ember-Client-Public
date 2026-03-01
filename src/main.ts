@@ -97,7 +97,7 @@ function createWindow(isAuthenticated: boolean) {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: false,
+      devTools: true,
     },
     frame: false,
     titleBarStyle: 'hidden',
