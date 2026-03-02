@@ -101,6 +101,22 @@
   color: var(--highlight);
 }
 
+.channel.has-unread .channel-name {
+  color: var(--highlight);
+  font-weight: 600;
+}
+
+.channel.has-unread::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--highlight);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* Drag-and-drop */
 .channel[draggable="true"],
 .channel-category[draggable="true"] {

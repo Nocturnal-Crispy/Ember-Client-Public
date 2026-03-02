@@ -180,9 +180,11 @@ declare global {
     connectWebSocket(): Promise<void>;
     disconnectWebSocket(): void;
     wsSubscribeToChannel(channelId: string): void;
+    wsUnsubscribeFromChannel(channelId: string): void;
     wsSubscribeToEmber(emberId: string): void;
     handlePresenceUpdate(payload: PresenceUpdatePayload): void;
     handleIncomingMessage(payload: Message): Promise<void>;
+    registerSentMessageId(id: string): void;
     // Globals set by message-service.ts
     sendEncryptedMessage(plaintext: string): Promise<void>;
     displayDecryptedMessage(msg: Message, prepend?: boolean): void;
@@ -207,6 +209,7 @@ declare global {
     closeChannelNameModal(): void;
     showChannelContextMenu(x: number, y: number, target: ContextMenuTarget): void;
     hideChannelContextMenu(): void;
+    markChannelUnread(channelId: string): void;
     // Globals set by invite-manager.ts
     openJoinServerModal(): void;
     closeJoinServerModal(): void;

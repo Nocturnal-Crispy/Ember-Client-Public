@@ -80,6 +80,7 @@
       channelEl.addEventListener('click', () => {
         document.querySelectorAll('.channel').forEach(el => el.classList.remove('active'));
         channelEl.classList.add('active');
+        channelEl.classList.remove('has-unread');
         if (channel.type === 'voice') {
           window.joinVoiceChannel(channel.id, channel.name);
         } else {
@@ -532,6 +533,11 @@
     }
   });
 
+  function markChannelUnread(channelId: string): void {
+    const el = document.querySelector<HTMLElement>(`.channel[data-channel-id="${channelId}"]`);
+    if (el) el.classList.add('has-unread');
+  }
+
   window.fetchChannels          = fetchChannels;
   window.fetchCategories        = fetchCategories;
   window.renderChannels         = renderChannels;
@@ -539,4 +545,5 @@
   window.closeChannelNameModal  = closeChannelNameModal;
   window.showChannelContextMenu = showChannelContextMenu;
   window.hideChannelContextMenu = hideChannelContextMenu;
+  window.markChannelUnread      = markChannelUnread;
 })();

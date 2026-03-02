@@ -7,6 +7,9 @@
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('WsManager');
 
+  const recentMessageIds = new Set<string>();
+  const DEDUP_MAX_SIZE = 50;
+
   async function connectWebSocket(): Promise<void> {
     if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN) return;
     log.debug('Connecting WebSocket');
@@ -95,6 +98,20 @@
     App.wsConnection.send(JSON.stringify({ type: 'subscribe_ember', ember_id: emberId }));
   }
 
+  function wsUnsubscribeFromChannel(channelId: string): void {
+    if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
+    log.debug('Unsubscribing from channel', { channel_id: channelId });
+    App.wsConnection.send(JSON.stringify({ type: 'unsubscribe', channel_id: channelId }));
+  }
+
+  function registerSentMessageId(id: string): void {
+    recentMessageIds.add(id);
+    if (recentMessageIds.size > DEDUP_MAX_SIZE) {
+      const first = recentMessageIds.values().next().value;
+      if (first !== undefined) recentMessageIds.delete(first);
+    }
+  }
+
   function handlePresenceUpdate(payload: { user_id: string; username: string; status: string }): void {
     const { user_id, username, status } = payload;
     const memberIdx = App.currentMembers.findIndex(m => m.user_id === user_id);
@@ -106,10 +123,15 @@
     window.renderMemberList(App.currentMembers);
   }
 
-  async function handleIncomingMessage(payload: { channel_id: string; sender_user_id: string } & Record<string, unknown>): Promise<void> {
-    if (payload.channel_id !== App.activeChannelId) return;
+  async function handleIncomingMessage(payload: { id: string; channel_id: string; sender_user_id: string } & Record<string, unknown>): Promise<void> {
+    if (payload.channel_id !== App.activeChannelId) {
+      window.markChannelUnread(payload.channel_id);
+      return;
+    }
+    if (recentMessageIds.has(payload.id)) return;
     const auth = await ipcRenderer.invoke('get-auth') as { user_id?: string } | null;
     if (auth && payload.sender_user_id === auth.user_id) return;
+    registerSentMessageId(payload.id);
     window.displayDecryptedMessage(payload as unknown as Parameters<typeof window.displayDecryptedMessage>[0]);
   }
 
@@ -124,10 +146,12 @@
     }
   }
 
-  window.connectWebSocket     = connectWebSocket;
-  window.disconnectWebSocket  = disconnectWebSocket;
-  window.wsSubscribeToChannel = wsSubscribeToChannel;
-  window.wsSubscribeToEmber   = wsSubscribeToEmber;
-  window.handlePresenceUpdate = handlePresenceUpdate;
-  window.handleIncomingMessage = handleIncomingMessage as unknown as typeof window.handleIncomingMessage;
+  window.connectWebSocket        = connectWebSocket;
+  window.disconnectWebSocket     = disconnectWebSocket;
+  window.wsSubscribeToChannel    = wsSubscribeToChannel;
+  window.wsUnsubscribeFromChannel = wsUnsubscribeFromChannel;
+  window.wsSubscribeToEmber      = wsSubscribeToEmber;
+  window.handlePresenceUpdate    = handlePresenceUpdate;
+  window.handleIncomingMessage   = handleIncomingMessage as unknown as typeof window.handleIncomingMessage;
+  window.registerSentMessageId   = registerSentMessageId;
 })();

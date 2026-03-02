@@ -29,6 +29,7 @@
       if (!auth || !auth.token || !auth.hostname) return;
       const msgData = await window.electronAPI.messageService.sendMessage(auth, App.activeChannelId, plaintext, emberKey);
       log.debug('Message sent successfully', { channel_id: App.activeChannelId, message_id: msgData.id });
+      window.registerSentMessageId(msgData.id);
       displayDecryptedMessage(msgData);
     } catch (error) {
       const err = error as Error;
@@ -137,7 +138,11 @@
     oldestMessageId = null;
     isLoadingOlderMessages = false;
     while (messagesContainer.firstChild) messagesContainer.removeChild(messagesContainer.firstChild);
+    const prevChannelId = App.activeChannelId;
     App.activeChannelId = channelId;
+    if (prevChannelId && prevChannelId !== channelId) {
+      window.wsUnsubscribeFromChannel(prevChannelId);
+    }
     window.wsSubscribeToChannel(channelId);
     const { messages, hasMore } = await fetchMessages(channelId);
     hasMoreMessages = hasMore;

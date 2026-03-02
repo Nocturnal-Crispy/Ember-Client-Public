@@ -217,3 +217,50 @@ describe('renderChannels', () => {
     expect(el.dataset['channelId']).toBe('ch-abc');
   });
 });
+
+// ─── markChannelUnread ────────────────────────────────────────────────────────
+
+describe('markChannelUnread', () => {
+  let channelsContainer: HTMLDivElement;
+
+  beforeEach(() => {
+    channelsContainer = document.createElement('div');
+    channelsContainer.className = 'channels';
+    document.body.appendChild(channelsContainer);
+  });
+
+  afterEach(() => {
+    document.body.removeChild(channelsContainer);
+  });
+
+  it('adds has-unread class to the matching channel element', () => {
+    (window as any).renderChannels(
+      [{ id: 'ch-bg', ember_id: 'e-1', name: 'background', type: 'text' as const }],
+      []
+    );
+
+    (window as any).markChannelUnread('ch-bg');
+
+    const el = channelsContainer.querySelector<HTMLElement>('.channel[data-channel-id="ch-bg"]');
+    expect(el?.classList.contains('has-unread')).toBe(true);
+  });
+
+  it('does not throw when the channel element does not exist', () => {
+    expect(() => (window as any).markChannelUnread('ch-nonexistent')).not.toThrow();
+  });
+
+  it('removes has-unread class when the channel is clicked', () => {
+    (window as any).renderChannels(
+      [{ id: 'ch-click', ember_id: 'e-1', name: 'clickme', type: 'text' as const }],
+      []
+    );
+    (window as any).markChannelUnread('ch-click');
+
+    const el = channelsContainer.querySelector<HTMLElement>('.channel[data-channel-id="ch-click"]')!;
+    expect(el.classList.contains('has-unread')).toBe(true);
+
+    el.click();
+
+    expect(el.classList.contains('has-unread')).toBe(false);
+  });
+});

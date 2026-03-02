@@ -167,6 +167,99 @@ describe('handlePresenceUpdate', () => {
   });
 });
 
+// ─── handleIncomingMessage ────────────────────────────────────────────────────
+
+describe('handleIncomingMessage', () => {
+  let mockDisplayDecryptedMessage: jest.Mock;
+  let mockMarkChannelUnread: jest.Mock;
+
+  beforeEach(() => {
+    mockDisplayDecryptedMessage = jest.fn();
+    mockMarkChannelUnread = jest.fn();
+    (window as any).displayDecryptedMessage = mockDisplayDecryptedMessage;
+    (window as any).markChannelUnread = mockMarkChannelUnread;
+    (window as any).App.activeChannelId = 'ch-active';
+    mockIpcInvoke.mockReset();
+  });
+
+  it('displays a message arriving on the active channel from a different user', async () => {
+    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    const payload = { id: 'msg-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+
+    await (window as any).handleIncomingMessage(payload);
+
+    expect(mockDisplayDecryptedMessage).toHaveBeenCalledWith(payload);
+    expect(mockMarkChannelUnread).not.toHaveBeenCalled();
+  });
+
+  it('does not display a message sent by the current user (self-filter)', async () => {
+    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    const payload = { id: 'msg-self-1', channel_id: 'ch-active', sender_user_id: 'user-self', ciphertext: 'abc', username: 'Me' };
+
+    await (window as any).handleIncomingMessage(payload);
+
+    expect(mockDisplayDecryptedMessage).not.toHaveBeenCalled();
+  });
+
+  it('calls markChannelUnread for a message arriving on a background channel', async () => {
+    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    const payload = { id: 'msg-bg-1', channel_id: 'ch-other', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+
+    await (window as any).handleIncomingMessage(payload);
+
+    expect(mockMarkChannelUnread).toHaveBeenCalledWith('ch-other');
+    expect(mockDisplayDecryptedMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not display a duplicate message (already in dedup set via registerSentMessageId)', async () => {
+    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    (window as any).registerSentMessageId('msg-dup-1');
+    const payload = { id: 'msg-dup-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+
+    await (window as any).handleIncomingMessage(payload);
+
+    expect(mockDisplayDecryptedMessage).not.toHaveBeenCalled();
+  });
+
+  it('displays a message when auth is null (cannot verify sender)', async () => {
+    mockIpcInvoke.mockResolvedValue(null);
+    const payload = { id: 'msg-noauth-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+
+    await (window as any).handleIncomingMessage(payload);
+
+    expect(mockDisplayDecryptedMessage).toHaveBeenCalledWith(payload);
+  });
+});
+
+// ─── wsUnsubscribeFromChannel ─────────────────────────────────────────────────
+
+describe('wsUnsubscribeFromChannel', () => {
+  it('sends an unsubscribe JSON message when the WebSocket is open', () => {
+    const mockWsSend = jest.fn();
+    (window as any).App.wsConnection = { readyState: WebSocket.OPEN, send: mockWsSend };
+
+    (window as any).wsUnsubscribeFromChannel('ch-123');
+
+    expect(mockWsSend).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'unsubscribe', channel_id: 'ch-123' })
+    );
+  });
+
+  it('does not send when the WebSocket is not open', () => {
+    const mockWsSend = jest.fn();
+    (window as any).App.wsConnection = { readyState: WebSocket.CLOSED, send: mockWsSend };
+
+    (window as any).wsUnsubscribeFromChannel('ch-123');
+
+    expect(mockWsSend).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when wsConnection is null', () => {
+    (window as any).App.wsConnection = null;
+    expect(() => (window as any).wsUnsubscribeFromChannel('ch-123')).not.toThrow();
+  });
+});
+
 // ─── disconnectWebSocket ──────────────────────────────────────────────────────
 
 describe('disconnectWebSocket', () => {
