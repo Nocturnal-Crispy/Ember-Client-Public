@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> For monorepo-level architecture (ember-server, ember-mobile, PM2 setup), see `../CLAUDE.md`.
+> For monorepo-level architecture (ember-server, ember-mobile), see `../CLAUDE.md`.
 
 ---
 

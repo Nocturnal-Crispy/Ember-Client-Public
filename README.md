@@ -122,6 +122,8 @@ Ember Server (WebSocket/HTTP)
 
 ### Source vs. Compiled Files
 
+<!-- AUTO-GENERATED from tsconfig.json -->
+
 **Always edit TypeScript source files, never compiled output:**
 
 | Source (edit these) | Compiled output (auto-generated) |
@@ -129,6 +131,8 @@ Ember Server (WebSocket/HTTP)
 | `src/main.ts` | `public/src/js/main.js` |
 | `src/preload.ts` | `public/src/js/preload.js` |
 | `src/renderer/**/*.ts` | `public/src/js/**/*.js` |
+
+<!-- END AUTO-GENERATED -->
 
 ### Script Load Order (index.html)
 
@@ -167,6 +171,8 @@ Build automatically rebuilds `ember-shared` before compiling TypeScript (`build:
 
 ### Structural Notes
 
+<!-- AUTO-GENERATED from codebase analysis -->
+
 These files exceed the project's <200-instruction guideline and are candidates for future extraction:
 
 | File | Lines |
@@ -177,9 +183,13 @@ These files exceed the project's <200-instruction guideline and are candidates f
 | `src/renderer/managers/ember-manager.ts` | 501 |
 | `src/renderer/managers/renderer.ts` | 444 |
 
+<!-- END AUTO-GENERATED -->
+
 ------------------------------------------------------------------------
 
 ## 📦 Build & Distribution
+
+<!-- AUTO-GENERATED from package.json scripts -->
 
 ### Development Builds
 
@@ -189,6 +199,12 @@ npm run build && npm start
 
 # Run tests
 npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage report
+npm test -- --coverage
 
 # Build for current platform
 npm run dist
@@ -206,6 +222,8 @@ npm run dist:win
 # macOS (DMG + ZIP)
 npm run dist:mac
 ```
+
+<!-- END AUTO-GENERATED -->
 
 ### Automated Release
 
@@ -358,6 +376,8 @@ npm --version
 
 ### Development Workflow
 
+<!-- AUTO-GENERATED from package.json scripts -->
+
 ```bash
 # Clone repository
 git clone https://github.com/Nocturnal-Crispy/Ember-Client-Public.git
@@ -372,12 +392,20 @@ npm run build && npm start
 # Run tests
 npm test
 
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
+
 # Type checking
 npm run build
 
 # Linting (if configured)
 npm run lint
 ```
+
+<!-- END AUTO-GENERATED -->
 
 ### Debug Mode
 
