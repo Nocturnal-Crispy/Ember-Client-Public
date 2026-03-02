@@ -67,6 +67,9 @@
         log.warn('WebSocket disconnected, scheduling reconnect in 3s');
         console.log('WebSocket disconnected');
         App.wsConnection = null;
+        if (typeof window.cleanupVoiceOnDisconnect === 'function') {
+          window.cleanupVoiceOnDisconnect();
+        }
         if (!App.wsReconnectTimer) {
           App.wsReconnectTimer = setTimeout(() => {
             App.wsReconnectTimer = null;

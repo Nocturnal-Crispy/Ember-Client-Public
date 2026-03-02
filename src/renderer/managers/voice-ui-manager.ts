@@ -678,6 +678,23 @@
     document.getElementById('vv-save-btn')?.addEventListener('click', saveVoiceVideoSettings);
   })();
 
+  function cleanupVoiceOnDisconnect(): void {
+    if (!App.voiceManager || !App.activeVoiceChannelId) return;
+    log.warn('WebSocket disconnected, cleaning up voice state', { channel_id: App.activeVoiceChannelId });
+    App.localCameraOn = false;
+    App.videoParticipants.clear();
+    updateVideoGridVisibility();
+    const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
+    if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '\u{1F4F7}'; cameraBtn.disabled = false; }
+    (App.voiceManager as { _cleanup(): void })._cleanup();
+    App.activeVoiceChannelId = null;
+    App.voiceParticipants.clear();
+    hideVoiceControls();
+    renderVoiceParticipants(null);
+    document.querySelectorAll('.voice-avatar.speaking').forEach(el => el.classList.remove('speaking'));
+    playVoiceSound('disconnect');
+  }
+
   window.joinVoiceChannel        = joinVoiceChannel;
   window.leaveVoiceChannel       = leaveVoiceChannel;
   window.handleVoiceUserJoined   = handleVoiceUserJoined;
@@ -690,5 +707,6 @@
   window.openSettingsModal       = openSettingsModal;
   window.closeSettingsModal      = closeSettingsModal;
   window.switchSettingsPage      = switchSettingsPage;
-  window.playVoiceSound          = playVoiceSound;
+  window.playVoiceSound             = playVoiceSound;
+  window.cleanupVoiceOnDisconnect   = cleanupVoiceOnDisconnect;
 })();

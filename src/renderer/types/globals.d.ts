@@ -232,6 +232,7 @@ declare global {
     closeSettingsModal(): void;
     switchSettingsPage(page: string): void;
     playVoiceSound(type: string): void;
+    cleanupVoiceOnDisconnect(): void;
     // Globals set by renderer.ts
     fetchMembers(emberId: string): Promise<Member[]>;
     renderMemberList(members: Member[]): void;
