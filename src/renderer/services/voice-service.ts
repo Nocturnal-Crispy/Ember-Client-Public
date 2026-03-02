@@ -148,10 +148,68 @@ class VoiceManager {
 
     this._setupLocalAudioMonitor();
 
-    _voiceLog.debug('Sending voice_join to server', { channel_id: channelId });
-    this.ws.send(JSON.stringify({ type: 'voice_join', channel_id: channelId }));
+    // Create peer connection before sending voice_join so we can include the
+    // offer in the join message. ion-SFU requires the client to be the offerer.
+    _voiceLog.debug('Creating RTCPeerConnection');
+    this.peerConnection = new RTCPeerConnection({ iceServers: this.iceServers });
 
-    _voiceLog.info('Voice channel join complete', { channel_id: channelId });
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        this.peerConnection!.addTrack(track, this.localStream!);
+      });
+    }
+
+    this.peerConnection.ontrack = (event: RTCTrackEvent) => {
+      const stream = event.streams[0];
+      if (!stream) return;
+      if (event.track.kind === 'audio') {
+        if (!this.remoteStreams.has(stream.id)) {
+          this.remoteStreams.set(stream.id, stream);
+          if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
+        }
+      } else if (event.track.kind === 'video') {
+        this.remoteVideoStreams.set(stream.id, stream);
+        if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
+      }
+    };
+
+    this.peerConnection.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+      if (event.candidate) {
+        this.ws.send(JSON.stringify({ type: 'voice_ice_candidate', channel_id: this.channelId, candidate: event.candidate }));
+      }
+    };
+
+    this.peerConnection.onconnectionstatechange = () => {
+      const state = this.peerConnection?.connectionState;
+      _voiceLog.info('Peer connection state changed', { state: state ?? 'unknown' });
+      console.log('[Voice] Connection state:', state);
+      if (state === 'connected' && this.onConnected) {
+        const cb = this.onConnected;
+        this.onConnected = null;
+        cb();
+      }
+    };
+
+    let offer: RTCSessionDescriptionInit;
+    try {
+      _voiceLog.debug('Creating WebRTC offer');
+      offer = await this.peerConnection.createOffer();
+      await this.peerConnection.setLocalDescription(offer);
+    } catch (e) {
+      _voiceLog.error('Failed to create WebRTC offer', { error: String(e) });
+      console.error('[Voice] Failed to create offer:', e);
+      this._cleanup();
+      return false;
+    }
+
+    _voiceLog.debug('Sending voice_join to server', { channel_id: channelId });
+    this.ws.send(JSON.stringify({
+      type: 'voice_join',
+      channel_id: channelId,
+      offer: { type: offer.type, sdp: offer.sdp },
+    }));
+
+    _voiceLog.info('Voice channel join initiated, offer sent', { channel_id: channelId });
     return true;
   }
 
@@ -192,66 +250,31 @@ class VoiceManager {
     }
   }
 
-  async handleOffer(sdp: RTCSessionDescriptionInit): Promise<void> {
-    if (!this.channelId) return;
-
-    _voiceLog.info('Received WebRTC offer from server, creating peer connection');
-    this.peerConnection = new RTCPeerConnection({ iceServers: this.iceServers });
-
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        this.peerConnection!.addTrack(track, this.localStream!);
-      });
-    }
-
-    this.peerConnection.ontrack = (event: RTCTrackEvent) => {
-      const stream = event.streams[0];
-      if (!stream) return;
-      if (event.track.kind === 'audio') {
-        if (!this.remoteStreams.has(stream.id)) {
-          this.remoteStreams.set(stream.id, stream);
-          if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
-        }
-      } else if (event.track.kind === 'video') {
-        this.remoteVideoStreams.set(stream.id, stream);
-        if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
-      }
-    };
-
-    this.peerConnection.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-      if (event.candidate) {
-        this.ws.send(JSON.stringify({ type: 'voice_ice_candidate', channel_id: this.channelId, candidate: event.candidate }));
-      }
-    };
-
-    this.peerConnection.onconnectionstatechange = () => {
-      const state = this.peerConnection?.connectionState;
-      _voiceLog.info('Peer connection state changed', { state: state ?? 'unknown' });
-      console.log('[Voice] Connection state:', state);
-      if (state === 'connected' && this.onConnected) {
-        const cb = this.onConnected;
-        this.onConnected = null;
-        cb();
-      }
-    };
-
-    _voiceLog.debug('Setting remote description from SFU offer');
+  // handleJoinAnswer is called when the SFU sends the answer to our initial
+  // join offer. Sets remote description and flushes any queued ICE candidates.
+  async handleJoinAnswer(sdp: RTCSessionDescriptionInit): Promise<void> {
+    if (!this.channelId || !this.peerConnection) return;
+    _voiceLog.info('Received SFU answer for initial offer');
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
     this._remoteDescSet = true;
-
     if (this._iceQueue.length > 0) {
       _voiceLog.debug('Flushing queued ICE candidates', { count: this._iceQueue.length });
       for (const c of this._iceQueue) {
         await this.peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(console.warn);
       }
+      this._iceQueue = [];
     }
-    this._iceQueue = [];
+  }
 
-    _voiceLog.debug('Creating WebRTC answer');
+  // handleOffer handles SFU renegotiation offers (sent when another participant
+  // joins or leaves). The peer connection already exists at this point.
+  async handleOffer(sdp: RTCSessionDescriptionInit): Promise<void> {
+    if (!this.channelId || !this.peerConnection) return;
+    _voiceLog.info('Received SFU renegotiation offer');
+    await this.peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
-
-    _voiceLog.info('WebRTC answer created and sent to server');
+    _voiceLog.info('Renegotiation answer sent to server');
     this.ws.send(JSON.stringify({ type: 'voice_answer', channel_id: this.channelId, sdp: answer }));
   }
 
@@ -385,10 +408,18 @@ class VoiceManager {
   handleMessage(msg: { type: string; payload: Record<string, unknown> }): void {
     _voiceLog.debug('WebSocket voice message received', { type: msg.type });
     switch (msg.type) {
+      case 'voice_answer': {
+        // Answer from SFU to our initial join offer — set remote description.
+        const raw = msg.payload['sdp'] as Record<string, unknown>;
+        if (raw && typeof raw['type'] === 'string' && typeof raw['sdp'] === 'string') {
+          this.handleJoinAnswer({ type: raw['type'] as RTCSdpType, sdp: raw['sdp'] });
+        } else {
+          _voiceLog.error('voice_answer received with invalid sdp payload', { payload: JSON.stringify(raw) });
+        }
+        break;
+      }
       case 'voice_offer': {
-        // payload.sdp is {type, sdp} forwarded from ion-SFU via the server.
-        // Validate both fields are present before handing off to avoid a silent
-        // RTCSessionDescription construction failure.
+        // Renegotiation offer from SFU (another participant joined/left).
         const raw = msg.payload['sdp'] as Record<string, unknown>;
         if (raw && typeof raw['type'] === 'string' && typeof raw['sdp'] === 'string') {
           this.handleOffer({ type: raw['type'] as RTCSdpType, sdp: raw['sdp'] });

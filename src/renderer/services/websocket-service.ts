@@ -44,7 +44,8 @@
             log.debug('WebSocket: presence_update', { user_id: String(data.payload['user_id'] ?? ''), status: String(data.payload['status'] ?? '') });
             handlePresenceUpdate(data.payload as Parameters<typeof handlePresenceUpdate>[0]);
           } else if (
-            data.type === 'voice_offer' || data.type === 'voice_ice_candidate' ||
+            data.type === 'voice_offer' || data.type === 'voice_answer' ||
+            data.type === 'voice_ice_candidate' ||
             data.type === 'voice_speaking' || data.type === 'voice_participants' ||
             data.type === 'voice_camera_on' || data.type === 'voice_camera_off'
           ) {

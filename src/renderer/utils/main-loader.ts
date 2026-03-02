@@ -13,16 +13,16 @@
   const FRAGMENT_BASE = 'src/html/';
 
   const SCRIPTS: string[] = [
-    'src/js/utils/logger.js',
-    'src/js/managers/app-state.js',
-    'src/js/services/voice-service.js',
-    'src/js/services/websocket-service.js',
-    'src/js/services/message-service.js',
-    'src/js/managers/channel-manager.js',
-    'src/js/managers/ember-manager.js',
-    'src/js/managers/invite-manager.js',
-    'src/js/managers/voice-ui-manager.js',
-    'src/js/managers/renderer.js',
+    'src/js/renderer/utils/logger.js',
+    'src/js/renderer/managers/app-state.js',
+    'src/js/renderer/services/voice-service.js',
+    'src/js/renderer/services/websocket-service.js',
+    'src/js/renderer/services/message-service.js',
+    'src/js/renderer/managers/channel-manager.js',
+    'src/js/renderer/managers/ember-manager.js',
+    'src/js/renderer/managers/invite-manager.js',
+    'src/js/renderer/managers/voice-ui-manager.js',
+    'src/js/renderer/managers/renderer.js',
   ];
 
   async function fetchFragment(name: string): Promise<string> {

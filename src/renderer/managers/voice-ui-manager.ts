@@ -66,6 +66,7 @@
       playVoiceSound('userJoin');
       App.activeVoiceChannelId = channelId;
       showVoiceControls(channelName);
+      renderVoiceParticipants(channelId);
     };
 
     const voiceSettings = await ipcRenderer.invoke('get-voice-video-settings').catch(() => null) as VoiceSettings | null;

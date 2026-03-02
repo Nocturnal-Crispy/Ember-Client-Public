@@ -13,8 +13,8 @@
   const FRAGMENT_BASE = 'src/html/';
 
   const SCRIPTS: string[] = [
-    'src/js/utils/logger.js',
-    'src/js/services/auth-service.js',
+    'src/js/renderer/utils/logger.js',
+    'src/js/renderer/services/auth-service.js',
   ];
 
   async function fetchFragment(name: string): Promise<string> {
