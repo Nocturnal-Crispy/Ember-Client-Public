@@ -34,6 +34,7 @@ class VoiceManager {
   isCameraOn: boolean;
   onCameraStateChanged: ((userId: string, isOn: boolean) => void) | null;
   onVideoStreamAdded: ((streamId: string, stream: MediaStream) => void) | null;
+  onConnected: (() => void) | null;
   _lastAudioSettings: VoiceSettings;
   _sensitivityThreshold: number;
   _audioCtx: AudioContext | null;
@@ -67,6 +68,7 @@ class VoiceManager {
     this.isCameraOn = false;
     this.onCameraStateChanged = null;
     this.onVideoStreamAdded = null;
+    this.onConnected = null;
     this._lastAudioSettings = {};
     this._sensitivityThreshold = 0.08;
     this._audioCtx = null;
@@ -165,6 +167,7 @@ class VoiceManager {
     this.channelId = null;
     this._remoteDescSet = false;
     this._iceQueue = [];
+    this.onConnected = null;
 
     if (this.peerConnection) { this.peerConnection.close(); this.peerConnection = null; }
     if (this.localStream) { this.localStream.getTracks().forEach(t => t.stop()); this.localStream = null; }
@@ -225,6 +228,11 @@ class VoiceManager {
       const state = this.peerConnection?.connectionState;
       _voiceLog.info('Peer connection state changed', { state: state ?? 'unknown' });
       console.log('[Voice] Connection state:', state);
+      if (state === 'connected' && this.onConnected) {
+        const cb = this.onConnected;
+        this.onConnected = null;
+        cb();
+      }
     };
 
     _voiceLog.debug('Setting remote description from SFU offer');
@@ -377,9 +385,18 @@ class VoiceManager {
   handleMessage(msg: { type: string; payload: Record<string, unknown> }): void {
     _voiceLog.debug('WebSocket voice message received', { type: msg.type });
     switch (msg.type) {
-      case 'voice_offer':
-        this.handleOffer(msg.payload['sdp'] as RTCSessionDescriptionInit);
+      case 'voice_offer': {
+        // payload.sdp is {type, sdp} forwarded from ion-SFU via the server.
+        // Validate both fields are present before handing off to avoid a silent
+        // RTCSessionDescription construction failure.
+        const raw = msg.payload['sdp'] as Record<string, unknown>;
+        if (raw && typeof raw['type'] === 'string' && typeof raw['sdp'] === 'string') {
+          this.handleOffer({ type: raw['type'] as RTCSdpType, sdp: raw['sdp'] });
+        } else {
+          _voiceLog.error('voice_offer received with invalid sdp payload', { payload: JSON.stringify(raw) });
+        }
         break;
+      }
       case 'voice_ice_candidate':
         this.handleRemoteICECandidate(msg.payload['candidate'] as RTCIceCandidateInit);
         break;

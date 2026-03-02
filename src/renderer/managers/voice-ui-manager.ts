@@ -58,14 +58,21 @@
       vm.auth = auth;
     }
 
+    // Register the SFU-connected callback before joining so UI and sound fire only
+    // once the WebRTC peer connection to the SFU is actually established.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (App.voiceManager as any).onConnected = () => {
+      log.info('SFU connection established, showing voice controls', { channel_id: channelId });
+      playVoiceSound('userJoin');
+      App.activeVoiceChannelId = channelId;
+      showVoiceControls(channelName);
+    };
+
     const voiceSettings = await ipcRenderer.invoke('get-voice-video-settings').catch(() => null) as VoiceSettings | null;
     const joined = await (App.voiceManager as { joinChannel(id: string, s: VoiceSettings | null): Promise<boolean> }).joinChannel(channelId, voiceSettings);
     if (!joined) { log.error('Failed to join voice channel', { channel_id: channelId }); return; }
 
-    log.info('Voice channel joined successfully', { channel_id: channelId });
-    playVoiceSound('userJoin');
-    App.activeVoiceChannelId = channelId;
-    showVoiceControls(channelName);
+    log.info('Voice channel join initiated, waiting for SFU connection', { channel_id: channelId });
   }
 
   async function leaveVoiceChannel(): Promise<void> {
