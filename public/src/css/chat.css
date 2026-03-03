@@ -59,6 +59,44 @@
   font-size: 16px;
 }
 
+/* Channel welcome banner — shown at the top of every text channel */
+.channel-welcome-banner {
+  padding: 16px 0 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.1);
+}
+
+.channel-welcome-heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--highlight);
+  margin: 0 0 8px;
+}
+
+.channel-welcome-subtitle {
+  font-size: 15px;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+.channel-welcome-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  border-radius: 4px;
+  color: var(--highlight);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-time);
+}
+
+.channel-welcome-edit-btn:hover {
+  background-color: rgba(var(--rgb-highlight), 0.2);
+}
+
 .message {
   display: flex;
   padding: 8px 0;

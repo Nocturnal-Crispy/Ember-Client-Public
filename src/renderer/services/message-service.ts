@@ -78,7 +78,9 @@
     messageDiv.appendChild(contentEl);
     if (messagesContainer) {
       if (prepend) {
-        messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+        const banner = messagesContainer.querySelector('.channel-welcome-banner');
+        const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
+        messagesContainer.insertBefore(messageDiv, referenceNode);
       } else {
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -144,6 +146,36 @@
       window.wsUnsubscribeFromChannel(prevChannelId);
     }
     window.wsSubscribeToChannel(channelId);
+
+    // Channel welcome banner — reads name from header (set by updateChatHeader before this call)
+    const channelName = document.querySelector('.chat-header .channel-title')?.textContent ?? '';
+    const banner = document.createElement('div');
+    banner.className = 'channel-welcome-banner';
+
+    const heading = document.createElement('h2');
+    heading.className = 'channel-welcome-heading';
+    heading.textContent = `Welcome to #${channelName}!`;
+
+    const subtitle = document.createElement('p');
+    subtitle.className = 'channel-welcome-subtitle';
+    subtitle.textContent = `This is the start of the #${channelName} channel.`;
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'channel-welcome-edit-btn';
+    const pencilSpan = document.createElement('span');
+    pencilSpan.textContent = '✏ ';
+    editBtn.appendChild(pencilSpan);
+    editBtn.appendChild(document.createTextNode('Edit Channel'));
+    editBtn.addEventListener('click', () => {
+      const desc = document.querySelector('.chat-header .channel-description')?.textContent ?? '';
+      window.openChannelNameModal('edit-channel', null, channelId, channelName, desc);
+    });
+
+    banner.appendChild(heading);
+    banner.appendChild(subtitle);
+    banner.appendChild(editBtn);
+    messagesContainer.appendChild(banner);
+
     const { messages, hasMore } = await fetchMessages(channelId);
     hasMoreMessages = hasMore;
     if (messages.length > 0) oldestMessageId = messages[0].id;
