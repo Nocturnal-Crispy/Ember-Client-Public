@@ -201,6 +201,11 @@
 
     // Clear stale voice presence from the previous ember before fetching the new one
     App.voiceChannelPresence.clear();
+    // If the user is in an active voice channel, restore their participants immediately
+    // from local session state so renderChannels can display them before the server fetch
+    if (App.activeVoiceChannelId && App.voiceParticipants.size > 0) {
+      App.voiceChannelPresence.set(App.activeVoiceChannelId, new Map(App.voiceParticipants));
+    }
 
     await fetchEmberKey(emberId);
     const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
