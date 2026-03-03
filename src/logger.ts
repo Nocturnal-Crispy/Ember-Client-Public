@@ -44,11 +44,7 @@ function levelColor(level: LogLevel): string {
   }
 }
 
-let minLevel: LogLevel = LogLevel.DEBUG;
-
-export function setLogLevel(level: LogLevel): void {
-  minLevel = level;
-}
+const minLevel: LogLevel = LogLevel.DEBUG;
 
 function write(level: LogLevel, context: string, message: string, data?: Record<string, unknown>): void {
   if (level < minLevel) return;
@@ -84,4 +80,3 @@ export function createLogger(context: string): Logger {
   };
 }
 
-export const logger = createLogger('Main');

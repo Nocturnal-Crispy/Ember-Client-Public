@@ -110,17 +110,21 @@
         if (!App.dragItem || App.dragItem.type !== 'channel') return;
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = channelEl.getBoundingClientRect();
+        const insertAfter = e.clientY > rect.top + rect.height / 2;
         clearDragHighlights();
-        channelEl.classList.add('drag-over-top');
+        channelEl.classList.add(insertAfter ? 'drag-over-bottom' : 'drag-over-top');
       });
-      channelEl.addEventListener('dragleave', () => { channelEl.classList.remove('drag-over-top'); });
+      channelEl.addEventListener('dragleave', () => { clearDragHighlights(); });
       channelEl.addEventListener('drop', async (e: DragEvent) => {
         e.preventDefault();
         clearDragHighlights();
         if (!App.dragItem || App.dragItem.type !== 'channel' || App.dragItem.id === channel.id) return;
+        const rect = channelEl.getBoundingClientRect();
+        const insertAfter = e.clientY > rect.top + rect.height / 2;
         const dropped = App.dragItem;
         App.dragItem = null;
-        await reorderChannels(dropped.id, channel.id, channel.category_id ?? null);
+        await reorderChannels(dropped.id, channel.id, channel.category_id ?? null, insertAfter);
       });
 
       if (!autoSelect && channel.type === 'text') autoSelect = { el: channelEl, channel };
@@ -166,12 +170,19 @@
       });
       catEl.addEventListener('dragend', () => { catEl.classList.remove('dragging'); clearDragHighlights(); });
       catEl.addEventListener('dragover', (e: DragEvent) => {
+        if (!App.dragItem) return;
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = catEl.getBoundingClientRect();
+        const insertAfter = e.clientY > rect.top + rect.height / 2;
         clearDragHighlights();
-        catEl.classList.add('drag-over-top');
+        if (App.dragItem.type === 'channel') {
+          catEl.classList.add('drag-over-top');
+        } else {
+          catEl.classList.add(insertAfter ? 'drag-over-bottom' : 'drag-over-top');
+        }
       });
-      catEl.addEventListener('dragleave', () => { catEl.classList.remove('drag-over-top'); });
+      catEl.addEventListener('dragleave', () => { clearDragHighlights(); });
       catEl.addEventListener('drop', async (e: DragEvent) => {
         e.preventDefault();
         clearDragHighlights();
@@ -181,7 +192,9 @@
         if (dropped.type === 'channel') {
           await reorderChannels(dropped.id, null, cat.id);
         } else if (dropped.type === 'category' && dropped.id !== cat.id) {
-          await reorderCategories(dropped.id, cat.id);
+          const rect = catEl.getBoundingClientRect();
+          const insertAfter = e.clientY > rect.top + rect.height / 2;
+          await reorderCategories(dropped.id, cat.id, insertAfter);
         }
       });
       channelsContainer.appendChild(catEl);
@@ -204,10 +217,12 @@
   }
 
   function clearDragHighlights(): void {
-    document.querySelectorAll('.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+      el.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
   }
 
-  async function reorderChannels(draggedId: string, beforeChannelId: string | null, newCategoryId: string | null): Promise<void> {
+  async function reorderChannels(draggedId: string, relativeToChannelId: string | null, newCategoryId: string | null, insertAfter = false): Promise<void> {
     log.debug('Reordering channels', { dragged_id: draggedId });
     const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
     if (!auth || !auth.token || !auth.hostname || !App.activeEmberId) return;
@@ -222,11 +237,15 @@
       const catId = el.dataset['catId'] ?? null;
       if (!id) continue;
       if (id === draggedId) continue;
-      if (beforeChannelId && id === beforeChannelId) {
+      if (!insertAfter && relativeToChannelId && id === relativeToChannelId) {
         updates.push({ id: draggedId, position: position++, category_id: newCategoryId ?? null });
         inserted = true;
       }
       updates.push({ id, position: position++, category_id: catId === '' ? null : catId });
+      if (insertAfter && relativeToChannelId && id === relativeToChannelId) {
+        updates.push({ id: draggedId, position: position++, category_id: newCategoryId ?? null });
+        inserted = true;
+      }
     }
     if (!inserted) updates.push({ id: draggedId, position, category_id: newCategoryId ?? null });
 
@@ -243,7 +262,7 @@
     }
   }
 
-  async function reorderCategories(draggedId: string, beforeCategoryId: string): Promise<void> {
+  async function reorderCategories(draggedId: string, relativeToCategoryId: string, insertAfter = false): Promise<void> {
     const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
     if (!auth || !auth.token || !auth.hostname || !App.activeEmberId) return;
 
@@ -256,8 +275,9 @@
       const id = el.dataset['categoryId'];
       if (!id) continue;
       if (id === draggedId) continue;
-      if (id === beforeCategoryId) { updates.push({ id: draggedId, position: position++ }); inserted = true; }
+      if (!insertAfter && id === relativeToCategoryId) { updates.push({ id: draggedId, position: position++ }); inserted = true; }
       updates.push({ id, position: position++ });
+      if (insertAfter && id === relativeToCategoryId) { updates.push({ id: draggedId, position: position++ }); inserted = true; }
     }
     if (!inserted) updates.push({ id: draggedId, position });
 

@@ -118,20 +118,19 @@
 }
 
 /* Drag-and-drop */
-.channel[draggable="true"],
-.channel-category[draggable="true"] {
-  cursor: grab;
-}
-
 .channel.dragging,
 .channel-category.dragging {
   opacity: 0.4;
-  cursor: grabbing;
 }
 
 .channel.drag-over-top,
 .channel-category.drag-over-top {
   border-top: 2px solid #5865f2;
+}
+
+.channel.drag-over-bottom,
+.channel-category.drag-over-bottom {
+  border-bottom: 2px solid #5865f2;
 }
 
 /* Description textarea in channel modal */
