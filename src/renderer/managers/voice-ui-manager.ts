@@ -17,6 +17,7 @@
     log.info('Joining voice channel', { channel_id: channelId, name: channelName });
 
     if (App.activeVoiceChannelId && App.activeVoiceChannelId !== channelId && App.voiceManager) {
+      const leavingChannelId = App.activeVoiceChannelId;
       if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
         App.wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
       }
@@ -26,6 +27,19 @@
       const cameraBtn = document.getElementById('voice-camera-btn');
       if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '📷'; }
       await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
+
+      // Optimistically remove self from sidebar presence for the channel being left
+      const leavingSelfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+      if (leavingSelfId) {
+        const presence = App.voiceChannelPresence.get(leavingChannelId);
+        if (presence) {
+          const updated = new Map(presence);
+          updated.delete(leavingSelfId);
+          App.voiceChannelPresence.set(leavingChannelId, updated);
+          renderVoiceParticipants(leavingChannelId);
+        }
+      }
+
       App.activeVoiceChannelId = null;
       App.voiceParticipants.clear();
       hideVoiceControls();
@@ -45,8 +59,13 @@
       const vm = App.voiceManager as any;
       vm.onSpeakingChanged    = (userId: string, isSpeaking: boolean) => updateSpeakingIndicator(userId, isSpeaking);
       vm.onParticipantsChanged = (participants: { user_id: string; username: string }[]) => {
+        // Update own-session participant list (used for video grid)
         App.voiceParticipants.clear();
         participants.forEach((p: { user_id: string; username: string }) => App.voiceParticipants.set(p.user_id, p.username));
+        // Update cross-channel presence for this channel's sidebar using captured channelId
+        const presenceMap = new Map<string, string>();
+        participants.forEach((p: { user_id: string; username: string }) => presenceMap.set(p.user_id, p.username));
+        App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
       };
       vm.onCameraStateChanged = (userId: string, isOn: boolean) => handleRemoteCameraStateChanged(userId, isOn);
@@ -56,6 +75,15 @@
       const vm = App.voiceManager as any;
       vm.ws   = App.wsConnection!;
       vm.auth = auth;
+      // Re-capture channelId in the participants callback for the new channel
+      vm.onParticipantsChanged = (participants: { user_id: string; username: string }[]) => {
+        App.voiceParticipants.clear();
+        participants.forEach((p: { user_id: string; username: string }) => App.voiceParticipants.set(p.user_id, p.username));
+        const presenceMap = new Map<string, string>();
+        participants.forEach((p: { user_id: string; username: string }) => presenceMap.set(p.user_id, p.username));
+        App.voiceChannelPresence.set(channelId, presenceMap);
+        renderVoiceParticipants(App.activeVoiceChannelId);
+      };
     }
 
     // Register the SFU-connected callback before joining so UI and sound fire only
@@ -78,7 +106,8 @@
 
   async function leaveVoiceChannel(): Promise<void> {
     if (!App.voiceManager) return;
-    log.info('Leaving voice channel', { channel_id: App.activeVoiceChannelId ?? '' });
+    const leavingChannelId = App.activeVoiceChannelId;
+    log.info('Leaving voice channel', { channel_id: leavingChannelId ?? '' });
     if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
       App.wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
     }
@@ -88,32 +117,64 @@
     const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '📷'; cameraBtn.disabled = false; }
     await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
+
+    // Optimistically remove self from sidebar presence before the server confirms
+    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+    if (selfId && leavingChannelId) {
+      const presence = App.voiceChannelPresence.get(leavingChannelId);
+      if (presence) {
+        const updated = new Map(presence);
+        updated.delete(selfId);
+        App.voiceChannelPresence.set(leavingChannelId, updated);
+        renderVoiceParticipants(leavingChannelId);
+      }
+    }
+
     App.activeVoiceChannelId = null;
     App.voiceParticipants.clear();
     hideVoiceControls();
-    renderVoiceParticipants(null);
     document.querySelectorAll('.voice-avatar.speaking').forEach(el => el.classList.remove('speaking'));
   }
 
   function handleVoiceUserJoined(payload: { channel_id: string; user_id: string; username: string }): void {
     const { channel_id, user_id, username } = payload;
     log.info('Voice user joined', { channel_id, user_id, username });
-    App.voiceParticipants.set(user_id, username);
+
+    // Update cross-channel sidebar presence (visible to all ember members)
+    const existingJoined = App.voiceChannelPresence.get(channel_id) ?? new Map<string, string>();
+    App.voiceChannelPresence.set(channel_id, new Map(existingJoined).set(user_id, username));
     renderVoiceParticipants(channel_id);
-    playVoiceSound('userJoin');
+
+    // Only update own-session state and play sound when it's our active channel
+    if (channel_id === App.activeVoiceChannelId) {
+      App.voiceParticipants.set(user_id, username);
+      playVoiceSound('userJoin');
+    }
   }
 
   function handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void {
     const { channel_id, user_id } = payload;
     log.info('Voice user left', { channel_id, user_id });
-    App.voiceParticipants.delete(user_id);
-    App.videoParticipants.delete(user_id);
-    removeVideoTile(user_id);
-    updateVideoGridVisibility();
-    renderVoiceParticipants(channel_id);
-    updateSpeakingIndicator(user_id, false);
-    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
-    if (user_id !== selfId) playVoiceSound('userLeave');
+
+    // Update cross-channel sidebar presence
+    const channelPresence = App.voiceChannelPresence.get(channel_id);
+    if (channelPresence) {
+      const updated = new Map(channelPresence);
+      updated.delete(user_id);
+      App.voiceChannelPresence.set(channel_id, updated);
+      renderVoiceParticipants(channel_id);
+    }
+
+    // Only update own-session state when it's our active channel
+    if (channel_id === App.activeVoiceChannelId) {
+      App.voiceParticipants.delete(user_id);
+      App.videoParticipants.delete(user_id);
+      removeVideoTile(user_id);
+      updateVideoGridVisibility();
+      updateSpeakingIndicator(user_id, false);
+      const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+      if (user_id !== selfId) playVoiceSound('userLeave');
+    }
   }
 
   function renderVoiceParticipants(channelId: string | null): void {
@@ -124,7 +185,9 @@
     const list = document.querySelector<HTMLElement>(`.voice-participant-list[data-voice-channel-id="${channelId}"]`);
     if (!list) return;
     list.replaceChildren();
-    App.voiceParticipants.forEach((username, userId) => {
+    const participants = App.voiceChannelPresence.get(channelId);
+    if (!participants) return;
+    participants.forEach((username, userId) => {
       const item = document.createElement('div');
       item.className = 'voice-participant';
       item.dataset['userId'] = userId;
@@ -139,6 +202,29 @@
       item.appendChild(nameEl);
       list.appendChild(item);
     });
+  }
+
+  // Fetch voice presence for all voice channels in an ember and render them in the sidebar.
+  async function fetchAndRenderVoicePresence(emberId: string): Promise<void> {
+    const auth = await ipcRenderer.invoke('get-auth') as { token?: string; hostname?: string } | null;
+    if (!auth || !auth.token || !auth.hostname) return;
+    try {
+      const res = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/voice/participants`, {
+        headers: { 'Authorization': `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { channels: Record<string, Array<{ user_id: string; username: string }>> };
+      App.voiceChannelPresence.clear();
+      for (const [channelId, participants] of Object.entries(data.channels)) {
+        const presenceMap = new Map<string, string>();
+        for (const p of participants) presenceMap.set(p.user_id, p.username);
+        App.voiceChannelPresence.set(channelId, presenceMap);
+      }
+      // Re-render all voice participant lists that are currently in the DOM
+      App.voiceChannelPresence.forEach((_, channelId) => renderVoiceParticipants(channelId));
+    } catch (e) {
+      log.error('Failed to fetch voice presence', { error: String(e) });
+    }
   }
 
   function updateSpeakingIndicator(userId: string, isSpeaking: boolean): void {
@@ -679,8 +765,13 @@
   })();
 
   function cleanupVoiceOnDisconnect(): void {
+    log.warn('WebSocket disconnected, cleaning up voice state');
+    // Clear all sidebar voice presence — data is stale until reconnected
+    App.voiceChannelPresence.clear();
+    renderVoiceParticipants(null);
+
     if (!App.voiceManager || !App.activeVoiceChannelId) return;
-    log.warn('WebSocket disconnected, cleaning up voice state', { channel_id: App.activeVoiceChannelId });
+    log.warn('Cleaning up active voice session', { channel_id: App.activeVoiceChannelId });
     App.localCameraOn = false;
     App.videoParticipants.clear();
     updateVideoGridVisibility();
@@ -690,11 +781,11 @@
     App.activeVoiceChannelId = null;
     App.voiceParticipants.clear();
     hideVoiceControls();
-    renderVoiceParticipants(null);
     document.querySelectorAll('.voice-avatar.speaking').forEach(el => el.classList.remove('speaking'));
     playVoiceSound('disconnect');
   }
 
+  window.fetchAndRenderVoicePresence = fetchAndRenderVoicePresence;
   window.joinVoiceChannel        = joinVoiceChannel;
   window.leaveVoiceChannel       = leaveVoiceChannel;
   window.handleVoiceUserJoined   = handleVoiceUserJoined;

@@ -21,6 +21,7 @@ window.App = {
   voiceManager: null,
   activeVoiceChannelId: null,
   voiceParticipants: new Map<string, string>(),
+  voiceChannelPresence: new Map<string, Map<string, string>>(),
 
   // ── Camera / video ───────────────────────────────────────────────────────
   videoParticipants: new Set<string>(),

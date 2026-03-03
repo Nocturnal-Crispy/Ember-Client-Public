@@ -214,6 +214,14 @@
       window.updateChatHeader(autoSelectEntry.channel.name, autoSelectEntry.channel.description ?? '');
       window.loadChannelMessages(autoSelectEntry.channel.id);
     }
+
+    // Repopulate voice participant lists from existing presence data.
+    // renderChannels rebuilds the DOM, so the .voice-participant-list elements are new and empty.
+    if (App.voiceChannelPresence.size > 0) {
+      App.voiceChannelPresence.forEach((_, channelId) => {
+        window.renderVoiceParticipants(channelId);
+      });
+    }
   }
 
   function clearDragHighlights(): void {

@@ -199,6 +199,9 @@
     const serverHeader = document.querySelector('.server-header h3');
     if (serverHeader) serverHeader.textContent = emberName;
 
+    // Clear stale voice presence from the previous ember before fetching the new one
+    App.voiceChannelPresence.clear();
+
     await fetchEmberKey(emberId);
     const auth = await ipcRenderer.invoke('get-auth') as AuthData | null;
     let channels: Channel[] = [];
@@ -209,6 +212,8 @@
       categories = result.categories;
     }
     window.renderChannels(channels, categories);
+    // Fetch and display current voice presence for all voice channels in this ember
+    await window.fetchAndRenderVoicePresence(emberId);
     const members = await window.fetchMembers(emberId);
     window.renderMemberList(members);
     window.wsSubscribeToEmber(emberId);

@@ -150,6 +150,7 @@ declare global {
     voiceManager: unknown | null;
     activeVoiceChannelId: string | null;
     voiceParticipants: Map<string, string>;
+    voiceChannelPresence: Map<string, Map<string, string>>;
     videoParticipants: Set<string>;
     localCameraOn: boolean;
     videoGridVisible: boolean;
@@ -219,6 +220,7 @@ declare global {
     closeAcceptInviteModal(): void;
     processInviteLink(code: string, hostname: string | null): Promise<void>;
     // Globals set by voice-ui-manager.ts
+    fetchAndRenderVoicePresence(emberId: string): Promise<void>;
     joinVoiceChannel(channelId: string, channelName: string): Promise<void>;
     leaveVoiceChannel(): Promise<void>;
     handleVoiceUserJoined(payload: { channel_id: string; user_id: string; username: string }): void;
