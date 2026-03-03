@@ -1,6 +1,6 @@
 {
   "name": "ember-client",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Ember Client",
   "main": "public/src/js/main.js",
   "scripts": {
