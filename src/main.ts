@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, net } from 'electron';
 import * as path from 'path';
 import Store from 'electron-store';
 import { createLogger, LogLevel } from './logger';
+import { isNewerVersion } from './version-utils';
 
 const log = createLogger('Main');
 
@@ -303,6 +304,40 @@ ipcMain.handle('save-voice-video-settings', (_event, settings: VoiceVideoSetting
   (store as any).set('voiceVideoSettings', settings);
   log.info('Voice/video settings saved');
   return true;
+});
+
+// ─── IPC: Update check ────────────────────────────────────────────────────────
+
+interface UpdateInfo {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string | null;
+  error?: string;
+}
+
+ipcMain.handle('check-for-update', async (): Promise<UpdateInfo> => {
+  const currentVersion = app.getVersion();
+  try {
+    const response = await net.fetch(
+      'https://api.github.com/repos/Nocturnal-Crispy/Ember-Client-Public/releases/latest',
+      { headers: { 'User-Agent': 'ember-client' } }
+    );
+    if (!response.ok) {
+      return { updateAvailable: false, currentVersion, latestVersion: null, error: `HTTP ${response.status}` };
+    }
+    const data = await response.json() as { tag_name?: string };
+    const tag = data?.tag_name;
+    if (typeof tag !== 'string' || !/^\d+\.\d+\.\d+$/.test(tag.replace(/^v/, ''))) {
+      return { updateAvailable: false, currentVersion, latestVersion: null, error: 'Invalid tag format' };
+    }
+    const latestVersion = tag.replace(/^v/, '');
+    const updateAvailable = isNewerVersion(currentVersion, latestVersion);
+    log.debug('Update check complete', { currentVersion, latestVersion, updateAvailable });
+    return { updateAvailable, currentVersion, latestVersion };
+  } catch (err) {
+    log.debug('Update check failed (network or parse error)');
+    return { updateAvailable: false, currentVersion, latestVersion: null, error: String(err) };
+  }
 });
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@
     'src/js/renderer/managers/ember-manager.js',
     'src/js/renderer/managers/invite-manager.js',
     'src/js/renderer/managers/voice-ui-manager.js',
+    'src/js/renderer/managers/update-notifier.js',
     'src/js/renderer/managers/renderer.js',
   ];
 

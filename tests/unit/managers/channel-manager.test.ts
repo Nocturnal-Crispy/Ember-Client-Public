@@ -52,6 +52,7 @@ beforeAll(() => {
   (window as any).updateChatHeader = jest.fn();
   (window as any).loadChannelMessages = jest.fn();
   (window as any).joinVoiceChannel = jest.fn();
+  (window as any).showTextChannelView = jest.fn();
 
   // 5. Load the IIFE
   require('../../../src/renderer/managers/channel-manager');

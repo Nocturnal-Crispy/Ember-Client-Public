@@ -47,6 +47,15 @@ declare global {
   type OscillatorType = import('ember-shared').OscillatorType;
   type SoundDef = import('ember-shared').SoundDef;
 
+  // ─── Update check ─────────────────────────────────────────────────────────
+
+  interface UpdateInfo {
+    updateAvailable: boolean;
+    currentVersion: string;
+    latestVersion: string | null;
+    error?: string;
+  }
+
   // ─── Electron bridge APIs ─────────────────────────────────────────────────
 
   interface EmberLogger {
@@ -238,6 +247,9 @@ declare global {
     switchSettingsPage(page: string): void;
     playVoiceSound(type: string): void;
     cleanupVoiceOnDisconnect(): void;
+    // Globals set by update-notifier.ts
+    checkForUpdate(): Promise<void>;
+    dismissUpdateNotification(): void;
     // Globals set by renderer.ts
     fetchMembers(emberId: string): Promise<Member[]>;
     renderMemberList(members: Member[]): void;
