@@ -6,11 +6,16 @@
 
   const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
   const NOTIFICATION_ID = 'ember-update-notification';
+  const DOWNLOAD_URL = 'https://ember-chat.com';
 
   function createNotificationElement(latestVersion: string): HTMLElement {
-    const container = document.createElement('div');
+    const container = document.createElement('button');
     container.id = NOTIFICATION_ID;
     container.className = 'update-notification';
+    container.setAttribute('aria-label', `Update available: v${latestVersion}. Click to download.`);
+    container.addEventListener('click', () => {
+      window.electronAPI.ipc.invoke('open-external-url', DOWNLOAD_URL);
+    });
 
     const icon = document.createElement('span');
     icon.className = 'update-notification__icon';
@@ -18,13 +23,15 @@
 
     const text = document.createElement('span');
     text.className = 'update-notification__text';
-    text.textContent = `Update available: v${latestVersion}`;
+    text.textContent = `Update available v${latestVersion}`;
 
-    const dismiss = document.createElement('button');
+    const dismiss = document.createElement('span');
     dismiss.className = 'update-notification__dismiss';
+    dismiss.setAttribute('role', 'button');
     dismiss.setAttribute('aria-label', 'Dismiss update notification');
     dismiss.textContent = '✕';
-    dismiss.addEventListener('click', () => {
+    dismiss.addEventListener('click', (e) => {
+      e.stopPropagation();
       dismissUpdateNotification();
     });
 
@@ -37,15 +44,18 @@
   function showNotification(latestVersion: string): void {
     const existing = document.getElementById(NOTIFICATION_ID);
     if (existing) {
-      // Update text in case version changed
       const textEl = existing.querySelector('.update-notification__text');
-      if (textEl) {
-        textEl.textContent = `Update available: v${latestVersion}`;
-      }
+      if (textEl) textEl.textContent = `Update available v${latestVersion}`;
       return;
     }
+    const windowControls = document.querySelector('.window-controls');
+    if (!windowControls) {
+      log.warn('Could not find .window-controls to insert update notification');
+      return;
+    }
+    const minimizeBtn = document.getElementById('minimize-btn');
     const el = createNotificationElement(latestVersion);
-    document.body.appendChild(el);
+    windowControls.insertBefore(el, minimizeBtn);
     log.info('Update notification shown', { latestVersion });
   }
 

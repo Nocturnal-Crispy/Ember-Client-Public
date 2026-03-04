@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell } from 'electron';
 import * as path from 'path';
 import Store from 'electron-store';
 import { createLogger, LogLevel } from './logger';
@@ -338,6 +338,11 @@ ipcMain.handle('check-for-update', async (): Promise<UpdateInfo> => {
     log.debug('Update check failed (network or parse error)');
     return { updateAvailable: false, currentVersion, latestVersion: null, error: String(err) };
   }
+});
+
+ipcMain.handle('open-external-url', (_event, url: unknown) => {
+  if (typeof url !== 'string' || !url.startsWith('https://')) return;
+  shell.openExternal(url);
 });
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────

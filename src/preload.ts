@@ -37,6 +37,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   'get-voice-video-settings',
   'save-voice-video-settings',
   'check-for-update',
+  'open-external-url',
 ];
 
 const ALLOWED_ON: readonly string[] = ['handle-invite-link'];

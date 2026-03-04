@@ -7,9 +7,9 @@
  */
 
 let mockIpcInvoke: jest.Mock;
+let windowControls: HTMLDivElement;
 
 beforeAll(() => {
-  // window.App is not needed by update-notifier, but set a minimal stub
   (window as any).App = {};
 
   mockIpcInvoke = jest.fn().mockResolvedValue({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: null });
@@ -31,23 +31,28 @@ beforeAll(() => {
     }),
   };
 
-  // Stub setInterval to prevent periodic checks from interfering with tests
   jest.spyOn(global, 'setInterval').mockImplementation(() => 0 as any);
 });
 
 beforeEach(() => {
-  // Clean up the notification element between tests
-  const existing = document.getElementById('ember-update-notification');
-  if (existing) existing.remove();
+  // Provide the .window-controls container the module inserts into
+  windowControls = document.createElement('div');
+  windowControls.className = 'window-controls';
+  const minimizeBtn = document.createElement('button');
+  minimizeBtn.id = 'minimize-btn';
+  windowControls.appendChild(minimizeBtn);
+  document.body.appendChild(windowControls);
 
-  // Reset mock state
+  // Clean up any leftover notification
+  document.getElementById('ember-update-notification')?.remove();
+
   mockIpcInvoke.mockClear();
-
-  // Reset module registry so the IIFE re-runs for each test
   jest.resetModules();
-
-  // Re-apply mocks after module reset (they persist on window)
   (window as any).electronAPI.ipc.invoke = mockIpcInvoke;
+});
+
+afterEach(() => {
+  windowControls.remove();
 });
 
 describe('checkForUpdate', () => {
@@ -55,8 +60,6 @@ describe('checkForUpdate', () => {
     mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: '0.0.13' });
 
     require('../../../src/renderer/managers/update-notifier');
-
-    // Allow async IPC call to resolve
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(document.getElementById('ember-update-notification')).toBeNull();
@@ -68,8 +71,20 @@ describe('checkForUpdate', () => {
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const el = document.getElementById('ember-update-notification');
-    expect(el).not.toBeNull();
+    expect(document.getElementById('ember-update-notification')).not.toBeNull();
+  });
+
+  test('notification is inserted before the minimize button', async () => {
+    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+
+    require('../../../src/renderer/managers/update-notifier');
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const children = Array.from(windowControls.children);
+    const notifIndex = children.findIndex(el => el.id === 'ember-update-notification');
+    const minimizeIndex = children.findIndex(el => el.id === 'minimize-btn');
+    expect(notifIndex).toBeGreaterThanOrEqual(0);
+    expect(notifIndex).toBeLessThan(minimizeIndex);
   });
 
   test('notification displays the correct version string', async () => {
@@ -113,9 +128,7 @@ describe('dismissUpdateNotification', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     (window as any).dismissUpdateNotification();
-    expect(document.getElementById('ember-update-notification')).toBeNull();
 
-    // Call checkForUpdate again — same version should not re-appear
     await (window as any).checkForUpdate();
     await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -130,7 +143,6 @@ describe('dismissUpdateNotification', () => {
 
     (window as any).dismissUpdateNotification();
 
-    // Now a newer version is released
     mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.15' });
 
     await (window as any).checkForUpdate();
