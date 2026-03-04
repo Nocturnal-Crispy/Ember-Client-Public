@@ -82,8 +82,13 @@
         channelEl.classList.add('active');
         channelEl.classList.remove('has-unread');
         if (channel.type === 'voice') {
-          window.joinVoiceChannel(channel.id, channel.name);
+          window.updateChatHeader(channel.name, channel.description ?? '');
+          window.showVoiceChannelView();
+          if (App.activeVoiceChannelId !== channel.id) {
+            window.joinVoiceChannel(channel.id, channel.name);
+          }
         } else {
+          window.showTextChannelView();
           window.updateChatHeader(channel.name, channel.description ?? '');
           window.loadChannelMessages(channel.id);
         }

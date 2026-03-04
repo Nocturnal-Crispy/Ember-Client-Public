@@ -113,6 +113,7 @@
     }
     App.localCameraOn = false;
     App.videoParticipants.clear();
+    if (App.activeView === 'voice') showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '📷'; cameraBtn.disabled = false; }
@@ -275,6 +276,37 @@
 
   document.getElementById('voice-camera-btn')?.addEventListener('click', () => toggleCamera());
 
+  // ─── View Switching Functions ──────────────────────────────────────────────
+
+  function showVoiceChannelView(): void {
+    const grid = document.getElementById('video-grid');
+    const messages = document.getElementById('messages');
+    const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+    if (!grid || !messages) return;
+    App.activeView = 'voice';
+    App.videoGridVisible = true;
+    grid.style.display = '';
+    messages.style.display = 'none';
+    if (inputContainer) inputContainer.style.display = 'none';
+    const headerIcon = document.querySelector<HTMLElement>('.chat-header .channel-icon');
+    if (headerIcon) headerIcon.textContent = '🔊';
+    renderVideoGrid();
+  }
+
+  function showTextChannelView(): void {
+    const grid = document.getElementById('video-grid');
+    const messages = document.getElementById('messages');
+    const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+    if (!grid || !messages) return;
+    App.activeView = 'text';
+    App.videoGridVisible = false;
+    grid.style.display = 'none';
+    messages.style.display = '';
+    if (inputContainer) inputContainer.style.display = '';
+    const headerIcon = document.querySelector<HTMLElement>('.chat-header .channel-icon');
+    if (headerIcon) headerIcon.textContent = '#';
+  }
+
   // ─── Camera / Video Functions ──────────────────────────────────────────────
 
   async function toggleCamera(): Promise<void> {
@@ -314,21 +346,24 @@
   }
 
   function updateVideoGridVisibility(): void {
-    const grid = document.getElementById('video-grid');
-    const messages = document.getElementById('messages');
-    const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
-    if (!grid || !messages) return;
-    const shouldShow = App.localCameraOn || App.videoParticipants.size > 0;
-    if (shouldShow && !App.videoGridVisible) {
-      App.videoGridVisible = true;
-      grid.style.display = '';
-      messages.style.display = 'none';
+    // When viewing the voice channel, keep the grid visible regardless of camera state.
+    // When viewing a text channel, keep the grid hidden regardless of camera state.
+    if (App.activeView === 'voice') {
+      const grid = document.getElementById('video-grid');
+      const messages = document.getElementById('messages');
+      const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+      if (grid) grid.style.display = '';
+      if (messages) messages.style.display = 'none';
       if (inputContainer) inputContainer.style.display = 'none';
-    } else if (!shouldShow && App.videoGridVisible) {
-      App.videoGridVisible = false;
-      grid.style.display = 'none';
-      messages.style.display = '';
+      App.videoGridVisible = true;
+    } else {
+      const grid = document.getElementById('video-grid');
+      const messages = document.getElementById('messages');
+      const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+      if (grid) grid.style.display = 'none';
+      if (messages) messages.style.display = '';
       if (inputContainer) inputContainer.style.display = '';
+      App.videoGridVisible = false;
     }
   }
 
@@ -341,9 +376,7 @@
     const selfId = vm?.auth?.user_id;
     const selfUsername = vm?.auth?.username;
 
-    if (App.localCameraOn) {
-      grid.appendChild(createVideoTile('__self__', selfUsername ?? 'You', vm?.localVideoStream ?? null, true));
-    }
+    grid.appendChild(createVideoTile('__self__', selfUsername ?? 'You', App.localCameraOn ? (vm?.localVideoStream ?? null) : null, true));
 
     App.voiceParticipants.forEach((username, userId) => {
       if (userId === selfId) return;
@@ -774,6 +807,7 @@
     log.warn('Cleaning up active voice session', { channel_id: App.activeVoiceChannelId });
     App.localCameraOn = false;
     App.videoParticipants.clear();
+    if (App.activeView === 'voice') showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (cameraBtn) { cameraBtn.classList.remove('active'); cameraBtn.title = 'Start Camera'; cameraBtn.textContent = '\u{1F4F7}'; cameraBtn.disabled = false; }
@@ -786,6 +820,8 @@
   }
 
   window.fetchAndRenderVoicePresence = fetchAndRenderVoicePresence;
+  window.showVoiceChannelView    = showVoiceChannelView;
+  window.showTextChannelView     = showTextChannelView;
   window.joinVoiceChannel        = joinVoiceChannel;
   window.leaveVoiceChannel       = leaveVoiceChannel;
   window.handleVoiceUserJoined   = handleVoiceUserJoined;

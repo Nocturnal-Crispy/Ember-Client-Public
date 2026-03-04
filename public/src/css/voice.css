@@ -160,3 +160,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Avatar-only tile (no camera) — larger avatar, dimmer background */
+.video-tile:not(:has(video)) {
+  background: #1a1a1a;
+}
+
+.video-tile:not(:has(video)) .video-tile-avatar {
+  width: 80px;
+  height: 80px;
+  font-size: 34px;
+}

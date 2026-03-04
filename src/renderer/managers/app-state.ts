@@ -27,6 +27,7 @@ window.App = {
   videoParticipants: new Set<string>(),
   localCameraOn: false,
   videoGridVisible: false,
+  activeView: 'text' as 'text' | 'voice',
 
   // ── Health check / reconnection ──────────────────────────────────────────
   healthcheckInterval: null,

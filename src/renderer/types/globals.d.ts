@@ -154,6 +154,7 @@ declare global {
     videoParticipants: Set<string>;
     localCameraOn: boolean;
     videoGridVisible: boolean;
+    activeView: 'text' | 'voice';
     healthcheckInterval: ReturnType<typeof setInterval> | null;
     reconnectionTimeout: ReturnType<typeof setTimeout> | null;
     reconnectionStartTime: number | null;
@@ -230,6 +231,8 @@ declare global {
     showVoiceControls(channelName: string): void;
     hideVoiceControls(): void;
     toggleCamera(): Promise<void>;
+    showVoiceChannelView(): void;
+    showTextChannelView(): void;
     openSettingsModal(page?: string): void;
     closeSettingsModal(): void;
     switchSettingsPage(page: string): void;
