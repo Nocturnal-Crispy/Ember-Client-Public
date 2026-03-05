@@ -228,6 +228,7 @@ declare global {
 
   interface EmberServiceAPI {
     fetchEmbers(auth: AuthData): Promise<Ember[]>;
+    updateEmber(auth: AuthData, emberId: string, updates: { name?: string; icon_data?: string }): Promise<Ember>;
   }
 
   interface ChannelServiceAPI {
@@ -311,6 +312,13 @@ declare global {
     wsSubscribeToEmber(emberId: string): void;
     handlePresenceUpdate(payload: PresenceUpdatePayload): void;
     handleIncomingMessage(payload: Message): Promise<void>;
+    handleEmberUpdated(payload: {
+      id: string;
+      name: string;
+      icon_data?: string;
+      created_at: number;
+      is_owner: boolean;
+    }): void;
     registerSentMessageId(id: string): void;
     // Globals set by message-service.ts
     sendEncryptedMessage(plaintext: string): Promise<void>;

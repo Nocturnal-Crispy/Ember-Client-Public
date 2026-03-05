@@ -69,6 +69,7 @@
         modalAddServer,
         modalJoinServer,
         modalCreateServer,
+        modalEditEmber,
         modalCreateInvite,
         modalAcceptInvite,
         ctxChannel,
@@ -88,6 +89,7 @@
         fetchFragment("modal-add-server.html"),
         fetchFragment("modal-join-server.html"),
         fetchFragment("modal-create-server.html"),
+        fetchFragment("modal-edit-ember.html"),
         fetchFragment("modal-create-invite.html"),
         fetchFragment("modal-accept-invite.html"),
         fetchFragment("context-menu-channel.html"),
@@ -116,6 +118,7 @@
       document.body.appendChild(parseFragment(modalAddServer));
       document.body.appendChild(parseFragment(modalJoinServer));
       document.body.appendChild(parseFragment(modalCreateServer));
+      document.body.appendChild(parseFragment(modalEditEmber));
       document.body.appendChild(parseFragment(modalCreateInvite));
       document.body.appendChild(parseFragment(modalAcceptInvite));
       document.body.appendChild(parseFragment(ctxChannel));

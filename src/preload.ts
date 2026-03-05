@@ -269,6 +269,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   emberService: {
     fetchEmbers: (auth: unknown) => emberServices.fetchEmbers(auth as AuthData),
+    updateEmber: (auth: unknown, emberId: string, updates: unknown) =>
+      emberServices.updateEmber(auth as AuthData, emberId, updates as any),
   },
 
   channelService: {

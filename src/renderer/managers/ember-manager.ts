@@ -667,6 +667,261 @@
     });
   }
 
+  // ─── Edit Ember Modal ───────────────────────────────────────────────────────
+
+  const editEmberModal = document.getElementById("edit-ember-modal");
+  const editEmberBtn = document.getElementById("ctx-ember-edit");
+  const editEmberNameInput = document.getElementById("edit-ember-name-input") as HTMLInputElement | null;
+  const editEmberIconUpload = document.getElementById("edit-ember-icon-upload") as HTMLInputElement | null;
+  const editUploadIconBtn = document.getElementById("edit-upload-icon-btn");
+  const editEmberIconUrl = document.getElementById("edit-ember-icon-url") as HTMLInputElement | null;
+  const editLoadUrlBtn = document.getElementById("edit-load-url-btn");
+  const editIconPreview = document.getElementById("edit-icon-preview");
+  const editRemoveIconBtn = document.getElementById("edit-remove-icon-btn");
+  const editEmberError = document.getElementById("edit-ember-error");
+  const editUploadSection = document.getElementById("edit-upload-section");
+  const editUrlSection = document.getElementById("edit-url-section");
+  const editIconToggleBtns = document.querySelectorAll<HTMLElement>(".icon-toggle-btn");
+  const editEmberSaveBtn = document.getElementById("edit-ember-save-btn") as HTMLButtonElement | null;
+  const editEmberCancelBtn = document.getElementById("edit-ember-cancel-btn") as HTMLButtonElement | null;
+
+  let editingEmber: Ember | null = null;
+  let editCurrentIconSource: "upload" | "url" = "upload";
+
+  if (editEmberBtn) {
+    editEmberBtn.addEventListener("click", () => {
+      if (!contextMenuEmber) return;
+      emberContextMenu?.classList.add("hidden");
+      openEditEmberModal(contextMenuEmber);
+    });
+  }
+
+  function openEditEmberModal(ember: Ember): void {
+    if (!editEmberModal) return;
+    editingEmber = ember;
+    resetEditEmberForm();
+    
+    // Pre-fill current values
+    if (editEmberNameInput) editEmberNameInput.value = ember.name;
+    if (ember.icon_data) {
+      App.currentIconData = ember.icon_data;
+      updateEditIconPreview(ember.icon_data);
+    }
+
+    editEmberModal.classList.remove("hidden");
+  }
+
+  function closeEditEmberModal(): void {
+    if (editEmberModal) {
+      editEmberModal.classList.add("hidden");
+      resetEditEmberForm();
+    }
+    editingEmber = null;
+  }
+
+  function resetEditEmberForm(): void {
+    if (editEmberNameInput) editEmberNameInput.value = "";
+    if (editEmberIconUrl) editEmberIconUrl.value = "";
+    if (editEmberIconUpload) editEmberIconUpload.value = "";
+    App.currentIconData = null;
+    updateEditIconPreview(null);
+    hideEditEmberError();
+    editCurrentIconSource = "upload";
+    updateEditIconSourceUI();
+  }
+
+  function updateEditIconSourceUI(): void {
+    editIconToggleBtns.forEach((btn) => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset["source"] === editCurrentIconSource
+      );
+    });
+    if (editCurrentIconSource === "upload") {
+      editUploadSection?.classList.remove("hidden");
+      editUrlSection?.classList.add("hidden");
+    } else {
+      editUploadSection?.classList.add("hidden");
+      editUrlSection?.classList.remove("hidden");
+    }
+  }
+
+  function updateEditIconPreview(data: string | null): void {
+    if (!editIconPreview) return;
+    while (editIconPreview.firstChild)
+      editIconPreview.removeChild(editIconPreview.firstChild);
+    if (data) {
+      const img = document.createElement("img");
+      img.src = data;
+      img.onerror = () => {
+        while (editIconPreview.firstChild)
+          editIconPreview.removeChild(editIconPreview.firstChild);
+        const span = document.createElement("span");
+        span.className = "preview-placeholder";
+        span.textContent = "Failed to load image";
+        editIconPreview.appendChild(span);
+        editRemoveIconBtn?.classList.add("hidden");
+      };
+      img.onload = () => editRemoveIconBtn?.classList.remove("hidden");
+      editIconPreview.appendChild(img);
+    } else {
+      const span = document.createElement("span");
+      span.className = "preview-placeholder";
+      span.textContent = "No icon selected";
+      editIconPreview.appendChild(span);
+      editRemoveIconBtn?.classList.add("hidden");
+    }
+  }
+
+  function showEditEmberError(message: string): void {
+    if (editEmberError) {
+      editEmberError.textContent = message;
+      editEmberError.classList.remove("hidden");
+    }
+  }
+
+  function hideEditEmberError(): void {
+    editEmberError?.classList.add("hidden");
+  }
+
+  // Edit ember modal event listeners
+  editIconToggleBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      editCurrentIconSource = (btn.dataset["source"] ?? "upload") as
+        | "upload"
+        | "url";
+      updateEditIconSourceUI();
+      App.currentIconData = null;
+      updateEditIconPreview(null);
+    });
+  });
+
+  editUploadIconBtn?.addEventListener("click", () => editEmberIconUpload?.click());
+
+  editEmberIconUpload?.addEventListener("change", async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) {
+      try {
+        const resizedBase64 = await resizeImage(file, 512, 512);
+        App.currentIconData = resizedBase64;
+        updateEditIconPreview(resizedBase64);
+      } catch (error) {
+        showEditEmberError("Failed to process image");
+        console.error("Image processing error:", error);
+      }
+    }
+  });
+
+  editLoadUrlBtn?.addEventListener("click", async () => {
+    const url = editEmberIconUrl?.value.trim();
+    if (!url) {
+      showEditEmberError("Please enter an image URL");
+      return;
+    }
+    if (!isValidUrl(url)) {
+      showEditEmberError("Please enter a valid URL");
+      return;
+    }
+    try {
+      App.currentIconData = url;
+      updateEditIconPreview(url);
+    } catch (error) {
+      showEditEmberError("Failed to load image from URL");
+    }
+  });
+
+  editRemoveIconBtn?.addEventListener("click", () => {
+    App.currentIconData = null;
+    updateEditIconPreview(null);
+    if (editEmberIconUpload) editEmberIconUpload.value = "";
+    if (editEmberIconUrl) editEmberIconUrl.value = "";
+  });
+
+  editEmberCancelBtn?.addEventListener("click", closeEditEmberModal);
+  editEmberModal?.addEventListener("click", (e: Event) => {
+    if (e.target === editEmberModal) closeEditEmberModal();
+  });
+
+  editEmberSaveBtn?.addEventListener("click", async () => {
+    await handleEditEmber();
+  });
+
+  async function handleEditEmber(): Promise<void> {
+    if (!editingEmber) return;
+
+    const emberName = editEmberNameInput?.value.trim();
+    if (!emberName) {
+      showEditEmberError("Server name is required");
+      return;
+    }
+    if (emberName.length > 100) {
+      showEditEmberError("Server name must be 100 characters or less");
+      return;
+    }
+
+    // Check if anything actually changed
+    const nameChanged = emberName !== editingEmber.name;
+    const iconChanged = App.currentIconData !== editingEmber.icon_data;
+
+    if (!nameChanged && !iconChanged) {
+      closeEditEmberModal();
+      return;
+    }
+
+    log.info("Updating ember", { 
+      ember_id: editingEmber.id, 
+      name: emberName,
+      has_icon_change: iconChanged 
+    });
+
+    try {
+      if (editEmberSaveBtn) {
+        editEmberSaveBtn.disabled = true;
+        editEmberSaveBtn.textContent = "Saving...";
+      }
+
+      const auth = await window.getValidAuth();
+      if (!auth) {
+        showEditEmberError("Not authenticated");
+        return;
+      }
+
+      // Build update request with only changed fields
+      const updates: any = {};
+      if (nameChanged) updates.name = emberName;
+      if (iconChanged) updates.icon_data = App.currentIconData;
+
+      const updatedEmber = await window.electronAPI.emberService.updateEmber(
+        auth,
+        editingEmber.id,
+        updates
+      );
+
+      closeEditEmberModal();
+      log.info("Ember updated successfully", {
+        ember_id: updatedEmber.id,
+        name: updatedEmber.name,
+      });
+
+      // Refresh ember list and switch back to this ember if it's active
+      const embers = await fetchEmbers();
+      renderServerList(embers);
+      
+      if (App.activeEmberId === editingEmber.id) {
+        loadServerContent(editingEmber.id, updatedEmber.name);
+      }
+    } catch (error) {
+      const err = error as Error;
+      log.error("Failed to update ember", { error: err.message });
+      showEditEmberError(err.message || "Failed to update server");
+    } finally {
+      if (editEmberSaveBtn) {
+        editEmberSaveBtn.disabled = false;
+        editEmberSaveBtn.textContent = "Save Changes";
+      }
+    }
+  }
+
   window.fetchEmbers = fetchEmbers;
   window.renderServerList = renderServerList;
   window.switchToServer = switchToServer;

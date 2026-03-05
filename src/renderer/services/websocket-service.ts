@@ -104,6 +104,14 @@
             window.handleVoiceUserLeft(
               data.payload as Parameters<typeof window.handleVoiceUserLeft>[0]
             );
+          } else if (data.type === "ember_updated" && data.payload) {
+            log.debug("WebSocket: ember_updated", {
+              ember_id: String(data.payload["id"] ?? ""),
+              name: String(data.payload["name"] ?? ""),
+            });
+            handleEmberUpdated(
+              data.payload as Parameters<typeof handleEmberUpdated>[0]
+            );
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
@@ -215,6 +223,37 @@
     );
   }
 
+  function handleEmberUpdated(payload: {
+    id: string;
+    name: string;
+    icon_data?: string;
+    created_at: number;
+    is_owner: boolean;
+  }): void {
+    // Update the ember in the current embers list if it exists
+    const emberIndex = App.currentEmbers.findIndex(e => e.id === payload.id);
+    if (emberIndex !== -1) {
+      App.currentEmbers[emberIndex] = {
+        id: payload.id,
+        name: payload.name,
+        icon_data: payload.icon_data || null,
+        is_owner: payload.is_owner
+      };
+      
+      // Re-render the server list to show updated ember
+      window.renderServerList(App.currentEmbers);
+      
+      // If this is the currently active ember, update the header and reload content
+      if (App.activeEmberId === payload.id) {
+        const serverHeader = document.querySelector(".server-header h3");
+        if (serverHeader) serverHeader.textContent = payload.name;
+        
+        // Reload server content to refresh any cached data
+        window.loadServerContent(payload.id, payload.name);
+      }
+    }
+  }
+
   function disconnectWebSocket(): void {
     if (App.wsReconnectTimer) {
       clearTimeout(App.wsReconnectTimer);
@@ -234,5 +273,6 @@
   window.handlePresenceUpdate = handlePresenceUpdate;
   window.handleIncomingMessage =
     handleIncomingMessage as unknown as typeof window.handleIncomingMessage;
+  window.handleEmberUpdated = handleEmberUpdated;
   window.registerSentMessageId = registerSentMessageId;
 })();
