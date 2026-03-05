@@ -67,6 +67,14 @@ declare global {
   type OscillatorType = import("ember-shared").OscillatorType;
   type SoundDef = import("ember-shared").SoundDef;
 
+  // ─── Direct Messaging Types ───────────────────────────────────────────────
+
+  type User = {
+    id: string;
+    username: string;
+    status: 'online' | 'offline' | 'away';
+  };
+
   // ─── Update check ─────────────────────────────────────────────────────────
 
   interface UpdateInfo {
@@ -409,5 +417,107 @@ declare global {
     updateChatHeader(name: string, description: string): void;
     hideWelcomeScreen(): void;
     showWelcomeScreen(): void;
+    // Globals set by direct-messaging-manager.ts
+    initializeDirectMessaging(): Promise<void>;
+    startDmConversation(participantId: string, participantUsername: string): Promise<string>;
+    sendDirectMessage(conversationId: string, plaintext: string): Promise<string>;
+    setActiveDmConversation(conversationId: string): void;
+    sendTypingIndicator(conversationId: string, isTyping: boolean): Promise<void>;
+    fetchConversationMessages(conversationId: string): Promise<Array<{
+      id: string;
+      conversationId: string;
+      senderId: string;
+      content: string;
+      timestamp: number;
+      isOwn: boolean;
+    }>>;
+    initiateKeyExchange(conversationId: string, participantId: string): Promise<void>;
+    handleDmMessage(payload: {
+      id: string;
+      conversation_id: string;
+      sender_user_id: string;
+      content: string;
+      timestamp: number;
+    }): void;
+    handleDmPresenceUpdate(payload: {
+      user_id: string;
+      username: string;
+      status: string;
+    }): void;
+    handleDmTypingIndicator(payload: {
+      conversation_id: string;
+      user_id: string;
+      typing: boolean;
+    }): void;
+    // Globals set by direct-messaging-ui.ts
+    initializeDirectMessagingUI(): void;
+    addDmConversationToList(conversation: {
+      id: string;
+      participantId: string;
+      participantUsername: string;
+      unreadCount: number;
+      isOnline: boolean;
+      keyExchanged: boolean;
+    }): void;
+    displayDmMessage(messageData: {
+      id: string;
+      conversationId: string;
+      senderId: string;
+      content: string;
+      timestamp: number;
+      isOwn: boolean;
+    }): void;
+    updateDmConversation(conversationId: string, updates: Partial<{
+      id: string;
+      participantId: string;
+      participantUsername: string;
+      lastMessage?: string;
+      unreadCount: number;
+      isOnline: boolean;
+    }>): void;
+    showDmTypingIndicator(isTyping: boolean, username?: string): void;
+    addDmMessageReactions(messageId: string, reactions: Array<{
+      emoji: string;
+      count: number;
+      reacted: boolean;
+    }>): void;
+    updateDmMessageStatus(messageId: string, status: 'sending' | 'sent' | 'delivered' | 'read'): void;
+    addDmNotificationBadge(element: HTMLElement, count: number): void;
+    removeDmConversation(conversationId: string): void;
+    // Performance optimization functions
+    getCachedMessages(channelId: string): {
+      messages: Message[];
+      hasMore: boolean;
+    } | null;
+    cacheMessages(channelId: string, result: {
+      messages: Message[];
+      hasMore: boolean;
+    }): void;
+    initializeVirtualScrolling(): void;
+    cleanupOldMessages(): void;
+    monitorPerformance(operation: string, startTime: number): void;
+    // Accessibility functions
+    announceToScreenReader(message: string): void;
+    updateScreenReaderStatus(status: string): void;
+    initializeAccessibility(): void;
+    // Test functions
+    testDmMessageSend(): Promise<void>;
+    debugTextarea(): void;
+    // Globals set by message-service.ts (DM extensions)
+    sendDirectMessage(conversationId: string, plaintext: string): Promise<string>;
+    displayDirectMessage(messageData: {
+      id: string;
+      conversation_id: string;
+      sender_user_id: string;
+      content: string;
+      timestamp: number;
+    }): Promise<void>;
+    cacheDmConversationKey(conversationId: string, key: Uint8Array): void;
+    removeDmConversationKey(conversationId: string): void;
+    // Globals set by websocket-service.ts (DM extensions)
+    wsSubscribeToDmConversation(conversationId: string): void;
+    wsUnsubscribeFromDmConversation(conversationId: string): void;
+    // Globals set by renderer.ts (DM extensions)
+    closeDMScreenOnServerSwitch(): void;
   }
 }

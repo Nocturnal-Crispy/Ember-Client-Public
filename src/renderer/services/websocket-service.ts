@@ -112,6 +112,30 @@
             handleEmberUpdated(
               data.payload as Parameters<typeof handleEmberUpdated>[0]
             );
+          } else if (data.type === "dm_message" && data.payload) {
+            log.debug("WebSocket: dm_message received", {
+              conversation_id: String(data.payload["conversation_id"] ?? ""),
+            });
+            handleDmMessage(
+              data.payload as unknown as Parameters<typeof handleDmMessage>[0]
+            );
+          } else if (data.type === "dm_presence_update" && data.payload) {
+            log.debug("WebSocket: dm_presence_update", {
+              user_id: String(data.payload["user_id"] ?? ""),
+              status: String(data.payload["status"] ?? ""),
+            });
+            handleDmPresenceUpdate(
+              data.payload as Parameters<typeof handleDmPresenceUpdate>[0]
+            );
+          } else if (data.type === "dm_typing" && data.payload) {
+            log.debug("WebSocket: dm_typing", {
+              conversation_id: String(data.payload["conversation_id"] ?? ""),
+              user_id: String(data.payload["user_id"] ?? ""),
+              typing: Boolean(data.payload["typing"] ?? false),
+            });
+            handleDmTypingIndicator(
+              data.payload as Parameters<typeof handleDmTypingIndicator>[0]
+            );
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
@@ -161,6 +185,24 @@
     log.debug("Subscribing to ember", { ember_id: emberId });
     App.wsConnection.send(
       JSON.stringify({ type: "subscribe_ember", ember_id: emberId })
+    );
+  }
+
+  function wsSubscribeToDmConversation(conversationId: string): void {
+    if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN)
+      return;
+    log.debug("Subscribing to DM conversation", { conversation_id: conversationId });
+    App.wsConnection.send(
+      JSON.stringify({ type: "subscribe_dm", conversation_id: conversationId })
+    );
+  }
+
+  function wsUnsubscribeFromDmConversation(conversationId: string): void {
+    if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN)
+      return;
+    log.debug("Unsubscribing from DM conversation", { conversation_id: conversationId });
+    App.wsConnection.send(
+      JSON.stringify({ type: "unsubscribe_dm", conversation_id: conversationId })
     );
   }
 
@@ -254,6 +296,47 @@
     }
   }
 
+  function handleDmMessage(payload: {
+    id: string;
+    conversation_id: string;
+    sender_user_id: string;
+    content: string;
+    timestamp: number;
+  }): void {
+    // Forward to Direct Messaging manager if available
+    if (typeof window.handleDmMessage === "function") {
+      window.handleDmMessage(payload);
+    } else {
+      log.warn("Direct Messaging manager not available, cannot handle DM message");
+    }
+  }
+
+  function handleDmPresenceUpdate(payload: {
+    user_id: string;
+    username: string;
+    status: string;
+  }): void {
+    // Forward to Direct Messaging manager if available
+    if (typeof window.handleDmPresenceUpdate === "function") {
+      window.handleDmPresenceUpdate(payload);
+    } else {
+      log.warn("Direct Messaging manager not available, cannot handle DM presence update");
+    }
+  }
+
+  function handleDmTypingIndicator(payload: {
+    conversation_id: string;
+    user_id: string;
+    typing: boolean;
+  }): void {
+    // Forward to Direct Messaging manager if available
+    if (typeof window.handleDmTypingIndicator === "function") {
+      window.handleDmTypingIndicator(payload);
+    } else {
+      log.warn("Direct Messaging manager not available, cannot handle DM typing indicator");
+    }
+  }
+
   function disconnectWebSocket(): void {
     if (App.wsReconnectTimer) {
       clearTimeout(App.wsReconnectTimer);
@@ -270,6 +353,8 @@
   window.wsSubscribeToChannel = wsSubscribeToChannel;
   window.wsUnsubscribeFromChannel = wsUnsubscribeFromChannel;
   window.wsSubscribeToEmber = wsSubscribeToEmber;
+  window.wsSubscribeToDmConversation = wsSubscribeToDmConversation;
+  window.wsUnsubscribeFromDmConversation = wsUnsubscribeFromDmConversation;
   window.handlePresenceUpdate = handlePresenceUpdate;
   window.handleIncomingMessage =
     handleIncomingMessage as unknown as typeof window.handleIncomingMessage;

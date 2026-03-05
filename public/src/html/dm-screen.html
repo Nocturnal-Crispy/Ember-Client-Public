@@ -1,0 +1,98 @@
+<!-- Direct Messages Screen -->
+<div class="dm-screen" id="dm-screen">
+  <!-- DM Sidebar -->
+  <div class="dm-sidebar">
+    <!-- DM Header -->
+    <div class="dm-header">
+      <h2>Direct Messages</h2>
+      <div class="dm-user-search">
+        <input type="text" class="dm-search-input" id="dm-search-input" placeholder="Search users...">
+        <span class="dm-search-icon">🔍</span>
+        <div class="dm-search-results" id="dm-search-results"></div>
+      </div>
+    </div>
+
+    <!-- DM Conversation List -->
+    <div class="dm-conversation-list" id="dm-conversation-list">
+      <!-- Conversations will be dynamically added here -->
+      <div class="dm-empty-state">
+        <div class="dm-empty-icon">💬</div>
+        <div class="dm-empty-title">No Direct Messages</div>
+        <div class="dm-empty-text">Start a conversation with someone!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DM Chat Area -->
+  <div class="dm-main-area">
+    <!-- DM Chat Container -->
+    <div class="dm-chat-container" id="dm-chat-container">
+      <!-- DM Chat Header -->
+      <div class="dm-chat-header">
+        <div class="dm-chat-header-info">
+          <div class="dm-chat-header-avatar" id="dm-chat-header-avatar">U</div>
+          <div>
+            <div class="dm-chat-header-name" id="dm-chat-header-name">Username</div>
+            <div class="dm-chat-header-status" id="dm-chat-header-status">Online</div>
+          </div>
+        </div>
+        <div class="dm-chat-actions">
+          <button class="dm-chat-action-btn" id="dm-call-btn" title="Start Call">📞</button>
+          <button class="dm-chat-action-btn" id="dm-video-btn" title="Start Video">📹</button>
+          <button class="dm-chat-action-btn" id="dm-info-btn" title="User Info">ℹ️</button>
+        </div>
+      </div>
+
+      <!-- DM Messages Area -->
+      <div class="dm-messages" id="dm-messages">
+        <!-- Messages will be dynamically added here -->
+      </div>
+
+      <!-- DM Typing Indicator -->
+      <div class="dm-typing-indicator" id="dm-typing-indicator">
+        <span id="dm-typing-user">Someone</span> is typing<span>.</span><span>.</span><span>.</span>
+      </div>
+
+      <!-- DM Input Area -->
+      <div class="dm-input-container">
+        <div class="dm-input-wrapper">
+          <textarea 
+            class="dm-input-field" 
+            id="dm-input-field" 
+            placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+            rows="1"
+            maxlength="2000"
+          ></textarea>
+          <div class="dm-input-actions">
+            <button class="dm-input-btn" id="dm-emoji-btn" title="Add Emoji">😊</button>
+            <button class="dm-input-btn" id="dm-attach-btn" title="Attach File">📎</button>
+            <button class="dm-input-btn" id="dm-send-btn" title="Send Message">➤</button>
+          </div>
+        </div>
+        <div class="dm-input-footer">
+          <span class="dm-character-count" id="dm-character-count">0/2000</span>
+        </div>
+      </div>
+
+      <!-- DM Search Prompt Empty State (shown when no conversations exist) -->
+      <div class="dm-empty-state" id="dm-search-prompt-state" style="display: none;">
+        <div class="dm-empty-icon">🔍</div>
+        <div class="dm-empty-title">Search for users to start messaging</div>
+        <div class="dm-empty-text">Use the search bar in the sidebar to find people and start direct conversations</div>
+        <div class="dm-empty-actions">
+          <button class="dm-empty-action-btn" id="dm-focus-search-btn">
+            <span>🔍</span>
+            Start Searching
+          </button>
+        </div>
+      </div>
+
+      <!-- DM Empty State (shown when no conversation selected) -->
+      <div class="dm-empty-state" id="dm-chat-empty-state">
+        <div class="dm-empty-icon">💬</div>
+        <div class="dm-empty-title">Select a conversation</div>
+        <div class="dm-empty-text">Choose a direct message from the sidebar to start chatting</div>
+      </div>
+    </div>
+  </div>
+</div>

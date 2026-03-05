@@ -24,6 +24,8 @@
     "src/js/renderer/managers/invite-manager.js",
     "src/js/renderer/managers/voice-ui-manager.js",
     "src/js/renderer/managers/update-notifier.js",
+    "src/js/renderer/managers/direct-messaging-manager.js",
+    "src/js/renderer/managers/direct-messaging-ui.js",
     "src/js/renderer/managers/renderer.js",
   ];
 
@@ -62,6 +64,7 @@
         titleBar,
         serverList,
         channelList,
+        dmScreen,
         welcomeScreen,
         chatContainer,
         memberList,
@@ -82,6 +85,7 @@
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
         fetchFragment("channel-list.html"),
+        fetchFragment("dm-screen.html"),
         fetchFragment("welcome-screen.html"),
         fetchFragment("chat-container.html"),
         fetchFragment("member-list.html"),
@@ -112,6 +116,9 @@
       appContainer.appendChild(parseFragment(chatContainer));
       appContainer.appendChild(parseFragment(memberList));
       document.body.appendChild(appContainer);
+
+      // DM Screen (hidden by default, shown when DM icon is clicked)
+      document.body.appendChild(parseFragment(dmScreen));
 
       // Modals and overlays (top-level, outside app-container)
       document.body.appendChild(parseFragment(modalLogout));

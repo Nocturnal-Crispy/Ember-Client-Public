@@ -9,7 +9,7 @@
 
   const messageInput = document.getElementById(
     "messageInput"
-  ) as HTMLInputElement | null;
+  ) as HTMLTextAreaElement | null;
 
   document.getElementById("minimize-btn")?.addEventListener("click", () => {
     ipcRenderer.send("window-minimize");
@@ -22,6 +22,98 @@
   document.getElementById("close-btn")?.addEventListener("click", () => {
     ipcRenderer.send("window-close");
   });
+
+  // DM Icon functionality
+  const dmIcon = document.getElementById("dm-icon");
+  const dmScreen = document.getElementById("dm-screen");
+  
+  if (dmIcon && dmScreen) {
+    dmIcon.addEventListener("click", () => {
+      toggleDMScreen();
+    });
+    
+    // Handle Escape key to close DM screen
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && dmScreen.classList.contains("active")) {
+        closeDMScreen();
+      }
+    });
+    
+    // Handle clicking outside DM screen to close
+    dmScreen.addEventListener("click", (e) => {
+      if (e.target === dmScreen) {
+        closeDMScreen();
+      }
+    });
+  }
+  
+  function toggleDMScreen() {
+    if (dmScreen!.classList.contains("active")) {
+      closeDMScreen();
+    } else {
+      openDMScreen();
+    }
+  }
+  
+  function openDMScreen() {
+    dmScreen!.classList.add("active");
+    dmIcon!.classList.add("active");
+    
+    // Hide main content but keep server list visible
+    const appContainer = document.querySelector(".app-container");
+    if (appContainer) {
+      const channelList = appContainer.querySelector(".channel-list");
+      const chatContainer = appContainer.querySelector(".chat-container");
+      const memberList = appContainer.querySelector(".member-list");
+      const welcomeScreen = appContainer.querySelector(".welcome-screen");
+      
+      if (channelList) (channelList as HTMLElement).style.display = "none";
+      if (chatContainer) (chatContainer as HTMLElement).style.display = "none";
+      if (memberList) (memberList as HTMLElement).style.display = "none";
+      if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = "none";
+    }
+    
+    // Focus on search input
+    setTimeout(() => {
+      const searchInput = document.getElementById("dm-search-input");
+      if (searchInput) {
+        (searchInput as HTMLInputElement).focus();
+      }
+    }, 100);
+    
+    log.info("DM Screen opened");
+  }
+  
+  function closeDMScreen() {
+    dmScreen!.classList.remove("active");
+    dmIcon!.classList.remove("active");
+    
+    // Show main content again
+    const appContainer = document.querySelector(".app-container");
+    if (appContainer) {
+      const channelList = appContainer.querySelector(".channel-list");
+      const chatContainer = appContainer.querySelector(".chat-container");
+      const memberList = appContainer.querySelector(".member-list");
+      const welcomeScreen = appContainer.querySelector(".welcome-screen");
+      
+      if (channelList) (channelList as HTMLElement).style.display = "";
+      if (chatContainer) (chatContainer as HTMLElement).style.display = "";
+      if (memberList) (memberList as HTMLElement).style.display = "";
+      if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = "";
+    }
+    
+    log.info("DM Screen closed");
+  }
+  
+  // Function to close DM screen when switching to server
+  function closeDMScreenOnServerSwitch() {
+    if (dmScreen!.classList.contains("active")) {
+      closeDMScreen();
+    }
+  }
+  
+  // Expose globally for other modules to call
+  window.closeDMScreenOnServerSwitch = closeDMScreenOnServerSwitch;
 
   const logoutBtn = document.getElementById("logout-btn");
   const logoutModal = document.getElementById("logout-modal");
@@ -56,13 +148,40 @@
   }
 
   if (messageInput) {
-    messageInput.addEventListener("keypress", async (e) => {
-      if (e.key === "Enter" && messageInput.value.trim()) {
-        const plaintext = messageInput.value.trim();
-        messageInput.value = "";
-        await window.sendEncryptedMessage(plaintext);
+    messageInput.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter") {
+        if (e.shiftKey) {
+          // Allow Shift+Enter to create a new line
+          return;
+        } else {
+          // Prevent default newline behavior and send message
+          e.preventDefault();
+          const plaintext = messageInput.value.trim();
+          if (plaintext) {
+            messageInput.value = "";
+            await window.sendEncryptedMessage(plaintext);
+          }
+        }
       }
     });
+
+    // Auto-resize textarea based on content
+    const autoResize = (): void => {
+      if (!messageInput) return;
+      messageInput.style.height = "auto";
+      messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
+    };
+
+    messageInput.addEventListener("input", autoResize);
+    messageInput.addEventListener("focus", autoResize);
+    messageInput.addEventListener("blur", () => {
+      if (messageInput) {
+        messageInput.style.height = "auto";
+      }
+    });
+
+    // Initial resize
+    autoResize();
   }
 
   const reconnectionOverlay = document.getElementById("reconnection-overlay");
@@ -509,6 +628,22 @@
       const usernameEl = document.querySelector(".user-panel .username");
       if (usernameEl) usernameEl.textContent = auth.username;
       log.info("User panel populated", { username: auth.username });
+    }
+    
+    // Initialize Direct Messaging UI
+    try {
+      await window.initializeDirectMessagingUI();
+      log.info("Direct Messaging UI initialized");
+    } catch (error) {
+      log.error("Failed to initialize Direct Messaging UI", { error });
+    }
+    
+    // Initialize Direct Messaging system
+    try {
+      await window.initializeDirectMessaging();
+      log.info("Direct Messaging system initialized");
+    } catch (error) {
+      log.error("Failed to initialize Direct Messaging system", { error });
     }
     const embers = await window.fetchEmbers();
     if (embers.length > 0) {

@@ -2,14 +2,21 @@
 :root,
 .visual-refresh,
 .visual-refresh.theme-dark {
-  --rgb-highlight: 255, 80, 40; /* The main highlight color - Ember Red */
-  --rgb-background: 0, 0, 0; /* The main background color */
-  --rgb-text: 197, 200, 198; /* The main text color */
-  --rgb-close-button: 212, 18, 39; /* The main "close this" or "deny" color */
-  --rgb-online-color: 57, 255, 20; /* The color used in the "online" user status symbol - Neon Green Accent */
-  --rgb-afk-color: 255, 255, 51; /* The color used in the "idle" user status symbol */
-  --rgb-dnd-color: 255, 0, 0; /* The color used in the "do not disturb" user status symbol */
-  --rgb-streaming-color: 188, 19, 254; /* The color used in the "streaming X" user status symbol */
+  --rgb-highlight: 255, 120, 80; /* Softer orange accent - more modern */
+  --rgb-background: 20, 20, 25; /* Darker, softer background instead of pure black */
+  --rgb-text: 220, 220, 225; /* Softer, more readable text color */
+  --rgb-close-button: 240, 71, 71; /* Softer red for close buttons */
+  --rgb-online-color: 67, 181, 129; /* Muted green for online status */
+  --rgb-afk-color: 250, 179, 86; /* Muted yellow for idle */
+  --rgb-dnd-color: 240, 71, 71; /* Muted red for do not disturb */
+  --rgb-streaming-color: 156, 89, 209; /* Muted purple for streaming */
+  
+  /* Additional modern colors */
+  --rgb-surface: 30, 30, 35; /* Slightly lighter than background */
+  --rgb-surface-hover: 40, 40, 45; /* Hover state for surfaces */
+  --rgb-accent-rgb: var(--rgb-highlight);
+  --rgb-status-positive-rgb: var(--rgb-online-color);
+  --rgb-status-negative-rgb: var(--rgb-dnd-color);
 
   --transition-time: .3s; /* How fast animations added by the theme happen. Default is 0.3 seconds */
 
@@ -20,6 +27,8 @@
   --background-brightness: 100%; /* Changes the background images brightness */
 
   --highlight: rgb(var(--rgb-highlight));
+  --accent-color: var(--highlight); /* Alias for highlight */
+  --accent-color-rgb: var(--rgb-highlight); /* RGB values for accent color */
   --background: rgb(var(--rgb-background));
   --text: rgb(var(--rgb-text));
   --close-button: rgb(var(--rgb-close-button));
@@ -35,17 +44,17 @@
   --scrollbar-auto-scrollbar-color-track: transparent;
   --background-primary: var(--background);
   --background-mobile-primary: var(--background);
-  --background-secondary: var(--background) !important;
-  --background-mobile-secondary: var(--background);
-  --background-secondary-alt: var(--background);
-  --background-tertiary: var(--background);
-  --background-accent: var(--background);
-  --background-floating: var(--background);
-  --background-nested-floating: var(--background);
-  --background-modifier-accent: rgba(var(--rgb-highlight), 20%);
-  --background-modifier-hover: rgba(var(--rgb-highlight), 10%);
-  --background-modifier-active: rgba(var(--rgb-highlight), 30%);
-  --background-modifier-selected: var(--rgb-highlight);
+  --background-secondary: rgb(var(--rgb-surface)) !important;
+  --background-mobile-secondary: rgb(var(--rgb-surface));
+  --background-secondary-alt: rgb(var(--rgb-surface));
+  --background-tertiary: rgb(var(--rgb-surface));
+  --background-accent: rgb(var(--rgb-surface));
+  --background-floating: rgb(var(--rgb-surface));
+  --background-nested-floating: rgb(var(--rgb-surface));
+  --background-modifier-accent: rgba(var(--rgb-highlight), 15%);
+  --background-modifier-hover: rgba(var(--rgb-highlight), 8%);
+  --background-modifier-active: rgba(var(--rgb-highlight), 20%);
+  --background-modifier-selected: rgba(var(--rgb-highlight), 25%);
   --background-base-lowest: var(--background);
   --background-base-low: var(--background);
   --background-surface-high: var(--background);
@@ -53,14 +62,15 @@
   --modal-footer-background: var(--background);
   --bg-surface-overlay: var(--background);
   --activity-card-background: var(--background);
-  --header-primary: rgb(var(--rgb-highlight));
-  --header-secondary: rgb(var(--rgb-highlight));
+  --header-primary: rgb(255, 255, 255); /* Pure white for headers for better hierarchy */
+  --header-secondary: rgba(255, 255, 255, 0.9); /* Slightly muted white */
   --chat-background: var(--background);
   --chat-border: var(--highlight);
   --chat-input-container-background: var(--background);
   --spoiler-hidden-background: var(--highlight);
   --spoiler-revealed-background: rgba(var(--rgb-highlight), 20%);
-  --input-background: var(--background);
+  --input-background: rgb(var(--rgb-surface));
+  --input-border: rgba(var(--rgb-highlight), 30%);
   --textbox-markdown-syntax: var(--highlight);
   --logo-primary: var(--highlight);
   --control-brand-foreground: var(--highlight);
@@ -79,8 +89,8 @@
   --text-warning: var(--afk-color);
   --text-danger: var(--dnd-color);
   --text-brand: var(--highlight);
-  --text-normal: var(--text);
-  --text-muted: var(--text);
+  --text-normal: rgb(220, 220, 225);
+  --text-muted: rgba(220, 220, 225, 0.6); /* Better contrast for muted text */
   --button-danger-background-disabled: rgba(var(--rgb-close-button), 20%);
   --button-danger-background: rgba(var(--rgb-close-button), 20%);
   --button-danger-background-hover: rgba(var(--rgb-close-button), 70%);

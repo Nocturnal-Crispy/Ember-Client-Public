@@ -47,6 +47,31 @@
   color: var(--background);
 }
 
+/* DM Icon Styling */
+.server-icon.dm-icon {
+  background-color: transparent;
+  padding: 4px;
+}
+
+.server-icon.dm-icon img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.server-icon.dm-icon:hover img {
+  transform: scale(1.1);
+}
+
+.server-icon.dm-icon.active {
+  background-color: var(--highlight);
+}
+
+.server-icon.dm-icon.active img {
+  transform: scale(0.9);
+}
+
 .server-separator {
   width: 32px;
   height: 2px;

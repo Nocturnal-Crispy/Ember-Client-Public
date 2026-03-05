@@ -1,12 +1,15 @@
 /**
  * Message service — TypeScript conversion of public/message-manager.js.
- * Handles message fetch, encrypt/send, decrypt/display.
+ * Handles message fetch, encrypt/send, decrypt/display for both channels and DMs.
  */
 (function (): void {
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("MessageManager");
   const emberCrypto = window.electronAPI.crypto;
+  
+  // Import DM crypto from ember-shared
+  const DMCrypto = (window as any).emberShared?.crypto?.directMessaging;
 
   const messagesContainer = document.getElementById("messages");
 
@@ -17,6 +20,34 @@
 
   // Current user ID cached for ownership checks (set in loadChannelMessages)
   let currentUserId: string | null = null;
+  
+  // DM conversation keys cache
+  const dmConversationKeys = new Map<string, Uint8Array>();
+  
+  // Performance optimizations
+  const messageCache = new Map<string, FetchResult>(); // channelId -> FetchResult
+  const messageElements = new Map<string, HTMLElement>(); // messageId -> HTMLElement
+  const renderedMessageIds = new Set<string>(); // Track currently rendered messages
+  let virtualScrollContainer: HTMLElement | null = null;
+  let intersectionObserver: IntersectionObserver | null = null;
+  let messageResizeObserver: ResizeObserver | null = null;
+  
+  // Performance monitoring
+  let lastLoadTime = 0;
+  let messageLoadCount = 0;
+  
+  // LRU cache tracking
+  const cacheAccessOrder = new Set<string>(); // Track access order for LRU eviction
+  
+  interface FetchResult {
+    messages: Message[];
+    hasMore: boolean;
+  }
+  
+  interface MessageCacheEntry extends FetchResult {
+    timestamp: number;
+    channelId: string;
+  }
 
   async function sendEncryptedMessage(plaintext: string): Promise<void> {
     if (!App.activeChannelId || !App.activeEmberId) return;
@@ -341,19 +372,252 @@
     return div.innerHTML;
   }
 
-  interface FetchResult {
-    messages: Message[];
-    hasMore: boolean;
+  /**
+   * Performance optimization functions
+   */
+  
+  /**
+   * Get cached messages for a channel
+   */
+  function getCachedMessages(channelId: string): FetchResult | null {
+    const cached = messageCache.get(channelId) as MessageCacheEntry | undefined;
+    if (!cached) return null;
+    
+    // Cache entries expire after 5 minutes
+    const now = Date.now();
+    if (now - cached.timestamp > 5 * 60 * 1000) {
+      messageCache.delete(channelId);
+      cacheAccessOrder.delete(channelId);
+      return null;
+    }
+    
+    // Update LRU access order
+    cacheAccessOrder.delete(channelId);
+    cacheAccessOrder.add(channelId);
+    
+    return { messages: cached.messages, hasMore: cached.hasMore };
+  }
+  
+  /**
+   * Cache messages for a channel
+   */
+  function cacheMessages(channelId: string, result: FetchResult): void {
+    const cacheEntry: MessageCacheEntry = {
+      ...result,
+      timestamp: Date.now(),
+      channelId
+    };
+    messageCache.set(channelId, cacheEntry);
+    
+    // Update LRU access order
+    cacheAccessOrder.delete(channelId);
+    cacheAccessOrder.add(channelId);
+    
+    // Limit cache size to prevent memory leaks using LRU eviction
+    if (messageCache.size > 50) {
+      const oldestKey = cacheAccessOrder.values().next().value;
+      if (oldestKey) {
+        messageCache.delete(oldestKey);
+        cacheAccessOrder.delete(oldestKey);
+      }
+    }
+  }
+  
+  /**
+   * Initialize virtual scrolling for better performance with large message lists
+   */
+  function initializeVirtualScrolling(): void {
+    if (!messagesContainer) return;
+    
+    // Create virtual scroll container
+    virtualScrollContainer = document.createElement('div');
+    virtualScrollContainer.className = 'virtual-scroll-container';
+    virtualScrollContainer.style.cssText = `
+      height: 100%;
+      overflow-y: auto;
+      position: relative;
+    `;
+    
+    // Move existing messages to virtual container
+    while (messagesContainer.firstChild) {
+      virtualScrollContainer.appendChild(messagesContainer.firstChild);
+    }
+    messagesContainer.appendChild(virtualScrollContainer);
+    
+    // Set up intersection observer for lazy loading
+    intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const messageId = entry.target.getAttribute('data-message-id');
+            if (messageId) {
+              loadMessageContent(messageId);
+            }
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '50px' }
+    );
+    
+    // Set up resize observer for container size changes
+    messageResizeObserver = new ResizeObserver(() => {
+      updateVirtualScrollHeight();
+    });
+    messageResizeObserver.observe(virtualScrollContainer);
+  }
+  
+  /**
+   * Load message content lazily
+   */
+  function loadMessageContent(messageId: string): void {
+    const element = messageElements.get(messageId);
+    if (!element || element.getAttribute('data-content-loaded') === 'true') return;
+    
+    // Mark as loaded to prevent duplicate work
+    element.setAttribute('data-content-loaded', 'true');
+    
+    // Add fade-in animation
+    element.style.opacity = '0';
+    element.style.transform = 'translateY(10px)';
+    
+    requestAnimationFrame(() => {
+      element.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      element.style.opacity = '1';
+      element.style.transform = 'translateY(0)';
+    });
+  }
+  
+  /**
+   * Update virtual scroll container height
+   */
+  function updateVirtualScrollHeight(): void {
+    if (!virtualScrollContainer) return;
+    
+    const totalHeight = Array.from(virtualScrollContainer.children)
+      .reduce((sum, child) => sum + (child as HTMLElement).offsetHeight, 0);
+    
+    virtualScrollContainer.style.height = `${totalHeight}px`;
+  }
+  
+  /**
+   * Optimize DOM operations by batching updates
+   */
+  function batchDOMUpdates(updates: (() => void)[]): void {
+    // Use requestAnimationFrame for smooth updates
+    requestAnimationFrame(() => {
+      updates.forEach(update => update());
+    });
+  }
+  
+  /**
+   * Clean up old messages to prevent memory leaks
+   */
+  function cleanupOldMessages(): void {
+    const maxMessages = 1000; // Keep only last 1000 messages in memory
+    
+    if (renderedMessageIds.size > maxMessages) {
+      const messagesToRemove = Array.from(renderedMessageIds).slice(0, renderedMessageIds.size - maxMessages);
+      
+      messagesToRemove.forEach(messageId => {
+        const element = messageElements.get(messageId);
+        if (element && element.parentNode) {
+          element.parentNode.removeChild(element);
+        }
+        messageElements.delete(messageId);
+        renderedMessageIds.delete(messageId);
+      });
+      
+      log.debug('Cleaned up old messages', { removed: messagesToRemove.length });
+    }
+  }
+  
+  /**
+   * Monitor performance metrics
+   */
+  function monitorPerformance(operation: string, startTime: number): void {
+    const duration = Date.now() - startTime;
+    lastLoadTime = duration;
+    messageLoadCount++;
+    
+    log.debug('Performance metric', {
+      operation,
+      duration,
+      count: messageLoadCount,
+      average: messageLoadCount > 0 ? duration / messageLoadCount : 0
+    });
+    
+    // Warn if operations are taking too long
+    if (duration > 1000) {
+      log.warn('Slow operation detected', { operation, duration });
+    }
+  }
+  
+  /**
+   * Optimize message rendering with document fragments
+   */
+  function createMessageFragment(messages: Message[]): DocumentFragment {
+    const fragment = document.createDocumentFragment();
+    
+    messages.forEach(message => {
+      const messageElement = createMessageElement(message);
+      if (messageElement) {
+        fragment.appendChild(messageElement);
+      }
+    });
+    
+    return fragment;
+  }
+  
+  /**
+   * Create optimized message element
+   */
+  function createMessageElement(message: Message): HTMLElement | null {
+    if (!App.activeEmberId) return null;
+    
+    // Check if element already exists
+    let messageElement = messageElements.get(message.id);
+    if (messageElement) {
+      return messageElement;
+    }
+    
+    // Create new element
+    messageElement = document.createElement('div');
+    messageElement.className = 'message';
+    messageElement.setAttribute('data-message-id', message.id);
+    messageElement.setAttribute('data-content-loaded', 'false');
+    
+    // Store reference
+    messageElements.set(message.id, messageElement);
+    renderedMessageIds.add(message.id);
+    
+    // Add to intersection observer for lazy loading
+    if (intersectionObserver) {
+      intersectionObserver.observe(messageElement);
+    }
+    
+    return messageElement;
   }
 
   async function fetchMessages(
     channelId: string,
     beforeId: string | null = null
   ): Promise<FetchResult> {
+    const startTime = Date.now();
+    const cacheKey = beforeId ? `${channelId}-${beforeId}` : channelId;
+    
     log.debug("Fetching messages", {
       channel_id: channelId,
       before: beforeId ?? "none",
     });
+    
+    // Check cache first
+    const cached = getCachedMessages(cacheKey);
+    if (cached) {
+      log.debug("Using cached messages", { channel_id: channelId, count: cached.messages.length });
+      monitorPerformance('fetch-messages-cache', startTime);
+      return cached;
+    }
+    
     try {
       const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
       if (!auth || !auth.token || !auth.hostname)
@@ -363,11 +627,17 @@
         channelId,
         beforeId ?? undefined
       );
+      
+      // Cache the result
+      cacheMessages(cacheKey, result);
+      
       log.debug("Messages fetched", {
         channel_id: channelId,
         count: result.messages.length,
         has_more: result.hasMore,
       });
+      
+      monitorPerformance('fetch-messages-network', startTime);
       return result;
     } catch (error) {
       const err = error as Error;
@@ -376,20 +646,43 @@
         error: err.message,
       });
       console.error("Error fetching messages:", error);
+      monitorPerformance('fetch-messages-error', startTime);
       return { messages: [], hasMore: false };
     }
   }
 
   async function loadChannelMessages(channelId: string): Promise<void> {
+    const startTime = Date.now();
+    
     if (!messagesContainer) return;
     log.info("Loading channel messages", { channel_id: channelId });
+    
+    // Initialize virtual scrolling if not already done
+    if (!virtualScrollContainer) {
+      initializeVirtualScrolling();
+    }
+    
     // Reset pagination state and ownership cache for the new channel
     hasMoreMessages = false;
     oldestMessageId = null;
     isLoadingOlderMessages = false;
     App.ownedMessageIds.clear();
-    while (messagesContainer.firstChild)
-      messagesContainer.removeChild(messagesContainer.firstChild);
+    
+    // Clear existing messages efficiently
+    if (virtualScrollContainer) {
+      while (virtualScrollContainer.firstChild) {
+        virtualScrollContainer.removeChild(virtualScrollContainer.firstChild);
+      }
+    } else {
+      while (messagesContainer.firstChild) {
+        messagesContainer.removeChild(messagesContainer.firstChild);
+      }
+    }
+    
+    // Clear message tracking
+    messageElements.clear();
+    renderedMessageIds.clear();
+    
     const prevChannelId = App.activeChannelId;
     App.activeChannelId = channelId;
     if (prevChannelId && prevChannelId !== channelId) {
@@ -433,7 +726,10 @@
     banner.appendChild(heading);
     banner.appendChild(subtitle);
     banner.appendChild(editBtn);
-    messagesContainer.appendChild(banner);
+    
+    // Add banner to appropriate container
+    const targetContainer = virtualScrollContainer || messagesContainer;
+    targetContainer.appendChild(banner);
 
     // Fetch auth once to populate ownership cache (fast IPC read from safeStorage)
     const authForOwnership = (await ipcRenderer.invoke(
@@ -444,17 +740,37 @@
     const { messages, hasMore } = await fetchMessages(channelId);
     hasMoreMessages = hasMore;
     if (messages.length > 0) oldestMessageId = messages[0].id;
+    
     log.debug("Rendering messages", {
       channel_id: channelId,
       count: messages.length,
       has_more: hasMore,
     });
+    
+    // Batch DOM updates for better performance
+    const updates: (() => void)[] = [];
+    
     messages.forEach((msg) => {
       if (currentUserId && msg.sender_user_id === currentUserId) {
         App.ownedMessageIds.add(msg.id);
       }
-      displayDecryptedMessage(msg);
+      
+      // Create message element and add to batch
+      const messageElement = createMessageElement(msg);
+      if (messageElement) {
+        updates.push(() => {
+          displayDecryptedMessage(msg);
+        });
+      }
     });
+    
+    // Execute all DOM updates in a single batch
+    batchDOMUpdates(updates);
+    
+    // Clean up old messages if needed
+    cleanupOldMessages();
+    
+    monitorPerformance('load-channel-messages', startTime);
   }
 
   function loadOlderMessages(): void {
@@ -487,6 +803,141 @@
     );
   }
 
+  // ─── Direct Messaging Functions ───────────────────────────────────────────
+
+  /**
+   * Send an encrypted direct message
+   */
+  async function sendDirectMessage(conversationId: string, plaintext: string): Promise<string> {
+    if (!DMCrypto) {
+      log.error("DM crypto not available");
+      throw new Error("Direct messaging crypto not available");
+    }
+    
+    const conversationKey = dmConversationKeys.get(conversationId);
+    if (!conversationKey) {
+      log.error("Cannot send DM: no conversation key", { conversationId });
+      throw new Error("Conversation key not available for encryption");
+    }
+    
+    log.debug("Sending encrypted direct message", { conversationId });
+    try {
+      // Encrypt message using ember-shared DM crypto
+      const encryptedContent = DMCrypto.encryptDirectMessage(plaintext, conversationKey);
+      
+      // Send via WebSocket
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        token?: string;
+        hostname?: string;
+      } | null;
+      
+      if (!auth || !auth.token || !auth.hostname) {
+        throw new Error("Authentication required");
+      }
+      
+      // This would send through the WebSocket connection
+      // For now, we'll use the existing WebSocket infrastructure
+      const messageData = {
+        conversation_id: conversationId,
+        content: encryptedContent,
+        timestamp: Date.now()
+      };
+      
+      // Send through existing WebSocket
+      if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN) {
+        App.wsConnection.send(JSON.stringify({
+          type: "dm_message",
+          payload: messageData
+        }));
+      }
+      
+      // Return a temporary message ID (in a real implementation, this would come from the server)
+      return `temp_${Date.now()}`;
+    } catch (error) {
+      const err = error as Error;
+      log.error("Error sending direct message", {
+        conversationId,
+        error: err.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Decrypt and display a direct message
+   */
+  async function displayDirectMessage(messageData: {
+    id: string;
+    conversation_id: string;
+    sender_user_id: string;
+    content: string;
+    timestamp: number;
+  }): Promise<void> {
+    if (!DMCrypto) {
+      log.error("DM crypto not available");
+      return;
+    }
+    
+    const conversationKey = dmConversationKeys.get(messageData.conversation_id);
+    if (!conversationKey) {
+      log.warn("Cannot decrypt DM: no conversation key", { 
+        conversationId: messageData.conversation_id 
+      });
+      return;
+    }
+    
+    try {
+      // Decrypt message using ember-shared DM crypto
+      const decryptedContent = DMCrypto.decryptDirectMessage(
+        messageData.content, 
+        conversationKey
+      );
+      
+      // Create message object for display
+      const displayData = {
+        id: messageData.id,
+        channel_id: messageData.conversation_id,
+        sender_user_id: messageData.sender_user_id,
+        content: decryptedContent,
+        sender_username: "User", // This would be resolved from user data
+        created_at: Math.floor(messageData.timestamp / 1000),
+        sender_id: messageData.sender_user_id,
+        ciphertext: messageData.content // Original encrypted content
+      };
+      
+      // Display using existing message display function
+      displayDecryptedMessage(displayData as any);
+      
+      log.debug("Direct message displayed", { 
+        messageId: messageData.id,
+        conversationId: messageData.conversation_id 
+      });
+    } catch (error) {
+      const err = error as Error;
+      log.error("Failed to decrypt direct message", {
+        messageId: messageData.id,
+        conversationId: messageData.conversation_id,
+        error: err.message
+      });
+    }
+  }
+
+  /**
+   * Cache a DM conversation key
+   */
+  function cacheDmConversationKey(conversationId: string, key: Uint8Array): void {
+    dmConversationKeys.set(conversationId, key);
+    log.debug("DM conversation key cached", { conversationId });
+  }
+
+  /**
+   * Remove a DM conversation key from cache
+   */
+  function removeDmConversationKey(conversationId: string): void {
+    dmConversationKeys.delete(conversationId);
+    log.debug("DM conversation key removed from cache", { conversationId });
+  }
+
   if (messagesContainer) {
     messagesContainer.addEventListener("scroll", () => {
       if (messagesContainer.scrollTop < 100) {
@@ -503,4 +954,17 @@
   window.fetchMessages = fetchMessages;
   window.addMessage = addMessage;
   window.formatTimestamp = formatTimestamp;
+  
+  // DM-specific functions
+  window.sendDirectMessage = sendDirectMessage;
+  window.displayDirectMessage = displayDirectMessage;
+  window.cacheDmConversationKey = cacheDmConversationKey;
+  window.removeDmConversationKey = removeDmConversationKey;
+  
+  // Performance optimization functions
+  window.getCachedMessages = getCachedMessages;
+  window.cacheMessages = cacheMessages;
+  window.initializeVirtualScrolling = initializeVirtualScrolling;
+  window.cleanupOldMessages = cleanupOldMessages;
+  window.monitorPerformance = monitorPerformance;
 })();

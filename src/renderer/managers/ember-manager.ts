@@ -75,7 +75,7 @@
     const separator = serverList.querySelector(".server-separator");
 
     serverList
-      .querySelectorAll<HTMLElement>(".server-icon:not(.add-server)")
+      .querySelectorAll<HTMLElement>(".server-icon:not(.add-server):not(.dm-icon)")
       .forEach((el) => el.remove());
 
     embers.forEach((ember, index) => {
@@ -167,6 +167,12 @@
 
   function switchToServer(emberId: string, emberName: string): void {
     log.info("Switching to server", { ember_id: emberId, name: emberName });
+    
+    // Close DM screen if it's active
+    if (window.closeDMScreenOnServerSwitch) {
+      window.closeDMScreenOnServerSwitch();
+    }
+    
     document.querySelectorAll<HTMLElement>(".server-icon").forEach((icon) => {
       if (icon.dataset["emberId"] === emberId) {
         icon.classList.add("active");
