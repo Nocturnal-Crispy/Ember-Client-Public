@@ -8,51 +8,55 @@
  * Referenced by public/index.html as the sole <script> tag.
  */
 (function (): void {
-  'use strict';
+  "use strict";
 
-  const FRAGMENT_BASE = 'src/html/';
+  const FRAGMENT_BASE = "src/html/";
 
   const SCRIPTS: string[] = [
-    'src/js/renderer/utils/logger.js',
-    'src/js/renderer/managers/app-state.js',
-    'src/js/renderer/services/voice-service.js',
-    'src/js/renderer/services/websocket-service.js',
-    'src/js/renderer/services/message-service.js',
-    'src/js/renderer/managers/channel-manager.js',
-    'src/js/renderer/managers/ember-manager.js',
-    'src/js/renderer/managers/invite-manager.js',
-    'src/js/renderer/managers/voice-ui-manager.js',
-    'src/js/renderer/managers/update-notifier.js',
-    'src/js/renderer/managers/renderer.js',
+    "src/js/renderer/utils/logger.js",
+    "src/js/renderer/utils/auth-loader.js",
+    "src/js/renderer/managers/app-state.js",
+    "src/js/renderer/services/voice-service.js",
+    "src/js/renderer/services/websocket-service.js",
+    "src/js/renderer/services/message-service.js",
+    "src/js/renderer/managers/channel-manager.js",
+    "src/js/renderer/managers/ember-manager.js",
+    "src/js/renderer/managers/invite-manager.js",
+    "src/js/renderer/managers/voice-ui-manager.js",
+    "src/js/renderer/managers/update-notifier.js",
+    "src/js/renderer/managers/renderer.js",
   ];
 
   async function fetchFragment(name: string): Promise<string> {
     const response = await fetch(FRAGMENT_BASE + name);
     if (!response.ok) {
-      throw new Error(`[main-loader] Failed to fetch fragment "${name}": HTTP ${response.status}`);
+      throw new Error(
+        `[main-loader] Failed to fetch fragment "${name}": HTTP ${response.status}`
+      );
     }
     return response.text();
   }
 
   /** Parse an HTML string and return a DocumentFragment of its body children. */
   function parseFragment(html: string): DocumentFragment {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const doc = new DOMParser().parseFromString(html, "text/html");
     const frag = document.createDocumentFragment();
-    Array.from(doc.body.childNodes).forEach(node => frag.appendChild(node));
+    Array.from(doc.body.childNodes).forEach((node) => frag.appendChild(node));
     return frag;
   }
 
   function loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const el = document.createElement('script');
+      const el = document.createElement("script");
       el.src = src;
       el.onload = () => resolve();
-      el.onerror = () => reject(new Error(`[main-loader] Failed to load script: ${src}`));
+      el.onerror = () =>
+        reject(new Error(`[main-loader] Failed to load script: ${src}`));
       document.body.appendChild(el);
     });
   }
 
-  document.addEventListener('DOMContentLoaded', async () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     try {
       const [
         titleBar,
@@ -74,32 +78,32 @@
         modalSettings,
         overlayReconnection,
       ] = await Promise.all([
-        fetchFragment('title-bar.html'),
-        fetchFragment('server-list.html'),
-        fetchFragment('channel-list.html'),
-        fetchFragment('welcome-screen.html'),
-        fetchFragment('chat-container.html'),
-        fetchFragment('member-list.html'),
-        fetchFragment('modal-logout.html'),
-        fetchFragment('modal-add-server.html'),
-        fetchFragment('modal-join-server.html'),
-        fetchFragment('modal-create-server.html'),
-        fetchFragment('modal-create-invite.html'),
-        fetchFragment('modal-accept-invite.html'),
-        fetchFragment('context-menu-channel.html'),
-        fetchFragment('context-menu-ember.html'),
-        fetchFragment('modal-channel-name.html'),
-        fetchFragment('modal-delete-confirm.html'),
-        fetchFragment('modal-settings.html'),
-        fetchFragment('overlay-reconnection.html'),
+        fetchFragment("title-bar.html"),
+        fetchFragment("server-list.html"),
+        fetchFragment("channel-list.html"),
+        fetchFragment("welcome-screen.html"),
+        fetchFragment("chat-container.html"),
+        fetchFragment("member-list.html"),
+        fetchFragment("modal-logout.html"),
+        fetchFragment("modal-add-server.html"),
+        fetchFragment("modal-join-server.html"),
+        fetchFragment("modal-create-server.html"),
+        fetchFragment("modal-create-invite.html"),
+        fetchFragment("modal-accept-invite.html"),
+        fetchFragment("context-menu-channel.html"),
+        fetchFragment("context-menu-ember.html"),
+        fetchFragment("modal-channel-name.html"),
+        fetchFragment("modal-delete-confirm.html"),
+        fetchFragment("modal-settings.html"),
+        fetchFragment("overlay-reconnection.html"),
       ]);
 
       // Title bar (top-level)
       document.body.appendChild(parseFragment(titleBar));
 
       // App container wraps the main layout columns
-      const appContainer = document.createElement('div');
-      appContainer.className = 'app-container';
+      const appContainer = document.createElement("div");
+      appContainer.className = "app-container";
       appContainer.appendChild(parseFragment(serverList));
       appContainer.appendChild(parseFragment(channelList));
       appContainer.appendChild(parseFragment(welcomeScreen));
@@ -126,7 +130,7 @@
         await loadScript(src);
       }
     } catch (err) {
-      console.error('[main-loader] Initialization failed:', err);
+      console.error("[main-loader] Initialization failed:", err);
     }
   });
 })();

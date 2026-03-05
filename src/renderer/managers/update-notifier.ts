@@ -1,36 +1,39 @@
 (function (): void {
-  const log = window.emberLog.createLogger('UpdateNotifier');
+  const log = window.emberLog.createLogger("UpdateNotifier");
 
   /** Version that was dismissed by the user — skip showing it again. */
   let dismissedVersion: string | null = null;
 
   const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-  const NOTIFICATION_ID = 'ember-update-notification';
-  const DOWNLOAD_URL = 'https://ember-chat.com';
+  const NOTIFICATION_ID = "ember-update-notification";
+  const DOWNLOAD_URL = "https://ember-chat.com";
 
   function createNotificationElement(latestVersion: string): HTMLElement {
-    const container = document.createElement('button');
+    const container = document.createElement("button");
     container.id = NOTIFICATION_ID;
-    container.className = 'update-notification';
-    container.setAttribute('aria-label', `Update available: v${latestVersion}. Click to download.`);
-    container.addEventListener('click', () => {
-      window.electronAPI.ipc.invoke('open-external-url', DOWNLOAD_URL);
+    container.className = "update-notification";
+    container.setAttribute(
+      "aria-label",
+      `Update available: v${latestVersion}. Click to download.`
+    );
+    container.addEventListener("click", () => {
+      window.electronAPI.ipc.invoke("open-external-url", DOWNLOAD_URL);
     });
 
-    const icon = document.createElement('span');
-    icon.className = 'update-notification__icon';
-    icon.textContent = '↑';
+    const icon = document.createElement("span");
+    icon.className = "update-notification__icon";
+    icon.textContent = "↑";
 
-    const text = document.createElement('span');
-    text.className = 'update-notification__text';
+    const text = document.createElement("span");
+    text.className = "update-notification__text";
     text.textContent = `Update available v${latestVersion}`;
 
-    const dismiss = document.createElement('span');
-    dismiss.className = 'update-notification__dismiss';
-    dismiss.setAttribute('role', 'button');
-    dismiss.setAttribute('aria-label', 'Dismiss update notification');
-    dismiss.textContent = '✕';
-    dismiss.addEventListener('click', (e) => {
+    const dismiss = document.createElement("span");
+    dismiss.className = "update-notification__dismiss";
+    dismiss.setAttribute("role", "button");
+    dismiss.setAttribute("aria-label", "Dismiss update notification");
+    dismiss.textContent = "✕";
+    dismiss.addEventListener("click", (e) => {
       e.stopPropagation();
       dismissUpdateNotification();
     });
@@ -44,19 +47,19 @@
   function showNotification(latestVersion: string): void {
     const existing = document.getElementById(NOTIFICATION_ID);
     if (existing) {
-      const textEl = existing.querySelector('.update-notification__text');
+      const textEl = existing.querySelector(".update-notification__text");
       if (textEl) textEl.textContent = `Update available v${latestVersion}`;
       return;
     }
-    const windowControls = document.querySelector('.window-controls');
+    const windowControls = document.querySelector(".window-controls");
     if (!windowControls) {
-      log.warn('Could not find .window-controls to insert update notification');
+      log.warn("Could not find .window-controls to insert update notification");
       return;
     }
-    const minimizeBtn = document.getElementById('minimize-btn');
+    const minimizeBtn = document.getElementById("minimize-btn");
     const el = createNotificationElement(latestVersion);
     windowControls.insertBefore(el, minimizeBtn);
-    log.info('Update notification shown', { latestVersion });
+    log.info("Update notification shown", { latestVersion });
   }
 
   function removeNotification(): void {
@@ -69,11 +72,11 @@
   function dismissUpdateNotification(): void {
     const existing = document.getElementById(NOTIFICATION_ID);
     if (existing) {
-      const textEl = existing.querySelector('.update-notification__text');
+      const textEl = existing.querySelector(".update-notification__text");
       const match = textEl?.textContent?.match(/v([\d.]+)$/);
       if (match) {
         dismissedVersion = match[1];
-        log.debug('Update notification dismissed', { dismissedVersion });
+        log.debug("Update notification dismissed", { dismissedVersion });
       }
       existing.remove();
     }
@@ -81,10 +84,14 @@
 
   async function checkForUpdate(): Promise<void> {
     try {
-      const info = await window.electronAPI.ipc.invoke('check-for-update') as UpdateInfo;
+      const info = (await window.electronAPI.ipc.invoke(
+        "check-for-update"
+      )) as UpdateInfo;
       if (info.updateAvailable && info.latestVersion) {
         if (info.latestVersion === dismissedVersion) {
-          log.debug('Skipping notification for dismissed version', { version: dismissedVersion });
+          log.debug("Skipping notification for dismissed version", {
+            version: dismissedVersion,
+          });
           return;
         }
         showNotification(info.latestVersion);
@@ -92,7 +99,7 @@
         removeNotification();
       }
     } catch (err) {
-      log.debug('Update check error', { error: String(err) });
+      log.debug("Update check error", { error: String(err) });
     }
   }
 

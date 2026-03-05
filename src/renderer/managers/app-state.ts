@@ -28,7 +28,7 @@ window.App = {
   videoParticipants: new Set<string>(),
   localCameraOn: false,
   videoGridVisible: false,
-  activeView: 'text' as 'text' | 'voice',
+  activeView: "text" as "text" | "voice",
 
   // ── Health check / reconnection ──────────────────────────────────────────
   healthcheckInterval: null,
@@ -45,7 +45,7 @@ window.App = {
 
   // ── Create-server modal ──────────────────────────────────────────────────
   currentIconData: null,
-  currentIconSource: 'upload',
+  currentIconSource: "upload",
 
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,

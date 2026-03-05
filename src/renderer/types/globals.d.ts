@@ -8,44 +8,64 @@
  */
 
 import type {
-  AuthData, DeviceIdentity, RegistrationPayload, LoginPayload, AuthResponse, RecoveryData,
-  Ember, Channel, Category, Member, ChannelReorderUpdate, CategoryReorderUpdate, DragItem, ContextMenuTarget,
-  Message, WsMessage, PresenceUpdatePayload, LogPayload,
-  VoiceSettings, SoundType, VoiceParticipant, ICEServer, AuthForVoice, OscillatorType, SoundDef,
-} from 'ember-shared';
+  AuthData,
+  DeviceIdentity,
+  RegistrationPayload,
+  LoginPayload,
+  AuthResponse,
+  RecoveryData,
+  Ember,
+  Channel,
+  Category,
+  Member,
+  ChannelReorderUpdate,
+  CategoryReorderUpdate,
+  DragItem,
+  ContextMenuTarget,
+  Message,
+  WsMessage,
+  PresenceUpdatePayload,
+  LogPayload,
+  VoiceSettings,
+  SoundType,
+  VoiceParticipant,
+  ICEServer,
+  AuthForVoice,
+  OscillatorType,
+  SoundDef,
+} from "ember-shared";
 
 declare global {
-
   // ─── Domain types re-exported from ember-shared ───────────────────────────
 
-  type AuthData = import('ember-shared').AuthData;
-  type DeviceIdentity = import('ember-shared').DeviceIdentity;
-  type RegistrationPayload = import('ember-shared').RegistrationPayload;
-  type LoginPayload = import('ember-shared').LoginPayload;
-  type AuthResponse = import('ember-shared').AuthResponse;
-  type RecoveryData = import('ember-shared').RecoveryData;
+  type AuthData = import("ember-shared").AuthData;
+  type DeviceIdentity = import("ember-shared").DeviceIdentity;
+  type RegistrationPayload = import("ember-shared").RegistrationPayload;
+  type LoginPayload = import("ember-shared").LoginPayload;
+  type AuthResponse = import("ember-shared").AuthResponse;
+  type RecoveryData = import("ember-shared").RecoveryData;
 
-  type Ember = import('ember-shared').Ember;
-  type Channel = import('ember-shared').Channel;
-  type Category = import('ember-shared').Category;
-  type Member = import('ember-shared').Member;
-  type ChannelReorderUpdate = import('ember-shared').ChannelReorderUpdate;
-  type CategoryReorderUpdate = import('ember-shared').CategoryReorderUpdate;
-  type DragItem = import('ember-shared').DragItem;
-  type ContextMenuTarget = import('ember-shared').ContextMenuTarget;
+  type Ember = import("ember-shared").Ember;
+  type Channel = import("ember-shared").Channel;
+  type Category = import("ember-shared").Category;
+  type Member = import("ember-shared").Member;
+  type ChannelReorderUpdate = import("ember-shared").ChannelReorderUpdate;
+  type CategoryReorderUpdate = import("ember-shared").CategoryReorderUpdate;
+  type DragItem = import("ember-shared").DragItem;
+  type ContextMenuTarget = import("ember-shared").ContextMenuTarget;
 
-  type Message = import('ember-shared').Message;
-  type WsMessage = import('ember-shared').WsMessage;
-  type PresenceUpdatePayload = import('ember-shared').PresenceUpdatePayload;
-  type LogPayload = import('ember-shared').LogPayload;
+  type Message = import("ember-shared").Message;
+  type WsMessage = import("ember-shared").WsMessage;
+  type PresenceUpdatePayload = import("ember-shared").PresenceUpdatePayload;
+  type LogPayload = import("ember-shared").LogPayload;
 
-  type VoiceSettings = import('ember-shared').VoiceSettings;
-  type SoundType = import('ember-shared').SoundType;
-  type VoiceParticipant = import('ember-shared').VoiceParticipant;
-  type ICEServer = import('ember-shared').ICEServer;
-  type AuthForVoice = import('ember-shared').AuthForVoice;
-  type OscillatorType = import('ember-shared').OscillatorType;
-  type SoundDef = import('ember-shared').SoundDef;
+  type VoiceSettings = import("ember-shared").VoiceSettings;
+  type SoundType = import("ember-shared").SoundType;
+  type VoiceParticipant = import("ember-shared").VoiceParticipant;
+  type ICEServer = import("ember-shared").ICEServer;
+  type AuthForVoice = import("ember-shared").AuthForVoice;
+  type OscillatorType = import("ember-shared").OscillatorType;
+  type SoundDef = import("ember-shared").SoundDef;
 
   // ─── Update check ─────────────────────────────────────────────────────────
 
@@ -71,11 +91,25 @@ declare global {
 
   interface NaClAPI {
     randomBytes(n: number): Uint8Array;
-    box(msg: Uint8Array, nonce: Uint8Array, theirPk: Uint8Array, mysk: Uint8Array): Uint8Array;
-    boxOpen(box: Uint8Array, nonce: Uint8Array, theirPk: Uint8Array, mysk: Uint8Array): Uint8Array | null;
+    box(
+      msg: Uint8Array,
+      nonce: Uint8Array,
+      theirPk: Uint8Array,
+      mysk: Uint8Array
+    ): Uint8Array;
+    boxOpen(
+      box: Uint8Array,
+      nonce: Uint8Array,
+      theirPk: Uint8Array,
+      mysk: Uint8Array
+    ): Uint8Array | null;
     boxKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array };
     secretbox(msg: Uint8Array, nonce: Uint8Array, k: Uint8Array): Uint8Array;
-    secretboxOpen(box: Uint8Array, nonce: Uint8Array, k: Uint8Array): Uint8Array | null;
+    secretboxOpen(
+      box: Uint8Array,
+      nonce: Uint8Array,
+      k: Uint8Array
+    ): Uint8Array | null;
     BOX_NONCE_LENGTH: number;
     SECRETBOX_NONCE_LENGTH: number;
     SECRETBOX_KEY_LENGTH: number;
@@ -90,36 +124,106 @@ declare global {
 
   interface EmberCryptoAPI {
     generateRecoveryCode(): string;
-    encryptPrivateKeyWithRecoveryCode(privateKey: Uint8Array, recoveryCode: string): Promise<{ encrypted: string; salt: string }>;
-    decryptPrivateKeyWithRecoveryCode(encryptedBase64: string, recoveryCode: string, saltBase64: string): Promise<Uint8Array | null>;
+    encryptPrivateKeyWithRecoveryCode(
+      privateKey: Uint8Array,
+      recoveryCode: string
+    ): Promise<{ encrypted: string; salt: string }>;
+    decryptPrivateKeyWithRecoveryCode(
+      encryptedBase64: string,
+      recoveryCode: string,
+      saltBase64: string
+    ): Promise<Uint8Array | null>;
     generateEmberKey(): Uint8Array;
-    encryptEmberKeyForUser(emberKey: Uint8Array, recipientPublicKey: Uint8Array, senderPrivateKey: Uint8Array): string;
-    decryptEmberKeyForUser(encryptedBase64: string, senderPublicKey: Uint8Array, recipientPrivateKey: Uint8Array): Uint8Array | null;
+    encryptEmberKeyForUser(
+      emberKey: Uint8Array,
+      recipientPublicKey: Uint8Array,
+      senderPrivateKey: Uint8Array
+    ): string;
+    decryptEmberKeyForUser(
+      encryptedBase64: string,
+      senderPublicKey: Uint8Array,
+      recipientPrivateKey: Uint8Array
+    ): Uint8Array | null;
     encryptMessage(plaintext: string, emberKey: Uint8Array): string;
-    decryptMessage(ciphertextBase64: string, emberKey: Uint8Array): string | null;
-    encryptEmberKeyForInvite(emberKey: Uint8Array, inviteCode: string): Promise<{ encrypted: string; salt: string }>;
-    decryptEmberKeyFromInvite(encryptedBase64: string, inviteCode: string, saltBase64: string): Promise<Uint8Array | null>;
+    decryptMessage(
+      ciphertextBase64: string,
+      emberKey: Uint8Array
+    ): string | null;
+    encryptEmberKeyForInvite(
+      emberKey: Uint8Array,
+      inviteCode: string
+    ): Promise<{ encrypted: string; salt: string }>;
+    decryptEmberKeyFromInvite(
+      encryptedBase64: string,
+      inviteCode: string,
+      saltBase64: string
+    ): Promise<Uint8Array | null>;
   }
 
   interface IPCRenderer {
     send(channel: string, ...args: unknown[]): void;
     invoke(channel: string, ...args: unknown[]): Promise<unknown>;
-    on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
+    on(
+      channel: string,
+      listener: (event: unknown, ...args: unknown[]) => void
+    ): void;
   }
 
   interface AuthServiceAPI {
     generateDeviceIdentity(): DeviceIdentity;
-    login(hostname: string, username: string, password: string, deviceId: string): Promise<AuthResponse>;
-    register(hostname: string, username: string, password: string, deviceId: string, publicKey: string, encryptedDeviceKey: string, salt: string): Promise<AuthResponse>;
-    registerWithRecovery(hostname: string, username: string, password: string, deviceIdentity: DeviceIdentity): Promise<AuthResponse & { _recoveryCode: string }>;
-    validateLoginForm(hostname: string, username: string, password: string): string | null;
-    validateRegisterForm(hostname: string, username: string, password: string, confirmPassword: string): string | null;
+    login(
+      hostname: string,
+      username: string,
+      password: string,
+      deviceId: string
+    ): Promise<AuthResponse>;
+    register(
+      hostname: string,
+      username: string,
+      password: string,
+      deviceId: string,
+      publicKey: string,
+      encryptedDeviceKey: string,
+      salt: string
+    ): Promise<AuthResponse>;
+    registerWithRecovery(
+      hostname: string,
+      username: string,
+      password: string,
+      deviceIdentity: DeviceIdentity
+    ): Promise<AuthResponse & { _recoveryCode: string }>;
+    validateLoginForm(
+      hostname: string,
+      username: string,
+      password: string
+    ): string | null;
+    validateRegisterForm(
+      hostname: string,
+      username: string,
+      password: string,
+      confirmPassword: string
+    ): string | null;
   }
 
   interface MessageServiceAPI {
-    fetchMessages(auth: AuthData, channelId: string, beforeId?: string): Promise<{ messages: Message[]; hasMore: boolean }>;
-    sendMessage(auth: AuthData, channelId: string, plaintext: string, emberKey: Uint8Array): Promise<Message>;
-    editMessage(auth: AuthData, channelId: string, messageId: string, plaintext: string, emberKey: Uint8Array): Promise<void>;
+    fetchMessages(
+      auth: AuthData,
+      channelId: string,
+      beforeId?: string
+    ): Promise<{ messages: Message[]; hasMore: boolean }>;
+    sendMessage(
+      auth: AuthData,
+      channelId: string,
+      plaintext: string,
+      emberKey: Uint8Array
+    ): Promise<Message>;
+    editMessage(
+      auth: AuthData,
+      channelId: string,
+      messageId: string,
+      plaintext: string,
+      emberKey: Uint8Array
+    ): Promise<void>;
   }
 
   interface EmberServiceAPI {
@@ -127,8 +231,14 @@ declare global {
   }
 
   interface ChannelServiceAPI {
-    fetchChannels(auth: AuthData, emberId: string): Promise<{ channels: Channel[]; categories: Category[] }>;
-    fetchEmberKey(auth: AuthData, emberId: string): Promise<{ encryptedEmberKey: string; senderPublicKey: string } | null>;
+    fetchChannels(
+      auth: AuthData,
+      emberId: string
+    ): Promise<{ channels: Channel[]; categories: Category[] }>;
+    fetchEmberKey(
+      auth: AuthData,
+      emberId: string
+    ): Promise<{ encryptedEmberKey: string; senderPublicKey: string } | null>;
   }
 
   interface WsServiceAPI {
@@ -165,7 +275,7 @@ declare global {
     videoParticipants: Set<string>;
     localCameraOn: boolean;
     videoGridVisible: boolean;
-    activeView: 'text' | 'voice';
+    activeView: "text" | "voice";
     healthcheckInterval: ReturnType<typeof setInterval> | null;
     reconnectionTimeout: ReturnType<typeof setTimeout> | null;
     reconnectionStartTime: number | null;
@@ -176,7 +286,7 @@ declare global {
     channelModalTargetId: string | null;
     channelModalCategoryId: string | null;
     currentIconData: string | null;
-    currentIconSource: 'upload' | 'url';
+    currentIconSource: "upload" | "url";
     pendingInvite: Record<string, unknown> | null;
     _vvSounds: Partial<Record<string, boolean>> | null;
     _micTestStream: MediaStream | null;
@@ -189,6 +299,10 @@ declare global {
     App: AppState;
     emberLog: EmberLogAPI;
     electronAPI: ElectronAPI;
+    // Auth utilities
+    getValidAuth(): Promise<AuthData | null>;
+    isValidAuth(auth: unknown): auth is AuthData;
+    createAuthenticatedFetch(url: string, options?: RequestInit): Promise<{ auth: AuthData; fetchOptions: RequestInit } | null>;
     // Globals set by websocket-service.ts
     connectWebSocket(): Promise<void>;
     disconnectWebSocket(): void;
@@ -201,11 +315,25 @@ declare global {
     // Globals set by message-service.ts
     sendEncryptedMessage(plaintext: string): Promise<void>;
     displayDecryptedMessage(msg: Message, prepend?: boolean): void;
-    handleEditedMessage(payload: { id: string; channel_id: string; ciphertext: string; updated_at?: number }): void;
+    handleEditedMessage(payload: {
+      id: string;
+      channel_id: string;
+      ciphertext: string;
+      updated_at?: number;
+    }): void;
     escapeHtml(text: string): string;
     loadChannelMessages(channelId: string): Promise<void>;
-    fetchMessages(channelId: string, beforeId?: string | null): Promise<{ messages: Message[]; hasMore: boolean }>;
-    addMessage(author: string, text: string, timestamp?: number, prepend?: boolean, messageId?: string): void;
+    fetchMessages(
+      channelId: string,
+      beforeId?: string | null
+    ): Promise<{ messages: Message[]; hasMore: boolean }>;
+    addMessage(
+      author: string,
+      text: string,
+      timestamp?: number,
+      prepend?: boolean,
+      messageId?: string
+    ): void;
     formatTimestamp(unixSeconds?: number): string;
     // Globals set by ember-manager.ts
     fetchEmbers(): Promise<Ember[]>;
@@ -219,9 +347,19 @@ declare global {
     fetchChannels(emberId: string): Promise<Channel[]>;
     fetchCategories(emberId: string): Promise<Category[]>;
     renderChannels(channels: Channel[], categories: Category[]): void;
-    openChannelNameModal(mode: string, categoryId: string | null, targetId: string | null, currentName: string, currentDescription?: string): void;
+    openChannelNameModal(
+      mode: string,
+      categoryId: string | null,
+      targetId: string | null,
+      currentName: string,
+      currentDescription?: string
+    ): void;
     closeChannelNameModal(): void;
-    showChannelContextMenu(x: number, y: number, target: ContextMenuTarget): void;
+    showChannelContextMenu(
+      x: number,
+      y: number,
+      target: ContextMenuTarget
+    ): void;
     hideChannelContextMenu(): void;
     markChannelUnread(channelId: string): void;
     // Globals set by invite-manager.ts
@@ -236,7 +374,11 @@ declare global {
     fetchAndRenderVoicePresence(emberId: string): Promise<void>;
     joinVoiceChannel(channelId: string, channelName: string): Promise<void>;
     leaveVoiceChannel(): Promise<void>;
-    handleVoiceUserJoined(payload: { channel_id: string; user_id: string; username: string }): void;
+    handleVoiceUserJoined(payload: {
+      channel_id: string;
+      user_id: string;
+      username: string;
+    }): void;
     handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void;
     renderVoiceParticipants(channelId: string | null): void;
     updateSpeakingIndicator(userId: string, isSpeaking: boolean): void;
