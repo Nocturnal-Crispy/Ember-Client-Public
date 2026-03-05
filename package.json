@@ -1,6 +1,6 @@
 {
   "name": "ember-client",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "Ember Client",
   "main": "public/src/js/main.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
-    "test": "jest --config ./tests/jest.config.ts"
+    "test": "jest --config ./tests/jest.config.ts",
+    "release": "npm run build && ./scripts/release.sh"
   },
   "keywords": [
     "typescript",
