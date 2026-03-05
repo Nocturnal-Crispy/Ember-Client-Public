@@ -1,3 +1,4 @@
+import type { AuthData, DeviceIdentity } from "ember-shared";
 import { contextBridge, ipcRenderer } from "electron";
 import * as nacl from "tweetnacl";
 import * as naclUtil from "tweetnacl-util";

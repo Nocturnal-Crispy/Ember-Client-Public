@@ -2,9 +2,9 @@
   "name": "ember-client",
   "version": "0.0.16",
   "description": "Ember Client",
-  "main": "public/src/js/main.js",
+  "main": "public/src/js/main/main.js",
   "scripts": {
-    "build": "npm run build:shared && tsc",
+    "build": "npm run build:shared && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
     "build:shared": "cd ../ember-shared && npm install && npm run build && cd - && cp -r ../ember-shared/dist/. node_modules/ember-shared/dist/",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",

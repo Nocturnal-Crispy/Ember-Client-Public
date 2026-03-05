@@ -105,10 +105,10 @@ function createWindow(isAuthenticated: boolean) {
 
   if (isAuthenticated) {
     log.debug("Loading main app window");
-    mainWindow.loadFile(path.join(__dirname, "../../index.html"));
+    mainWindow.loadFile(path.join(__dirname, "../../../../public/index.html"));
   } else {
     log.debug("Loading login window");
-    mainWindow.loadFile(path.join(__dirname, "../../login.html"));
+    mainWindow.loadFile(path.join(__dirname, "../../../../public/login.html"));
   }
 
   mainWindow.on("closed", () => {
@@ -194,7 +194,7 @@ ipcMain.on("window-close", () => {
 ipcMain.on("auth-success", () => {
   log.info("Auth success signal received, loading main window");
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, "../../index.html"));
+    mainWindow.loadFile(path.join(__dirname, "../../../../public/index.html"));
   }
 });
 
@@ -202,7 +202,7 @@ ipcMain.on("auth-logout", () => {
   log.info("Logout signal received, clearing auth and loading login window");
   store.delete("auth");
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, "../../login.html"));
+    mainWindow.loadFile(path.join(__dirname, "../../../../public/login.html"));
   }
 });
 
