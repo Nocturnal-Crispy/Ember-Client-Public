@@ -21,9 +21,17 @@ let mockChannelServiceFetchChannels: jest.Mock;
 beforeAll(() => {
   // 1. Populate window.App
   require('../../../src/renderer/managers/app-state');
+  
+  // 2. Load auth-loader to make getValidAuth available globally
+  require('../../../src/renderer/utils/auth-loader');
 
-  // 2. Mock window.electronAPI
-  mockIpcInvoke = jest.fn().mockResolvedValue(null);
+  // 3. Mock window.electronAPI
+  mockIpcInvoke = jest.fn().mockImplementation((channel: string) => {
+    if (channel === 'get-auth') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  });
   mockEmberServiceFetchEmbers = jest.fn().mockResolvedValue([]);
   mockChannelServiceFetchChannels = jest.fn().mockResolvedValue({ channels: [], categories: [] });
   (window as any).electronAPI = {
@@ -85,6 +93,14 @@ beforeEach(() => {
   (window as any).App.currentEmbers = [];
   mockEmberServiceFetchEmbers.mockClear();
   mockChannelServiceFetchChannels.mockClear();
+  mockIpcInvoke.mockReset();
+  // Reset the default implementation
+  mockIpcInvoke.mockImplementation((channel: string) => {
+    if (channel === 'get-auth') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  });
 });
 
 // ─── fetchEmbers ──────────────────────────────────────────────────────────────
@@ -105,7 +121,12 @@ describe('fetchEmbers', () => {
   });
 
   it('returns an empty array when the service throws', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
     mockEmberServiceFetchEmbers.mockRejectedValueOnce(new Error('forbidden'));
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
@@ -116,14 +137,24 @@ describe('fetchEmbers', () => {
       { id: 'e-1', name: 'Ember One' },
       { id: 'e-2', name: 'Ember Two' },
     ];
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
     mockEmberServiceFetchEmbers.mockResolvedValueOnce(mockEmbers);
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual(mockEmbers);
   });
 
   it('returns an empty array when the service rejects', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
     mockEmberServiceFetchEmbers.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchEmbers();
     expect(result).toEqual([]);
@@ -151,7 +182,12 @@ describe('fetchEmberKey', () => {
 
   it('returns null when get-device-identity is not available (cache miss)', async () => {
     mockIpcInvoke
-      .mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' }) // get-auth
+      .mockImplementationOnce((channel: string) => {
+        if (channel === 'get-auth') {
+          return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+        }
+        return Promise.resolve(null);
+      }) // get-auth
       .mockResolvedValueOnce(null); // get-device-identity
     const result = await (window as any).fetchEmberKey('e-no-device');
     expect(result).toBeNull();

@@ -20,9 +20,17 @@ let mockChannelServiceFetchChannels: jest.Mock;
 beforeAll(() => {
   // 1. Populate window.App
   require('../../../src/renderer/managers/app-state');
+  
+  // 2. Load auth-loader to make getValidAuth available globally
+  require('../../../src/renderer/utils/auth-loader');
 
-  // 2. Mock window.electronAPI
-  mockIpcInvoke = jest.fn().mockResolvedValue(null);
+  // 3. Mock window.electronAPI
+  mockIpcInvoke = jest.fn().mockImplementation((channel: string) => {
+    if (channel === 'get-auth') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  });
   mockChannelServiceFetchChannels = jest.fn().mockResolvedValue({ channels: [], categories: [] });
   (window as any).electronAPI = {
     ipc: {
@@ -62,6 +70,14 @@ beforeEach(() => {
   (window as any).App.activeEmberId = 'e-test';
   (window as any).App.activeChannelId = null;
   mockChannelServiceFetchChannels.mockClear();
+  mockIpcInvoke.mockReset();
+  // Reset the default implementation
+  mockIpcInvoke.mockImplementation((channel: string) => {
+    if (channel === 'get-auth') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  });
 });
 
 // ─── fetchChannels ────────────────────────────────────────────────────────────
@@ -93,14 +109,29 @@ describe('fetchChannels', () => {
       { id: 'ch-1', ember_id: 'e-1', name: 'general', type: 'text' },
       { id: 'ch-2', ember_id: 'e-1', name: 'voice', type: 'voice' },
     ];
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: mockChannels, categories: [] });
+    
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
+    
+    mockChannelServiceFetchChannels.mockImplementationOnce((auth: any, emberId: any) => {
+      return Promise.resolve({ channels: mockChannels, categories: [] });
+    });
+    
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual(mockChannels);
   });
 
   it('returns an empty array when the service rejects', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
     mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
@@ -108,7 +139,12 @@ describe('fetchChannels', () => {
 
   it('calls channelService.fetchChannels with auth and emberId', async () => {
     const auth = { token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' };
-    mockIpcInvoke.mockResolvedValueOnce(auth);
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve(auth);
+      }
+      return Promise.resolve(null);
+    });
     mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: [] });
     await (window as any).fetchChannels('e-42');
     expect(mockChannelServiceFetchChannels).toHaveBeenCalledWith(auth, 'e-42');
@@ -126,7 +162,12 @@ describe('fetchCategories', () => {
 
   it('returns categories from a successful response', async () => {
     const mockCats = [{ id: 'cat-1', ember_id: 'e-1', name: 'Text Channels' }];
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockIpcInvoke.mockImplementationOnce((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+      }
+      return Promise.resolve(null);
+    });
     mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: mockCats });
     const result = await (window as any).fetchCategories('e-1');
     expect(result).toEqual(mockCats);
