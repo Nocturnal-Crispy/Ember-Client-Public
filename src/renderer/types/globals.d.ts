@@ -119,6 +119,7 @@ declare global {
   interface MessageServiceAPI {
     fetchMessages(auth: AuthData, channelId: string, beforeId?: string): Promise<{ messages: Message[]; hasMore: boolean }>;
     sendMessage(auth: AuthData, channelId: string, plaintext: string, emberKey: Uint8Array): Promise<Message>;
+    editMessage(auth: AuthData, channelId: string, messageId: string, plaintext: string, emberKey: Uint8Array): Promise<void>;
   }
 
   interface EmberServiceAPI {
@@ -152,6 +153,7 @@ declare global {
     activeChannelId: string | null;
     activeEmberId: string | null;
     emberKeyCache: Map<string, Uint8Array>;
+    ownedMessageIds: Set<string>;
     currentEmbers: Ember[];
     currentMembers: Member[];
     wsConnection: WebSocket | null;
@@ -199,10 +201,11 @@ declare global {
     // Globals set by message-service.ts
     sendEncryptedMessage(plaintext: string): Promise<void>;
     displayDecryptedMessage(msg: Message, prepend?: boolean): void;
+    handleEditedMessage(payload: { id: string; channel_id: string; ciphertext: string; updated_at?: number }): void;
     escapeHtml(text: string): string;
     loadChannelMessages(channelId: string): Promise<void>;
     fetchMessages(channelId: string, beforeId?: string | null): Promise<{ messages: Message[]; hasMore: boolean }>;
-    addMessage(author: string, text: string, timestamp?: number, prepend?: boolean): void;
+    addMessage(author: string, text: string, timestamp?: number, prepend?: boolean, messageId?: string): void;
     formatTimestamp(unixSeconds?: number): string;
     // Globals set by ember-manager.ts
     fetchEmbers(): Promise<Ember[]>;

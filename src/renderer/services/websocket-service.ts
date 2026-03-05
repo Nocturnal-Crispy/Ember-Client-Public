@@ -40,6 +40,9 @@
           if (data.type === 'new_message' && data.payload) {
             log.debug('WebSocket: new_message received', { channel_id: String(data.payload['channel_id'] ?? '') });
             window.handleIncomingMessage(data.payload as unknown as Parameters<typeof window.handleIncomingMessage>[0]);
+          } else if (data.type === 'edit_message' && data.payload) {
+            log.debug('WebSocket: edit_message received', { id: String(data.payload['id'] ?? '') });
+            window.handleEditedMessage(data.payload as Parameters<typeof window.handleEditedMessage>[0]);
           } else if (data.type === 'presence_update' && data.payload) {
             log.debug('WebSocket: presence_update', { user_id: String(data.payload['user_id'] ?? ''), status: String(data.payload['status'] ?? '') });
             handlePresenceUpdate(data.payload as Parameters<typeof handlePresenceUpdate>[0]);
@@ -134,7 +137,10 @@
     }
     if (recentMessageIds.has(payload.id)) return;
     const auth = await ipcRenderer.invoke('get-auth') as { user_id?: string } | null;
-    if (auth && payload.sender_user_id === auth.user_id) return;
+    if (auth && payload.sender_user_id === auth.user_id) {
+      App.ownedMessageIds.add(payload.id);
+      return;
+    }
     registerSentMessageId(payload.id);
     window.displayDecryptedMessage(payload as unknown as Parameters<typeof window.displayDecryptedMessage>[0]);
   }

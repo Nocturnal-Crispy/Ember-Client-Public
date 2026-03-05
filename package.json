@@ -5,7 +5,7 @@
   "main": "public/src/js/main.js",
   "scripts": {
     "build": "npm run build:shared && tsc",
-    "build:shared": "cd ../ember-shared && npm install && npm run build && cd -",
+    "build:shared": "cd ../ember-shared && npm install && npm run build && cd - && cp -r ../ember-shared/dist/. node_modules/ember-shared/dist/",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",

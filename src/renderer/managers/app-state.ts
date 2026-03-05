@@ -8,6 +8,7 @@ window.App = {
   activeChannelId: null,
   activeEmberId: null,
   emberKeyCache: new Map<string, Uint8Array>(),
+  ownedMessageIds: new Set<string>(),
 
   // ── Server list ──────────────────────────────────────────────────────────
   currentEmbers: [],

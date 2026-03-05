@@ -101,6 +101,7 @@
   display: flex;
   padding: 8px 0;
   margin: 4px 0;
+  position: relative;
   transition: background-color 0.1s;
 }
 
@@ -152,6 +153,126 @@
   color: var(--text);
   line-height: 1.375;
   word-wrap: break-word;
+}
+
+/* Edited indicator */
+.message-edited {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.4);
+  margin-left: 6px;
+  font-style: italic;
+}
+
+/* Inline message edit */
+.message-edit-container {
+  margin-top: 2px;
+}
+
+.message-edit-textarea {
+  width: 100%;
+  background-color: rgba(var(--rgb-highlight), 0.05);
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.375;
+  padding: 6px 8px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.message-edit-textarea:focus {
+  border-color: var(--highlight);
+}
+
+.message-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.message-edit-hint {
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.4);
+  flex: 1;
+}
+
+.message-edit-btn {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+}
+
+.message-edit-cancel {
+  background: transparent;
+  color: rgba(var(--rgb-text), 0.7);
+}
+
+.message-edit-cancel:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.message-edit-save {
+  background-color: var(--highlight);
+  color: var(--background);
+  font-weight: 600;
+}
+
+.message-edit-save:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.message-edit-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Message Action Toolbar */
+.message-action-bar {
+  display: none;
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  background-color: var(--background);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.message:hover .message-action-bar {
+  display: flex;
+}
+
+.message-action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.message-action-btn:hover {
+  background-color: rgba(var(--rgb-highlight), 0.15);
+  color: var(--highlight);
 }
 
 /* Message Input */

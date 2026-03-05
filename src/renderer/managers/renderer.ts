@@ -130,6 +130,7 @@ function forceLogout(): void {
   hideReconnectionOverlay();
   window.disconnectWebSocket();
   App.emberKeyCache.clear();
+  App.ownedMessageIds.clear();
   App.activeChannelId = null;
   if (App.healthcheckInterval) {
     clearInterval(App.healthcheckInterval);

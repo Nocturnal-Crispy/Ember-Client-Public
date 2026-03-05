@@ -154,6 +154,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       emberServices.fetchMessages(auth, channelId, beforeId),
     sendMessage: (auth: unknown, channelId: string, plaintext: string, emberKey: Uint8Array) =>
       emberServices.sendMessage(auth, channelId, plaintext, emberKey),
+    editMessage: (auth: unknown, channelId: string, messageId: string, plaintext: string, emberKey: Uint8Array) =>
+      emberServices.editMessage(auth, channelId, messageId, plaintext, emberKey),
   },
 
   emberService: {
