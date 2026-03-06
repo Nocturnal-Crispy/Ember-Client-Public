@@ -556,6 +556,7 @@ body.dm-screen-open .user-panel .user-status-icon {
   font-weight: bold;
   flex-shrink: 0;
   line-height: 1.4;
+  margin-right: 8px;
 }
 
 .dm-input-wrapper:focus-within {
