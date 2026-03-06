@@ -18,7 +18,7 @@ const cssHotReload: CssHotReload = {
    */
   watchCssFiles(mainWindow: BrowserWindow) {
     // Use absolute path from project root - updated to new styles directory
-    const cssDir = path.join(process.cwd(), 'styles');
+    const cssDir = path.join(process.cwd(), 'src/renderer/styles');
     
     console.log('Looking for CSS directory at:', cssDir);
     

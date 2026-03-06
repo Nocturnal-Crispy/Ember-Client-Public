@@ -4,30 +4,30 @@
  * Fetches all HTML fragment files and assembles the page body, then
  * dynamically loads application scripts in dependency order.
  *
- * Compiled to public/src/js/utils/main-loader.js via tsconfig.renderer.json.
- * Referenced by public/index.html as the sole <script> tag.
+ * Compiled to dist/renderer/utils/main-loader.js via tsconfig.renderer.json.
+ * Referenced by src/renderer/index.html as the sole <script> tag.
  */
 (function (): void {
   "use strict";
 
-  const FRAGMENT_BASE = "src/html/";
+  const FRAGMENT_BASE = "";
 
   const SCRIPTS: string[] = [
-    "src/js/renderer/utils/logger.js",
-    "src/js/renderer/utils/css-hot-reload.js",
-    "src/js/renderer/utils/auth-loader.js",
-    "src/js/renderer/managers/app-state.js",
-    "src/js/renderer/services/voice-service.js",
-    "src/js/renderer/services/websocket-service.js",
-    "src/js/renderer/services/message-service.js",
-    "src/js/renderer/managers/channel-manager.js",
-    "src/js/renderer/managers/ember-manager.js",
-    "src/js/renderer/managers/invite-manager.js",
-    "src/js/renderer/managers/voice-ui-manager.js",
-    "src/js/renderer/managers/update-notifier.js",
-    "src/js/renderer/managers/direct-messaging-manager.js",
-    "src/js/renderer/managers/direct-messaging-ui.js",
-    "src/js/renderer/managers/renderer.js",
+    "../../dist/renderer/utils/logger.js",
+    "../../dist/renderer/utils/css-hot-reload.js",
+    "../../dist/renderer/utils/auth-loader.js",
+    "../../dist/renderer/managers/app-state.js",
+    "../../dist/renderer/services/voice-service.js",
+    "../../dist/renderer/services/websocket-service.js",
+    "../../dist/renderer/services/message-service.js",
+    "../../dist/renderer/managers/channel-manager.js",
+    "../../dist/renderer/managers/ember-manager.js",
+    "../../dist/renderer/managers/invite-manager.js",
+    "../../dist/renderer/managers/voice-ui-manager.js",
+    "../../dist/renderer/managers/update-notifier.js",
+    "../../dist/renderer/managers/direct-messaging-manager.js",
+    "../../dist/renderer/managers/direct-messaging-ui.js",
+    "../../dist/renderer/managers/renderer.js",
   ];
 
   async function fetchFragment(name: string): Promise<string> {
@@ -52,9 +52,14 @@
     return new Promise((resolve, reject) => {
       const el = document.createElement("script");
       el.src = src;
-      el.onload = () => resolve();
-      el.onerror = () =>
+      el.onload = () => {
+        console.log(`[main-loader] Script loaded successfully: ${src}`);
+        resolve();
+      };
+      el.onerror = () => {
+        console.error(`[main-loader] Failed to load script: ${src}`);
         reject(new Error(`[main-loader] Failed to load script: ${src}`));
+      };
       document.body.appendChild(el);
     });
   }
@@ -138,8 +143,10 @@
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {
+        console.log(`[main-loader] Loading script: ${src}`);
         await loadScript(src);
       }
+      console.log("[main-loader] All scripts loaded successfully");
     } catch (err) {
       console.error("[main-loader] Initialization failed:", err);
     }

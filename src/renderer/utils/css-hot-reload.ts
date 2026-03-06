@@ -176,4 +176,5 @@ class CssHotReloader {
 // Initialize CSS hot-reloader
 const cssHotReloader = new CssHotReloader();
 
-export default cssHotReloader;
+// Make available globally for other scripts
+(window as any).cssHotReloader = cssHotReloader;

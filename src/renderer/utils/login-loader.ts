@@ -4,17 +4,17 @@
  * Fetches all login page HTML fragment files and assembles the page body,
  * then dynamically loads auth scripts in order.
  *
- * Compiled to public/src/js/utils/login-loader.js via tsconfig.renderer.json.
- * Referenced by public/login.html as the sole <script> tag.
+ * Compiled to dist/renderer/utils/login-loader.js via tsconfig.renderer.json.
+ * Referenced by src/renderer/login.html as the sole <script> tag.
  */
 (function (): void {
   "use strict";
 
-  const FRAGMENT_BASE = "src/html/";
+  const FRAGMENT_BASE = "";
 
   const SCRIPTS: string[] = [
-    "src/js/renderer/utils/logger.js",
-    "src/js/renderer/services/auth-service.js",
+    "../../dist/renderer/utils/logger.js",
+    "../../dist/renderer/services/auth-service.js",
   ];
 
   async function fetchFragment(name: string): Promise<string> {

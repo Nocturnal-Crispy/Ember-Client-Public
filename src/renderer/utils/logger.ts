@@ -18,24 +18,21 @@
   function ts(): string {
     const now = new Date();
     const p2 = (n: number): string => String(n).padStart(2, "0");
-    const p3 = (n: number): string => String(n).padStart(3, "0");
-    return (
-      `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ` +
-      `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}.${p3(now.getMilliseconds())}`
-    );
+    return `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
   }
 
-  function fmtData(data?: Record<string, unknown> | null): string {
-    if (!data || typeof data !== "object" || Array.isArray(data)) return "";
-    const parts = Object.entries(data).map(([k, v]) => {
+  function fmtData(data?: Record<string, unknown>): string {
+    if (!data) return "";
+    const parts = [];
+    for (const [k, v] of Object.entries(data)) {
       const vs =
         v === null || v === undefined
           ? String(v)
           : typeof v === "object"
             ? JSON.stringify(v)
             : String(v);
-      return `${k}=${vs}`;
-    });
+      parts.push(`${k}=${vs}`);
+    }
     return parts.length ? ` { ${parts.join(", ")} }` : "";
   }
 

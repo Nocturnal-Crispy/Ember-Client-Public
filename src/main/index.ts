@@ -5,53 +5,10 @@ import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
 import { isDev } from "./dev";
 import cssHotReload from "./css-hot-reload";
+import { VoiceVideoSettings, StoreSchema } from "../shared/types";
+const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
-
-interface VoiceVideoSettings {
-  inputDevice: string;
-  outputDevice: string;
-  inputVolume: number;
-  outputVolume: number;
-  echoCancellation: boolean;
-  noiseSuppression: boolean;
-  autoGainControl: boolean;
-  autoSensitivity: boolean;
-  sensitivityThreshold: number;
-  pushToTalk: boolean;
-  pttKey: string;
-  cameraDevice: string;
-  alwaysPreviewVideo: boolean;
-  sounds: {
-    mute: boolean;
-    unmute: boolean;
-    deafen: boolean;
-    undeafen: boolean;
-    userJoin: boolean;
-    userLeave: boolean;
-    disconnect: boolean;
-  };
-}
-
-interface StoreSchema {
-  auth?: {
-    token: string;
-    user_id: string;
-    device_id: string;
-    hostname: string;
-    username: string;
-  };
-  device?: {
-    device_id: string;
-    public_key: string;
-    private_key?: string; // only present during migration from old format
-  };
-  devicePrivateKey?: string; // safeStorage-encrypted private key, stored as base64
-  settings?: {
-    last_hostname: string;
-  };
-  voiceVideoSettings?: VoiceVideoSettings;
-}
 
 const store = new Store<StoreSchema>();
 
@@ -93,14 +50,15 @@ function createWindow(isAuthenticated: boolean) {
     minWidth: 800,
     minHeight: 600,
     backgroundColor: "#36393f",
-    icon: path.join(__dirname, "../../Icons/ember_1024x1024.png"),
+    icon: path.join(__dirname, "../../assets/icons/ember_1024x1024.png"),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "../preload/index.js"),
       devTools: true,
-      webSecurity: false, // Enable for local file loading in dev
+      webSecurity: true, // Always enable web security for safety
+      allowRunningInsecureContent: false, // Disable insecure content
     },
     frame: false,
     titleBarStyle: "hidden",
@@ -122,10 +80,18 @@ function createWindow(isAuthenticated: boolean) {
 
   if (isAuthenticated) {
     log.debug("Loading main app window");
-    mainWindow.loadFile(path.join(__dirname, "../../../../public/index.html"));
+    if (isDev) {
+      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/index.html"));
+    } else {
+      mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+    }
   } else {
     log.debug("Loading login window");
-    mainWindow.loadFile(path.join(__dirname, "../../../../public/login.html"));
+    if (isDev) {
+      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/login.html"));
+    } else {
+      mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
+    }
   }
 
   mainWindow.on("closed", () => {
@@ -211,7 +177,11 @@ ipcMain.on("window-close", () => {
 ipcMain.on("auth-success", () => {
   log.info("Auth success signal received, loading main window");
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, "../../../../public/index.html"));
+    if (isDev) {
+      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/index.html"));
+    } else {
+      mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+    }
   }
 });
 
@@ -219,7 +189,11 @@ ipcMain.on("auth-logout", () => {
   log.info("Logout signal received, clearing auth and loading login window");
   store.delete("auth");
   if (mainWindow) {
-    mainWindow.loadFile(path.join(__dirname, "../../../../public/login.html"));
+    if (isDev) {
+      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/login.html"));
+    } else {
+      mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
+    }
   }
 });
 

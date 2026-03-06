@@ -1,1 +1,1 @@
-{"extends": "./tsconfig.json", "compilerOptions": {"module": "CommonJS", "outDir": "./public/src/js/main", "target": "ES2020"}, "include": ["src/main.ts", "src/preload.ts", "src/version-utils.ts"], "exclude": ["src/renderer/**/*", "node_modules", "public"]}
+{"extends": "./tsconfig.json", "compilerOptions": {"module": "CommonJS", "outDir": "./dist", "target": "ES2020"}, "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*"], "exclude": ["src/renderer/**/*", "node_modules", "dist"]}

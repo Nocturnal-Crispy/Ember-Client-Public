@@ -1,25 +1,71 @@
 /**
- * Renderer manager — TypeScript conversion of public/src/js/renderer.js.
+ * Renderer manager — TypeScript conversion of renderer.js.
  * Application entry point: initializes the UI, health checks, and WebSocket.
  */
 (function (): void {
-  const ipcRenderer = window.electronAPI.ipc;
-  const log = window.emberLog.createLogger("Renderer");
-  const App = window.App;
+  console.log("[renderer] Renderer manager starting...");
+  
+  // Wait for electronAPI to be available
+  function waitForElectronAPI(): Promise<void> {
+    return new Promise((resolve) => {
+      if ((window as any).electronAPI) {
+        resolve();
+        return;
+      }
+      
+      const checkInterval = setInterval(() => {
+        if ((window as any).electronAPI) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 10);
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        console.warn("[renderer] electronAPI not available after timeout");
+        resolve();
+      }, 5000);
+    });
+  }
+  
+  // Initialize when API is ready
+  waitForElectronAPI().then(() => {
+    console.log("[renderer] electronAPI available, initializing...");
+    
+    const ipcRenderer = (window as any).electronAPI.ipc;
+    const log = (window as any).emberLog.createLogger("Renderer");
+    const App = (window as any).App;
+    
+    console.log("[renderer] window.electronAPI:", (window as any).electronAPI);
+    console.log("[renderer] window.emberLog:", (window as any).emberLog);
 
   const messageInput = document.getElementById(
     "messageInput"
   ) as HTMLTextAreaElement | null;
 
-  document.getElementById("minimize-btn")?.addEventListener("click", () => {
+  const minimizeBtn = document.getElementById("minimize-btn");
+  const maximizeBtn = document.getElementById("maximize-btn");
+  const closeBtn = document.getElementById("close-btn");
+  
+  console.log("[renderer] Button elements found:", {
+    minimizeBtn: !!minimizeBtn,
+    maximizeBtn: !!maximizeBtn,
+    closeBtn: !!closeBtn
+  });
+  
+  minimizeBtn?.addEventListener("click", () => {
+    console.log("[renderer] Minimize button clicked");
     ipcRenderer.send("window-minimize");
   });
 
-  document.getElementById("maximize-btn")?.addEventListener("click", () => {
+  maximizeBtn?.addEventListener("click", () => {
+    console.log("[renderer] Maximize button clicked");
     ipcRenderer.send("window-maximize");
   });
 
-  document.getElementById("close-btn")?.addEventListener("click", () => {
+  closeBtn?.addEventListener("click", () => {
+    console.log("[renderer] Close button clicked");
     ipcRenderer.send("window-close");
   });
 
@@ -447,13 +493,13 @@
     };
     statusEl.classList.add(classMap[status] ?? "status-online");
     const iconMap: Record<string, string> = {
-      online: "Icons/ember_connected.png",
-      idle: "Icons/ember_idle.gif",
-      dnd: "Icons/ember_error.png",
-      invisible: "Icons/ember_disconnected.png",
-      offline: "Icons/ember_disconnected.png",
+      online: "assets/icons/ember_connected.png",
+      idle: "assets/icons/ember_idle.gif",
+      dnd: "assets/icons/ember_error.png",
+      invisible: "assets/icons/ember_disconnected.png",
+      offline: "assets/icons/ember_disconnected.png",
     };
-    const iconSrc = iconMap[status] ?? "Icons/ember_connected.png";
+    const iconSrc = iconMap[status] ?? "assets/icons/ember_connected.png";
     const userStatusIcon = document.getElementById(
       "user-status-icon"
     ) as HTMLImageElement | null;
@@ -545,10 +591,10 @@
       (groups[key] ?? groups["offline"]).members.push(member);
     });
     const statusIconMap: Record<string, string> = {
-      online: "Icons/ember_connected.png",
-      idle: "Icons/ember_idle.gif",
-      dnd: "Icons/ember_error.png",
-      offline: "Icons/ember_disconnected.png",
+      online: "assets/icons/ember_connected.png",
+      idle: "assets/icons/ember_idle.gif",
+      dnd: "assets/icons/ember_error.png",
+      offline: "assets/icons/ember_disconnected.png",
     };
     (["online", "idle", "dnd", "offline"] as const).forEach((key) => {
       const group = groups[key];
@@ -563,7 +609,7 @@
         memberEl.dataset["userId"] = member.user_id;
         if (key === "offline") memberEl.classList.add("offline");
         const statusClass = key === "dnd" ? "dnd" : key;
-        const iconSrc = statusIconMap[key] ?? "Icons/ember_disconnected.png";
+        const iconSrc = statusIconMap[key] ?? "assets/icons/ember_disconnected.png";
         memberEl.innerHTML = `
         <div class="member-avatar ${statusClass}">
           ${window.escapeHtml((member.username ?? "?").charAt(0).toUpperCase())}
@@ -712,4 +758,5 @@
   window.showWelcomeScreen = showWelcomeScreen;
 
   initializeAppWithWS();
+  });
 })();

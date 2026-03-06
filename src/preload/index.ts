@@ -4,6 +4,7 @@ import * as nacl from "tweetnacl";
 import * as naclUtil from "tweetnacl-util";
 import * as emberCrypto from "ember-shared";
 import * as emberServices from "ember-shared";
+const { IPC_CHANNELS } = require("../shared/constants");
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
 function preloadLog(
@@ -12,7 +13,7 @@ function preloadLog(
   data?: Record<string, unknown>
 ) {
   try {
-    ipcRenderer.send("log-to-console", {
+    ipcRenderer.send(IPC_CHANNELS.LOG_TO_CONSOLE, {
       level: level.toUpperCase(),
       context: "Preload",
       message,
