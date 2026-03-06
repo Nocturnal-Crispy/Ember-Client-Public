@@ -56,7 +56,7 @@ function createWindow(isAuthenticated: boolean) {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "../preload/index.js"),
-      devTools: true,
+      devTools: false,
       webSecurity: true, // Always enable web security for safety
       allowRunningInsecureContent: false, // Disable insecure content
     },
@@ -80,18 +80,10 @@ function createWindow(isAuthenticated: boolean) {
 
   if (isAuthenticated) {
     log.debug("Loading main app window");
-    if (isDev) {
-      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/index.html"));
-    } else {
-      mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-    }
+    mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   } else {
     log.debug("Loading login window");
-    if (isDev) {
-      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/login.html"));
-    } else {
-      mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
-    }
+    mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
   }
 
   mainWindow.on("closed", () => {
@@ -177,11 +169,7 @@ ipcMain.on("window-close", () => {
 ipcMain.on("auth-success", () => {
   log.info("Auth success signal received, loading main window");
   if (mainWindow) {
-    if (isDev) {
-      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/index.html"));
-    } else {
-      mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-    }
+    mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
 });
 
@@ -189,11 +177,7 @@ ipcMain.on("auth-logout", () => {
   log.info("Logout signal received, clearing auth and loading login window");
   store.delete("auth");
   if (mainWindow) {
-    if (isDev) {
-      mainWindow.loadFile(path.join(__dirname, "../../src/renderer/login.html"));
-    } else {
-      mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
-    }
+    mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
   }
 });
 
