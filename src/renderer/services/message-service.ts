@@ -293,7 +293,8 @@
     text: string,
     timestamp?: number,
     prepend = false,
-    messageId?: string
+    messageId?: string,
+    chatColor?: string
   ): void {
     const messageDiv = document.createElement("div");
     messageDiv.className = "message";
@@ -301,6 +302,9 @@
     messageDiv.dataset["chumhandle"] = "[" + toChumhandle(author) + "]: ";
     if (currentUsername && author === currentUsername) {
       messageDiv.classList.add("own");
+    }
+    if (chatColor) {
+      messageDiv.style.color = chatColor;
     }
     const timeString = formatTimestamp(timestamp);
     const avatarEl = document.createElement("div");
@@ -354,7 +358,8 @@
         "[Encrypted message - key unavailable]",
         msg.created_at,
         prepend,
-        msg.id
+        msg.id,
+        msg.chat_color
       );
       return;
     }
@@ -366,7 +371,8 @@
         "[Failed to decrypt message]",
         msg.created_at,
         prepend,
-        msg.id
+        msg.id,
+        msg.chat_color
       );
       return;
     }
@@ -375,7 +381,8 @@
       plaintext,
       msg.created_at,
       prepend,
-      msg.id
+      msg.id,
+      msg.chat_color
     );
   }
 

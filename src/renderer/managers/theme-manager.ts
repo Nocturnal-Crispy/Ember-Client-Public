@@ -277,10 +277,25 @@
     }
   }
 
+  async function pushChatColorToServer(chatColor: string): Promise<void> {
+    try {
+      const auth = (await ipcRenderer.invoke("get-auth")) as { token?: string; hostname?: string } | null;
+      if (!auth?.token || !auth?.hostname) return;
+      await fetch(`${auth.hostname}/api/v1/chat-color`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+        body: JSON.stringify({ chat_color: chatColor }),
+      });
+    } catch (e) {
+      log.warn("Failed to push chat color to server", { error: String(e) });
+    }
+  }
+
   async function saveTheme(): Promise<void> {
     const saveStatus = document.getElementById("theme-save-status");
     try {
       await ipcRenderer.invoke("save-theme-settings", pendingSettings);
+      await pushChatColorToServer(pendingSettings.chatColor ?? "");
       log.info("Theme saved", { themeId: pendingSettings.themeId });
       if (saveStatus) {
         saveStatus.textContent = "Saved!";

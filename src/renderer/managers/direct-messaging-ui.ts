@@ -789,6 +789,7 @@
     content: string;
     timestamp: number;
     isOwn: boolean;
+    chatColor?: string;
   }): void {
     if (!dmChatContainer || messageData.conversationId !== activeConversationId) return;
     
@@ -808,6 +809,9 @@
       ? ownUsername
       : (conversation?.participantUsername || 'User');
     messageElement.dataset['chumhandle'] = '[' + toChumhandle(senderName) + ']: ';
+    if (messageData.chatColor) {
+      messageElement.style.color = messageData.chatColor;
+    }
 
     messageElement.innerHTML = `
       <div class="dm-message-avatar">${messageData.isOwn ? 'You' : avatarLetter}</div>
@@ -837,6 +841,7 @@
     content: string;
     timestamp: number;
     isOwn: boolean;
+    chatColor?: string;
   }): void {
     // Add context menu support
     messageElement.addEventListener('contextmenu', (e) => {
