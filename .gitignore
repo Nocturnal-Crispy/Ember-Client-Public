@@ -4,3 +4,6 @@ release/
 *.log
 .DS_Store
 public/src/js/*
+.env
+.env.local
+.env.*.local

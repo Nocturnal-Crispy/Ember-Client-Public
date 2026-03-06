@@ -24,6 +24,9 @@ class VoiceManager {
   auth: AuthForVoice;
   channelId: string | null;
   peerConnection: RTCPeerConnection | null;
+  subscriberPC: RTCPeerConnection | null;
+  _subscriberIceQueue: RTCIceCandidateInit[];
+  _subscriberRemoteDescSet: boolean;
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   audioElements: Map<string, HTMLAudioElement>;
@@ -60,6 +63,9 @@ class VoiceManager {
     this.auth = authObj;
     this.channelId = null;
     this.peerConnection = null;
+    this.subscriberPC = null;
+    this._subscriberIceQueue = [];
+    this._subscriberRemoteDescSet = false;
     this.localStream = null;
     this.remoteStreams = new Map();
     this.audioElements = new Map();
@@ -187,24 +193,30 @@ class VoiceManager {
     });
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        this.peerConnection!.addTrack(track, this.localStream!);
+      const tracks = this.localStream.getTracks();
+      _voiceLog.info("Local stream created", { 
+        trackCount: tracks.length,
+        audioTracks: this.localStream.getAudioTracks().length,
+        videoTracks: this.localStream.getVideoTracks().length
       });
+      
+      tracks.forEach((track) => {
+        // Use addTransceiver with sendonly so the SFU appends recvonly m-lines
+        // for remote participants at the end rather than reordering existing ones.
+        // addTrack (sendrecv) causes ion-SFU renegotiation offers to reorder
+        // m-lines, which Chrome rejects with an InvalidAccessError.
+        this.peerConnection!.addTransceiver(track, {
+          direction: "sendonly",
+          streams: [this.localStream!],
+        });
+        _voiceLog.debug("Local track added to peer connection", { kind: track.kind, id: track.id, enabled: track.enabled });
+      });
+    } else {
+      _voiceLog.error("No local stream created - microphone access may have failed");
     }
 
-    this.peerConnection.ontrack = (event: RTCTrackEvent) => {
-      const stream = event.streams[0];
-      if (!stream) return;
-      if (event.track.kind === "audio") {
-        if (!this.remoteStreams.has(stream.id)) {
-          this.remoteStreams.set(stream.id, stream);
-          if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
-        }
-      } else if (event.track.kind === "video") {
-        this.remoteVideoStreams.set(stream.id, stream);
-        if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
-      }
-    };
+    // ontrack lives on subscriberPC (created in handleOffer) — the publisher PC
+    // only sends local audio; remote tracks arrive on the subscriber PC.
 
     this.peerConnection.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
       if (event.candidate) {
@@ -213,6 +225,7 @@ class VoiceManager {
             type: "voice_ice_candidate",
             channel_id: this.channelId,
             candidate: event.candidate,
+            target: 0, // publisher PC
           })
         );
       }
@@ -270,11 +283,17 @@ class VoiceManager {
     this.channelId = null;
     this._remoteDescSet = false;
     this._iceQueue = [];
+    this._subscriberRemoteDescSet = false;
+    this._subscriberIceQueue = [];
     this.onConnected = null;
 
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
+    }
+    if (this.subscriberPC) {
+      this.subscriberPC.close();
+      this.subscriberPC = null;
     }
     if (this.localStream) {
       this.localStream.getTracks().forEach((t) => t.stop());
@@ -336,17 +355,112 @@ class VoiceManager {
     }
   }
 
-  // handleOffer handles SFU renegotiation offers (sent when another participant
-  // joins or leaves). The peer connection already exists at this point.
+  // handleOffer handles SFU subscriber offers (sent when another participant
+  // joins or leaves). ion-SFU uses a separate subscriber PeerConnection to push
+  // remote tracks — applying this offer to the publisher PC causes m-line order
+  // errors because the two PCs have independent SDP structures.
   async handleOffer(sdp: RTCSessionDescriptionInit): Promise<void> {
-    if (!this.channelId || !this.peerConnection) return;
-    _voiceLog.info("Received SFU renegotiation offer");
-    await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(sdp)
-    );
-    const answer = await this.peerConnection.createAnswer();
-    await this.peerConnection.setLocalDescription(answer);
-    _voiceLog.info("Renegotiation answer sent to server");
+    if (!this.channelId) return;
+
+    // Create the subscriber PC on first offer.
+    if (!this.subscriberPC) {
+      _voiceLog.debug("Creating subscriber RTCPeerConnection");
+      this.subscriberPC = new RTCPeerConnection({
+        iceServers: this.iceServers,
+      });
+
+      this.subscriberPC.ontrack = (event: RTCTrackEvent) => {
+        const stream = event.streams[0];
+        _voiceLog.debug("ontrack fired (subscriber)", {
+          kind: event.track.kind,
+          trackId: event.track.id,
+          streamId: stream?.id ?? "none",
+        });
+        if (!stream) return;
+        if (event.track.kind === "audio") {
+          if (!this.remoteStreams.has(stream.id)) {
+            this.remoteStreams.set(stream.id, stream);
+            _voiceLog.info("Remote audio stream added", { streamId: stream.id });
+            if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
+          } else {
+            _voiceLog.debug("Remote audio stream already tracked, skipping", {
+              streamId: stream.id,
+            });
+          }
+        } else if (event.track.kind === "video") {
+          this.remoteVideoStreams.set(stream.id, stream);
+          _voiceLog.info("Remote video stream added", { streamId: stream.id });
+          if (this.onVideoStreamAdded)
+            this.onVideoStreamAdded(stream.id, stream);
+        }
+      };
+
+      this.subscriberPC.onicecandidate = (
+        event: RTCPeerConnectionIceEvent
+      ) => {
+        if (event.candidate) {
+          _voiceLog.debug("Subscriber ICE candidate generated, sending to server", {
+            protocol: event.candidate.protocol,
+            type: event.candidate.type,
+          });
+          this.ws.send(
+            JSON.stringify({
+              type: "voice_ice_candidate",
+              channel_id: this.channelId,
+              candidate: event.candidate,
+              target: 1, // subscriber PC
+            })
+          );
+        } else {
+          _voiceLog.debug("Subscriber ICE gathering complete (null candidate)");
+        }
+      };
+
+      this.subscriberPC.onconnectionstatechange = () => {
+        const state = this.subscriberPC?.connectionState;
+        _voiceLog.info("Subscriber PC connection state changed", {
+          state: state ?? "unknown",
+        });
+      };
+
+      this.subscriberPC.onicegatheringstatechange = () => {
+        _voiceLog.debug("Subscriber PC ICE gathering state", {
+          state: this.subscriberPC?.iceGatheringState ?? "unknown",
+        });
+      };
+
+      this.subscriberPC.oniceconnectionstatechange = () => {
+        _voiceLog.debug("Subscriber PC ICE connection state", {
+          state: this.subscriberPC?.iceConnectionState ?? "unknown",
+        });
+      };
+    }
+
+    _voiceLog.info("Received SFU subscriber offer", {
+      signalingState: this.subscriberPC.signalingState,
+    });
+    await this.subscriberPC.setRemoteDescription(new RTCSessionDescription(sdp));
+    this._subscriberRemoteDescSet = true;
+
+    if (this._subscriberIceQueue.length > 0) {
+      _voiceLog.debug("Flushing queued subscriber ICE candidates", {
+        count: this._subscriberIceQueue.length,
+      });
+      for (const c of this._subscriberIceQueue) {
+        await this.subscriberPC
+          .addIceCandidate(new RTCIceCandidate(c))
+          .catch(console.warn);
+      }
+      this._subscriberIceQueue = [];
+    }
+
+    _voiceLog.debug("Subscriber remote description set");
+    const answer = await this.subscriberPC.createAnswer();
+    await this.subscriberPC.setLocalDescription(answer);
+    _voiceLog.debug("Subscriber local description set", {
+      iceGatheringState: this.subscriberPC.iceGatheringState,
+    });
+    _voiceLog.info("Subscriber answer sent to server");
     this.ws.send(
       JSON.stringify({
         type: "voice_answer",
@@ -357,8 +471,32 @@ class VoiceManager {
   }
 
   async handleRemoteICECandidate(
-    candidate: RTCIceCandidateInit
+    candidate: RTCIceCandidateInit,
+    target: number = 0
   ): Promise<void> {
+    if (target === 1) {
+      // Subscriber ICE candidate
+      if (!this.subscriberPC || !this._subscriberRemoteDescSet) {
+        _voiceLog.debug(
+          "Queuing subscriber ICE candidate (subscriber PC not ready)"
+        );
+        this._subscriberIceQueue.push(candidate);
+        return;
+      }
+      try {
+        await this.subscriberPC.addIceCandidate(
+          new RTCIceCandidate(candidate)
+        );
+        _voiceLog.debug("Subscriber ICE candidate added");
+      } catch (e) {
+        _voiceLog.warn("Failed to add subscriber ICE candidate", {
+          error: String(e),
+        });
+      }
+      return;
+    }
+
+    // Publisher ICE candidate (target === 0)
     if (!this.peerConnection) return;
     if (!this._remoteDescSet) {
       _voiceLog.debug("Queuing ICE candidate (remote description not yet set)");
@@ -432,13 +570,18 @@ class VoiceManager {
 
   _setupLocalAudioMonitor(): void {
     _voiceLog.debug("Setting up local audio monitor");
+    if (!this.localStream) {
+      _voiceLog.error("Cannot setup audio monitor - no local stream");
+      return;
+    }
+    
     try {
       const ctx = new (
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext })
           .webkitAudioContext
       )();
-      const source = ctx.createMediaStreamSource(this.localStream!);
+      const source = ctx.createMediaStreamSource(this.localStream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.3;
@@ -446,6 +589,12 @@ class VoiceManager {
 
       this._audioCtx = ctx;
       this._analyser = analyser;
+      
+      _voiceLog.info("Local audio monitor setup completed", {
+        audioContext: ctx.state,
+        streamActive: this.localStream.active,
+        audioTracks: this.localStream.getAudioTracks().length
+      });
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       let isSpeakingLocal = false;
@@ -502,6 +651,10 @@ class VoiceManager {
       this.peerConnection.close();
       this.peerConnection = null;
     }
+    if (this.subscriberPC) {
+      this.subscriberPC.close();
+      this.subscriberPC = null;
+    }
     if (this.localStream) {
       this.localStream.getTracks().forEach((t) => t.stop());
       this.localStream = null;
@@ -524,6 +677,8 @@ class VoiceManager {
     this.audioElements.clear();
     this._remoteDescSet = false;
     this._iceQueue = [];
+    this._subscriberRemoteDescSet = false;
+    this._subscriberIceQueue = [];
     this.isCameraOn = false;
     const channelId = this.channelId;
     this.channelId = null;
@@ -563,7 +718,9 @@ class VoiceManager {
           this.handleOffer({
             type: raw["type"] as RTCSdpType,
             sdp: raw["sdp"],
-          });
+          }).catch((err) =>
+            _voiceLog.error("Renegotiation handleOffer failed", { error: String(err) })
+          );
         } else {
           _voiceLog.error("voice_offer received with invalid sdp payload", {
             payload: JSON.stringify(raw),
@@ -573,7 +730,10 @@ class VoiceManager {
       }
       case "voice_ice_candidate":
         this.handleRemoteICECandidate(
-          msg.payload["candidate"] as RTCIceCandidateInit
+          msg.payload["candidate"] as RTCIceCandidateInit,
+          typeof msg.payload["target"] === "number"
+            ? (msg.payload["target"] as number)
+            : 0
         );
         break;
       case "voice_speaking":
