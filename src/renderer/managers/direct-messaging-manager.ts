@@ -100,6 +100,7 @@
     unreadCount: number;
     isActive: boolean;
     keyExchanged: boolean;
+    isOnline: boolean;
   }
   
   interface DMMessage {
@@ -243,7 +244,8 @@
             participantUsername,
             unreadCount: 0,
             isActive: conv.status === 'active',
-            keyExchanged: false
+            keyExchanged: false,
+            isOnline: false // Default to offline, will be updated by presence updates
           };
           
           dmConversations.set(conv.id, conversation);
@@ -262,13 +264,30 @@
               participantId,
               participantUsername,
               unreadCount: 0,
-              isOnline: true,
+              isOnline: conversation.isOnline,
               keyExchanged: false
             });
           }
         }
         
         log.info("DM conversations processed successfully", { count: dmConversations.size });
+        
+        // Don't fetch presence states immediately - wait until members are loaded
+        log.info("Deferring presence fetch until server members are loaded");
+        
+        // Set up a listener to fetch presence when members become available
+        const checkMembersAndFetchPresence = () => {
+          if (App.currentMembers && App.currentMembers.length > 0) {
+            log.info("Members are now available, fetching presence states");
+            fetchInitialPresenceStates();
+          } else {
+            // Check again in a moment
+            setTimeout(checkMembersAndFetchPresence, 500);
+          }
+        };
+        
+        // Start checking after a short delay to allow server loading
+        setTimeout(checkMembersAndFetchPresence, 1000);
       } else {
         log.error("Failed to load conversations", { status: response.status });
       }
@@ -331,10 +350,23 @@
         participantUsername,
         unreadCount: 0,
         isActive: true,
-        keyExchanged: false
+        keyExchanged: false,
+        isOnline: false // Default to offline, will be updated by presence updates
       };
       
       dmConversations.set(conversationId, conversation);
+      
+      // Notify UI manager about the new conversation
+      if (typeof window.addDmConversationToList === 'function') {
+        window.addDmConversationToList({
+          id: conversationId,
+          participantId,
+          participantUsername,
+          unreadCount: 0,
+          isOnline: conversation.isOnline,
+          keyExchanged: false
+        });
+      }
       
       // Initiate key exchange
       await initiateKeyExchange(conversationId, participantId);
@@ -557,12 +589,213 @@
   }
   
   /**
+   * Fetch initial presence states for all DM participants
+   * Note: The ember server uses WebSocket for presence, not REST API endpoints
+   */
+  async function fetchInitialPresenceStates(): Promise<void> {
+    try {
+      log.info("Starting to fetch initial presence states for DM participants");
+      
+      // Since the server doesn't have REST presence endpoints, we rely on:
+      // 1. App.currentMembers (populated when server loads)
+      // 2. WebSocket presence updates for real-time changes
+      
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        token?: string;
+        hostname?: string;
+      } | null;
+      
+      if (!auth || !auth.token || !auth.hostname) {
+        log.warn("Cannot fetch presence states: not authenticated");
+        return;
+      }
+      
+      // Get all unique participant IDs from conversations
+      const participantIds = Array.from(dmConversations.values())
+        .map(conv => conv.participantId)
+        .filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
+      
+      log.info("Found DM participants to check presence for", { 
+        participantCount: participantIds.length,
+        participantIds: participantIds
+      });
+      
+      // Debug: Check App.currentMembers state before fetching
+      log.debug("App.currentMembers state before presence fetch", {
+        memberCount: App.currentMembers.length,
+        members: App.currentMembers.map(m => ({ user_id: m.user_id, username: m.username, status: m.status }))
+      });
+      
+      if (participantIds.length === 0) {
+        log.debug("No DM participants to fetch presence for");
+        return;
+      }
+      
+      // Since server doesn't have REST presence endpoints, we only use members list
+      // Fetch presence for each participant from the members list
+      for (const participantId of participantIds) {
+        try {
+          log.debug("Looking up presence for user in members list", { participantId });
+          
+          // Try to get from members list (this is the primary method since server uses WebSocket presence)
+          let presenceData: any = null;
+          let endpointUsed = '';
+          
+          log.debug("Current members in App.currentMembers", { 
+            memberCount: App.currentMembers.length,
+            members: App.currentMembers.map(m => ({ user_id: m.user_id, username: m.username, status: m.status }))
+          });
+          
+          const member = App.currentMembers.find(m => m.user_id === participantId);
+          if (member) {
+            presenceData = {
+              status: member.status,
+              username: member.username
+            };
+            endpointUsed = 'members-list-primary';
+            log.debug("Presence data from members list", { participantId, presenceData });
+          } else {
+            log.debug("Member not found in App.currentMembers", { 
+              participantId,
+              availableMemberIds: App.currentMembers.map(m => m.user_id)
+            });
+          }
+          
+          if (presenceData) {
+            // Handle different status formats
+            let status = 'offline'; // Default to offline
+            if (presenceData.status) {
+              const statusStr = String(presenceData.status).toLowerCase();
+              // Consider various online status indicators
+              if (statusStr === 'online' || statusStr === 'active' || statusStr === 'available') {
+                status = 'online';
+              } else {
+                status = 'offline'; // Treat anything else as offline
+              }
+            }
+            
+            log.debug("Processed presence status", { 
+              participantId, 
+              endpointUsed,
+              originalStatus: presenceData.status, 
+              processedStatus: status 
+            });
+            
+            handleDmPresenceUpdate({
+              user_id: participantId,
+              username: presenceData.username || 'Unknown',
+              status: status
+            });
+          } else {
+            log.warn("Member not found in server members list, defaulting to offline", { 
+              participantId
+            });
+            
+            // Try to get username from the conversation itself as last resort
+            const conversation = Array.from(dmConversations.values()).find(conv => conv.participantId === participantId);
+            const fallbackUsername = conversation?.participantUsername || 'Unknown';
+            
+            log.debug("Using conversation username as fallback", { participantId, fallbackUsername });
+            
+            // Default to offline when member not found
+            handleDmPresenceUpdate({
+              user_id: participantId,
+              username: fallbackUsername,
+              status: 'offline'
+            });
+          }
+        } catch (error) {
+          log.warn("Error processing presence for user", { 
+            participantId, 
+            error 
+          });
+          // Default to offline when there's an error
+          handleDmPresenceUpdate({
+            user_id: participantId,
+            username: 'Unknown',
+            status: 'offline'
+          });
+        }
+      }
+      
+      log.info("Initial presence states processing completed", { participantCount: participantIds.length });
+    } catch (error) {
+      const err = error as Error;
+      log.error("Failed to process initial presence states", { error: err.message });
+    }
+  }
+
+  /**
+   * Manually refresh presence states for all DM participants
+   * Useful for debugging and fixing incorrect presence states
+   */
+  async function refreshAllPresenceStates(): Promise<void> {
+    log.info("=== MANUAL PRESENCE REFRESH TRIGGERED ===");
+    log.info("Manually refreshing all presence states");
+    await fetchInitialPresenceStates();
+    log.info("=== MANUAL PRESENCE REFRESH COMPLETED ===");
+  }
+
+  /**
    * Handle DM presence updates
    */
-  function handleDmPresenceUpdate(presenceData: any): void {
-    log.debug("DM presence update", presenceData);
-    // Update participant online status in conversation list
-    updateDmConversationList();
+  function handleDmPresenceUpdate(presenceData: {
+    user_id: string;
+    username: string;
+    status: string;
+  }): void {
+    log.debug("DM presence update received", presenceData);
+    
+    // Normalize status value
+    const normalizedStatus = String(presenceData.status).toLowerCase();
+    const isOnline = normalizedStatus === 'online' || normalizedStatus === 'active' || normalizedStatus === 'available';
+    
+    // Find the conversation with this participant
+    for (const [conversationId, conversation] of dmConversations) {
+      if (conversation.participantId === presenceData.user_id) {
+        // Update the online status based on presence
+        const wasOnline = conversation.isOnline;
+        conversation.isOnline = isOnline;
+        
+        log.debug("Updating conversation presence", {
+          conversationId,
+          participantId: presenceData.user_id,
+          username: presenceData.username,
+          originalStatus: presenceData.status,
+          normalizedStatus: normalizedStatus,
+          isOnline: isOnline,
+          wasOnline: wasOnline
+        });
+        
+        // Update UI if status changed
+        if (wasOnline !== conversation.isOnline) {
+          // Update the UI through the Direct Messaging UI manager
+          if (typeof window.updateDmConversation === 'function') {
+            window.updateDmConversation(conversationId, {
+              isOnline: conversation.isOnline
+            });
+            log.debug("Sent UI update for conversation", { conversationId, isOnline: conversation.isOnline });
+          }
+          
+          // Update the active conversation if it's currently open
+          if (conversationId === activeDmConversationId) {
+            const dmChatHeader = document.querySelector('.dm-chat-header-status') as HTMLElement;
+            if (dmChatHeader) {
+              dmChatHeader.textContent = conversation.isOnline ? 'Online' : 'Offline';
+              log.debug("Updated active conversation header", { conversationId, status: dmChatHeader.textContent });
+            }
+          }
+        }
+        
+        break; // Found the conversation, no need to continue searching
+      }
+    }
+    
+    // Log if no conversation was found for this user
+    const conversationExists = Array.from(dmConversations.values()).some(conv => conv.participantId === presenceData.user_id);
+    if (!conversationExists) {
+      log.debug("No DM conversation found for user", { userId: presenceData.user_id, username: presenceData.username });
+    }
   }
   
   /**
@@ -684,4 +917,5 @@
   window.sendTypingIndicator = sendTypingIndicator;
   window.fetchConversationMessages = fetchConversationMessages;
   window.initiateKeyExchange = initiateKeyExchange;
+  window.refreshAllPresenceStates = refreshAllPresenceStates;
 })();

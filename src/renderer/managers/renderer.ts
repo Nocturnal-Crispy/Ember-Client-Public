@@ -59,18 +59,37 @@
     dmScreen!.classList.add("active");
     dmIcon!.classList.add("active");
     
-    // Hide main content but keep server list visible
+    // Add class to body for CSS targeting
+    document.body.classList.add("dm-screen-open");
+    
+    // Hide main content but keep user panel visible
     const appContainer = document.querySelector(".app-container");
     if (appContainer) {
       const channelList = appContainer.querySelector(".channel-list");
       const chatContainer = appContainer.querySelector(".chat-container");
       const memberList = appContainer.querySelector(".member-list");
       const welcomeScreen = appContainer.querySelector(".welcome-screen");
+      const userPanel = appContainer.querySelector(".user-panel");
       
-      if (channelList) (channelList as HTMLElement).style.display = "none";
+      if (channelList) {
+        // Hide channel list content but keep the container for user panel
+        const serverHeader = (channelList as HTMLElement).querySelector(".server-header");
+        const channels = (channelList as HTMLElement).querySelector(".channels");
+        const voiceControls = (channelList as HTMLElement).querySelector(".voice-controls");
+        
+        if (serverHeader) (serverHeader as HTMLElement).style.display = "none";
+        if (channels) (channels as HTMLElement).style.display = "none";
+        if (voiceControls) (voiceControls as HTMLElement).style.display = "none";
+        
+        // Keep channel list itself visible to show user panel
+        (channelList as HTMLElement).style.display = "";
+      }
       if (chatContainer) (chatContainer as HTMLElement).style.display = "none";
       if (memberList) (memberList as HTMLElement).style.display = "none";
       if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = "none";
+      
+      // Ensure user panel stays visible
+      if (userPanel) (userPanel as HTMLElement).style.display = "flex";
     }
     
     // Focus on search input
@@ -88,6 +107,9 @@
     dmScreen!.classList.remove("active");
     dmIcon!.classList.remove("active");
     
+    // Remove class from body
+    document.body.classList.remove("dm-screen-open");
+    
     // Show main content again
     const appContainer = document.querySelector(".app-container");
     if (appContainer) {
@@ -96,7 +118,16 @@
       const memberList = appContainer.querySelector(".member-list");
       const welcomeScreen = appContainer.querySelector(".welcome-screen");
       
-      if (channelList) (channelList as HTMLElement).style.display = "";
+      if (channelList) {
+        // Restore channel list content
+        const serverHeader = (channelList as HTMLElement).querySelector(".server-header");
+        const channels = (channelList as HTMLElement).querySelector(".channels");
+        const voiceControls = (channelList as HTMLElement).querySelector(".voice-controls");
+        
+        if (serverHeader) (serverHeader as HTMLElement).style.display = "";
+        if (channels) (channels as HTMLElement).style.display = "";
+        if (voiceControls) (voiceControls as HTMLElement).style.display = "";
+      }
       if (chatContainer) (chatContainer as HTMLElement).style.display = "";
       if (memberList) (memberList as HTMLElement).style.display = "";
       if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = "";
@@ -452,28 +483,38 @@
         token?: string;
         hostname?: string;
       } | null;
-      if (!auth || !auth.token || !auth.hostname) return [];
-      const response = await fetch(
-        `${auth.hostname}/api/v1/embers/${emberId}/members`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }
-      );
-      if (!response.ok) {
-        log.error("Failed to fetch members", {
-          status: String(response.status),
-          ember_id: emberId,
-        });
+      
+      if (!auth || !auth.token || !auth.hostname) {
+        log.warn("Cannot fetch members: not authenticated");
         return [];
       }
-      const data = (await response.json()) as { members?: Member[] };
-      const members = data.members ?? [];
-      log.debug("Members fetched", {
-        ember_id: emberId,
-        count: String(members.length),
+      
+      const url = `${auth.hostname}/api/v1/embers/${emberId}/members`;
+      log.debug("Making members API call", { url });
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${auth.token}` },
       });
-      return members;
+      
+      log.debug("Members API response", { 
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok 
+      });
+      
+      if (!response.ok) {
+        log.warn("Failed to fetch members", { status: response.status, statusText: response.statusText });
+        return [];
+      }
+      
+      const data = await response.json();
+      log.debug("Members API response data", { 
+        memberCount: data.members?.length || 0,
+        members: data.members?.map((m: any) => ({ user_id: m.user_id, username: m.username, status: m.status })) || []
+      });
+      
+      return data.members || [];
     } catch (error) {
       const err = error as Error;
       log.error("Error fetching members", {

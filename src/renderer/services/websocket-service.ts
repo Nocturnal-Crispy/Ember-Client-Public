@@ -238,6 +238,11 @@
       App.currentMembers.push({ user_id, username, status, role: "member" });
     }
     window.renderMemberList(App.currentMembers);
+    
+    // Also forward to DM system in case this user is a DM participant
+    if (typeof window.handleDmPresenceUpdate === "function") {
+      window.handleDmPresenceUpdate(payload);
+    }
   }
 
   async function handleIncomingMessage(

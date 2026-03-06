@@ -423,7 +423,7 @@
           participantId: userId,
           participantUsername: username,
           unreadCount: 0,
-          isOnline: true,
+          isOnline: false, // Default to offline, will be updated by presence updates
           keyExchanged: false
         });
         
@@ -464,7 +464,6 @@
       </div>
       <div class="dm-conversation-info">
         <div class="dm-conversation-name">${conversation.participantUsername}</div>
-        <div class="dm-conversation-last-message">${conversation.lastMessage || 'No messages yet'}</div>
       </div>
       ${conversation.unreadCount > 0 ? 
         `<div class="dm-unread-count">${conversation.unreadCount}</div>` : 
@@ -865,9 +864,20 @@
     const nameElement = conversation.element.querySelector('.dm-conversation-name') as HTMLElement;
     const lastMessageElement = conversation.element.querySelector('.dm-conversation-last-message') as HTMLElement;
     const unreadElement = conversation.element.querySelector('.dm-unread-count, .dm-unread-indicator') as HTMLElement;
+    const avatarElement = conversation.element.querySelector('.dm-avatar') as HTMLElement;
     
     if (nameElement) nameElement.textContent = conversation.participantUsername;
-    if (lastMessageElement) lastMessageElement.textContent = conversation.lastMessage || 'No messages yet';
+    
+    // Update avatar online status
+    if (avatarElement) {
+      if (conversation.isOnline) {
+        avatarElement.classList.add('online');
+        avatarElement.classList.remove('offline');
+      } else {
+        avatarElement.classList.add('offline');
+        avatarElement.classList.remove('online');
+      }
+    }
     
     // Update unread indicator
     if (unreadElement) {

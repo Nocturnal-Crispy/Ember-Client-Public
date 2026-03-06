@@ -432,6 +432,7 @@ declare global {
       isOwn: boolean;
     }>>;
     initiateKeyExchange(conversationId: string, participantId: string): Promise<void>;
+    refreshAllPresenceStates(): Promise<void>;
     handleDmMessage(payload: {
       id: string;
       conversation_id: string;
