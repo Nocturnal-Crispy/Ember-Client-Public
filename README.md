@@ -70,6 +70,16 @@ Ember client automatically detects and connects to Ember servers. Key configurat
 -   **Theme Preferences**: Customizable appearance and behavior
 -   **Security Settings**: Recovery code management and key storage
 
+### Environment Variables
+
+<!-- AUTO-GENERATED from codebase analysis -->
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NODE_ENV` | Set to 'development' for debug mode and developer tools | `production` |
+
+<!-- END AUTO-GENERATED -->
+
 ### Data Storage
 
 -   **Linux**: `~/.config/ember-client/`
@@ -177,11 +187,15 @@ These files exceed the project's <200-instruction guideline and are candidates f
 
 | File | Lines |
 |------|-------|
-| `src/renderer/managers/voice-ui-manager.ts` | 686 |
-| `src/renderer/managers/channel-manager.ts` | 542 |
-| `src/renderer/services/voice-service.ts` | 527 |
-| `src/renderer/managers/ember-manager.ts` | 501 |
-| `src/renderer/managers/renderer.ts` | 444 |
+| `src/renderer/managers/direct-messaging-ui.ts` | 1,619 |
+| `src/renderer/managers/voice-ui-manager.ts` | 1,227 |
+| `src/renderer/services/message-service.ts` | 970 |
+| `src/renderer/managers/ember-manager.ts` | 938 |
+| `src/renderer/managers/direct-messaging-manager.ts` | 921 |
+| `src/renderer/managers/channel-manager.ts` | 870 |
+| `src/renderer/services/voice-service.ts` | 792 |
+| `src/renderer/managers/renderer.ts` | 762 |
+| `src/renderer/managers/dm-accessibility-enhancer.ts` | 731 |
 
 <!-- END AUTO-GENERATED -->
 
@@ -222,6 +236,23 @@ npm run dist:win
 # macOS (DMG + ZIP)
 npm run dist:mac
 ```
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `build` | Build TypeScript and copy assets to dist/ |
+| `build:shared` | Build ember-shared dependency |
+| `start` | Build and launch the application |
+| `dev` | Development build with NODE_ENV=development |
+| `dev:watch` | Development mode with CSS file watching |
+| `watch:css` | Watch CSS files for changes |
+| `dist` | Build and create distributable packages |
+| `dist:linux` | Build for Linux (AppImage + deb) |
+| `dist:win` | Build for Windows (Installer + Portable) |
+| `dist:mac` | Build for macOS (DMG + ZIP) |
+| `test` | Run Jest test suite |
+| `release` | Build and execute release script |
 
 <!-- END AUTO-GENERATED -->
 
