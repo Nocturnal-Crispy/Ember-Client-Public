@@ -168,6 +168,16 @@
   function switchToServer(emberId: string, emberName: string): void {
     log.info("Switching to server", { ember_id: emberId, name: emberName });
     
+    // Check if DM screen is open - if so, always allow switching
+    const dmScreen = document.getElementById("dm-screen");
+    const isDmScreenOpen = dmScreen?.classList.contains("active");
+    
+    // Don't reload if already in this server and not in DM mode
+    if (App.activeEmberId === emberId && !isDmScreenOpen) {
+      log.debug("Already in server, skipping reload", { ember_id: emberId });
+      return;
+    }
+    
     // Close DM screen if it's active
     if (window.closeDMScreenOnServerSwitch) {
       window.closeDMScreenOnServerSwitch();
@@ -248,6 +258,14 @@
   ): Promise<void> {
     const serverHeader = document.querySelector(".server-header h3");
     if (serverHeader) serverHeader.textContent = emberName;
+
+    // Clear messages container to prevent duplicates when switching from DM mode
+    const messagesContainer = document.getElementById("messages");
+    if (messagesContainer) {
+      while (messagesContainer.firstChild) {
+        messagesContainer.removeChild(messagesContainer.firstChild);
+      }
+    }
 
     // Clear stale voice presence from the previous ember before fetching the new one
     App.voiceChannelPresence.clear();

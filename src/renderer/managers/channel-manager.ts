@@ -110,7 +110,9 @@
         } else {
           window.showTextChannelView();
           window.updateChatHeader(channel.name, channel.description ?? "");
-          window.loadChannelMessages(channel.id);
+          if (App.activeChannelId !== channel.id) {
+            window.loadChannelMessages(channel.id);
+          }
         }
       });
 
