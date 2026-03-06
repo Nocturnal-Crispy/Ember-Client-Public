@@ -2,7 +2,7 @@
  * Unit tests for the isNewerVersion helper in src/main.ts
  */
 
-import { isNewerVersion } from '../../../src/version-utils';
+import { isNewerVersion } from '../../../src/main/version-utils';
 
 describe('isNewerVersion', () => {
   test('returns true when patch is newer', () => {
