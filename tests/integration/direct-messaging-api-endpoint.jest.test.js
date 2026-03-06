@@ -1,6 +1,4 @@
 /**
- * @jest-environment node
- *
  * Jest-compatible test for direct messaging API endpoint fix
  * This test validates that the fix resolves the "Not Found" error
  */
@@ -15,6 +13,7 @@ const TEST_CONFIG = {
 
 // Mock fetch for testing
 let mockFetchCalls = [];
+let originalFetch;
 
 // Mock fetch function
 const mockFetch = jest.fn(async (url, options) => {
@@ -66,11 +65,15 @@ async function sendDirectMessage(conversationId, content, hostname, token) {
 describe('Direct Messaging API Endpoint Fix', () => {
   beforeEach(() => {
     mockFetchCalls = [];
+    originalFetch = global.fetch;
     global.fetch = mockFetch;
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    if (originalFetch) {
+      global.fetch = originalFetch;
+    }
   });
 
   test('Should use correct API endpoint', async () => {
@@ -132,25 +135,34 @@ describe('Direct Messaging API Endpoint Fix', () => {
   });
 
   test('Should fail with old endpoint', async () => {
-    // Simulate using the old incorrect endpoint
-    const response = await mockFetch(`https://test.ember.com/api/v1/direct-messages/conversations/${TEST_CONFIG.conversationId}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer test-token'
-      },
-      body: JSON.stringify({
-        content: 'encrypted-content',
-        timestamp: Date.now()
-      })
-    });
+    // Create a function that uses the old incorrect endpoint
+    async function sendDirectMessageOldEndpoint(conversationId, content, hostname, token) {
+      const response = await mockFetch(`${hostname}/api/v1/direct-messages/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content: 'encrypted-content',
+          timestamp: Date.now()
+        })
+      });
 
-    if (!response.ok) {
-      expect(() => {
+      if (!response.ok) {
         throw new Error(`Failed to send message: ${response.statusText}`);
-      }).toThrow('Failed to send message: Not Found');
-    } else {
-      fail('Should have failed with old endpoint');
+      }
+      
+      return await response.json();
     }
+
+    await expect(
+      sendDirectMessageOldEndpoint(
+        TEST_CONFIG.conversationId,
+        TEST_CONFIG.messageContent,
+        'https://test.ember.com',
+        'test-token'
+      )
+    ).rejects.toThrow('Failed to send message: Not Found');
   });
 });
