@@ -160,18 +160,12 @@ body.dm-screen-open .user-panel .user-status-icon {
 }
 
 .dm-search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   background: rgba(var(--rgb-surface), 0.95);
-  border: 1px solid rgba(var(--rgb-highlight), 0.2);
-  border-radius: 12px;
-  margin-top: 8px;
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.2);
   max-height: 240px;
   overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   display: none;
   backdrop-filter: blur(20px);
 }

@@ -278,8 +278,10 @@
         <div class="dm-loading-text">Searching...</div>
       </div>
     `;
-    
+
     resultsContainer.style.display = 'block';
+    const convList1 = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
+    if (convList1) convList1.style.display = 'none';
   }
   
   /**
@@ -297,8 +299,10 @@
         <div class="dm-no-results-text">No users found for "${query}"</div>
       </div>
     `;
-    
+
     resultsContainer.style.display = 'block';
+    const convList2 = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
+    if (convList2) convList2.style.display = 'none';
   }
   
   /**
@@ -362,7 +366,9 @@
     });
     
     resultsContainer.style.display = 'block';
-    
+    const convList3 = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
+    if (convList3) convList3.style.display = 'none';
+
     // Don't auto-focus first result to allow continued typing
     // User can navigate with arrow keys when ready
   }
@@ -373,28 +379,32 @@
   function showSearchResults(): void {
     if (!dmSidebarElement) return;
     const resultsContainer = dmSidebarElement.querySelector('.dm-search-results') as HTMLElement;
+    const conversationList = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
     if (resultsContainer && resultsContainer.children.length > 0) {
       resultsContainer.style.display = 'block';
+      if (conversationList) conversationList.style.display = 'none';
     }
   }
-  
+
   /**
    * Hide search results
    */
   function hideSearchResults(): void {
     if (!dmSidebarElement) return;
-    
+
     // Clear any pending search timeout
     if (searchTimeout) {
       clearTimeout(searchTimeout);
       searchTimeout = null;
     }
-    
+
     const resultsContainer = dmSidebarElement.querySelector('.dm-search-results') as HTMLElement;
+    const conversationList = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
     if (resultsContainer) {
       resultsContainer.style.display = 'none';
-      resultsContainer.innerHTML = ''; // Clear content to prevent stale results
+      resultsContainer.replaceChildren(); // Clear content to prevent stale results
     }
+    if (conversationList) conversationList.style.display = '';
   }
   
   /**
