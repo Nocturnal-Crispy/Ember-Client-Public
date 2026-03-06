@@ -1,68 +1,103 @@
-/* Member List */
+/* ─── Member List ──────────────────────────────────────────────────────────── */
+
 .member-list {
   width: 240px;
   background-color: var(--background);
-  padding: 16px 8px;
+  padding: 4px 0;
   overflow-y: auto;
   border-left: 1px solid rgba(var(--rgb-highlight), 0.2);
+  font-family: 'Courier New', Courier, monospace;
 }
 
+.member-list::-webkit-scrollbar { width: 6px; background: transparent; }
+.member-list::-webkit-scrollbar-thumb { background: rgba(var(--rgb-highlight), 0.2); }
+.member-list::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-highlight), 0.5); }
+
+/* ─── Category Label ───────────────────────────────────────────────────────── */
+
 .member-category {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--highlight);
-  padding: 8px;
-  letter-spacing: 0.5px;
-  margin-top: 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba(var(--rgb-highlight), 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 10px 14px 4px;
 }
+
+/* ─── Individual Member Row ────────────────────────────────────────────────── */
 
 .member {
   display: flex;
   align-items: center;
-  padding: 6px 8px;
-  margin: 1px 0;
-  border-radius: 4px;
+  padding: 8px 14px;
   cursor: pointer;
-  transition: background-color var(--transition-time);
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.06);
+  transition: background-color 0.1s ease;
 }
 
 .member:hover {
-  background-color: var(--background-modifier-hover);
+  background: rgba(var(--rgb-highlight), 0.07);
 }
 
 .member.offline {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
+/* ─── Member Avatar ────────────────────────────────────────────────────────── */
+
 .member-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--highlight);
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Courier New', Courier, monospace;
   font-weight: bold;
-  font-size: 14px;
-  color: var(--background);
-  margin-right: 12px;
+  font-size: 11px;
+  color: rgba(var(--rgb-highlight), 0.7);
+  background-color: transparent;
+  margin-right: 10px;
   position: relative;
+  flex-shrink: 0;
+}
+
+.member-avatar.online {
+  border-color: var(--highlight);
+  color: var(--highlight);
+  box-shadow: 0 0 6px rgba(var(--rgb-highlight), 0.25);
+}
+
+.member-avatar.idle {
+  border-color: var(--afk-color);
+  color: var(--afk-color);
+}
+
+.member-avatar.dnd {
+  border-color: var(--dnd-color);
+  color: var(--dnd-color);
 }
 
 .status-icon {
   position: absolute;
   bottom: -3px;
   right: -3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
   border: 2px solid var(--background);
   pointer-events: none;
 }
 
+/* ─── Member Name ──────────────────────────────────────────────────────────── */
+
 .member-name {
-  font-size: 15px;
-  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: rgba(var(--rgb-text), 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .member:hover .member-name {

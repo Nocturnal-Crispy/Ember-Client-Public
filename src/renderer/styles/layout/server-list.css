@@ -1,4 +1,5 @@
-/* Server List (Left Sidebar) */
+/* ─── Ember Bar (Left Sidebar) ─────────────────────────────────────────────── */
+
 .server-list {
   width: 72px;
   background-color: var(--background);
@@ -6,80 +7,92 @@
   flex-direction: column;
   align-items: center;
   padding: 12px 0;
-  gap: 8px;
+  margin-right: 5px;
+  gap: 6px;
+  border-right: 2px solid var(--highlight);
+  font-family: 'Courier New', Courier, monospace;
 }
 
+/* ─── Ember Icon ───────────────────────────────────────────────────────────── */
+
 .server-icon {
-  width: 48px;
-  height: 48px;
-  background-color: rgba(var(--rgb-highlight), 0.1);
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  background-color: transparent;
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-time) ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  font-family: 'Courier New', Courier, monospace;
   font-weight: bold;
-  font-size: 18px;
-  color: var(--text);
+  font-size: 14px;
+  color: rgba(var(--rgb-highlight), 0.6);
 }
 
 .server-icon:hover {
-  border-radius: 35%;
-  background-color: var(--highlight);
-  color: var(--background);
+  border-color: var(--highlight);
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  color: var(--highlight);
 }
 
 .server-icon.active {
-  border-radius: 35%;
-  background-color: var(--highlight);
-  color: var(--background);
+  border-color: var(--highlight);
+  background-color: rgba(var(--rgb-highlight), 0.15);
+  color: var(--highlight);
+  box-shadow: 0 0 8px rgba(var(--rgb-highlight), 0.2);
 }
 
+/* ─── Add Server ───────────────────────────────────────────────────────────── */
+
 .server-icon.add-server {
-  background-color: rgba(var(--rgb-highlight), 0.1);
-  color: var(--online-color);
-  font-size: 28px;
+  border-style: dashed;
+  border-color: rgba(var(--rgb-highlight), 0.2);
+  color: rgba(var(--rgb-highlight), 0.4);
+  font-size: 20px;
 }
 
 .server-icon.add-server:hover {
-  background-color: var(--online-color);
-  color: var(--background);
+  border-color: var(--highlight);
+  border-style: solid;
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  color: var(--highlight);
 }
 
-/* DM Icon Styling */
+/* ─── DM Icon ──────────────────────────────────────────────────────────────── */
+
 .server-icon.dm-icon {
-  background-color: transparent;
+  border-color: rgba(var(--rgb-highlight), 0.25);
   padding: 4px;
 }
 
 .server-icon.dm-icon img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  transition: transform 0.2s ease;
+  width: 32px;
+  height: 32px;
+  transition: opacity 0.15s ease;
 }
 
-.server-icon.dm-icon:hover img {
-  transform: scale(1.1);
+.server-icon.dm-icon:hover {
+  border-color: var(--highlight);
 }
 
 .server-icon.dm-icon.active {
-  background-color: var(--highlight);
+  border-color: var(--highlight);
+  background-color: rgba(var(--rgb-highlight), 0.15);
 }
 
-.server-icon.dm-icon.active img {
-  transform: scale(0.9);
-}
+/* ─── Separator ────────────────────────────────────────────────────────────── */
 
 .server-separator {
-  width: 32px;
-  height: 2px;
-  background-color: var(--highlight);
-  border-radius: 1px;
-  margin: 4px 0;
+  width: 36px;
+  height: 1px;
+  background-color: rgba(var(--rgb-highlight), 0.3);
+  margin: 2px 0;
 }
 
+/* ─── Drag-and-drop ────────────────────────────────────────────────────────── */
+
 .server-icon.drag-over-ember {
-  border-top: 2px solid #5865f2;
+  border-top: 2px solid var(--highlight);
 }

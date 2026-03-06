@@ -82,6 +82,7 @@ declare global {
     accentRgb: string;
     backgroundRgb: string;
     surfaceRgb: string;
+    chatColor?: string;
   }
 
   interface ThemePreset {

@@ -12,6 +12,7 @@
   let activeConversationId: string | null = null;
   let conversations = new Map<string, DMConversationUI>();
   let searchTimeout: NodeJS.Timeout | null = null;
+  let ownUsername: string = 'Me';
   
   interface DMConversationUI {
     id: string;
@@ -30,7 +31,13 @@
   function initializeDirectMessagingUI(): void {
     try {
       log.info("Initializing Direct Messaging UI");
-      
+
+      // Fetch own username for chumhandle display
+      window.electronAPI.ipc.invoke('get-auth').then((auth) => {
+        const a = auth as { username?: string } | null;
+        if (a?.username) ownUsername = a.username;
+      }).catch(() => { /* keep default */ });
+
       // Get existing DM elements from the DOM
       dmSidebarElement = document.querySelector('.dm-sidebar');
       dmChatContainer = document.querySelector('.dm-chat-container');
@@ -761,6 +768,18 @@
   }
   
   /**
+   * Derive a 2-letter chat handle abbreviation from a username.
+   * Splits on camelCase word boundaries; falls back to first 2 letters.
+   */
+  function toChumhandle(username: string): string {
+    const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return username.slice(0, 2).toUpperCase();
+  }
+
+  /**
    * Display a new message in the chat
    */
   function displayMessage(messageData: {
@@ -783,6 +802,13 @@
     const messageElement = document.createElement('div');
     messageElement.className = `dm-message ${messageData.isOwn ? 'own' : ''}`;
     messageElement.setAttribute('data-message-id', messageData.id);
+
+    // Always set handle abbreviation — used by CSS ::before for the terminal-style prefix
+    const senderName = messageData.isOwn
+      ? ownUsername
+      : (conversation?.participantUsername || 'User');
+    messageElement.dataset['chumhandle'] = '[' + toChumhandle(senderName) + ']: ';
+
     messageElement.innerHTML = `
       <div class="dm-message-avatar">${messageData.isOwn ? 'You' : avatarLetter}</div>
       <div class="dm-message-content">

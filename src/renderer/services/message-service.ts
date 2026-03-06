@@ -18,8 +18,9 @@
   let oldestMessageId: string | null = null;
   let isLoadingOlderMessages = false;
 
-  // Current user ID cached for ownership checks (set in loadChannelMessages)
+  // Current user ID and username cached for ownership checks (set in loadChannelMessages)
   let currentUserId: string | null = null;
+  let currentUsername: string = '';
   
   // DM conversation keys cache
   const dmConversationKeys = new Map<string, Uint8Array>();
@@ -278,6 +279,14 @@
     return toolbar;
   }
 
+  function toChumhandle(username: string): string {
+    const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return username.slice(0, 2).toUpperCase();
+  }
+
   function addMessage(
     author: string,
     text: string,
@@ -288,6 +297,10 @@
     const messageDiv = document.createElement("div");
     messageDiv.className = "message";
     if (messageId) messageDiv.dataset["messageId"] = messageId;
+    messageDiv.dataset["chumhandle"] = "[" + toChumhandle(author) + "]: ";
+    if (currentUsername && author === currentUsername) {
+      messageDiv.classList.add("own");
+    }
     const timeString = formatTimestamp(timestamp);
     const avatarEl = document.createElement("div");
     avatarEl.className = "message-avatar";
@@ -673,11 +686,12 @@
       while (virtualScrollContainer.firstChild) {
         virtualScrollContainer.removeChild(virtualScrollContainer.firstChild);
       }
-    } else {
-      while (messagesContainer.firstChild) {
-        messagesContainer.removeChild(messagesContainer.firstChild);
-      }
     }
+    // Always clear direct children of messagesContainer (e.g. welcome banner)
+    const directChildren = Array.from(messagesContainer.childNodes).filter(
+      (n) => n !== virtualScrollContainer
+    );
+    directChildren.forEach((n) => messagesContainer.removeChild(n));
     
     // Clear message tracking
     messageElements.clear();
@@ -727,15 +741,15 @@
     banner.appendChild(subtitle);
     banner.appendChild(editBtn);
     
-    // Add banner to appropriate container
-    const targetContainer = virtualScrollContainer || messagesContainer;
-    targetContainer.appendChild(banner);
+    // Add banner directly to messagesContainer (before the virtual scroll div)
+    messagesContainer.insertBefore(banner, messagesContainer.firstChild);
 
     // Fetch auth once to populate ownership cache (fast IPC read from safeStorage)
     const authForOwnership = (await ipcRenderer.invoke(
       "get-auth"
     )) as AuthData | null;
     currentUserId = authForOwnership?.user_id ?? null;
+    currentUsername = authForOwnership?.username ?? '';
 
     const { messages, hasMore } = await fetchMessages(channelId);
     hasMoreMessages = hasMore;

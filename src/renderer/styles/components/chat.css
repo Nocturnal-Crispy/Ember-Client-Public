@@ -1,186 +1,205 @@
-/* Chat Container */
+/* ─── Chat Container ───────────────────────────────────────────────────────── */
+
 .chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   background-color: var(--background);
+  font-family: 'Courier New', Courier, monospace;
 }
+
+/* ─── Chat Header ──────────────────────────────────────────────────────────── */
 
 .chat-header {
   height: 48px;
   padding: 0 16px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.2);
-  box-shadow: 0 1px 0 rgba(var(--rgb-highlight), 0.1);
+  border-bottom: 2px solid rgba(var(--rgb-highlight), 0.5);
+  background: rgba(var(--rgb-surface), 0.5);
+  flex-shrink: 0;
 }
 
 .channel-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: bold;
   color: var(--highlight);
+  text-transform: uppercase;
+  letter-spacing: 1px;
   margin-left: 8px;
 }
 
+.channel-title::before { content: '-- #'; }
+.channel-title::after  { content: ' --'; }
+
 .chat-header-divider {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background-color: rgba(var(--rgb-highlight), 0.3);
-  margin: 0 16px;
+  margin: 0 14px;
 }
 
 .channel-description {
-  font-size: 14px;
-  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.5);
+  font-style: italic;
 }
+
+/* ─── Messages Container ───────────────────────────────────────────────────── */
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
+  padding: 12px;
 }
+
+.messages-container::-webkit-scrollbar { width: 6px; background: transparent; }
+.messages-container::-webkit-scrollbar-thumb { background: rgba(var(--rgb-highlight), 0.2); }
+.messages-container::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-highlight), 0.5); }
+
+/* ─── Welcome Banner ───────────────────────────────────────────────────────── */
 
 .welcome-message {
   padding: 16px 0;
   margin-bottom: 16px;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .welcome-message h1 {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: bold;
   color: var(--highlight);
   margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .welcome-message p {
-  color: var(--text);
-  font-size: 16px;
-}
-
-/* Channel welcome banner — shown at the top of every text channel */
-.channel-welcome-banner {
-  padding: 16px 0 24px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.1);
-}
-
-.channel-welcome-heading {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--highlight);
-  margin: 0 0 8px;
-}
-
-.channel-welcome-subtitle {
-  font-size: 15px;
-  color: var(--text);
-  margin: 0 0 16px;
-}
-
-.channel-welcome-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  background-color: rgba(var(--rgb-highlight), 0.1);
-  border: 1px solid rgba(var(--rgb-highlight), 0.2);
-  border-radius: 4px;
-  color: var(--highlight);
+  color: rgba(var(--rgb-text), 0.6);
   font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color var(--transition-time);
 }
 
-.channel-welcome-edit-btn:hover {
-  background-color: rgba(var(--rgb-highlight), 0.2);
-}
-
-.message {
-  display: flex;
-  padding: 8px 0;
-  margin: 4px 0;
-  position: relative;
-  transition: background-color 0.1s;
-}
-
-.message:hover {
-  background-color: var(--background-modifier-hover);
-  margin: 4px -8px;
-  padding: 8px 8px;
-  border-radius: 4px;
-}
-
-.message-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: var(--highlight);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: var(--background);
-  margin-right: 16px;
-  flex-shrink: 0;
-}
-
-.message-content {
-  flex: 1;
-}
-
-.message-header {
-  display: flex;
-  align-items: baseline;
+.channel-welcome-banner {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: rgba(var(--rgb-text), 0.4);
+  padding: 4px;
   margin-bottom: 4px;
 }
 
-.message-author {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--highlight);
-  margin-right: 8px;
+.channel-welcome-heading {
+  display: inline;
+  font-size: inherit;
+  font-weight: normal;
+  color: rgba(var(--rgb-highlight), 0.6);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-.message-timestamp {
-  font-size: 12px;
-  color: rgba(var(--rgb-text), 0.5);
+.channel-welcome-heading::before { content: '=== '; }
+.channel-welcome-heading::after  { content: ' ==='; }
+
+.channel-welcome-subtitle {
+  display: none;
+}
+
+.channel-welcome-edit-btn {
+  display: none;
+}
+
+/* ─── Individual Messages — Terminal Chat Log Lines ───────────────────────── */
+
+.message {
+  display: block;
+  max-width: 100%;
+  margin-bottom: 2px;
+  padding: 0 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  background: transparent;
+  position: relative;
+}
+
+.message:hover {
+  background: rgba(var(--rgb-highlight), 0.04);
+}
+
+/* Chumhandle prefix via data attribute */
+.message::before {
+  content: attr(data-chumhandle);
+  font-weight: bold;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Hide the bubble sub-elements */
+.message-avatar  { display: none; }
+.message-header  { display: none; }
+
+/* Content and text flow inline after the ::before handle */
+.message-content {
+  display: inline;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .message-text {
-  font-size: 15px;
-  color: var(--text);
-  line-height: 1.375;
+  display: inline;
+  background: transparent;
+  padding: 0;
+  border: none;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: inherit;
+  color: inherit;
   word-wrap: break-word;
   white-space: pre-wrap;
 }
 
-/* Edited indicator */
+/* Own messages — chat color (user-customizable, defaults to accent) */
+.message.own {
+  color: var(--chat-color);
+}
+
+.message.own .message-text {
+  color: inherit;
+}
+
+/* Other messages — neutral text color */
+.message:not(.own) {
+  color: rgba(var(--rgb-text), 0.85);
+}
+
+/* ─── Edited Indicator ─────────────────────────────────────────────────────── */
+
 .message-edited {
+  font-family: 'Courier New', Courier, monospace;
   font-size: 11px;
-  color: rgba(var(--rgb-text), 0.4);
+  color: rgba(var(--rgb-text), 0.35);
   margin-left: 6px;
   font-style: italic;
 }
 
-/* Inline message edit */
+/* ─── Inline Message Edit ──────────────────────────────────────────────────── */
+
 .message-edit-container {
+  display: block;
   margin-top: 2px;
+  padding-left: 4px;
 }
 
 .message-edit-textarea {
   width: 100%;
   background-color: rgba(var(--rgb-highlight), 0.05);
   border: 1px solid rgba(var(--rgb-highlight), 0.3);
-  border-radius: 4px;
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.375;
-  padding: 6px 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 5px 8px;
   resize: none;
   outline: none;
-  font-family: inherit;
   box-sizing: border-box;
   min-height: 20px;
   max-height: 120px;
@@ -189,33 +208,35 @@
 }
 
 .message-edit-textarea:focus {
-  border-color: var(--highlight);
+  border-color: rgba(var(--rgb-highlight), 0.7);
 }
 
 .message-edit-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .message-edit-hint {
-  font-size: 12px;
-  color: rgba(var(--rgb-text), 0.4);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.35);
   flex: 1;
 }
 
 .message-edit-btn {
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 2px 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
   cursor: pointer;
-  border: none;
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
 }
 
 .message-edit-cancel {
   background: transparent;
-  color: rgba(var(--rgb-text), 0.7);
+  color: rgba(var(--rgb-text), 0.6);
+  border-color: transparent;
 }
 
 .message-edit-cancel:hover {
@@ -224,34 +245,33 @@
 }
 
 .message-edit-save {
-  background-color: var(--highlight);
-  color: var(--background);
-  font-weight: 600;
+  background-color: rgba(var(--rgb-highlight), 0.15);
+  color: var(--highlight);
+  font-weight: bold;
 }
 
 .message-edit-save:hover:not(:disabled) {
-  opacity: 0.85;
+  background-color: rgba(var(--rgb-highlight), 0.25);
 }
 
 .message-edit-save:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* Message Action Toolbar */
+/* ─── Message Action Toolbar ───────────────────────────────────────────────── */
+
 .message-action-bar {
   display: none;
   position: absolute;
-  top: 6px;
+  top: 2px;
   right: 8px;
   flex-direction: row;
   align-items: center;
-  gap: 2px;
-  padding: 2px 4px;
+  gap: 1px;
+  padding: 1px 3px;
   background-color: var(--background);
-  border: 1px solid rgba(var(--rgb-highlight), 0.2);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
   z-index: 10;
 }
 
@@ -260,58 +280,61 @@
 }
 
 .message-action-btn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--text);
-  font-size: 14px;
+  color: rgba(var(--rgb-text), 0.5);
+  font-size: 12px;
   cursor: pointer;
-  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.1s, color 0.1s;
+  transition: color 0.1s;
 }
 
 .message-action-btn:hover {
-  background-color: rgba(var(--rgb-highlight), 0.15);
   color: var(--highlight);
 }
 
-/* Message Input */
+/* ─── Message Input — Terminal Style ───────────────────────────────────────── */
+
 .message-input-container {
-  padding: 16px;
+  padding: 10px 14px 12px;
+  border-top: 2px solid rgba(var(--rgb-highlight), 0.4);
+  flex-shrink: 0;
 }
 
 .message-input-wrapper {
-  background-color: rgba(var(--rgb-highlight), 0.05);
-  border: 1px solid rgba(var(--rgb-highlight), 0.2);
-  border-radius: 8px;
-  padding: 8px 16px;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  background: transparent;
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
+  padding: 6px 10px;
+  transition: border-color 0.15s ease;
+  position: relative;
+}
+
+.message-input-wrapper::before {
+  content: '> ';
+  color: var(--chat-color);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 0;
+  line-height: 1.4;
+  padding-top: 1px;
+  margin-right: 8px;
+}
+
+.message-input-wrapper:focus-within {
+  border-color: rgba(var(--rgb-highlight), 0.7);
+  box-shadow: 0 0 8px rgba(var(--rgb-highlight), 0.12);
 }
 
 .attachment-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background-color: transparent;
-  color: var(--highlight);
-  font-size: 24px;
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color var(--transition-time);
-}
-
-.attachment-btn:hover {
-  background-color: var(--background-modifier-hover);
+  display: none;
 }
 
 .message-input {
@@ -319,19 +342,21 @@
   background-color: transparent;
   border: none;
   outline: none;
-  color: var(--text);
-  font-size: 15px;
+  color: var(--chat-color);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
   resize: none;
   min-height: 20px;
   max-height: 120px;
   overflow-y: auto;
   line-height: 1.4;
   padding: 0;
-  font-family: inherit;
+  caret-color: var(--chat-color);
 }
 
 .message-input::placeholder {
-  color: rgba(var(--rgb-text), 0.5);
+  color: rgba(var(--rgb-highlight), 0.25);
+  font-style: italic;
 }
 
 .input-actions {
@@ -340,17 +365,16 @@
 }
 
 .input-action-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   background-color: transparent;
-  color: var(--highlight);
-  font-size: 14px;
+  color: rgba(var(--rgb-highlight), 0.4);
+  font-size: 13px;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background-color var(--transition-time);
+  transition: color 0.12s ease;
 }
 
 .input-action-btn:hover {
-  background-color: var(--background-modifier-hover);
+  color: var(--highlight);
 }

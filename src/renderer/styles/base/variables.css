@@ -27,6 +27,7 @@
   --background-brightness: 100%; /* Changes the background images brightness */
 
   --highlight: rgb(var(--rgb-highlight));
+  --chat-color: var(--highlight); /* Own message color — overridden by user preference */
   --accent-color: var(--highlight); /* Alias for highlight */
   --accent-color-rgb: var(--rgb-highlight); /* RGB values for accent color */
   --background: rgb(var(--rgb-background));

@@ -32,6 +32,7 @@ export interface ThemeSettings {
   accentRgb: string;
   backgroundRgb: string;
   surfaceRgb: string;
+  chatColor?: string;
 }
 
 export interface StoreSchema {

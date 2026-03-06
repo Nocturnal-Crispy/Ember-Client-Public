@@ -56,6 +56,13 @@
       backgroundRgb: "16, 20, 24",
       surfaceRgb: "24, 30, 34",
     },
+    {
+      id: "matrix",
+      name: "Matrix",
+      accentRgb: "0, 209, 0",
+      backgroundRgb: "0, 0, 0",
+      surfaceRgb: "10, 10, 10",
+    },
   ];
 
   const DEFAULT_SETTINGS: ThemeSettings = {
@@ -63,6 +70,7 @@
     accentRgb: "255, 120, 80",
     backgroundRgb: "20, 20, 25",
     surfaceRgb: "30, 30, 35",
+    chatColor: "",
   };
 
   // ─── State ─────────────────────────────────────────────────────────────────
@@ -101,6 +109,11 @@
       "--rgb-surface-hover",
       computeSurfaceHover(settings.surfaceRgb)
     );
+    if (settings.chatColor) {
+      root.style.setProperty("--chat-color", settings.chatColor);
+    } else {
+      root.style.removeProperty("--chat-color");
+    }
   }
 
   // ─── Startup application ───────────────────────────────────────────────────
@@ -191,6 +204,17 @@
     }
   }
 
+  function syncChatColorPicker(): void {
+    const picker = document.getElementById(
+      "theme-chat-color-picker"
+    ) as HTMLInputElement | null;
+    if (picker) {
+      picker.value = pendingSettings.chatColor
+        ? pendingSettings.chatColor
+        : rgbStrToHex(pendingSettings.accentRgb);
+    }
+  }
+
   function updateSwatches(): void {
     const accentSwatch = document.getElementById("theme-swatch-accent") as HTMLElement | null;
     const bgSwatch = document.getElementById("theme-swatch-bg") as HTMLElement | null;
@@ -211,6 +235,10 @@
     const picker = document.getElementById(
       "theme-accent-picker"
     ) as HTMLInputElement | null;
+    const chatColorPicker = document.getElementById(
+      "theme-chat-color-picker"
+    ) as HTMLInputElement | null;
+    const chatColorReset = document.getElementById("theme-chat-color-reset");
     const saveBtn = document.getElementById("theme-save-btn");
 
     if (picker) {
@@ -222,6 +250,25 @@
         updateSwatches();
         const valueEl = document.getElementById("theme-accent-value");
         if (valueEl) valueEl.textContent = `rgb(${accentRgb})`;
+        // If no custom chat color is set, update picker to track accent
+        if (!pendingSettings.chatColor) {
+          syncChatColorPicker();
+        }
+      });
+    }
+
+    if (chatColorPicker) {
+      chatColorPicker.addEventListener("input", () => {
+        pendingSettings = { ...pendingSettings, chatColor: chatColorPicker.value };
+        applyThemeToDom(pendingSettings);
+      });
+    }
+
+    if (chatColorReset) {
+      chatColorReset.addEventListener("click", () => {
+        pendingSettings = { ...pendingSettings, chatColor: "" };
+        applyThemeToDom(pendingSettings);
+        syncChatColorPicker();
       });
     }
 
@@ -268,6 +315,7 @@
 
     renderPresetCards();
     syncColorPicker();
+    syncChatColorPicker();
     updateSwatches();
 
     if (!eventsWired) {
