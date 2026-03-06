@@ -17,8 +17,8 @@ const cssHotReload: CssHotReload = {
    * Watch for CSS file changes and hot-reload them
    */
   watchCssFiles(mainWindow: BrowserWindow) {
-    // Use absolute path from project root
-    const cssDir = path.join(process.cwd(), 'public/src/css');
+    // Use absolute path from project root - updated to new styles directory
+    const cssDir = path.join(process.cwd(), 'styles');
     
     console.log('Looking for CSS directory at:', cssDir);
     
@@ -30,21 +30,38 @@ const cssHotReload: CssHotReload = {
     console.log('Starting CSS hot-reload watcher for:', cssDir);
 
     try {
-      // Read all CSS files and watch them individually
-      const cssFiles = fs.readdirSync(cssDir).filter(file => file.endsWith('.css'));
+      // Recursively find all CSS files in the styles directory
+      const findCssFiles = (dir: string): string[] => {
+        const files: string[] = [];
+        const items = fs.readdirSync(dir);
+        
+        for (const item of items) {
+          const fullPath = path.join(dir, item);
+          const stat = fs.statSync(fullPath);
+          
+          if (stat.isDirectory()) {
+            files.push(...findCssFiles(fullPath));
+          } else if (item.endsWith('.css')) {
+            files.push(fullPath);
+          }
+        }
+        
+        return files;
+      };
+      
+      const cssFiles = findCssFiles(cssDir);
       
       console.log('Found CSS files:', cssFiles);
       
       cssFiles.forEach(cssFile => {
-        const filePath = path.join(cssDir, cssFile);
-        console.log('Watching CSS file:', filePath);
+        console.log('Watching CSS file:', cssFile);
         
         // Watch each CSS file individually (non-recursive)
-        fs.watchFile(filePath, (curr, prev) => {
+        fs.watchFile(cssFile, (curr, prev) => {
           if (curr.mtime !== prev.mtime) {
-            console.log('CSS file changed:', filePath);
+            console.log('CSS file changed:', cssFile);
             setTimeout(() => {
-              this.injectCss(mainWindow, filePath);
+              this.injectCss(mainWindow, cssFile);
             }, 100);
           }
         });
@@ -66,7 +83,8 @@ const cssHotReload: CssHotReload = {
 
     try {
       const cssContent = fs.readFileSync(cssPath, 'utf8');
-      const relativePath = path.relative(path.join(process.cwd(), 'public/src/css'), cssPath);
+      // Update path calculation for new styles directory structure
+      const relativePath = path.relative(path.join(process.cwd(), 'styles'), cssPath);
       
       console.log('CSS file changed:', cssPath);
       

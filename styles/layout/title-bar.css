@@ -1,0 +1,63 @@
+/* Custom Title Bar */
+.title-bar {
+  height: 30px;
+  background-color: var(--background);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  position: relative;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.2);
+}
+
+.title-bar-drag-region {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.title-bar-title {
+  font-size: 12px;
+  color: var(--highlight);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  user-select: none;
+  -webkit-app-region: drag;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.window-control {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background-color: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-time);
+  padding: 0;
+}
+
+.window-control:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.window-control.close:hover {
+  background-color: var(--close-button);
+  color: var(--background);
+}
+
+.window-control svg {
+  pointer-events: none;
+}

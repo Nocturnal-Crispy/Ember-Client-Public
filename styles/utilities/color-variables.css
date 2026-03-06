@@ -1,0 +1,73 @@
+/* Color Variable Utilities */
+/* Common RGBA patterns to reduce redundancy */
+
+:root {
+  /* Opacity levels for highlight color */
+  --highlight-opacity-5: rgba(var(--rgb-highlight), 5%);
+  --highlight-opacity-8: rgba(var(--rgb-highlight), 8%);
+  --highlight-opacity-10: rgba(var(--rgb-highlight), 10%);
+  --highlight-opacity-15: rgba(var(--rgb-highlight), 15%);
+  --highlight-opacity-20: rgba(var(--rgb-highlight), 20%);
+  --highlight-opacity-25: rgba(var(--rgb-highlight), 25%);
+  --highlight-opacity-30: rgba(var(--rgb-highlight), 30%);
+  --highlight-opacity-40: rgba(var(--rgb-highlight), 40%);
+  --highlight-opacity-50: rgba(var(--rgb-highlight), 50%);
+  --highlight-opacity-60: rgba(var(--rgb-highlight), 60%);
+  --highlight-opacity-70: rgba(var(--rgb-highlight), 70%);
+  --highlight-opacity-80: rgba(var(--rgb-highlight), 80%);
+  --highlight-opacity-100: rgba(var(--rgb-highlight), 100%);
+
+  /* Opacity levels for surface color */
+  --surface-opacity-5: rgba(var(--rgb-surface), 5%);
+  --surface-opacity-8: rgba(var(--rgb-surface), 8%);
+  --surface-opacity-10: rgba(var(--rgb-surface), 10%);
+  --surface-opacity-15: rgba(var(--rgb-surface), 15%);
+  --surface-opacity-20: rgba(var(--rgb-surface), 20%);
+  --surface-opacity-25: rgba(var(--rgb-surface), 25%);
+  --surface-opacity-30: rgba(var(--rgb-surface), 30%);
+  --surface-opacity-40: rgba(var(--rgb-surface), 40%);
+  --surface-opacity-50: rgba(var(--rgb-surface), 50%);
+  --surface-opacity-60: rgba(var(--rgb-surface), 60%);
+  --surface-opacity-70: rgba(var(--rgb-surface), 70%);
+  --surface-opacity-80: rgba(var(--rgb-surface), 80%);
+  --surface-opacity-100: rgba(var(--rgb-surface), 100%);
+
+  /* Opacity levels for background color */
+  --background-opacity-5: rgba(var(--rgb-background), 5%);
+  --background-opacity-8: rgba(var(--rgb-background), 8%);
+  --background-opacity-10: rgba(var(--rgb-background), 10%);
+  --background-opacity-15: rgba(var(--rgb-background), 15%);
+  --background-opacity-20: rgba(var(--rgb-background), 20%);
+  --background-opacity-25: rgba(var(--rgb-background), 25%);
+  --background-opacity-30: rgba(var(--rgb-background), 30%);
+  --background-opacity-40: rgba(var(--rgb-background), 40%);
+  --background-opacity-50: rgba(var(--rgb-background), 50%);
+  --background-opacity-60: rgba(var(--rgb-background), 60%);
+  --background-opacity-70: rgba(var(--rgb-background), 70%);
+  --background-opacity-80: rgba(var(--rgb-background), 80%);
+  --background-opacity-90: rgba(var(--rgb-background), 90%);
+  --background-opacity-100: rgba(var(--rgb-background), 100%);
+
+  /* Opacity levels for text color */
+  --text-opacity-10: rgba(var(--rgb-text), 10%);
+  --text-opacity-20: rgba(var(--rgb-text), 20%);
+  --text-opacity-30: rgba(var(--rgb-text), 30%);
+  --text-opacity-40: rgba(var(--rgb-text), 40%);
+  --text-opacity-50: rgba(var(--rgb-text), 50%);
+  --text-opacity-60: rgba(var(--rgb-text), 60%);
+  --text-opacity-70: rgba(var(--rgb-text), 70%);
+  --text-opacity-80: rgba(var(--rgb-text), 80%);
+  --text-opacity-90: rgba(var(--rgb-text), 90%);
+  --text-opacity-100: rgba(var(--rgb-text), 100%);
+
+  /* Common shadow colors */
+  --shadow-light: rgba(0, 0, 0, 0.1);
+  --shadow-medium: rgba(0, 0, 0, 0.2);
+  --shadow-dark: rgba(0, 0, 0, 0.3);
+
+  /* Border colors */
+  --border-subtle: rgba(var(--rgb-highlight), 10%);
+  --border-light: rgba(var(--rgb-highlight), 15%);
+  --border-medium: rgba(var(--rgb-highlight), 20%);
+  --border-strong: rgba(var(--rgb-highlight), 30%);
+}

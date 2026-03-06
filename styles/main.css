@@ -1,0 +1,33 @@
+/* Ember CSS - Main Entry Point */
+/* Modern CSS Architecture with Organized Imports */
+
+/* Base Layer - Foundation Styles */
+@import './base/variables.css';
+@import './base/reset.css';
+@import './base/typography.css';
+
+/* Layout Layer - Structural Components */
+@import './layout/title-bar.css';
+@import './layout/server-list.css';
+@import './layout/channel-list.css';
+@import './layout/user-panel.css';
+
+/* Component Layer - UI Components */
+@import './components/chat.css';
+@import './components/direct-messaging.css';
+@import './components/modals.css';
+@import './components/overlays.css';
+@import './components/member-list.css';
+@import './components/create-server.css';
+@import './components/invite.css';
+@import './components/context-menu.css';
+@import './components/voice.css';
+@import './components/settings.css';
+@import './components/update-notifier.css';
+@import './components/theme.css';
+
+/* Utility Layer - Helper Classes */
+@import './utilities/spacing.css';
+@import './utilities/transitions.css';
+@import './utilities/colors.css';
+@import './utilities/color-variables.css';

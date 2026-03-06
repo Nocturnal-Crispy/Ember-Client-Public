@@ -1,0 +1,73 @@
+/* Color Utilities */
+/* Consistent color system using CSS custom properties */
+
+/* Background colors */
+.bg-transparent { background-color: transparent; }
+.bg-primary { background-color: var(--background); }
+.bg-secondary { background-color: var(--background-secondary); }
+.bg-surface { background-color: rgb(var(--rgb-surface)); }
+.bg-surface-hover { background-color: rgb(var(--rgb-surface-hover)); }
+.bg-accent { background-color: var(--highlight); }
+.bg-positive { background-color: var(--online-color); }
+.bg-warning { background-color: var(--afk-color); }
+.bg-danger { background-color: var(--dnd-color); }
+
+/* Text colors */
+.text-primary { color: var(--text); }
+.text-secondary { color: var(--text-muted); }
+.text-accent { color: var(--highlight); }
+.text-positive { color: var(--online-color); }
+.text-warning { color: var(--afk-color); }
+.text-danger { color: var(--dnd-color); }
+.text-white { color: #ffffff; }
+.text-inherit { color: inherit; }
+
+/* Border colors */
+.border-none { border: none; }
+.border-primary { border-color: var(--border-subtle); }
+.border-accent { border-color: var(--highlight); }
+.border-positive { border-color: var(--online-color); }
+.border-warning { border-color: var(--afk-color); }
+.border-danger { border-color: var(--dnd-color); }
+
+/* Opacity utilities */
+.opacity-0 { opacity: 0; }
+.opacity-25 { opacity: 0.25; }
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+.opacity-100 { opacity: 1; }
+
+/* Hover state modifiers */
+.hover-bg-accent:hover { background-color: var(--highlight); }
+.hover-bg-surface:hover { background-color: rgb(var(--rgb-surface-hover)); }
+.hover-text-accent:hover { color: var(--highlight); }
+.hover-border-accent:hover { border-color: var(--highlight); }
+
+/* Focus state modifiers */
+.focus-bg-accent:focus { background-color: var(--highlight); }
+.focus-text-accent:focus { color: var(--highlight); }
+.focus-border-accent:focus { border-color: var(--highlight); }
+
+/* Active state modifiers */
+.active-bg-accent:active { background-color: var(--highlight); }
+.active-text-accent:active { color: var(--highlight); }
+.active-border-accent:active { border-color: var(--highlight); }
+
+/* Status colors */
+.status-online { color: var(--online-color); }
+.status-idle { color: var(--afk-color); }
+.status-dnd { color: var(--dnd-color); }
+.status-streaming { color: var(--streaming-color); }
+
+/* Interactive states */
+.interactive-muted { color: var(--interactive-muted); }
+.interactive-normal { color: var(--interactive-normal); }
+.interactive-hover { color: var(--interactive-hover); }
+.interactive-active { color: var(--interactive-active); }
+
+/* Message states */
+.message-mentioned { background-color: var(--background-mentioned); }
+.message-mentioned-hover:hover { background-color: var(--background-mentioned-hover); }
+.message-hover:hover { background-color: var(--background-message-hover); }
+.message-highlight { background-color: var(--background-message-highlight); }
+.message-highlight-hover:hover { background-color: var(--background-message-highlight-hover); }
