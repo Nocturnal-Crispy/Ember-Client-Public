@@ -288,7 +288,7 @@ ipcMain.handle("save-auth", (_event, authData) => {
 ipcMain.handle("get-last-hostname", () => {
   log.debug("IPC: get-last-hostname");
   const settings = store.get("settings");
-  const hostname = settings?.last_hostname || "http://localhost:8085";
+  const hostname = settings?.last_hostname || "https://ember-chat.com";
   log.debug("Last hostname retrieved");
   return hostname;
 });
