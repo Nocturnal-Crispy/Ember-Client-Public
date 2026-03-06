@@ -46,7 +46,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "open-external-url",
 ];
 
-const ALLOWED_ON: readonly string[] = ["handle-invite-link"];
+const ALLOWED_ON: readonly string[] = ["handle-invite-link", "css-hot-reload"];
 
 preloadLog("debug", "Setting up contextBridge API");
 
@@ -283,6 +283,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   wsService: {
     buildWsUrl: (hostname: string, token: string) =>
       emberServices.buildWsUrl(hostname, token),
+  },
+
+  // Development utilities
+  onCssHotReload: (callback: (message: { path: string; content: string }) => void) => {
+    preloadLog("debug", "Setting up CSS hot-reload listener");
+    ipcRenderer.on("css-hot-reload", (_event, message) => callback(message));
   },
 });
 

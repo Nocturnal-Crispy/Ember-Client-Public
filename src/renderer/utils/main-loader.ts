@@ -14,6 +14,7 @@
 
   const SCRIPTS: string[] = [
     "src/js/renderer/utils/logger.js",
+    "src/js/renderer/utils/css-hot-reload.js",
     "src/js/renderer/utils/auth-loader.js",
     "src/js/renderer/managers/app-state.js",
     "src/js/renderer/services/voice-service.js",

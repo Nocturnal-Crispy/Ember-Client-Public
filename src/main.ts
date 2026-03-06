@@ -3,6 +3,8 @@ import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
+import { isDev } from "./dev";
+import cssHotReload from "./css-hot-reload";
 
 const log = createLogger("Main");
 
@@ -98,10 +100,25 @@ function createWindow(isAuthenticated: boolean) {
       sandbox: false,
       preload: path.join(__dirname, "preload.js"),
       devTools: true,
+      webSecurity: false, // Enable for local file loading in dev
     },
     frame: false,
     titleBarStyle: "hidden",
   });
+
+  // Enable live reload for Electron in development
+  if (isDev) {
+    try {
+      require('electron-reload')(__dirname, {
+        hardResetMethod: 'exit'
+      });
+    } catch (error) {
+      console.log('Electron reload not available:', error);
+    }
+    
+    // Start CSS hot-reloading
+    cssHotReload.watchCssFiles(mainWindow);
+  }
 
   if (isAuthenticated) {
     log.debug("Loading main app window");

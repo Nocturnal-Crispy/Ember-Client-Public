@@ -264,6 +264,7 @@ declare global {
     emberService: EmberServiceAPI;
     channelService: ChannelServiceAPI;
     wsService: WsServiceAPI;
+    onCssHotReload: (callback: (message: { path: string; content: string }) => void) => void;
   }
 
   // ─── App state ────────────────────────────────────────────────────────────
