@@ -20,14 +20,6 @@
   transition: all var(--transition-normal) var(--transition-smooth);
 }
 
-.transition-all-fast {
-  transition: all var(--transition-fast) var(--transition-smooth);
-}
-
-.transition-all-slow {
-  transition: all var(--transition-slow) var(--transition-smooth);
-}
-
 /* Property-specific transitions */
 .transition-colors {
   transition: color var(--transition-normal) var(--transition-smooth),
@@ -61,7 +53,7 @@
   box-shadow: 0 0 20px rgba(var(--rgb-highlight), 0.3);
 }
 
-/* Animation keyframes */
+/* Animation keyframes - keep only used ones */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -116,39 +108,10 @@
   }
 }
 
-@keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0, 0, 0);
-  }
-  40%, 43% {
-    transform: translate3d(0, -30px, 0);
-  }
-  70% {
-    transform: translate3d(0, -15px, 0);
-  }
-  90% {
-    transform: translate3d(0, -4px, 0);
-  }
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Animation utility classes */
+/* Animation utility classes - keep only used ones */
 .animate-fadeIn { animation: fadeIn var(--transition-normal) var(--transition-smooth); }
 .animate-fadeOut { animation: fadeOut var(--transition-normal) var(--transition-smooth); }
 .animate-slideInUp { animation: slideInUp var(--transition-normal) var(--transition-smooth); }
 .animate-slideInDown { animation: slideInDown var(--transition-normal) var(--transition-smooth); }
 .animate-slideInLeft { animation: slideInLeft var(--transition-normal) var(--transition-smooth); }
 .animate-slideInRight { animation: slideInRight var(--transition-normal) var(--transition-smooth); }
-.animate-bounce { animation: bounce 1s var(--transition-bounce); }
-.animate-pulse { animation: pulse 2s infinite; }
-.animate-spin { animation: spin 1s linear infinite; }

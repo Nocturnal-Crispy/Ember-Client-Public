@@ -8,7 +8,6 @@
   --spacing-lg: 1.5rem;    /* 24px */
   --spacing-xl: 2rem;      /* 32px */
   --spacing-2xl: 3rem;     /* 48px */
-  --spacing-3xl: 4rem;     /* 64px */
 }
 
 /* Margin utilities */
@@ -19,7 +18,6 @@
 .m-lg { margin: var(--spacing-lg); }
 .m-xl { margin: var(--spacing-xl); }
 .m-2xl { margin: var(--spacing-2xl); }
-.m-3xl { margin: var(--spacing-3xl); }
 
 .mt-0 { margin-top: 0; }
 .mt-xs { margin-top: var(--spacing-xs); }
@@ -28,7 +26,6 @@
 .mt-lg { margin-top: var(--spacing-lg); }
 .mt-xl { margin-top: var(--spacing-xl); }
 .mt-2xl { margin-top: var(--spacing-2xl); }
-.mt-3xl { margin-top: var(--spacing-3xl); }
 
 .mb-0 { margin-bottom: 0; }
 .mb-xs { margin-bottom: var(--spacing-xs); }
@@ -37,7 +34,6 @@
 .mb-lg { margin-bottom: var(--spacing-lg); }
 .mb-xl { margin-bottom: var(--spacing-xl); }
 .mb-2xl { margin-bottom: var(--spacing-2xl); }
-.mb-3xl { margin-bottom: var(--spacing-3xl); }
 
 .ml-0 { margin-left: 0; }
 .ml-xs { margin-left: var(--spacing-xs); }
@@ -46,7 +42,6 @@
 .ml-lg { margin-left: var(--spacing-lg); }
 .ml-xl { margin-left: var(--spacing-xl); }
 .ml-2xl { margin-left: var(--spacing-2xl); }
-.ml-3xl { margin-left: var(--spacing-3xl); }
 
 .mr-0 { margin-right: 0; }
 .mr-xs { margin-right: var(--spacing-xs); }
@@ -55,7 +50,6 @@
 .mr-lg { margin-right: var(--spacing-lg); }
 .mr-xl { margin-right: var(--spacing-xl); }
 .mr-2xl { margin-right: var(--spacing-2xl); }
-.mr-3xl { margin-right: var(--spacing-3xl); }
 
 /* Padding utilities */
 .p-0 { padding: 0; }
@@ -65,7 +59,6 @@
 .p-lg { padding: var(--spacing-lg); }
 .p-xl { padding: var(--spacing-xl); }
 .p-2xl { padding: var(--spacing-2xl); }
-.p-3xl { padding: var(--spacing-3xl); }
 
 .pt-0 { padding-top: 0; }
 .pt-xs { padding-top: var(--spacing-xs); }
@@ -74,7 +67,6 @@
 .pt-lg { padding-top: var(--spacing-lg); }
 .pt-xl { padding-top: var(--spacing-xl); }
 .pt-2xl { padding-top: var(--spacing-2xl); }
-.pt-3xl { padding-top: var(--spacing-3xl); }
 
 .pb-0 { padding-bottom: 0; }
 .pb-xs { padding-bottom: var(--spacing-xs); }
@@ -83,7 +75,6 @@
 .pb-lg { padding-bottom: var(--spacing-lg); }
 .pb-xl { padding-bottom: var(--spacing-xl); }
 .pb-2xl { padding-bottom: var(--spacing-2xl); }
-.pb-3xl { padding-bottom: var(--spacing-3xl); }
 
 .pl-0 { padding-left: 0; }
 .pl-xs { padding-left: var(--spacing-xs); }
@@ -92,7 +83,6 @@
 .pl-lg { padding-left: var(--spacing-lg); }
 .pl-xl { padding-left: var(--spacing-xl); }
 .pl-2xl { padding-left: var(--spacing-2xl); }
-.pl-3xl { padding-left: var(--spacing-3xl); }
 
 .pr-0 { padding-right: 0; }
 .pr-xs { padding-right: var(--spacing-xs); }
@@ -101,7 +91,6 @@
 .pr-lg { padding-right: var(--spacing-lg); }
 .pr-xl { padding-right: var(--spacing-xl); }
 .pr-2xl { padding-right: var(--spacing-2xl); }
-.pr-3xl { padding-right: var(--spacing-3xl); }
 
 /* Gap utilities for flexbox/grid */
 .gap-0 { gap: 0; }
@@ -111,4 +100,3 @@
 .gap-lg { gap: var(--spacing-lg); }
 .gap-xl { gap: var(--spacing-xl); }
 .gap-2xl { gap: var(--spacing-2xl); }
-.gap-3xl { gap: var(--spacing-3xl); }
