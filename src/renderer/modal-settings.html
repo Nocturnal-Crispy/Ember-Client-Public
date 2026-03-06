@@ -90,10 +90,48 @@
       <!-- Themes -->
       <div class="settings-page hidden" id="settings-page-themes">
         <h2 class="settings-page-title">Themes</h2>
-        <p class="settings-placeholder-text">Customize the look and feel of the app.</p>
-        <div class="settings-card settings-placeholder-card">
-          <span class="settings-placeholder-icon">🎨</span>
-          <span>Theme customization coming soon.</span>
+
+        <h3 class="settings-subsection-title">Preset Themes</h3>
+        <div class="theme-presets-grid" id="theme-presets-grid">
+          <!-- populated by theme-manager.ts -->
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <h3 class="settings-subsection-title">Custom Accent Color</h3>
+        <div class="theme-color-row">
+          <label class="vv-label">Accent Color</label>
+          <div class="theme-color-picker-group">
+            <input type="color" id="theme-accent-picker" class="theme-color-input">
+            <span class="theme-color-value" id="theme-accent-value">rgb(255, 120, 80)</span>
+          </div>
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <h3 class="settings-subsection-title">Color Preview</h3>
+        <div class="theme-preview-bar">
+          <div class="theme-swatch-item">
+            <div class="theme-swatch" id="theme-swatch-accent"></div>
+            <span class="theme-swatch-label">Accent</span>
+          </div>
+          <div class="theme-swatch-item">
+            <div class="theme-swatch" id="theme-swatch-bg"></div>
+            <span class="theme-swatch-label">Background</span>
+          </div>
+          <div class="theme-swatch-item">
+            <div class="theme-swatch" id="theme-swatch-surface"></div>
+            <span class="theme-swatch-label">Surface</span>
+          </div>
+          <div class="theme-preview-text-sample" id="theme-preview-text">
+            <span class="theme-preview-label">Sample</span>
+            <span class="theme-preview-accent-text">Accent Text</span>
+          </div>
+        </div>
+
+        <div class="vv-save-row">
+          <button class="modal-btn modal-btn-primary" id="theme-save-btn">Save Theme</button>
+          <span class="vv-save-status" id="theme-save-status"></span>
         </div>
       </div>
 

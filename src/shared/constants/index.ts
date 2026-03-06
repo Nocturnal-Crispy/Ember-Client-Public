@@ -21,6 +21,8 @@ const IPC_CHANNELS = {
   // Settings
   GET_VOICE_VIDEO_SETTINGS: 'get-voice-video-settings',
   SAVE_VOICE_VIDEO_SETTINGS: 'save-voice-video-settings',
+  GET_THEME_SETTINGS: 'get-theme-settings',
+  SAVE_THEME_SETTINGS: 'save-theme-settings',
   
   // System
   CHECK_FOR_UPDATE: 'check-for-update',

@@ -75,6 +75,23 @@ declare global {
     status: 'online' | 'offline' | 'away';
   };
 
+  // ─── Theme settings ───────────────────────────────────────────────────────
+
+  interface ThemeSettings {
+    themeId: string;
+    accentRgb: string;
+    backgroundRgb: string;
+    surfaceRgb: string;
+  }
+
+  interface ThemePreset {
+    id: string;
+    name: string;
+    accentRgb: string;
+    backgroundRgb: string;
+    surfaceRgb: string;
+  }
+
   // ─── Update check ─────────────────────────────────────────────────────────
 
   interface UpdateInfo {
@@ -409,6 +426,8 @@ declare global {
     switchSettingsPage(page: string): void;
     playVoiceSound(type: string): void;
     cleanupVoiceOnDisconnect(): void;
+    // Globals set by theme-manager.ts
+    initThemeSettings(): Promise<void>;
     // Globals set by update-notifier.ts
     checkForUpdate(): Promise<void>;
     dismissUpdateNotification(): void;

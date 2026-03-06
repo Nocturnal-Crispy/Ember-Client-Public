@@ -43,6 +43,8 @@ const ALLOWED_INVOKE: readonly string[] = [
   "get-last-hostname",
   "get-voice-video-settings",
   "save-voice-video-settings",
+  "get-theme-settings",
+  "save-theme-settings",
   "check-for-update",
   "open-external-url",
 ];

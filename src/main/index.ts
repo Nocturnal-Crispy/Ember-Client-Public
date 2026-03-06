@@ -5,7 +5,7 @@ import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
 import { isDev } from "./dev";
 import cssHotReload from "./css-hot-reload";
-import { VoiceVideoSettings, StoreSchema } from "../shared/types";
+import { VoiceVideoSettings, ThemeSettings, StoreSchema } from "../shared/types";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
@@ -311,6 +311,31 @@ ipcMain.handle(
     log.debug("IPC: save-voice-video-settings");
     store.set("voiceVideoSettings", settings);
     log.info("Voice/video settings saved");
+    return true;
+  }
+);
+
+// ─── IPC: Theme settings ──────────────────────────────────────────────────────
+
+const defaultThemeSettings: ThemeSettings = {
+  themeId: 'ember',
+  accentRgb: '255, 120, 80',
+  backgroundRgb: '20, 20, 25',
+  surfaceRgb: '30, 30, 35',
+};
+
+ipcMain.handle("get-theme-settings", () => {
+  log.debug("IPC: get-theme-settings");
+  const saved = store.get("themeSettings") ?? {} as Partial<ThemeSettings>;
+  return { ...defaultThemeSettings, ...saved };
+});
+
+ipcMain.handle(
+  "save-theme-settings",
+  (_event, settings: ThemeSettings) => {
+    log.debug("IPC: save-theme-settings");
+    store.set("themeSettings", settings);
+    log.info("Theme settings saved");
     return true;
   }
 );

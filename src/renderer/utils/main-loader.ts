@@ -23,6 +23,7 @@
     "../../dist/renderer/managers/channel-manager.js",
     "../../dist/renderer/managers/ember-manager.js",
     "../../dist/renderer/managers/invite-manager.js",
+    "../../dist/renderer/managers/theme-manager.js",
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/update-notifier.js",
     "../../dist/renderer/managers/direct-messaging-manager.js",

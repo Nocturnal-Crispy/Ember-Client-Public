@@ -27,6 +27,13 @@ export interface VoiceVideoSettings {
   };
 }
 
+export interface ThemeSettings {
+  themeId: string;
+  accentRgb: string;
+  backgroundRgb: string;
+  surfaceRgb: string;
+}
+
 export interface StoreSchema {
   auth?: AuthData;
   device?: DeviceIdentity;
@@ -35,6 +42,7 @@ export interface StoreSchema {
     last_hostname: string;
   };
   voiceVideoSettings?: VoiceVideoSettings;
+  themeSettings?: ThemeSettings;
 }
 
 export interface AuthData {

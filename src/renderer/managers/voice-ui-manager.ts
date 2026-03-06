@@ -664,6 +664,9 @@
       stopCameraPreview();
       populateVoiceVideoSettings();
     }
+    if (page === "themes") {
+      window.initThemeSettings();
+    }
   }
 
   async function populateSettingsAccount(): Promise<void> {
