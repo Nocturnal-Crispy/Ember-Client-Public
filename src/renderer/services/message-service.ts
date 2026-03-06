@@ -48,6 +48,7 @@
   interface MessageCacheEntry extends FetchResult {
     timestamp: number;
     channelId: string;
+    oldestMessageId?: string; // Store oldest message ID for pagination
   }
 
   async function sendEncryptedMessage(plaintext: string): Promise<void> {
@@ -325,17 +326,16 @@
     messageDiv.appendChild(avatarEl);
     messageDiv.appendChild(contentEl);
     messageDiv.appendChild(createActionToolbar(messageId));
+    
+    // Virtual scrolling temporarily disabled - use messagesContainer directly
     if (messagesContainer) {
       if (prepend) {
-        const banner = messagesContainer.querySelector(
-          ".channel-welcome-banner"
-        );
-        const referenceNode = banner
-          ? banner.nextSibling
-          : messagesContainer.firstChild;
+        const banner = messagesContainer.querySelector(".channel-welcome-banner");
+        const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
         messagesContainer.insertBefore(messageDiv, referenceNode);
       } else {
         messagesContainer.appendChild(messageDiv);
+        // Scroll to bottom if not prepending (new message)
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
     }
@@ -408,6 +408,11 @@
     cacheAccessOrder.delete(channelId);
     cacheAccessOrder.add(channelId);
     
+    // Restore pagination state from cache
+    if (cached.oldestMessageId) {
+      oldestMessageId = cached.oldestMessageId;
+    }
+    
     return { messages: cached.messages, hasMore: cached.hasMore };
   }
   
@@ -418,7 +423,8 @@
     const cacheEntry: MessageCacheEntry = {
       ...result,
       timestamp: Date.now(),
-      channelId
+      channelId,
+      oldestMessageId: oldestMessageId || undefined // Store current pagination state
     };
     messageCache.set(channelId, cacheEntry);
     
@@ -447,14 +453,17 @@
     virtualScrollContainer.className = 'virtual-scroll-container';
     virtualScrollContainer.style.cssText = `
       height: 100%;
+      width: 100%;
       overflow-y: auto;
       position: relative;
+      box-sizing: border-box;
     `;
     
     // Move existing messages to virtual container
     while (messagesContainer.firstChild) {
       virtualScrollContainer.appendChild(messagesContainer.firstChild);
     }
+    
     messagesContainer.appendChild(virtualScrollContainer);
     
     // Set up intersection observer for lazy loading
@@ -664,6 +673,55 @@
     }
   }
 
+  /**
+   * Create and show loading indicator for message loading
+   */
+  function showLoadingIndicator(): HTMLElement {
+    const loadingIndicator = document.createElement("div");
+    loadingIndicator.className = "messages-loading-indicator";
+    loadingIndicator.innerHTML = `
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading more messages...</div>
+    `;
+    
+    // Add styles for the loading indicator
+    loadingIndicator.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      color: #666;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 8px;
+      margin: 8px 0;
+    `;
+    
+    const spinner = loadingIndicator.querySelector(".loading-spinner") as HTMLElement;
+    if (spinner) {
+      spinner.style.cssText = `
+        width: 20px;
+        height: 20px;
+        border: 2px solid #e0e0e0;
+        border-top: 2px solid #666;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+      `;
+    }
+    
+    return loadingIndicator;
+  }
+  
+  /**
+   * Hide loading indicator
+   */
+  function hideLoadingIndicator(indicator: HTMLElement): void {
+    if (indicator && indicator.parentNode) {
+      indicator.parentNode.removeChild(indicator);
+    }
+  }
+
   async function loadChannelMessages(channelId: string): Promise<void> {
     const startTime = Date.now();
     
@@ -671,9 +729,10 @@
     log.info("Loading channel messages", { channel_id: channelId });
     
     // Initialize virtual scrolling if not already done
-    if (!virtualScrollContainer) {
-      initializeVirtualScrolling();
-    }
+    // Temporarily disabled to fix layout issues
+    // if (!virtualScrollContainer) {
+    //   initializeVirtualScrolling();
+    // }
     
     // Reset pagination state and ownership cache for the new channel
     hasMoreMessages = false;
@@ -682,16 +741,10 @@
     App.ownedMessageIds.clear();
     
     // Clear existing messages efficiently
-    if (virtualScrollContainer) {
-      while (virtualScrollContainer.firstChild) {
-        virtualScrollContainer.removeChild(virtualScrollContainer.firstChild);
-      }
+    // Virtual scrolling temporarily disabled
+    while (messagesContainer.firstChild) {
+      messagesContainer.removeChild(messagesContainer.firstChild);
     }
-    // Always clear direct children of messagesContainer (e.g. welcome banner)
-    const directChildren = Array.from(messagesContainer.childNodes).filter(
-      (n) => n !== virtualScrollContainer
-    );
-    directChildren.forEach((n) => messagesContainer.removeChild(n));
     
     // Clear message tracking
     messageElements.clear();
@@ -784,7 +837,102 @@
     // Clean up old messages if needed
     cleanupOldMessages();
     
+    // Auto-load more messages if available (Phase 2: Auto-pagination)
+    if (hasMoreMessages && !isLoadingOlderMessages) {
+      await autoLoadMoreMessages(channelId);
+    }
+    
+    // Scroll to bottom to show newest messages (after all loading is complete)
+    // Virtual scrolling temporarily disabled - use messagesContainer directly
+    if (messagesContainer) {
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      });
+    }
+    
     monitorPerformance('load-channel-messages', startTime);
+  }
+
+  /**
+   * Automatically load more messages when channel is loaded
+   * Loads messages in batches until we have a reasonable amount or no more messages
+   */
+  async function autoLoadMoreMessages(channelId: string): Promise<void> {
+    const targetMessageCount = 100; // Target 100 messages total
+    let currentMessageCount = renderedMessageIds.size;
+    
+    log.debug("Auto-loading more messages", {
+      channel_id: channelId,
+      current_count: currentMessageCount,
+      target_count: targetMessageCount,
+      has_more: hasMoreMessages
+    });
+    
+    // Show loading indicator at the top of messages
+    const loadingIndicator = showLoadingIndicator();
+    // Virtual scrolling disabled - use messagesContainer directly
+    if (messagesContainer) {
+      // Insert after welcome banner or at the top
+      const banner = messagesContainer.querySelector(".channel-welcome-banner");
+      const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
+      messagesContainer.insertBefore(loadingIndicator, referenceNode);
+    }
+    
+    while (currentMessageCount < targetMessageCount && hasMoreMessages && !isLoadingOlderMessages) {
+      isLoadingOlderMessages = true;
+      
+      try {
+        const { messages, hasMore } = await fetchMessages(channelId, oldestMessageId);
+        hasMoreMessages = hasMore;
+        
+        if (messages.length > 0) {
+          oldestMessageId = messages[0].id;
+          
+          // Prepend messages in reverse order so oldest appears at top
+          const updates: (() => void)[] = [];
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (currentUserId && messages[i].sender_user_id === currentUserId) {
+              App.ownedMessageIds.add(messages[i].id);
+            }
+            updates.push(() => {
+              displayDecryptedMessage(messages[i], true);
+            });
+          }
+          
+          // Execute all DOM updates in a single batch
+          batchDOMUpdates(updates);
+          
+          currentMessageCount = renderedMessageIds.size;
+          
+          log.debug("Auto-loaded batch of messages", {
+            channel_id: channelId,
+            batch_size: messages.length,
+            total_count: currentMessageCount,
+            has_more: hasMore
+          });
+        } else {
+          break;
+        }
+      } catch (error) {
+        log.error("Error auto-loading messages", {
+          channel_id: channelId,
+          error: String(error)
+        });
+        break;
+      } finally {
+        isLoadingOlderMessages = false;
+      }
+    }
+    
+    // Hide loading indicator
+    hideLoadingIndicator(loadingIndicator);
+    
+    log.debug("Auto-loading completed", {
+      channel_id: channelId,
+      final_count: renderedMessageIds.size,
+      has_more: hasMoreMessages
+    });
   }
 
   function loadOlderMessages(): void {
@@ -795,7 +943,17 @@
       channel_id: App.activeChannelId,
       before: oldestMessageId,
     });
-    const prevScrollHeight = messagesContainer!.scrollHeight;
+    
+    // Show loading indicator at the top
+    const loadingIndicator = showLoadingIndicator();
+    // Virtual scrolling disabled - use messagesContainer directly
+    if (messagesContainer) {
+      const banner = messagesContainer.querySelector(".channel-welcome-banner");
+      const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
+      messagesContainer.insertBefore(loadingIndicator, referenceNode);
+    }
+    
+    const prevScrollHeight = messagesContainer?.scrollHeight || 0;
     fetchMessages(App.activeChannelId, oldestMessageId).then(
       ({ messages, hasMore }) => {
         hasMoreMessages = hasMore;
@@ -813,8 +971,22 @@
             messagesContainer!.scrollHeight - prevScrollHeight;
         }
         isLoadingOlderMessages = false;
+        hideLoadingIndicator(loadingIndicator);
+        
+        log.debug("Older messages loaded", {
+          channel_id: App.activeChannelId,
+          count: messages.length,
+          has_more: hasMore
+        });
       }
-    );
+    ).catch((error) => {
+      log.error("Error loading older messages", {
+        channel_id: App.activeChannelId,
+        error: String(error)
+      });
+      isLoadingOlderMessages = false;
+      hideLoadingIndicator(loadingIndicator);
+    });
   }
 
   // ─── Direct Messaging Functions ───────────────────────────────────────────
@@ -953,10 +1125,32 @@
   }
 
   if (messagesContainer) {
+    let scrollTimeout: NodeJS.Timeout | null = null;
+    
     messagesContainer.addEventListener("scroll", () => {
-      if (messagesContainer.scrollTop < 100) {
-        loadOlderMessages();
+      // Clear existing timeout
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
       }
+      
+      // Debounce scroll events and check if we're near the top
+      scrollTimeout = setTimeout(() => {
+        const scrollThreshold = 200; // Increased threshold for better UX
+        // Virtual scrolling disabled - use messagesContainer directly
+        const scrollTop = messagesContainer.scrollTop;
+        const isNearTop = scrollTop < scrollThreshold;
+        const hasMoreContent = hasMoreMessages && !isLoadingOlderMessages;
+        
+        if (isNearTop && hasMoreContent) {
+          log.debug("Scroll trigger: loading older messages", {
+            scroll_top: scrollTop,
+            threshold: scrollThreshold,
+            has_more: hasMoreMessages,
+            is_loading: isLoadingOlderMessages
+          });
+          loadOlderMessages();
+        }
+      }, 100); // 100ms debounce
     });
   }
 
