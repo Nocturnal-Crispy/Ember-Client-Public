@@ -9,19 +9,62 @@
   const emberCrypto = window.electronAPI.crypto;
   const naclUtil = window.electronAPI.naclUtil;
 
+  // Setup IPC listener immediately to avoid missing messages
+  log.debug("Setting up IPC listener for handle-invite-link");
+  ipcRenderer.on(
+    "handle-invite-link",
+    () => {
+      log.info("Received invite link notification from main process");
+      // Get the pending invite data via invoke to work around context bridge issues
+      handleInviteNotification();
+    }
+  );
+  log.debug("IPC listener setup complete");
+
+  async function handleInviteNotification(): Promise<void> {
+    try {
+      log.debug("Getting pending invite data...");
+      const invite = await ipcRenderer.invoke("get-pending-invite") as { code: string; hostname: string | null } | null;
+      if (!invite) {
+        log.error("No pending invite data found!");
+        return;
+      }
+      log.debug("Retrieved pending invite:", { code: invite.code, hostname: invite.hostname });
+      processInviteLink(invite.code, invite.hostname);
+    } catch (error) {
+      const err = error as Error;
+      log.error("Error handling invite notification:", { error: err.message });
+    }
+  }
+
   // ─── Join Server Modal ─────────────────────────────────────────────────────
 
-  const joinServerModal = document.getElementById("join-server-modal");
-  const joinInviteInput = document.getElementById(
-    "join-invite-input"
-  ) as HTMLInputElement | null;
-  const joinServerBtn = document.getElementById(
-    "join-server-btn"
-  ) as HTMLButtonElement | null;
-  const joinServerCancelBtn = document.getElementById("join-server-cancel-btn");
-  const joinServerError = document.getElementById("join-server-error");
+  function getJoinServerModal(): HTMLElement | null {
+    return document.getElementById("join-server-modal");
+  }
+
+  function getJoinInviteInput(): HTMLInputElement | null {
+    return document.getElementById("join-invite-input") as HTMLInputElement | null;
+  }
+
+  function getJoinServerBtn(): HTMLButtonElement | null {
+    return document.getElementById("join-server-btn") as HTMLButtonElement | null;
+  }
+
+  function getJoinServerCancelBtn(): HTMLElement | null {
+    return document.getElementById("join-server-cancel-btn");
+  }
+
+  function getJoinServerError(): HTMLElement | null {
+    return document.getElementById("join-server-error");
+  }
 
   function openJoinServerModal(): void {
+    const joinServerModal = getJoinServerModal();
+    const joinInviteInput = getJoinInviteInput();
+    const joinServerError = getJoinServerError();
+    const joinServerBtn = getJoinServerBtn();
+    
     if (!joinServerModal) return;
     if (joinInviteInput) joinInviteInput.value = "";
     if (joinServerError) joinServerError.classList.add("hidden");
@@ -34,20 +77,28 @@
   }
 
   function closeJoinServerModal(): void {
+    const joinServerModal = getJoinServerModal();
     joinServerModal?.classList.add("hidden");
   }
 
   function showJoinServerError(message: string): void {
+    const joinServerError = getJoinServerError();
     if (joinServerError) {
       joinServerError.textContent = message;
       joinServerError.classList.remove("hidden");
     }
   }
 
-  joinServerCancelBtn?.addEventListener("click", closeJoinServerModal);
-  joinServerModal?.addEventListener("click", (e: Event) => {
-    if (e.target === joinServerModal) closeJoinServerModal();
-  });
+  // Setup event listeners when DOM is ready
+  function setupJoinServerEventListeners(): void {
+    const joinServerCancelBtn = getJoinServerCancelBtn();
+    const joinServerModal = getJoinServerModal();
+    
+    joinServerCancelBtn?.addEventListener("click", closeJoinServerModal);
+    joinServerModal?.addEventListener("click", (e: Event) => {
+      if (e.target === joinServerModal) closeJoinServerModal();
+    });
+  }
 
   interface ParsedInvite {
     code: string;
@@ -70,7 +121,9 @@
     return null;
   }
 
-  joinServerBtn?.addEventListener("click", async () => {
+  getJoinServerBtn()?.addEventListener("click", async () => {
+    const joinInviteInput = getJoinInviteInput();
+    const joinServerBtn = getJoinServerBtn();
     const value = joinInviteInput ? joinInviteInput.value : "";
     if (!value.trim()) {
       showJoinServerError("Please enter an invite link or code");
@@ -89,8 +142,8 @@
     await processInviteLink(parsed.code, parsed.hostname);
   });
 
-  joinInviteInput?.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") joinServerBtn?.click();
+  getJoinInviteInput()?.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") getJoinServerBtn()?.click();
   });
 
   // ─── Server Header Dropdown ────────────────────────────────────────────────
@@ -116,27 +169,41 @@
 
   // ─── Create Invite Modal ───────────────────────────────────────────────────
 
-  const createInviteModal = document.getElementById("create-invite-modal");
-  const createInviteBtn = document.getElementById(
-    "create-invite-btn"
-  ) as HTMLButtonElement | null;
-  const createInviteCancelBtn = document.getElementById(
-    "create-invite-cancel-btn"
-  );
-  const inviteExpirationSelect = document.getElementById(
-    "invite-expiration"
-  ) as HTMLSelectElement | null;
-  const inviteMaxUsesSelect = document.getElementById(
-    "invite-max-uses"
-  ) as HTMLSelectElement | null;
-  const inviteLinkResult = document.getElementById("invite-link-result");
-  const inviteLinkInput = document.getElementById(
-    "invite-link-input"
-  ) as HTMLInputElement | null;
-  const inviteCopyBtn = document.getElementById(
-    "invite-copy-btn"
-  ) as HTMLButtonElement | null;
-  const createInviteError = document.getElementById("create-invite-error");
+  function getCreateInviteModal(): HTMLElement | null {
+    return document.getElementById("create-invite-modal");
+  }
+
+  function getCreateInviteBtn(): HTMLButtonElement | null {
+    return document.getElementById("create-invite-btn") as HTMLButtonElement | null;
+  }
+
+  function getCreateInviteCancelBtn(): HTMLElement | null {
+    return document.getElementById("create-invite-cancel-btn");
+  }
+
+  function getInviteExpirationSelect(): HTMLSelectElement | null {
+    return document.getElementById("invite-expiration") as HTMLSelectElement | null;
+  }
+
+  function getInviteMaxUsesSelect(): HTMLSelectElement | null {
+    return document.getElementById("invite-max-uses") as HTMLSelectElement | null;
+  }
+
+  function getInviteLinkResult(): HTMLElement | null {
+    return document.getElementById("invite-link-result");
+  }
+
+  function getInviteLinkInput(): HTMLInputElement | null {
+    return document.getElementById("invite-link-input") as HTMLInputElement | null;
+  }
+
+  function getInviteCopyBtn(): HTMLButtonElement | null {
+    return document.getElementById("invite-copy-btn") as HTMLButtonElement | null;
+  }
+
+  function getCreateInviteError(): HTMLElement | null {
+    return document.getElementById("create-invite-error");
+  }
 
   invitePeopleBtn?.addEventListener("click", () => {
     serverHeaderMenu?.classList.add("hidden");
@@ -144,17 +211,25 @@
   });
 
   function openCreateInviteModal(): void {
+    const createInviteModal = getCreateInviteModal();
     if (!createInviteModal) return;
     resetCreateInviteForm();
     createInviteModal.classList.remove("hidden");
   }
 
   function closeCreateInviteModal(): void {
+    const createInviteModal = getCreateInviteModal();
     createInviteModal?.classList.add("hidden");
     resetCreateInviteForm();
   }
 
   function resetCreateInviteForm(): void {
+    const inviteExpirationSelect = getInviteExpirationSelect();
+    const inviteMaxUsesSelect = getInviteMaxUsesSelect();
+    const inviteLinkResult = getInviteLinkResult();
+    const inviteLinkInput = getInviteLinkInput();
+    const createInviteBtn = getCreateInviteBtn();
+    
     if (inviteExpirationSelect) inviteExpirationSelect.value = "86400";
     if (inviteMaxUsesSelect) inviteMaxUsesSelect.value = "0";
     inviteLinkResult?.classList.add("hidden");
@@ -167,6 +242,7 @@
   }
 
   function showCreateInviteError(message: string): void {
+    const createInviteError = getCreateInviteError();
     if (createInviteError) {
       createInviteError.textContent = message;
       createInviteError.classList.remove("hidden");
@@ -174,29 +250,41 @@
   }
 
   function hideCreateInviteError(): void {
+    const createInviteError = getCreateInviteError();
     createInviteError?.classList.add("hidden");
   }
 
-  createInviteCancelBtn?.addEventListener("click", closeCreateInviteModal);
-  createInviteModal?.addEventListener("click", (e: Event) => {
-    if (e.target === createInviteModal) closeCreateInviteModal();
-  });
-  createInviteBtn?.addEventListener("click", async () => {
-    await handleCreateInvite();
-  });
-
-  inviteCopyBtn?.addEventListener("click", () => {
-    if (inviteLinkInput?.value) {
-      navigator.clipboard.writeText(inviteLinkInput.value).then(() => {
-        if (inviteCopyBtn) {
-          inviteCopyBtn.textContent = "Copied!";
-          setTimeout(() => {
-            if (inviteCopyBtn) inviteCopyBtn.textContent = "Copy";
-          }, 2000);
-        }
-      });
-    }
-  });
+  // Setup event listeners for create invite modal
+  function setupCreateInviteEventListeners(): void {
+    const createInviteCancelBtn = getCreateInviteCancelBtn();
+    const createInviteModal = getCreateInviteModal();
+    const createInviteBtn = getCreateInviteBtn();
+    const inviteCopyBtn = getInviteCopyBtn();
+    
+    createInviteCancelBtn?.addEventListener("click", closeCreateInviteModal);
+    createInviteModal?.addEventListener("click", (e: Event) => {
+      if (e.target === createInviteModal) closeCreateInviteModal();
+    });
+    createInviteBtn?.addEventListener("click", async () => {
+      await handleCreateInvite();
+    });
+    
+    inviteCopyBtn?.addEventListener("click", () => {
+      const inviteLinkInput = getInviteLinkInput();
+      if (inviteLinkInput?.value) {
+        navigator.clipboard.writeText(inviteLinkInput.value).then(() => {
+          const inviteCopyBtn = getInviteCopyBtn();
+          if (inviteCopyBtn) {
+            inviteCopyBtn.textContent = "Copied!";
+            setTimeout(() => {
+              const btn = getInviteCopyBtn();
+              if (btn) btn.textContent = "Copy";
+            }, 2000);
+          }
+        });
+      }
+    });
+  }
 
   async function handleCreateInvite(): Promise<void> {
     if (!App.activeEmberId) {
@@ -215,6 +303,7 @@
 
     log.info("Creating invite", { ember_id: App.activeEmberId });
     try {
+      const createInviteBtn = getCreateInviteBtn();
       if (createInviteBtn) {
         createInviteBtn.disabled = true;
         createInviteBtn.textContent = "Generating...";
@@ -228,6 +317,8 @@
         return;
       }
 
+      const inviteExpirationSelect = getInviteExpirationSelect();
+      const inviteMaxUsesSelect = getInviteMaxUsesSelect();
       const expiresIn = parseInt(inviteExpirationSelect?.value ?? "0") || 0;
       const maxUses = parseInt(inviteMaxUsesSelect?.value ?? "0") || 0;
       const inviteCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
@@ -264,6 +355,8 @@
         throw new Error(errorData.error ?? "Failed to create invite");
       }
       const data = (await response.json()) as { invite_url?: string };
+      const inviteLinkInput = getInviteLinkInput();
+      const inviteLinkResult = getInviteLinkResult();
       if (inviteLinkInput) inviteLinkInput.value = data.invite_url ?? "";
       inviteLinkResult?.classList.remove("hidden");
       log.info("Invite created successfully", { ember_id: App.activeEmberId });
@@ -275,6 +368,7 @@
       });
       showCreateInviteError(err.message || "Failed to create invite");
     } finally {
+      const createInviteBtn = getCreateInviteBtn();
       if (createInviteBtn) {
         createInviteBtn.disabled = false;
         createInviteBtn.textContent = "Generate Link";
@@ -284,17 +378,33 @@
 
   // ─── Accept Invite Modal ───────────────────────────────────────────────────
 
-  const acceptInviteModal = document.getElementById("accept-invite-modal");
-  const acceptInviteCancelBtn = document.getElementById(
-    "accept-invite-cancel-btn"
-  );
-  const acceptInviteJoinBtn = document.getElementById(
-    "accept-invite-join-btn"
-  ) as HTMLButtonElement | null;
-  const acceptInviteIcon = document.getElementById("accept-invite-icon");
-  const acceptInviteName = document.getElementById("accept-invite-name");
-  const acceptInviteMembers = document.getElementById("accept-invite-members");
-  const acceptInviteError = document.getElementById("accept-invite-error");
+  function getAcceptInviteModal(): HTMLElement | null {
+    return document.getElementById("accept-invite-modal");
+  }
+
+  function getAcceptInviteCancelBtn(): HTMLElement | null {
+    return document.getElementById("accept-invite-cancel-btn");
+  }
+
+  function getAcceptInviteJoinBtn(): HTMLButtonElement | null {
+    return document.getElementById("accept-invite-join-btn") as HTMLButtonElement | null;
+  }
+
+  function getAcceptInviteIcon(): HTMLElement | null {
+    return document.getElementById("accept-invite-icon");
+  }
+
+  function getAcceptInviteName(): HTMLElement | null {
+    return document.getElementById("accept-invite-name");
+  }
+
+  function getAcceptInviteMembers(): HTMLElement | null {
+    return document.getElementById("accept-invite-members");
+  }
+
+  function getAcceptInviteError(): HTMLElement | null {
+    return document.getElementById("accept-invite-error");
+  }
 
   interface InviteInfo {
     ember_name?: string;
@@ -307,10 +417,23 @@
   }
 
   function openAcceptInviteModal(inviteInfo: Record<string, unknown>): void {
-    if (!acceptInviteModal) return;
+    log.debug("openAcceptInviteModal called");
+    const acceptInviteModal = getAcceptInviteModal();
+    log.debug("acceptInviteModal element found:", { found: !!acceptInviteModal });
+    if (!acceptInviteModal) {
+      log.error("acceptInviteModal element not found!");
+      return;
+    }
     App.pendingInvite = inviteInfo;
     const info = inviteInfo as unknown as InviteInfo;
 
+    const acceptInviteIcon = getAcceptInviteIcon();
+    const acceptInviteName = getAcceptInviteName();
+    const acceptInviteMembers = getAcceptInviteMembers();
+    const acceptInviteError = getAcceptInviteError();
+    const acceptInviteJoinBtn = getAcceptInviteJoinBtn();
+
+    log.debug("Populating modal with invite info...");
     if (acceptInviteIcon) {
       while (acceptInviteIcon.firstChild)
         acceptInviteIcon.removeChild(acceptInviteIcon.firstChild);
@@ -340,33 +463,45 @@
       acceptInviteJoinBtn.disabled = false;
       acceptInviteJoinBtn.textContent = "Join Server";
     }
+    log.debug("Removing hidden class from modal...");
     acceptInviteModal.classList.remove("hidden");
+    log.debug("Modal should now be visible");
   }
 
   function closeAcceptInviteModal(): void {
+    const acceptInviteModal = getAcceptInviteModal();
     acceptInviteModal?.classList.add("hidden");
     App.pendingInvite = null;
   }
 
   function showAcceptInviteError(message: string): void {
+    const acceptInviteError = getAcceptInviteError();
     if (acceptInviteError) {
       acceptInviteError.textContent = message;
       acceptInviteError.classList.remove("hidden");
     }
   }
 
-  acceptInviteCancelBtn?.addEventListener("click", closeAcceptInviteModal);
-  acceptInviteModal?.addEventListener("click", (e: Event) => {
-    if (e.target === acceptInviteModal) closeAcceptInviteModal();
-  });
-  acceptInviteJoinBtn?.addEventListener("click", async () => {
-    await handleAcceptInvite();
-  });
+  // Setup event listeners for accept invite modal
+  function setupAcceptInviteEventListeners(): void {
+    const acceptInviteCancelBtn = getAcceptInviteCancelBtn();
+    const acceptInviteModal = getAcceptInviteModal();
+    const acceptInviteJoinBtn = getAcceptInviteJoinBtn();
+    
+    acceptInviteCancelBtn?.addEventListener("click", closeAcceptInviteModal);
+    acceptInviteModal?.addEventListener("click", (e: Event) => {
+      if (e.target === acceptInviteModal) closeAcceptInviteModal();
+    });
+    acceptInviteJoinBtn?.addEventListener("click", async () => {
+      await handleAcceptInvite();
+    });
+  }
 
   async function handleAcceptInvite(): Promise<void> {
     if (!App.pendingInvite) return;
     log.info("Accepting invite");
     try {
+      const acceptInviteJoinBtn = getAcceptInviteJoinBtn();
       if (acceptInviteJoinBtn) {
         acceptInviteJoinBtn.disabled = true;
         acceptInviteJoinBtn.textContent = "Joining...";
@@ -445,6 +580,7 @@
       log.error("Failed to accept invite", { error: err.message });
       showAcceptInviteError(err.message || "Failed to join server");
     } finally {
+      const acceptInviteJoinBtn = getAcceptInviteJoinBtn();
       if (acceptInviteJoinBtn) {
         acceptInviteJoinBtn.disabled = false;
         acceptInviteJoinBtn.textContent = "Join Server";
@@ -456,21 +592,25 @@
     code: string,
     hostname: string | null
   ): Promise<void> {
-    log.info("Processing invite link");
+    log.info("Processing invite link", { code, hostname });
     try {
+      log.debug("Getting auth data...");
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         token?: string;
         hostname?: string;
       } | null;
+      log.debug("Auth data retrieved:", { hasAuth: !!auth, hasToken: !!auth?.token });
       if (!auth || !auth.token) {
         log.error("Cannot process invite link: not authenticated");
         return;
       }
       const targetHostname = hostname ?? auth.hostname!;
+      log.debug("Making request to:", { targetHostname, code });
       const response = await fetch(`${targetHostname}/api/v1/invites/${code}`, {
         method: "GET",
         headers: { Authorization: `Bearer ${auth.token}` },
       });
+      log.debug("Response received:", { status: response.status, ok: response.ok });
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
           error?: string;
@@ -487,21 +627,14 @@
       log.info("Invite info retrieved, opening accept modal", {
         ember_name: String(inviteInfo["ember_name"] ?? ""),
       });
+      log.debug("Calling openAcceptInviteModal...");
       openAcceptInviteModal(inviteInfo);
+      log.debug("openAcceptInviteModal called");
     } catch (error) {
       const err = error as Error;
       log.error("Error processing invite link", { error: err.message });
     }
   }
-
-  ipcRenderer.on(
-    "handle-invite-link",
-    (_event: unknown, ...args: unknown[]) => {
-      log.info("Received invite link from main process");
-      const invite = args[0] as { code: string; hostname: string | null };
-      processInviteLink(invite.code, invite.hostname);
-    }
-  );
 
   window.openJoinServerModal = openJoinServerModal;
   window.closeJoinServerModal = closeJoinServerModal;
@@ -510,4 +643,18 @@
   window.openAcceptInviteModal = openAcceptInviteModal;
   window.closeAcceptInviteModal = closeAcceptInviteModal;
   window.processInviteLink = processInviteLink;
+
+  // Setup event listeners when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setupJoinServerEventListeners();
+      setupCreateInviteEventListeners();
+      setupAcceptInviteEventListeners();
+    });
+  } else {
+    // DOM is already ready
+    setupJoinServerEventListeners();
+    setupCreateInviteEventListeners();
+    setupAcceptInviteEventListeners();
+  }
 })();

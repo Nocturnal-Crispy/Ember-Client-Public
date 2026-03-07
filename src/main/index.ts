@@ -453,7 +453,9 @@ function handleInviteLink(url: string): void {
   }
   if (mainWindow && mainWindow.webContents) {
     log.info("Sending invite link to renderer");
+    log.debug("Invite data to send:", { invite });
     mainWindow.webContents.send("handle-invite-link", invite);
+    log.debug("Invite data sent successfully");
   } else {
     log.info("No window available, storing invite as pending");
     pendingInviteLink = url;

@@ -346,6 +346,12 @@ declare global {
       created_at: number;
       is_owner: boolean;
     }): void;
+    handleMembershipUpdated(payload: {
+      ember_id: string;
+      user_id: string;
+      username: string;
+      action: string;
+    }): Promise<void>;
     registerSentMessageId(id: string): void;
     // Globals set by message-service.ts
     sendEncryptedMessage(plaintext: string): Promise<void>;

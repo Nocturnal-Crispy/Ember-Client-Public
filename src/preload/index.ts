@@ -26,6 +26,9 @@ function preloadLog(
 
 preloadLog("info", "Preload script initializing");
 
+// Store pending invite data to work around context bridge argument passing issues
+let pendingInvite: { code: string; hostname: string | null } | null = null;
+
 const ALLOWED_SEND: readonly string[] = [
   "window-minimize",
   "window-maximize",
@@ -47,6 +50,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "save-theme-settings",
   "check-for-update",
   "open-external-url",
+  "get-pending-invite",
 ];
 
 const ALLOWED_ON: readonly string[] = ["handle-invite-link", "css-hot-reload"];
@@ -64,6 +68,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
     invoke(channel: string, ...args: unknown[]) {
       if (ALLOWED_INVOKE.includes(channel)) {
+        if (channel === "get-pending-invite") {
+          const invite = pendingInvite;
+          pendingInvite = null; // Clear after retrieving
+          preloadLog("debug", "Returning pending invite:", { invite });
+          return Promise.resolve(invite);
+        }
         return ipcRenderer.invoke(channel, ...args);
       }
       preloadLog("warn", `Blocked IPC invoke on unlisted channel: ${channel}`);
@@ -71,7 +81,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
     on(channel: string, listener: (...args: unknown[]) => void) {
       if (ALLOWED_ON.includes(channel)) {
-        ipcRenderer.on(channel, (_event, ...args) => listener(...args));
+        preloadLog("debug", `Setting up IPC listener for channel: ${channel}`);
+        ipcRenderer.on(channel, (_event, ...args) => {
+          preloadLog("debug", `IPC received on channel ${channel}:`, { args });
+          if (channel === "handle-invite-link" && args.length > 0) {
+            // Store the invite data to work around context bridge argument passing issues
+            pendingInvite = args[0] as { code: string; hostname: string | null };
+            preloadLog("debug", "Stored pending invite:", { pendingInvite });
+            // Just call the listener without arguments to trigger the invite processing
+            listener();
+          } else {
+            preloadLog("debug", `Calling listener with ${args.length} arguments`);
+            try {
+              listener(...args);
+              preloadLog("debug", `Listener called successfully`);
+            } catch (error) {
+              preloadLog("error", `Error calling listener:`, { error: String(error) });
+            }
+          }
+        });
       } else {
         preloadLog(
           "warn",

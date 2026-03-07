@@ -112,6 +112,15 @@
             handleEmberUpdated(
               data.payload as Parameters<typeof handleEmberUpdated>[0]
             );
+          } else if (data.type === "membership_updated" && data.payload) {
+            log.debug("WebSocket: membership_updated", {
+              ember_id: String(data.payload["ember_id"] ?? ""),
+              user_id: String(data.payload["user_id"] ?? ""),
+              action: String(data.payload["action"] ?? ""),
+            });
+            handleMembershipUpdated(
+              data.payload as Parameters<typeof handleMembershipUpdated>[0]
+            );
           } else if (data.type === "dm_message" && data.payload) {
             log.debug("WebSocket: dm_message received", {
               conversation_id: String(data.payload["conversation_id"] ?? ""),
@@ -301,6 +310,35 @@
     }
   }
 
+  async function handleMembershipUpdated(payload: {
+    ember_id: string;
+    user_id: string;
+    username: string;
+    action: string;
+  }): Promise<void> {
+    const { ember_id, user_id, username, action } = payload;
+    
+    // Only refresh members list if this is for the currently active ember
+    if (App.activeEmberId !== ember_id) {
+      log.debug("Membership update for different ember, ignoring", { 
+        active_ember_id: App.activeEmberId, 
+        update_ember_id: ember_id 
+      });
+      return;
+    }
+
+    log.info("Membership updated, refreshing members list", { 
+      ember_id, 
+      user_id, 
+      username, 
+      action 
+    });
+
+    // Refresh the members list to get the latest data
+    const members = await window.fetchMembers(ember_id);
+    window.renderMemberList(members);
+  }
+
   function handleDmMessage(payload: {
     id: string;
     conversation_id: string;
@@ -364,5 +402,6 @@
   window.handleIncomingMessage =
     handleIncomingMessage as unknown as typeof window.handleIncomingMessage;
   window.handleEmberUpdated = handleEmberUpdated;
+  window.handleMembershipUpdated = handleMembershipUpdated;
   window.registerSentMessageId = registerSentMessageId;
 })();
