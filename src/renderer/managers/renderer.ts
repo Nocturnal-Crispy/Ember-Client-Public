@@ -146,6 +146,12 @@
       }
     }, 100);
     
+    // Hide version display when DM screen is opened
+    const versionDisplay = document.getElementById("version-display");
+    if (versionDisplay) {
+      versionDisplay.style.display = "none";
+    }
+    
     log.info("DM Screen opened");
   }
   
@@ -177,6 +183,12 @@
       if (chatContainer) (chatContainer as HTMLElement).style.display = "";
       if (memberList) (memberList as HTMLElement).style.display = "";
       if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = "";
+    }
+    
+    // Show version display when DM screen is closed
+    const versionDisplay = document.getElementById("version-display");
+    if (versionDisplay) {
+      versionDisplay.style.display = "block";
     }
     
     log.info("DM Screen closed");

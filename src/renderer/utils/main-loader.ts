@@ -26,6 +26,7 @@
     "../../dist/renderer/managers/theme-manager.js",
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/update-notifier.js",
+    "../../dist/renderer/managers/version-display.js",
     "../../dist/renderer/managers/direct-messaging-manager.js",
     "../../dist/renderer/managers/direct-messaging-ui.js",
     "../../dist/renderer/managers/renderer.js",
@@ -88,6 +89,7 @@
         modalDeleteConfirm,
         modalSettings,
         overlayReconnection,
+        versionDisplay,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -109,6 +111,7 @@
         fetchFragment("modal-delete-confirm.html"),
         fetchFragment("modal-settings.html"),
         fetchFragment("overlay-reconnection.html"),
+        fetchFragment("version-display.html"),
       ]);
 
       // Title bar (top-level)
@@ -141,6 +144,7 @@
       document.body.appendChild(parseFragment(modalDeleteConfirm));
       document.body.appendChild(parseFragment(modalSettings));
       document.body.appendChild(parseFragment(overlayReconnection));
+      document.body.appendChild(parseFragment(versionDisplay));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

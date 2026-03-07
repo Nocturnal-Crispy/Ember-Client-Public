@@ -7,3 +7,6 @@ public/src/js/*
 .env
 .env.local
 .env.*.local
+# Exclude compiled JavaScript files from src directory
+src/**/*.js
+!src/**/*.tsbuildinfo
