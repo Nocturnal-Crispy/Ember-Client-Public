@@ -30,7 +30,6 @@ const IPC_CHANNELS = {
   
   // Events
   HANDLE_INVITE_LINK: 'handle-invite-link',
-  CSS_HOT_RELOAD: 'css-hot-reload',
 } as const;
 
 const LOG_LEVELS = {
