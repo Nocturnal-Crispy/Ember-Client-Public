@@ -9,6 +9,20 @@
   const log = window.emberLog.createLogger("VersionDisplay");
 
   /**
+   * Get version from package.json
+   */
+  async function getPackageVersion(): Promise<string> {
+    try {
+      const response = await fetch('../../package.json');
+      const packageJson = await response.json();
+      return packageJson.version;
+    } catch (error) {
+      log.warn("Failed to read package.json:", { error: String(error) });
+      return "NotFound"; // Final fallback
+    }
+  }
+
+  /**
    * Update the version display with the current version
    */
   async function updateVersionDisplay(): Promise<void> {
@@ -29,15 +43,17 @@
         log.info(`Version display updated to v${updateInfo.currentVersion}`);
       } else {
         // Fallback to package.json version if IPC fails
-        versionElement.textContent = "0.0.31";
-        log.warn("Failed to get version from main process, using fallback");
+        const packageVersion = await getPackageVersion();
+        versionElement.textContent = packageVersion;
+        log.warn("Failed to get version from main process, using package.json version");
       }
     } catch (error) {
       log.error("Failed to update version display:", { error: String(error) });
-      // Set fallback version
+      // Set fallback version from package.json
       const versionElement = document.getElementById("version-number");
       if (versionElement) {
-        versionElement.textContent = "0.0.31";
+        const packageVersion = await getPackageVersion();
+        versionElement.textContent = packageVersion;
       }
     }
   }
