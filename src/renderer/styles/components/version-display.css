@@ -1,0 +1,49 @@
+/* Version Display - Persistent version indicator in bottom-right corner */
+
+.version-display {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10000; /* Very high z-index to ensure it's always on top */
+  background: rgba(var(--rgb-background), 0.8);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  pointer-events: none; /* Don't interfere with mouse events */
+  user-select: none;
+}
+
+.version-display:hover {
+  background: rgba(var(--rgb-background), 0.9);
+  border-color: rgba(var(--rgb-highlight), 0.5);
+  color: var(--text-normal);
+}
+
+.version-display__text {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* Ensure visibility across all themes */
+.theme-dark .version-display,
+.theme-light .version-display {
+  background: rgba(var(--rgb-background), 0.8);
+  color: var(--text-muted);
+}
+
+/* Responsive adjustments for smaller windows */
+@media (max-width: 768px) {
+  .version-display {
+    bottom: 12px;
+    right: 12px;
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+}

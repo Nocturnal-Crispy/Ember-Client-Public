@@ -24,6 +24,7 @@
 @import './components/voice.css';
 @import './components/settings.css';
 @import './components/update-notifier.css';
+@import './components/version-display.css';
 @import './components/theme.css';
 
 /* Utility Layer - Helper Classes */

@@ -4,7 +4,6 @@ import Store from "electron-store";
 import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
 import { isDev } from "./dev";
-import cssHotReload from "./css-hot-reload";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema } from "../shared/types";
 const { IPC_CHANNELS } = require("../shared/constants");
 
@@ -64,19 +63,6 @@ function createWindow(isAuthenticated: boolean) {
     titleBarStyle: "hidden",
   });
 
-  // Enable live reload for Electron in development
-  if (isDev) {
-    try {
-      require('electron-reload')(__dirname, {
-        hardResetMethod: 'exit'
-      });
-    } catch (error) {
-      console.log('Electron reload not available:', error);
-    }
-    
-    // Start CSS hot-reloading
-    cssHotReload.watchCssFiles(mainWindow);
-  }
 
   if (isAuthenticated) {
     log.debug("Loading main app window");
