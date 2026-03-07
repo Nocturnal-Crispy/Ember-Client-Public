@@ -215,33 +215,6 @@ class VoiceManager {
       _voiceLog.error("No local stream created - microphone access may have failed");
     }
 
-    // ontrack handler for publisher PC - receives audio from participants who join after the initiator
-    this.peerConnection.ontrack = (event: RTCTrackEvent) => {
-      const stream = event.streams[0];
-      _voiceLog.debug("ontrack fired (publisher)", {
-        kind: event.track.kind,
-        trackId: event.track.id,
-        streamId: stream?.id ?? "none",
-      });
-      if (!stream) return;
-      if (event.track.kind === "audio") {
-        if (!this.remoteStreams.has(stream.id)) {
-          this.remoteStreams.set(stream.id, stream);
-          _voiceLog.info("Remote audio stream added to publisher PC", { streamId: stream.id });
-          if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
-        } else {
-          _voiceLog.debug("Remote audio stream already tracked in publisher PC, skipping", {
-            streamId: stream.id,
-          });
-        }
-      } else if (event.track.kind === "video") {
-        this.remoteVideoStreams.set(stream.id, stream);
-        _voiceLog.info("Remote video stream added to publisher PC", { streamId: stream.id });
-        if (this.onVideoStreamAdded)
-          this.onVideoStreamAdded(stream.id, stream);
-      }
-    };
-
     // ontrack lives on subscriberPC (created in handleOffer) — the publisher PC
     // only sends local audio; remote tracks arrive on the subscriber PC.
 
