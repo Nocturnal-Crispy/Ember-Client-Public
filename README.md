@@ -120,7 +120,7 @@ Ember Server (WebSocket/HTTP)
 
 **Key Components:**
 
--   **Main Process** (`src/main.ts`) - Window lifecycle, IPC, security
+-   **Main Process** (`src/main/`) - Window lifecycle, IPC, security
 -   **Renderer Process** (`src/renderer/`) - UI logic, services, managers
 -   **Crypto Service** - End-to-end encryption using NaCl
 -   **WebSocket Service** - Real-time communication with server
@@ -132,22 +132,25 @@ Ember Server (WebSocket/HTTP)
 
 ### Source vs. Compiled Files
 
-<!-- AUTO-GENERATED from tsconfig.json -->
+<!-- AUTO-GENERATED from tsconfig.main.json + tsconfig.renderer.json -->
 
 **Always edit TypeScript source files, never compiled output:**
 
 | Source (edit these) | Compiled output (auto-generated) |
 |---------------------|----------------------------------|
-| `src/main.ts` | `public/src/js/main.js` |
-| `src/preload.ts` | `public/src/js/preload.js` |
-| `src/renderer/**/*.ts` | `public/src/js/**/*.js` |
+| `src/main/**/*.ts` | `dist/main/**/*.js` |
+| `src/preload/**/*.ts` | `dist/preload/**/*.js` |
+| `src/renderer/**/*.ts` | `dist/renderer/**/*.js` |
+| `src/shared/**/*.ts` | `dist/shared/**/*.js` |
 
 <!-- END AUTO-GENERATED -->
 
 ### Script Load Order (index.html)
 
 ```
-logger.js → app-state.js → voice.js → ws-manager.js → [modules] → renderer.js
+logger.js → app-state.js → voice-service.js → websocket-service.js →
+message-service.js → channel-manager.js → ember-manager.js →
+invite-manager.js → voice-ui-manager.js → renderer.js
 ```
 
 ### Renderer Module Pattern (IIFE)
@@ -245,8 +248,7 @@ npm run dist:mac
 | `build:shared` | Build ember-shared dependency |
 | `start` | Build and launch the application |
 | `dev` | Development build with NODE_ENV=development |
-| `dev:watch` | Development mode with CSS file watching |
-| `watch:css` | Watch CSS files for changes |
+| `dev:watch` | Development build with NODE_ENV=development + launch |
 | `dist` | Build and create distributable packages |
 | `dist:linux` | Build for Linux (AppImage + deb) |
 | `dist:win` | Build for Windows (Installer + Portable) |
