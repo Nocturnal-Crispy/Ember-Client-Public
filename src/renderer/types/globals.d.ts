@@ -298,6 +298,7 @@ declare global {
     wsReconnectTimer: ReturnType<typeof setTimeout> | null;
     voiceManager: unknown | null;
     activeVoiceChannelId: string | null;
+    activeVoiceChannelName: string | null;
     voiceParticipants: Map<string, string>;
     voiceChannelPresence: Map<string, Map<string, string>>;
     videoParticipants: Set<string>;

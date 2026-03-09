@@ -156,6 +156,9 @@
         log.warn("WebSocket disconnected, scheduling reconnect in 3s");
         console.log("WebSocket disconnected");
         App.wsConnection = null;
+        // Capture voice channel before cleanupVoiceOnDisconnect clears App state.
+        const rejoinChannelId = App.activeVoiceChannelId;
+        const rejoinChannelName = App.activeVoiceChannelName ?? "";
         if (typeof window.cleanupVoiceOnDisconnect === "function") {
           window.cleanupVoiceOnDisconnect();
         }
@@ -163,7 +166,29 @@
           App.wsReconnectTimer = setTimeout(() => {
             App.wsReconnectTimer = null;
             log.debug("Attempting WebSocket reconnect");
-            connectWebSocket();
+            connectWebSocket().then(() => {
+              if (rejoinChannelId && rejoinChannelName) {
+                // Brief delay lets WS subscriptions (ember/channel) settle before
+                // sending voice_join, which requires an active channel subscription.
+                setTimeout(() => {
+                  if (
+                    App.wsConnection?.readyState === WebSocket.OPEN &&
+                    !App.activeVoiceChannelId
+                  ) {
+                    log.info("Auto-rejoining voice channel after reconnect", {
+                      channel_id: rejoinChannelId,
+                    });
+                    window
+                      .joinVoiceChannel(rejoinChannelId, rejoinChannelName)
+                      .catch((e: unknown) =>
+                        log.error("Voice auto-rejoin failed", {
+                          error: String(e),
+                        })
+                      );
+                  }
+                }, 500);
+              }
+            });
           }, 3000);
         }
       };

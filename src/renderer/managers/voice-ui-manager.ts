@@ -135,6 +135,7 @@
       });
       playVoiceSound("userJoin");
       App.activeVoiceChannelId = channelId;
+      App.activeVoiceChannelName = channelName;
       showVoiceControls(channelName);
       renderVoiceParticipants(channelId);
     };
@@ -195,6 +196,7 @@
     }
 
     App.activeVoiceChannelId = null;
+    App.activeVoiceChannelName = null;
     App.voiceParticipants.clear();
     hideVoiceControls();
     document
@@ -1202,6 +1204,7 @@
     }
     (App.voiceManager as { _cleanup(): void })._cleanup();
     App.activeVoiceChannelId = null;
+    App.activeVoiceChannelName = null;
     App.voiceParticipants.clear();
     hideVoiceControls();
     document

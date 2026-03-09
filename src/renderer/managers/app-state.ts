@@ -21,6 +21,7 @@ window.App = {
   // ── Voice ────────────────────────────────────────────────────────────────
   voiceManager: null,
   activeVoiceChannelId: null,
+  activeVoiceChannelName: null,
   voiceParticipants: new Map<string, string>(),
   voiceChannelPresence: new Map<string, Map<string, string>>(),
 

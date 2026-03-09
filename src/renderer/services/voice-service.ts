@@ -647,6 +647,12 @@ class VoiceManager {
   }
 
   _partialCleanup(): string | null {
+    // Notify the server before tearing down local state so the server can
+    // close the SFU connection cleanly rather than waiting for the next
+    // voice_join to trigger an implicit voiceLeave.
+    if (this.channelId && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: "voice_leave" }));
+    }
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
@@ -688,6 +694,15 @@ class VoiceManager {
   handleMessage(msg: { type: string; payload: Record<string, unknown> }): void {
     _voiceLog.debug("WebSocket voice message received", { type: msg.type });
     switch (msg.type) {
+      case "voice_error": {
+        const errMsg = String(msg.payload["message"] ?? "unknown SFU error");
+        _voiceLog.error("SFU connection error — cleaning up voice session", {
+          message: errMsg,
+        });
+        console.error("[Voice] SFU error:", errMsg);
+        this._cleanup();
+        break;
+      }
       case "voice_answer": {
         // Answer from SFU to our initial join offer — set remote description.
         const raw = msg.payload["sdp"] as Record<string, unknown>;
