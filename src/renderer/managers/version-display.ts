@@ -35,7 +35,7 @@
 
       // Get version info from the main process
       const updateInfo: UpdateInfo = await window.electronAPI.ipc.invoke(
-        "CHECK_FOR_UPDATE"
+        "check-for-update"
       ) as UpdateInfo;
       
       if (updateInfo.currentVersion) {
