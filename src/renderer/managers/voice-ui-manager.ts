@@ -512,7 +512,7 @@
     }
   }
 
-  function renderVideoGrid(): void {
+  async function renderVideoGrid(): Promise<void> {
     const grid = document.getElementById("video-grid");
     if (!grid) return;
     grid.replaceChildren();
@@ -523,12 +523,17 @@
       remoteVideoStreams?: Map<string, MediaStream>;
     } | null;
     const selfId = vm?.auth?.user_id;
-    const selfUsername = vm?.auth?.username;
+    let selfUsername = vm?.auth?.username;
+
+    if (!selfUsername) {
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice | null;
+      selfUsername = auth?.username;
+    }
 
     grid.appendChild(
       createVideoTile(
         "__self__",
-        selfUsername ?? "You",
+        selfUsername ?? selfId ?? "?",
         App.localCameraOn ? (vm?.localVideoStream ?? null) : null,
         true
       )
@@ -575,11 +580,7 @@
 
     const label = document.createElement("div");
     label.className = "video-tile-label";
-    label.textContent = isSelf
-      ? username
-        ? username + " (You)"
-        : "You"
-      : (username ?? userId);
+    label.textContent = username ?? userId;
     tile.appendChild(label);
     return tile;
   }
