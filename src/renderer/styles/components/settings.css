@@ -200,6 +200,15 @@
   gap: 16px;
 }
 
+/* Avatar wrapper: positions overlay on top of the avatar */
+.settings-avatar-wrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
 .settings-avatar {
   width: 64px;
   height: 64px;
@@ -212,6 +221,62 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* Avatar image (shown when user has uploaded one) */
+.settings-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.settings-avatar-img.hidden {
+  display: none;
+}
+
+/* Hover overlay */
+.settings-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  border: 2px solid var(--highlight);
+}
+
+.settings-avatar-wrapper:hover .settings-avatar-overlay {
+  opacity: 1;
+}
+
+.settings-avatar-overlay-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--highlight);
+  letter-spacing: 0.8px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Status feedback text (avatar & username) */
+.settings-save-status {
+  display: block;
+  font-size: 11px;
+  font-family: 'Courier New', Courier, monospace;
+  margin-top: 6px;
+  min-height: 16px;
+}
+
+.settings-save-status.success {
+  color: #57f287;
+}
+
+.settings-save-status.error {
+  color: #ed4245;
 }
 
 .settings-user-info {
@@ -258,6 +323,38 @@
   font-size: 15px;
   color: var(--text);
   font-family: 'Courier New', Courier, monospace;
+}
+
+/* Editable field row: input + save button */
+.settings-field-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.settings-field-input {
+  flex: 1;
+  background-color: transparent;
+  border: 1px solid rgba(var(--rgb-highlight), 0.35);
+  border-radius: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Courier New', Courier, monospace;
+  padding: 6px 8px;
+  outline: none;
+  transition: border-color 0.1s ease;
+}
+
+.settings-field-input:focus {
+  border-color: var(--highlight);
+}
+
+.settings-field-save-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 6px 12px;
+  letter-spacing: 0.6px;
 }
 
 /* Placeholder pages */

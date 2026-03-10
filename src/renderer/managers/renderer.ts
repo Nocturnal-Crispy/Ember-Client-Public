@@ -726,6 +726,19 @@
     if (auth?.username) {
       const usernameEl = document.querySelector(".user-panel .username");
       if (usernameEl) usernameEl.textContent = auth.username;
+      // Populate avatar in user panel if stored
+      const storedAvatar = (auth as typeof auth & { avatar?: string }).avatar;
+      if (storedAvatar) {
+        const panelAvatar = document.querySelector(".user-panel .user-avatar") as HTMLElement | null;
+        if (panelAvatar) {
+          const img = document.createElement("img");
+          img.src = storedAvatar;
+          img.alt = "avatar";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:0;";
+          panelAvatar.textContent = "";
+          panelAvatar.appendChild(img);
+        }
+      }
       log.info("User panel populated", { username: auth.username });
     }
     
