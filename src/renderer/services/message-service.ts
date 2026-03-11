@@ -746,6 +746,9 @@
     oldestMessageId = null;
     isLoadingOlderMessages = false;
     App.ownedMessageIds.clear();
+
+    // Invalidate stale cache so fresh messages are always fetched from the server
+    messageCache.delete(channelId);
     
     // Clear existing messages efficiently
     // Virtual scrolling temporarily disabled
