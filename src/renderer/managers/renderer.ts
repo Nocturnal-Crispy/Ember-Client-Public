@@ -751,17 +751,45 @@
     if (!isValid) return;
     const auth = (await ipcRenderer.invoke("get-auth")) as {
       username?: string;
+      avatar?: string;
+      token?: string;
+      hostname?: string;
+      user_id?: string;
     } | null;
     if (auth?.username) {
       const usernameEl = document.querySelector(".user-panel .username");
       if (usernameEl) usernameEl.textContent = auth.username;
-      // Populate avatar in user panel if stored
-      const storedAvatar = (auth as typeof auth & { avatar?: string }).avatar;
-      if (storedAvatar) {
+
+      // Use stored avatar, or fetch from server if missing
+      let avatarData = auth.avatar || "";
+      if (!avatarData && auth.token && auth.hostname) {
+        try {
+          const resp = await fetch(`${auth.hostname}/api/v1/me`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          if (resp.ok) {
+            const profile = (await resp.json()) as { avatar?: string; username?: string };
+            if (profile.avatar) {
+              avatarData = profile.avatar;
+              // Persist to local store so subsequent launches are instant
+              await ipcRenderer.invoke("save-auth", {
+                ...auth,
+                avatar: avatarData,
+                username: profile.username || auth.username,
+              });
+              log.info("Avatar fetched from server and cached locally");
+            }
+          }
+        } catch (e) {
+          log.warn("Failed to fetch profile from server", { error: String(e) });
+        }
+      }
+
+      if (avatarData) {
         const panelAvatar = document.querySelector(".user-panel .user-avatar") as HTMLElement | null;
         if (panelAvatar) {
           const img = document.createElement("img");
-          img.src = storedAvatar;
+          img.src = avatarData;
           img.alt = "avatar";
           img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:0;";
           panelAvatar.textContent = "";

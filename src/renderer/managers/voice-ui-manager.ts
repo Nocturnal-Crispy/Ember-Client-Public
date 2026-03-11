@@ -675,17 +675,36 @@
   async function populateSettingsAccount(): Promise<void> {
     log.debug("Populating settings account panel");
     try {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData & { avatar?: string } | null;
       if (!auth) return;
       const username = auth.username ?? "";
+
+      // Use stored avatar or fetch from server
+      let avatarData = auth.avatar ?? "";
+      if (!avatarData) {
+        try {
+          const resp = await fetch(`${auth.hostname}/api/v1/me`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          if (resp.ok) {
+            const profile = (await resp.json()) as { avatar?: string };
+            if (profile.avatar) {
+              avatarData = profile.avatar;
+              await ipcRenderer.invoke("save-auth", { ...auth, avatar: avatarData });
+              log.info("Avatar fetched from server for settings panel");
+            }
+          }
+        } catch (e) {
+          log.warn("Could not fetch profile for settings panel", { error: String(e) });
+        }
+      }
 
       // Avatar: show image if available, else show letter fallback
       const avatarImg = document.getElementById("settings-avatar-img") as HTMLImageElement | null;
       const avatarLetter = document.getElementById("settings-avatar-display");
-      const storedAvatar = (auth as AuthData & { avatar?: string }).avatar ?? "";
       if (avatarImg && avatarLetter) {
-        if (storedAvatar) {
-          avatarImg.src = storedAvatar;
+        if (avatarData) {
+          avatarImg.src = avatarData;
           avatarImg.classList.remove("hidden");
           avatarLetter.classList.add("hidden");
         } else {
