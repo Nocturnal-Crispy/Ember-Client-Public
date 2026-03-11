@@ -257,6 +257,11 @@
     }
   }
 
+  function getMemberAvatar(userId: string): string {
+    const member = App.currentMembers.find((m) => m.user_id === userId);
+    return member?.avatar ?? "";
+  }
+
   function renderVoiceParticipants(channelId: string | null): void {
     if (!channelId) {
       document
@@ -275,14 +280,23 @@
       const item = document.createElement("div");
       item.className = "voice-participant";
       item.dataset["userId"] = userId;
-      const avatar = document.createElement("div");
-      avatar.className = "voice-avatar";
-      avatar.dataset["userId"] = userId;
-      avatar.textContent = username.charAt(0).toUpperCase();
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "voice-avatar";
+      avatarEl.dataset["userId"] = userId;
+      const avatarData = getMemberAvatar(userId);
+      if (avatarData) {
+        const img = document.createElement("img");
+        img.src = avatarData;
+        img.alt = username;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = username.charAt(0).toUpperCase();
+      }
       const nameEl = document.createElement("span");
       nameEl.className = "voice-username";
       nameEl.textContent = username;
-      item.appendChild(avatar);
+      item.appendChild(avatarEl);
       item.appendChild(nameEl);
       list.appendChild(item);
     });
@@ -525,9 +539,14 @@
     const selfId = vm?.auth?.user_id;
     let selfUsername = vm?.auth?.username;
 
+    let selfAvatar = "";
     if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice & { avatar?: string } | null;
       selfUsername = auth?.username;
+      selfAvatar = auth?.avatar ?? "";
+    } else {
+      const auth = (await ipcRenderer.invoke("get-auth")) as { avatar?: string } | null;
+      selfAvatar = auth?.avatar ?? "";
     }
 
     grid.appendChild(
@@ -535,7 +554,8 @@
         "__self__",
         selfUsername ?? selfId ?? "?",
         App.localCameraOn ? (vm?.localVideoStream ?? null) : null,
-        true
+        true,
+        selfAvatar
       )
     );
 
@@ -549,7 +569,7 @@
         });
       }
       grid.appendChild(
-        createVideoTile(userId, username, hasCamera ? stream : null, false)
+        createVideoTile(userId, username, hasCamera ? stream : null, false, getMemberAvatar(userId))
       );
     });
   }
@@ -558,7 +578,8 @@
     userId: string,
     username: string,
     stream: MediaStream | null,
-    isSelf: boolean
+    isSelf: boolean,
+    avatar?: string
   ): HTMLElement {
     const tile = document.createElement("div");
     tile.className = "video-tile";
@@ -572,10 +593,18 @@
       video.srcObject = stream;
       tile.appendChild(video);
     } else {
-      const avatar = document.createElement("div");
-      avatar.className = "video-tile-avatar";
-      avatar.textContent = (username ?? "?").charAt(0).toUpperCase();
-      tile.appendChild(avatar);
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "video-tile-avatar";
+      if (avatar) {
+        const img = document.createElement("img");
+        img.src = avatar;
+        img.alt = username ?? userId;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+      }
+      tile.appendChild(avatarEl);
     }
 
     const label = document.createElement("div");
