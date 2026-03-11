@@ -1439,11 +1439,19 @@
     playVoiceSound("disconnect");
   }
 
-  function handleMemberAvatarUpdate(payload: { user_id: string; avatar: string }): void {
-    updateMemberListAvatar(payload.user_id, payload.avatar);
+  function handleMemberUpdate(payload: { user_id: string; avatar?: string; username?: string }): void {
+    if (payload.avatar !== undefined) {
+      updateMemberListAvatar(payload.user_id, payload.avatar);
+    }
+    if (payload.username !== undefined) {
+      const nameEl = document.querySelector(
+        `#member-list .member[data-user-id="${CSS.escape(payload.user_id)}"] .member-name`
+      ) as HTMLElement | null;
+      if (nameEl) nameEl.textContent = payload.username;
+    }
   }
 
-  window.handleMemberAvatarUpdate = handleMemberAvatarUpdate;
+  window.handleMemberUpdate = handleMemberUpdate;
   window.fetchAndRenderVoicePresence = fetchAndRenderVoicePresence;
   window.showVoiceChannelView = showVoiceChannelView;
   window.showTextChannelView = showTextChannelView;
