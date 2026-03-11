@@ -1439,6 +1439,11 @@
     playVoiceSound("disconnect");
   }
 
+  function handleMemberAvatarUpdate(payload: { user_id: string; avatar: string }): void {
+    updateMemberListAvatar(payload.user_id, payload.avatar);
+  }
+
+  window.handleMemberAvatarUpdate = handleMemberAvatarUpdate;
   window.fetchAndRenderVoicePresence = fetchAndRenderVoicePresence;
   window.showVoiceChannelView = showVoiceChannelView;
   window.showTextChannelView = showTextChannelView;
