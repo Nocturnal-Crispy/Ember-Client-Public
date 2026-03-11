@@ -96,6 +96,7 @@
     id: string;
     participantId: string;
     participantUsername: string;
+    participantAvatar?: string;
     lastMessage?: DMMessage;
     unreadCount: number;
     isActive: boolean;
@@ -237,32 +238,35 @@
           
           // Use the participant username from server response, fallback to generated format
           const participantUsername = conv.participant_username || `User ${participantId.slice(0, 8)}`;
-          
+          const participantAvatar: string = conv.participant_avatar || '';
+
           const conversation: DMConversation = {
             id: conv.id,
             participantId,
             participantUsername,
+            participantAvatar: participantAvatar || undefined,
             unreadCount: 0,
             isActive: conv.status === 'active',
             keyExchanged: false,
             isOnline: false // Default to offline, will be updated by presence updates
           };
-          
+
           dmConversations.set(conv.id, conversation);
-          
+
           // Initiate key exchange for this conversation
           try {
             await initiateKeyExchange(conv.id, participantId);
           } catch (error) {
             log.warn("Failed to initiate key exchange for conversation", { conversationId: conv.id, error });
           }
-          
+
           // Notify UI manager about the conversation
           if (typeof window.addDmConversationToList === 'function') {
             window.addDmConversationToList({
               id: conv.id,
               participantId,
               participantUsername,
+              participantAvatar: participantAvatar || undefined,
               unreadCount: 0,
               isOnline: conversation.isOnline,
               keyExchanged: false

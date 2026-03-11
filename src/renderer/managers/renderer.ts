@@ -622,13 +622,30 @@
         if (key === "offline") memberEl.classList.add("offline");
         const statusClass = key === "dnd" ? "dnd" : key;
         const iconSrc = statusIconMap[key] ?? "assets/icons/ember_disconnected.png";
-        memberEl.innerHTML = `
-        <div class="member-avatar ${statusClass}">
-          ${window.escapeHtml((member.username ?? "?").charAt(0).toUpperCase())}
-          <img class="status-icon" src="${iconSrc}" alt="${key}">
-        </div>
-        <span class="member-name">${window.escapeHtml(member.username ?? "Unknown")}</span>
-      `;
+
+        const avatarEl = document.createElement("div");
+        avatarEl.className = `member-avatar ${statusClass}`;
+        if (member.avatar) {
+          const img = document.createElement("img");
+          img.src = member.avatar;
+          img.alt = member.username ?? "avatar";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          avatarEl.appendChild(img);
+        } else {
+          avatarEl.textContent = (member.username ?? "?").charAt(0).toUpperCase();
+        }
+        const statusIcon = document.createElement("img");
+        statusIcon.className = "status-icon";
+        statusIcon.src = iconSrc;
+        statusIcon.alt = key;
+        avatarEl.appendChild(statusIcon);
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "member-name";
+        nameEl.textContent = member.username ?? "Unknown";
+
+        memberEl.appendChild(avatarEl);
+        memberEl.appendChild(nameEl);
         memberList.appendChild(memberEl);
       });
     });

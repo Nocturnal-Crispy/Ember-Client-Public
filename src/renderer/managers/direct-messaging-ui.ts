@@ -18,6 +18,7 @@
     id: string;
     participantId: string;
     participantUsername: string;
+    participantAvatar?: string;
     lastMessage?: string;
     unreadCount: number;
     isOnline: boolean;
@@ -321,12 +322,36 @@
     const resultsContainer = dmSidebarElement.querySelector('.dm-search-results') as HTMLElement;
     if (!resultsContainer) return;
     
-    resultsContainer.innerHTML = users.map((user, index) => `
-      <div class="dm-search-result-item" data-user-id="${user.id}" data-username="${user.username}" tabindex="0" role="option">
-        <div class="dm-search-result-avatar">${user.username[0].toUpperCase()}</div>
-        <div class="dm-search-result-name">${user.username}</div>
-      </div>
-    `).join('');
+    resultsContainer.replaceChildren(
+      ...users.map((user) => {
+        const item = document.createElement('div');
+        item.className = 'dm-search-result-item';
+        item.setAttribute('data-user-id', user.id);
+        item.setAttribute('data-username', user.username);
+        item.setAttribute('tabindex', '0');
+        item.setAttribute('role', 'option');
+
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'dm-search-result-avatar';
+        if (user.avatar) {
+          const img = document.createElement('img');
+          img.src = user.avatar;
+          img.alt = user.username;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          avatarEl.appendChild(img);
+        } else {
+          avatarEl.textContent = user.username[0].toUpperCase();
+        }
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'dm-search-result-name';
+        nameEl.textContent = user.username;
+
+        item.appendChild(avatarEl);
+        item.appendChild(nameEl);
+        return item;
+      })
+    );
     
     // Add click handlers
     resultsContainer.querySelectorAll('.dm-search-result-item').forEach(item => {
@@ -475,19 +500,33 @@
     const conversationElement = document.createElement('div');
     conversationElement.className = 'dm-conversation-item';
     conversationElement.setAttribute('data-conversation-id', conversation.id);
-    conversationElement.innerHTML = `
-      <div class="dm-avatar ${conversation.isOnline ? 'online' : 'offline'}">
-        ${conversation.participantUsername[0].toUpperCase()}
-      </div>
-      <div class="dm-conversation-info">
-        <div class="dm-conversation-name">${conversation.participantUsername}</div>
-      </div>
-      ${conversation.unreadCount > 0 ? 
-        `<div class="dm-unread-count">${conversation.unreadCount}</div>` : 
-        conversation.unreadCount > 0 ? 
-        '<div class="dm-unread-indicator"></div>' : ''
-      }
-    `;
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = `dm-avatar ${conversation.isOnline ? 'online' : 'offline'}`;
+    if (conversation.participantAvatar) {
+      const img = document.createElement('img');
+      img.src = conversation.participantAvatar;
+      img.alt = conversation.participantUsername;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      avatarDiv.appendChild(img);
+    } else {
+      avatarDiv.textContent = conversation.participantUsername[0].toUpperCase();
+    }
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'dm-conversation-info';
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'dm-conversation-name';
+    nameDiv.textContent = conversation.participantUsername;
+    infoDiv.appendChild(nameDiv);
+
+    conversationElement.appendChild(avatarDiv);
+    conversationElement.appendChild(infoDiv);
+    if (conversation.unreadCount > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'dm-unread-count';
+      badge.textContent = String(conversation.unreadCount);
+      conversationElement.appendChild(badge);
+    }
     
     conversationElement.addEventListener('click', () => {
       setActiveConversation(conversation.id);
@@ -798,8 +837,7 @@
     
     // Get conversation info for avatar
     const conversation = conversations.get(messageData.conversationId);
-    const avatarLetter = conversation ? conversation.participantUsername[0].toUpperCase() : 'U';
-    
+
     const messageElement = document.createElement('div');
     messageElement.className = `dm-message ${messageData.isOwn ? 'own' : ''}`;
     messageElement.setAttribute('data-message-id', messageData.id);
@@ -813,16 +851,46 @@
       messageElement.style.color = messageData.chatColor;
     }
 
-    messageElement.innerHTML = `
-      <div class="dm-message-avatar">${messageData.isOwn ? 'You' : avatarLetter}</div>
-      <div class="dm-message-content">
-        <div class="dm-message-header">
-          ${!messageData.isOwn ? `<span class="dm-message-name">${conversation?.participantUsername || 'User'}</span>` : ''}
-          <span class="dm-message-time">${formatMessageTime(messageData.timestamp)}</span>
-        </div>
-        <div class="dm-message-text">${escapeHtml(messageData.content)}</div>
-      </div>
-    `;
+    // Avatar element
+    const msgAvatarEl = document.createElement('div');
+    msgAvatarEl.className = 'dm-message-avatar';
+    if (messageData.isOwn) {
+      msgAvatarEl.textContent = 'You';
+    } else if (conversation?.participantAvatar) {
+      const img = document.createElement('img');
+      img.src = conversation.participantAvatar;
+      img.alt = conversation.participantUsername;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      msgAvatarEl.appendChild(img);
+    } else {
+      msgAvatarEl.textContent = conversation ? conversation.participantUsername[0].toUpperCase() : 'U';
+    }
+
+    // Content element
+    const contentEl = document.createElement('div');
+    contentEl.className = 'dm-message-content';
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'dm-message-header';
+    if (!messageData.isOwn) {
+      const nameEl = document.createElement('span');
+      nameEl.className = 'dm-message-name';
+      nameEl.textContent = conversation?.participantUsername || 'User';
+      headerEl.appendChild(nameEl);
+    }
+    const timeEl = document.createElement('span');
+    timeEl.className = 'dm-message-time';
+    timeEl.textContent = formatMessageTime(messageData.timestamp);
+    headerEl.appendChild(timeEl);
+
+    const textEl = document.createElement('div');
+    textEl.className = 'dm-message-text';
+    textEl.textContent = messageData.content;
+
+    contentEl.appendChild(headerEl);
+    contentEl.appendChild(textEl);
+    messageElement.appendChild(msgAvatarEl);
+    messageElement.appendChild(contentEl);
     
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;

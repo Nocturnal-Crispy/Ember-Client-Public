@@ -73,6 +73,7 @@ declare global {
     id: string;
     username: string;
     status: 'online' | 'offline' | 'away';
+    avatar?: string;
   };
 
   // ─── Theme settings ───────────────────────────────────────────────────────
@@ -484,6 +485,7 @@ declare global {
       id: string;
       participantId: string;
       participantUsername: string;
+      participantAvatar?: string;
       unreadCount: number;
       isOnline: boolean;
       keyExchanged: boolean;
