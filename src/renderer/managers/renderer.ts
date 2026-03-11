@@ -540,39 +540,51 @@
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         token?: string;
         hostname?: string;
+        user_id?: string;
+        avatar?: string;
       } | null;
-      
+
       if (!auth || !auth.token || !auth.hostname) {
         log.warn("Cannot fetch members: not authenticated");
         return [];
       }
-      
+
       const url = `${auth.hostname}/api/v1/embers/${emberId}/members`;
       log.debug("Making members API call", { url });
-      
+
       const response = await fetch(url, {
         method: "GET",
         headers: { Authorization: `Bearer ${auth.token}` },
       });
-      
-      log.debug("Members API response", { 
+
+      log.debug("Members API response", {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok 
+        ok: response.ok
       });
-      
+
       if (!response.ok) {
         log.warn("Failed to fetch members", { status: response.status, statusText: response.statusText });
         return [];
       }
-      
+
       const data = await response.json();
-      log.debug("Members API response data", { 
+      log.debug("Members API response data", {
         memberCount: data.members?.length || 0,
         members: data.members?.map((m: any) => ({ user_id: m.user_id, username: m.username, status: m.status })) || []
       });
-      
-      return data.members || [];
+
+      const members: Member[] = data.members || [];
+      // Inject the locally-stored avatar for the current user so it shows
+      // even when the server DB hasn't been updated yet.
+      if (auth.user_id && auth.avatar) {
+        for (const m of members) {
+          if (m.user_id === auth.user_id && !m.avatar) {
+            m.avatar = auth.avatar;
+          }
+        }
+      }
+      return members;
     } catch (error) {
       const err = error as Error;
       log.error("Error fetching members", {
