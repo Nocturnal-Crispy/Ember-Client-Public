@@ -853,6 +853,9 @@
         // Update user panel avatar in sidebar
         updateUserPanelAvatar(dataUrl, auth.username ?? "");
 
+        // Update the current user's entry in the member list
+        updateMemberListAvatar(auth.user_id ?? "", dataUrl);
+
         showAccountStatus("settings-avatar-status", "Avatar updated!", "success");
         log.info("Avatar updated");
       } catch (e) {
@@ -861,6 +864,24 @@
       }
     };
     reader.readAsDataURL(file);
+  }
+
+  function updateMemberListAvatar(userId: string, avatarData: string): void {
+    const memberEl = document.querySelector(
+      `#member-list .member[data-user-id="${CSS.escape(userId)}"] .member-avatar`
+    ) as HTMLElement | null;
+    if (!memberEl) return;
+    // Remove existing letter text, keep the status-icon img
+    const statusIcon = memberEl.querySelector("img.status-icon") as HTMLImageElement | null;
+    memberEl.textContent = "";
+    if (avatarData) {
+      const img = document.createElement("img");
+      img.src = avatarData;
+      img.alt = "avatar";
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+      memberEl.appendChild(img);
+    }
+    if (statusIcon) memberEl.appendChild(statusIcon);
   }
 
   function updateUserPanelAvatar(avatarData: string, username: string): void {
