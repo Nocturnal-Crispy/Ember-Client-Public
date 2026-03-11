@@ -73,6 +73,7 @@ declare global {
     id: string;
     username: string;
     status: 'online' | 'offline' | 'away';
+    avatar?: string;
   };
 
   // ─── Theme settings ───────────────────────────────────────────────────────
@@ -413,6 +414,7 @@ declare global {
     closeAcceptInviteModal(): void;
     processInviteLink(code: string, hostname: string | null): Promise<void>;
     // Globals set by voice-ui-manager.ts
+    handleMemberUpdate(payload: { user_id: string; avatar?: string; username?: string }): void;
     fetchAndRenderVoicePresence(emberId: string): Promise<void>;
     joinVoiceChannel(channelId: string, channelName: string): Promise<void>;
     leaveVoiceChannel(): Promise<void>;
@@ -484,6 +486,7 @@ declare global {
       id: string;
       participantId: string;
       participantUsername: string;
+      participantAvatar?: string;
       unreadCount: number;
       isOnline: boolean;
       keyExchanged: boolean;

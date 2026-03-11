@@ -257,6 +257,11 @@
     }
   }
 
+  function getMemberAvatar(userId: string): string {
+    const member = App.currentMembers.find((m) => m.user_id === userId);
+    return member?.avatar ?? "";
+  }
+
   function renderVoiceParticipants(channelId: string | null): void {
     if (!channelId) {
       document
@@ -275,14 +280,23 @@
       const item = document.createElement("div");
       item.className = "voice-participant";
       item.dataset["userId"] = userId;
-      const avatar = document.createElement("div");
-      avatar.className = "voice-avatar";
-      avatar.dataset["userId"] = userId;
-      avatar.textContent = username.charAt(0).toUpperCase();
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "voice-avatar";
+      avatarEl.dataset["userId"] = userId;
+      const avatarData = getMemberAvatar(userId);
+      if (avatarData) {
+        const img = document.createElement("img");
+        img.src = avatarData;
+        img.alt = username;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = username.charAt(0).toUpperCase();
+      }
       const nameEl = document.createElement("span");
       nameEl.className = "voice-username";
       nameEl.textContent = username;
-      item.appendChild(avatar);
+      item.appendChild(avatarEl);
       item.appendChild(nameEl);
       list.appendChild(item);
     });
@@ -525,9 +539,14 @@
     const selfId = vm?.auth?.user_id;
     let selfUsername = vm?.auth?.username;
 
+    let selfAvatar = "";
     if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice & { avatar?: string } | null;
       selfUsername = auth?.username;
+      selfAvatar = auth?.avatar ?? "";
+    } else {
+      const auth = (await ipcRenderer.invoke("get-auth")) as { avatar?: string } | null;
+      selfAvatar = auth?.avatar ?? "";
     }
 
     grid.appendChild(
@@ -535,7 +554,8 @@
         "__self__",
         selfUsername ?? selfId ?? "?",
         App.localCameraOn ? (vm?.localVideoStream ?? null) : null,
-        true
+        true,
+        selfAvatar
       )
     );
 
@@ -549,7 +569,7 @@
         });
       }
       grid.appendChild(
-        createVideoTile(userId, username, hasCamera ? stream : null, false)
+        createVideoTile(userId, username, hasCamera ? stream : null, false, getMemberAvatar(userId))
       );
     });
   }
@@ -558,7 +578,8 @@
     userId: string,
     username: string,
     stream: MediaStream | null,
-    isSelf: boolean
+    isSelf: boolean,
+    avatar?: string
   ): HTMLElement {
     const tile = document.createElement("div");
     tile.className = "video-tile";
@@ -572,10 +593,18 @@
       video.srcObject = stream;
       tile.appendChild(video);
     } else {
-      const avatar = document.createElement("div");
-      avatar.className = "video-tile-avatar";
-      avatar.textContent = (username ?? "?").charAt(0).toUpperCase();
-      tile.appendChild(avatar);
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "video-tile-avatar";
+      if (avatar) {
+        const img = document.createElement("img");
+        img.src = avatar;
+        img.alt = username ?? userId;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+      }
+      tile.appendChild(avatarEl);
     }
 
     const label = document.createElement("div");
@@ -675,26 +704,270 @@
   async function populateSettingsAccount(): Promise<void> {
     log.debug("Populating settings account panel");
     try {
-      const auth = (await ipcRenderer.invoke("get-auth")) as {
-        username?: string;
-      } | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData & { avatar?: string } | null;
       if (!auth) return;
       const username = auth.username ?? "";
-      const set = (id: string, val: string) => {
+
+      // Use stored avatar or fetch from server
+      let avatarData = auth.avatar ?? "";
+      if (!avatarData) {
+        try {
+          const resp = await fetch(`${auth.hostname}/api/v1/me`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          if (resp.ok) {
+            const profile = (await resp.json()) as { avatar?: string };
+            if (profile.avatar) {
+              avatarData = profile.avatar;
+              await ipcRenderer.invoke("save-auth", { ...auth, avatar: avatarData });
+              log.info("Avatar fetched from server for settings panel");
+            }
+          }
+        } catch (e) {
+          log.warn("Could not fetch profile for settings panel", { error: String(e) });
+        }
+      }
+
+      // Avatar: show image if available, else show letter fallback
+      const avatarImg = document.getElementById("settings-avatar-img") as HTMLImageElement | null;
+      const avatarLetter = document.getElementById("settings-avatar-display");
+      if (avatarImg && avatarLetter) {
+        if (avatarData) {
+          avatarImg.src = avatarData;
+          avatarImg.classList.remove("hidden");
+          avatarLetter.classList.add("hidden");
+        } else {
+          avatarLetter.textContent = username.charAt(0).toUpperCase() || "U";
+          avatarImg.classList.add("hidden");
+          avatarLetter.classList.remove("hidden");
+        }
+      }
+
+      const setText = (id: string, val: string) => {
         const el = document.getElementById(id);
         if (el) el.textContent = val;
       };
-      const avatarEl = document.getElementById("settings-avatar-display");
-      if (avatarEl)
-        avatarEl.textContent = username.charAt(0).toUpperCase() || "U";
-      set("settings-username-display", username);
-      set("settings-user-tag-display", username);
-      set("settings-account-username", username);
-      set("settings-display-name", username);
+      setText("settings-username-display", username);
+      setText("settings-user-tag-display", username);
+      setText("settings-display-name", username);
+
+      // Populate username input
+      const usernameInput = document.getElementById("settings-username-input") as HTMLInputElement | null;
+      if (usernameInput) usernameInput.value = username;
     } catch (e) {
       log.error("Failed to populate settings account", { error: String(e) });
     }
   }
+
+  function showAccountStatus(elementId: string, message: string, type: "success" | "error"): void {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.textContent = message;
+    el.className = `settings-save-status ${type}`;
+    setTimeout(() => {
+      el.textContent = "";
+      el.className = "settings-save-status";
+    }, 3000);
+  }
+
+  async function handleSaveUsername(): Promise<void> {
+    const input = document.getElementById("settings-username-input") as HTMLInputElement | null;
+    if (!input) return;
+    const newUsername = input.value.trim();
+
+    if (newUsername.length < 3 || newUsername.length > 32) {
+      showAccountStatus("settings-username-status", "Username must be 3–32 characters.", "error");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+      showAccountStatus("settings-username-status", "Only letters, numbers, and underscores allowed.", "error");
+      return;
+    }
+
+    const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
+    if (!auth) {
+      showAccountStatus("settings-username-status", "Not authenticated.", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${auth.hostname}/api/v1/me/username`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ username: newUsername }),
+      });
+
+      if (response.status === 409) {
+        showAccountStatus("settings-username-status", "Username already taken.", "error");
+        return;
+      }
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        showAccountStatus("settings-username-status", body.error ?? "Failed to update username.", "error");
+        return;
+      }
+
+      // Update local auth store
+      const updatedAuth = { ...auth, username: newUsername };
+      await ipcRenderer.invoke("save-auth", updatedAuth);
+
+      // Update header displays
+      const setText = (id: string, val: string) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setText("settings-username-display", newUsername);
+      setText("settings-user-tag-display", newUsername);
+      setText("settings-display-name", newUsername);
+
+      // Update user panel in sidebar
+      const panelUsername = document.querySelector(".user-panel .username");
+      if (panelUsername) panelUsername.textContent = newUsername;
+
+      showAccountStatus("settings-username-status", "Username updated!", "success");
+      log.info("Username updated", { username: newUsername });
+    } catch (e) {
+      showAccountStatus("settings-username-status", "Network error. Try again.", "error");
+      log.error("Failed to save username", { error: String(e) });
+    }
+  }
+
+  async function handleAvatarUpload(file: File): Promise<void> {
+    // Resize/compress to 128×128 using an offscreen canvas
+    const resizeImage = (src: string): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 128;
+          canvas.height = 128;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("no canvas context")); return; }
+          ctx.drawImage(img, 0, 0, 128, 128);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => reject(new Error("failed to load image"));
+        img.src = src;
+      });
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const raw = ev.target?.result as string | null;
+      if (!raw) { showAccountStatus("settings-avatar-status", "Failed to read file.", "error"); return; }
+
+      let dataUrl: string;
+      try {
+        dataUrl = await resizeImage(raw);
+      } catch {
+        showAccountStatus("settings-avatar-status", "Invalid image file.", "error");
+        return;
+      }
+
+      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
+      if (!auth) { showAccountStatus("settings-avatar-status", "Not authenticated.", "error"); return; }
+
+      try {
+        const response = await fetch(`${auth.hostname}/api/v1/me/avatar`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.token}`,
+          },
+          body: JSON.stringify({ avatar: dataUrl }),
+        });
+
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({}))) as { error?: string };
+          showAccountStatus("settings-avatar-status", body.error ?? "Failed to upload avatar.", "error");
+          return;
+        }
+
+        // Update local auth store
+        const updatedAuth = { ...auth, avatar: dataUrl } as AuthData & { avatar: string };
+        await ipcRenderer.invoke("save-auth", updatedAuth);
+
+        // Update avatar display in settings
+        const avatarImg = document.getElementById("settings-avatar-img") as HTMLImageElement | null;
+        const avatarLetter = document.getElementById("settings-avatar-display");
+        if (avatarImg && avatarLetter) {
+          avatarImg.src = dataUrl;
+          avatarImg.classList.remove("hidden");
+          avatarLetter.classList.add("hidden");
+        }
+
+        // Update user panel avatar in sidebar
+        updateUserPanelAvatar(dataUrl, auth.username ?? "");
+
+        // Update the current user's entry in the member list
+        updateMemberListAvatar(auth.user_id ?? "", dataUrl);
+
+        showAccountStatus("settings-avatar-status", "Avatar updated!", "success");
+        log.info("Avatar updated");
+      } catch (e) {
+        showAccountStatus("settings-avatar-status", "Network error. Try again.", "error");
+        log.error("Failed to upload avatar", { error: String(e) });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateMemberListAvatar(userId: string, avatarData: string): void {
+    const memberEl = document.querySelector(
+      `#member-list .member[data-user-id="${CSS.escape(userId)}"] .member-avatar`
+    ) as HTMLElement | null;
+    if (!memberEl) return;
+    // Remove existing letter text, keep the status-icon img
+    const statusIcon = memberEl.querySelector("img.status-icon") as HTMLImageElement | null;
+    memberEl.textContent = "";
+    if (avatarData) {
+      const img = document.createElement("img");
+      img.src = avatarData;
+      img.alt = "avatar";
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+      memberEl.appendChild(img);
+    }
+    if (statusIcon) memberEl.appendChild(statusIcon);
+  }
+
+  function updateUserPanelAvatar(avatarData: string, username: string): void {
+    const panelAvatar = document.querySelector(".user-panel .user-avatar") as HTMLElement | null;
+    if (!panelAvatar) return;
+    if (avatarData) {
+      const img = panelAvatar.querySelector("img.user-avatar-img") as HTMLImageElement | null
+        ?? document.createElement("img");
+      img.src = avatarData;
+      img.className = "user-avatar-img";
+      img.alt = "avatar";
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:0;";
+      panelAvatar.textContent = "";
+      panelAvatar.appendChild(img);
+    } else {
+      panelAvatar.textContent = username.charAt(0).toUpperCase() || "U";
+    }
+  }
+
+  // Wire up account settings event listeners
+  const avatarWrapper = document.getElementById("settings-avatar-wrapper");
+  const avatarInput = document.getElementById("settings-avatar-input") as HTMLInputElement | null;
+  const usernameSaveBtn = document.getElementById("settings-username-save-btn");
+  const usernameInput = document.getElementById("settings-username-input") as HTMLInputElement | null;
+
+  avatarWrapper?.addEventListener("click", () => avatarInput?.click());
+
+  avatarInput?.addEventListener("change", () => {
+    const file = avatarInput.files?.[0];
+    if (file) handleAvatarUpload(file);
+    avatarInput.value = ""; // reset so same file can be re-selected
+  });
+
+  usernameSaveBtn?.addEventListener("click", () => handleSaveUsername());
+
+  usernameInput?.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") handleSaveUsername();
+  });
 
   settingsNavItems.forEach((item) =>
     item.addEventListener("click", () =>
@@ -1214,6 +1487,19 @@
     playVoiceSound("disconnect");
   }
 
+  function handleMemberUpdate(payload: { user_id: string; avatar?: string; username?: string }): void {
+    if (payload.avatar !== undefined) {
+      updateMemberListAvatar(payload.user_id, payload.avatar);
+    }
+    if (payload.username !== undefined) {
+      const nameEl = document.querySelector(
+        `#member-list .member[data-user-id="${CSS.escape(payload.user_id)}"] .member-name`
+      ) as HTMLElement | null;
+      if (nameEl) nameEl.textContent = payload.username;
+    }
+  }
+
+  window.handleMemberUpdate = handleMemberUpdate;
   window.fetchAndRenderVoicePresence = fetchAndRenderVoicePresence;
   window.showVoiceChannelView = showVoiceChannelView;
   window.showTextChannelView = showTextChannelView;

@@ -48,12 +48,20 @@
         <h2 class="settings-page-title">My Account</h2>
         <div class="settings-card">
           <div class="settings-avatar-row">
-            <div class="settings-avatar" id="settings-avatar-display">U</div>
+            <div class="settings-avatar-wrapper" id="settings-avatar-wrapper" title="Click to change avatar">
+              <div class="settings-avatar" id="settings-avatar-display">U</div>
+              <img class="settings-avatar-img hidden" id="settings-avatar-img" alt="avatar">
+              <div class="settings-avatar-overlay">
+                <span class="settings-avatar-overlay-text">CHANGE</span>
+              </div>
+              <input type="file" id="settings-avatar-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
+            </div>
             <div class="settings-user-info">
               <div class="settings-username" id="settings-username-display">Username</div>
               <div class="settings-user-tag" id="settings-user-tag-display">user@example.com</div>
             </div>
           </div>
+          <span class="settings-save-status" id="settings-avatar-status"></span>
         </div>
         <div class="settings-section-divider"></div>
         <h3 class="settings-subsection-title">Account Information</h3>
@@ -63,7 +71,11 @@
         </div>
         <div class="settings-field">
           <label class="settings-field-label">Username</label>
-          <div class="settings-field-value" id="settings-account-username">—</div>
+          <div class="settings-field-edit-row">
+            <input class="settings-field-input" type="text" id="settings-username-input" maxlength="32" placeholder="Username" autocomplete="off" spellcheck="false">
+            <button class="modal-btn modal-btn-primary settings-field-save-btn" id="settings-username-save-btn">SAVE</button>
+          </div>
+          <span class="settings-save-status" id="settings-username-status"></span>
         </div>
       </div>
 

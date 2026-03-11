@@ -540,39 +540,51 @@
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         token?: string;
         hostname?: string;
+        user_id?: string;
+        avatar?: string;
       } | null;
-      
+
       if (!auth || !auth.token || !auth.hostname) {
         log.warn("Cannot fetch members: not authenticated");
         return [];
       }
-      
+
       const url = `${auth.hostname}/api/v1/embers/${emberId}/members`;
       log.debug("Making members API call", { url });
-      
+
       const response = await fetch(url, {
         method: "GET",
         headers: { Authorization: `Bearer ${auth.token}` },
       });
-      
-      log.debug("Members API response", { 
+
+      log.debug("Members API response", {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok 
+        ok: response.ok
       });
-      
+
       if (!response.ok) {
         log.warn("Failed to fetch members", { status: response.status, statusText: response.statusText });
         return [];
       }
-      
+
       const data = await response.json();
-      log.debug("Members API response data", { 
+      log.debug("Members API response data", {
         memberCount: data.members?.length || 0,
         members: data.members?.map((m: any) => ({ user_id: m.user_id, username: m.username, status: m.status })) || []
       });
-      
-      return data.members || [];
+
+      const members: Member[] = data.members || [];
+      // Inject the locally-stored avatar for the current user so it shows
+      // even when the server DB hasn't been updated yet.
+      if (auth.user_id && auth.avatar) {
+        for (const m of members) {
+          if (m.user_id === auth.user_id && !m.avatar) {
+            m.avatar = auth.avatar;
+          }
+        }
+      }
+      return members;
     } catch (error) {
       const err = error as Error;
       log.error("Error fetching members", {
@@ -622,13 +634,30 @@
         if (key === "offline") memberEl.classList.add("offline");
         const statusClass = key === "dnd" ? "dnd" : key;
         const iconSrc = statusIconMap[key] ?? "assets/icons/ember_disconnected.png";
-        memberEl.innerHTML = `
-        <div class="member-avatar ${statusClass}">
-          ${window.escapeHtml((member.username ?? "?").charAt(0).toUpperCase())}
-          <img class="status-icon" src="${iconSrc}" alt="${key}">
-        </div>
-        <span class="member-name">${window.escapeHtml(member.username ?? "Unknown")}</span>
-      `;
+
+        const avatarEl = document.createElement("div");
+        avatarEl.className = `member-avatar ${statusClass}`;
+        if (member.avatar) {
+          const img = document.createElement("img");
+          img.src = member.avatar;
+          img.alt = member.username ?? "avatar";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          avatarEl.appendChild(img);
+        } else {
+          avatarEl.textContent = (member.username ?? "?").charAt(0).toUpperCase();
+        }
+        const statusIcon = document.createElement("img");
+        statusIcon.className = "status-icon";
+        statusIcon.src = iconSrc;
+        statusIcon.alt = key;
+        avatarEl.appendChild(statusIcon);
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "member-name";
+        nameEl.textContent = member.username ?? "Unknown";
+
+        memberEl.appendChild(avatarEl);
+        memberEl.appendChild(nameEl);
         memberList.appendChild(memberEl);
       });
     });
@@ -722,10 +751,51 @@
     if (!isValid) return;
     const auth = (await ipcRenderer.invoke("get-auth")) as {
       username?: string;
+      avatar?: string;
+      token?: string;
+      hostname?: string;
+      user_id?: string;
     } | null;
     if (auth?.username) {
       const usernameEl = document.querySelector(".user-panel .username");
       if (usernameEl) usernameEl.textContent = auth.username;
+
+      // Use stored avatar, or fetch from server if missing
+      let avatarData = auth.avatar || "";
+      if (!avatarData && auth.token && auth.hostname) {
+        try {
+          const resp = await fetch(`${auth.hostname}/api/v1/me`, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+          if (resp.ok) {
+            const profile = (await resp.json()) as { avatar?: string; username?: string };
+            if (profile.avatar) {
+              avatarData = profile.avatar;
+              // Persist to local store so subsequent launches are instant
+              await ipcRenderer.invoke("save-auth", {
+                ...auth,
+                avatar: avatarData,
+                username: profile.username || auth.username,
+              });
+              log.info("Avatar fetched from server and cached locally");
+            }
+          }
+        } catch (e) {
+          log.warn("Failed to fetch profile from server", { error: String(e) });
+        }
+      }
+
+      if (avatarData) {
+        const panelAvatar = document.querySelector(".user-panel .user-avatar") as HTMLElement | null;
+        if (panelAvatar) {
+          const img = document.createElement("img");
+          img.src = avatarData;
+          img.alt = "avatar";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:0;";
+          panelAvatar.textContent = "";
+          panelAvatar.appendChild(img);
+        }
+      }
       log.info("User panel populated", { username: auth.username });
     }
     

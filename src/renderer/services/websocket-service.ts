@@ -145,6 +145,15 @@
             handleDmTypingIndicator(
               data.payload as Parameters<typeof handleDmTypingIndicator>[0]
             );
+          } else if (data.type === "member_updated" && data.payload) {
+            log.debug("WebSocket: member_updated", {
+              user_id: String(data.payload["user_id"] ?? ""),
+            });
+            if (typeof window.handleMemberUpdate === "function") {
+              window.handleMemberUpdate(
+                data.payload as Parameters<typeof window.handleMemberUpdate>[0]
+              );
+            }
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
