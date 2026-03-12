@@ -14,6 +14,7 @@
 
 /* Component Layer - UI Components */
 @import './components/chat.css';
+@import './components/message-input.css';
 @import './components/direct-messaging.css';
 @import './components/modals.css';
 @import './components/overlays.css';

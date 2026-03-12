@@ -56,23 +56,21 @@
       </div>
 
       <!-- DM Input Area -->
-      <div class="dm-input-container">
-        <div class="dm-input-wrapper">
-          <textarea 
-            class="dm-input-field" 
-            id="dm-input-field" 
-            placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+      <div class="message-input-container dm-input-container">
+        <input type="file" id="dm-attachment-file-input" style="display:none">
+        <div id="dm-attachment-preview" class="attachment-preview hidden"></div>
+        <div class="message-input-wrapper">
+          <textarea
+            class="message-input"
+            id="dm-input-field"
+            placeholder="Message @Username"
             rows="1"
-            maxlength="2000"
           ></textarea>
-          <div class="dm-input-actions">
-            <button class="dm-input-btn" id="dm-emoji-btn" title="Add Emoji">😊</button>
-            <button class="dm-input-btn" id="dm-attach-btn" title="Attach File">📎</button>
-            <button class="dm-input-btn" id="dm-send-btn" title="Send Message">➤</button>
+          <div class="input-actions">
+            <button class="attachment-btn" id="dm-attachment-btn" title="Add Attachment">+</button>
+            <button class="input-action-btn" id="dm-emoji-btn" title="Add Emoji">&#x1F60A;</button>
+            <button class="input-action-btn" id="dm-gif-btn" title="Add GIF">GIF</button>
           </div>
-        </div>
-        <div class="dm-input-footer">
-          <span class="dm-character-count" id="dm-character-count">0/2000</span>
         </div>
       </div>
 

@@ -289,6 +289,17 @@ declare global {
       channelId: string,
       attachmentId: string
     ): Promise<AttachmentDownloadResult>;
+    uploadDMAttachment(
+      auth: AuthData,
+      conversationId: string,
+      encryptedData: string,
+      meta: { name: string; size: number; mime: string }
+    ): Promise<{ id: string; created_at: number }>;
+    downloadDMAttachment(
+      auth: AuthData,
+      conversationId: string,
+      attachmentId: string
+    ): Promise<AttachmentDownloadResult>;
   }
 
   interface EmberServiceAPI {
