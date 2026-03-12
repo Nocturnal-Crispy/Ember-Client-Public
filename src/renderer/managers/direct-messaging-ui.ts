@@ -13,6 +13,7 @@
   let conversations = new Map<string, DMConversationUI>();
   let searchTimeout: NodeJS.Timeout | null = null;
   let ownUsername: string = 'Me';
+  let dmPendingAttachment: { file: File; name: string } | null = null;
   
   interface DMConversationUI {
     id: string;
@@ -119,7 +120,7 @@
     }
     
     // Message input - with enhanced debugging
-    const messageInput = dmChatContainer.querySelector('.dm-input-field') as HTMLTextAreaElement;
+    const messageInput = dmChatContainer.querySelector('.message-input') as HTMLTextAreaElement;
     if (messageInput) {
       log.debug("Message input found, setting up event listeners", {
         tagName: messageInput.tagName,
@@ -153,10 +154,20 @@
       log.error("Message input not found in DM chat container");
     }
     
-    // Send button
-    const sendButton = dmChatContainer.querySelector('.dm-input-btn:last-child') as HTMLButtonElement;
-    if (sendButton) {
-      sendButton.addEventListener('click', handleSendMessage);
+    // GIF button — override window.sendGif to route to this DM conversation
+    const gifButton = dmChatContainer.querySelector('#dm-gif-btn') as HTMLButtonElement | null;
+    if (gifButton) {
+      gifButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.sendGif = (url: string, title: string): void => {
+          if (!activeConversationId) return;
+          const payload = JSON.stringify({ t: 'gif', url, title });
+          window.sendDirectMessage(activeConversationId, payload).catch((err: Error) => {
+            log.error('Failed to send DM GIF', { error: err.message });
+          });
+        };
+        (window as any).openGifPicker(gifButton);
+      });
     }
 
     // Emoji button
@@ -168,6 +179,19 @@
       });
     }
     
+    // Attachment button — directly trigger file input (no modal)
+    const attachmentFileInput = dmChatContainer.querySelector('#dm-attachment-file-input') as HTMLInputElement | null;
+    const attachmentBtn = dmChatContainer.querySelector('#dm-attachment-btn') as HTMLButtonElement | null;
+    const attachmentPreviewEl = dmChatContainer.querySelector('#dm-attachment-preview') as HTMLElement | null;
+    attachmentBtn?.addEventListener('click', () => {
+      attachmentFileInput?.click();
+    });
+    attachmentFileInput?.addEventListener('change', () => {
+      const file = attachmentFileInput.files?.[0];
+      if (file) setDmPendingAttachment(file, attachmentPreviewEl);
+      attachmentFileInput.value = '';
+    });
+
     // Click outside handler for search results
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -751,12 +775,14 @@
       messagesContainer.innerHTML = '';
     }
     
-    // Reset input
-    const messageInput = dmChatContainer.querySelector('.dm-input-field') as HTMLTextAreaElement;
+    // Reset input and attachment
+    const messageInput = dmChatContainer.querySelector('.message-input') as HTMLTextAreaElement;
     if (messageInput) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
+    const switchAttachmentPreviewEl = dmChatContainer.querySelector('#dm-attachment-preview') as HTMLElement | null;
+    clearDmAttachmentPreview(switchAttachmentPreviewEl);
   }
   
   /**
@@ -790,21 +816,58 @@
   async function handleSendMessage(): Promise<void> {
     if (!activeConversationId || !dmChatContainer) return;
     
-    const messageInput = dmChatContainer.querySelector('.dm-input-field') as HTMLTextAreaElement;
+    const messageInput = dmChatContainer.querySelector('.message-input') as HTMLTextAreaElement;
     if (!messageInput) return;
     
-    const content = messageInput.value.trim();
-    if (!content) return;
-    
+    let content = messageInput.value.trim();
+    if (!content && !dmPendingAttachment) return;
+
+    const sendAttachmentPreviewEl = dmChatContainer.querySelector('#dm-attachment-preview') as HTMLElement | null;
     try {
+      // Handle DM attachment upload if present
+      if (dmPendingAttachment) {
+        const auth = (await window.electronAPI.ipc.invoke("get-auth")) as AuthData | null;
+        
+        if (!auth || !auth.token || !auth.hostname) {
+          throw new Error("Authentication required");
+        }
+
+        const { file, name } = dmPendingAttachment;
+        const arrayBuffer = await file.arrayBuffer();
+        const fileBytes = new Uint8Array(arrayBuffer);
+        
+        // For DM attachments, we need to encrypt with the conversation key
+        // Get conversation key from cache
+        const conversationKeys = (window as any).dmConversationKeys as Map<string, Uint8Array>;
+        const conversationKey = conversationKeys?.get(activeConversationId);
+        
+        if (!conversationKey) {
+          throw new Error("Conversation key not available for encryption");
+        }
+
+        const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, conversationKey);
+        const { id } = await window.electronAPI.messageService.uploadDMAttachment(
+          auth, activeConversationId, encryptedBase64, { name, size: file.size, mime: file.type }
+        );
+        
+        // Build file message payload
+        const attachmentPayload = JSON.stringify({ 
+          t: "file", 
+          body: content, 
+          a: { id, name, size: file.size, mime: file.type } 
+        });
+        content = attachmentPayload;
+      }
+
       // Send message via Direct Messaging manager
       if (typeof window.sendDirectMessage === 'function') {
         await window.sendDirectMessage(activeConversationId, content);
-        
-        // Clear input
+
+        // Clear input and attachment
         messageInput.value = '';
         messageInput.style.height = 'auto';
-        
+        clearDmAttachmentPreview(sendAttachmentPreviewEl);
+
         log.debug("Message sent successfully", { conversationId: activeConversationId });
       } else {
         log.error("Direct Messaging manager not available");
@@ -815,6 +878,49 @@
     }
   }
   
+  function tryParseMessageContent(content: string): { t: string; url?: string; title?: string } | null {
+    try {
+      const parsed = JSON.parse(content) as { t?: string; url?: string; title?: string };
+      return parsed?.t ? (parsed as { t: string; url?: string; title?: string }) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function setDmPendingAttachment(file: File, previewEl: HTMLElement | null): void {
+    const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+    if (file.size === 0 || file.size > MAX_ATTACHMENT_SIZE) return;
+    dmPendingAttachment = { file, name: file.name };
+    renderDmAttachmentPreview(previewEl);
+  }
+
+  function clearDmAttachmentPreview(previewEl: HTMLElement | null): void {
+    dmPendingAttachment = null;
+    if (!previewEl) return;
+    previewEl.classList.add('hidden');
+    while (previewEl.firstChild) previewEl.removeChild(previewEl.firstChild);
+  }
+
+  function renderDmAttachmentPreview(previewEl: HTMLElement | null): void {
+    if (!previewEl || !dmPendingAttachment) return;
+    while (previewEl.firstChild) previewEl.removeChild(previewEl.firstChild);
+    const icon = document.createElement('span');
+    icon.className = 'attachment-preview-icon';
+    icon.textContent = '📎 ';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'attachment-preview-name';
+    nameEl.textContent = dmPendingAttachment.name;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'attachment-preview-remove';
+    removeBtn.title = 'Remove attachment';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => clearDmAttachmentPreview(previewEl));
+    previewEl.appendChild(icon);
+    previewEl.appendChild(nameEl);
+    previewEl.appendChild(removeBtn);
+    previewEl.classList.remove('hidden');
+  }
+
   /**
    * Derive a 2-letter chat handle abbreviation from a username.
    * Splits on camelCase word boundaries; falls back to first 2 letters.
@@ -894,7 +1000,21 @@
 
     const textEl = document.createElement('div');
     textEl.className = 'dm-message-text';
-    textEl.textContent = messageData.content;
+    const parsedContent = tryParseMessageContent(messageData.content);
+    if (parsedContent?.t === 'gif' && parsedContent.url) {
+      const gifCard = document.createElement('div');
+      gifCard.className = 'gif-card';
+      const gifImg = document.createElement('img');
+      gifImg.src = parsedContent.url;
+      gifImg.alt = parsedContent.title || 'GIF';
+      gifImg.addEventListener('click', () => {
+        (window as any).openImageViewer?.(parsedContent.url, parsedContent.title || 'GIF');
+      });
+      gifCard.appendChild(gifImg);
+      textEl.appendChild(gifCard);
+    } else {
+      textEl.textContent = messageData.content;
+    }
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(textEl);
@@ -1169,45 +1289,6 @@
   }
   
   /**
-   * Add character count and input enhancements
-   */
-  function enhanceMessageInput(): void {
-    if (!dmChatContainer) return;
-    
-    const inputField = dmChatContainer.querySelector('.dm-input-field') as HTMLTextAreaElement;
-    const inputWrapper = dmChatContainer.querySelector('.dm-input-wrapper') as HTMLElement;
-    
-    if (!inputField || !inputWrapper) return;
-    
-    // Add character count footer
-    const footer = document.createElement('div');
-    footer.className = 'dm-input-footer';
-    footer.innerHTML = `
-      <span class="dm-character-count">0 / 2000</span>
-    `;
-    
-    inputWrapper.appendChild(footer);
-    
-    const characterCount = footer.querySelector('.dm-character-count') as HTMLElement;
-    
-    // Update character count
-    inputField.addEventListener('input', () => {
-      const length = inputField.value.length;
-      const maxLength = 2000;
-      
-      characterCount.textContent = `${length} / ${maxLength}`;
-      
-      if (length > maxLength * 0.9) {
-        characterCount.className = 'dm-character-count warning';
-      } else if (length >= maxLength) {
-        characterCount.className = 'dm-character-count error';
-      } else {
-        characterCount.className = 'dm-character-count';
-      }
-    });
-  }
-  
-  /**
    * Enhanced search with loading state
    */
   function enhanceSearchInput(): void {
@@ -1259,7 +1340,6 @@
    * Initialize enhanced UI features
    */
   function initializeEnhancedUI(): void {
-    enhanceMessageInput();
     enhanceSearchInput();
     
     // Add context menu support
@@ -1351,7 +1431,7 @@
     }
     
     // Add keyboard navigation to input
-    const inputField = dmChatContainer.querySelector('.dm-input-field') as HTMLTextAreaElement;
+    const inputField = dmChatContainer.querySelector('.message-input') as HTMLTextAreaElement;
     if (inputField) {
       inputField.setAttribute('aria-label', 'Type a message');
       
@@ -1396,7 +1476,7 @@
       case 'Enter':
         event.preventDefault();
         // Focus the input field to reply
-        const inputField = dmChatContainer?.querySelector('.dm-input-field') as HTMLTextAreaElement;
+        const inputField = dmChatContainer?.querySelector('.message-input') as HTMLTextAreaElement;
         if (inputField) {
           inputField.focus();
         }
@@ -1504,7 +1584,7 @@
     // Add focus indicators
     document.addEventListener('focusin', (e) => {
       const target = e.target as HTMLElement;
-      if (target.matches('.dm-conversation-item, .dm-message, .dm-input-field, .dm-search-input')) {
+      if (target.matches('.dm-conversation-item, .dm-message, .message-input, .dm-search-input')) {
         addFocusIndicator(target);
       }
     });
@@ -1619,7 +1699,7 @@
     try {
       log.info("Debugging textarea functionality");
       
-      const textarea = dmChatContainer?.querySelector('.dm-input-field') as HTMLTextAreaElement;
+      const textarea = dmChatContainer?.querySelector('.message-input') as HTMLTextAreaElement;
       
       if (!textarea) {
         log.error("Textarea not found");

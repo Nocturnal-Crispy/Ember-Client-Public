@@ -332,6 +332,28 @@ contextBridge.exposeInMainWorld("electronAPI", {
         channelId,
         attachmentId
       ),
+    uploadDMAttachment: (
+      auth: unknown,
+      conversationId: string,
+      encryptedData: string,
+      meta: { name: string; size: number; mime: string }
+    ) =>
+      emberServices.uploadDMAttachment(
+        auth as AuthData,
+        conversationId,
+        encryptedData,
+        meta
+      ),
+    downloadDMAttachment: (
+      auth: unknown,
+      conversationId: string,
+      attachmentId: string
+    ) =>
+      emberServices.downloadDMAttachment(
+        auth as AuthData,
+        conversationId,
+        attachmentId
+      ),
   },
 
   emberService: {
