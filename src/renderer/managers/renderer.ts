@@ -456,6 +456,15 @@
     };
   })();
 
+  // Wire emoji button → picker
+  const emojiBtn = document.getElementById("emoji-btn") as HTMLElement | null;
+  if (emojiBtn && messageInput) {
+    emojiBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      (window as any).openEmojiPicker(emojiBtn, messageInput);
+    });
+  }
+
   // Wire attachment button → modal
   const attachmentBtn = document.getElementById("attachment-btn");
   const attachmentModal = document.getElementById("attachment-modal");

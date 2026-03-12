@@ -26,6 +26,7 @@
 @import './components/update-notifier.css';
 @import './components/version-display.css';
 @import './components/theme.css';
+@import './components/emoji-picker.css';
 
 /* Utility Layer - Helper Classes */
 @import './utilities/spacing.css';

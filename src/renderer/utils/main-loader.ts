@@ -28,6 +28,7 @@
     "../../dist/renderer/managers/version-display.js",
     "../../dist/renderer/managers/direct-messaging-manager.js",
     "../../dist/renderer/managers/direct-messaging-ui.js",
+    "../../dist/renderer/managers/emoji-picker.js",
     "../../dist/renderer/managers/renderer.js",
   ];
 
@@ -91,6 +92,7 @@
         versionDisplay,
         modalAttachment,
         modalImageViewer,
+        emojiPicker,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -115,6 +117,7 @@
         fetchFragment("version-display.html"),
         fetchFragment("modal-attachment.html"),
         fetchFragment("modal-image-viewer.html"),
+        fetchFragment("emoji-picker.html"),
       ]);
 
       // Title bar (top-level)
@@ -150,6 +153,7 @@
       document.body.appendChild(parseFragment(versionDisplay));
       document.body.appendChild(parseFragment(modalAttachment));
       document.body.appendChild(parseFragment(modalImageViewer));
+      document.body.appendChild(parseFragment(emojiPicker));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

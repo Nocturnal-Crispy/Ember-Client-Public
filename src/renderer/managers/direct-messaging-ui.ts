@@ -158,6 +158,15 @@
     if (sendButton) {
       sendButton.addEventListener('click', handleSendMessage);
     }
+
+    // Emoji button
+    const emojiButton = dmChatContainer.querySelector('#dm-emoji-btn') as HTMLButtonElement | null;
+    if (emojiButton && messageInput) {
+      emojiButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        (window as any).openEmojiPicker(emojiButton, messageInput);
+      });
+    }
     
     // Click outside handler for search results
     document.addEventListener('click', (e) => {

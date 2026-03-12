@@ -593,5 +593,7 @@ declare global {
     wsUnsubscribeFromDmConversation(conversationId: string): void;
     // Globals set by renderer.ts (DM extensions)
     closeDMScreenOnServerSwitch(): void;
+    // Globals set by emoji-picker.ts
+    openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
   }
 }
