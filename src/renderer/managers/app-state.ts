@@ -51,6 +51,9 @@ window.App = {
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,
 
+  // ── Attachment composer ───────────────────────────────────────────────────
+  pendingAttachment: null,
+
   // ── Voice & Video settings ───────────────────────────────────────────────
   _vvSounds: null,
   _micTestStream: null,

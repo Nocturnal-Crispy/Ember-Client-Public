@@ -334,7 +334,22 @@
 }
 
 .attachment-btn {
-  display: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background-color: transparent;
+  color: rgba(var(--rgb-highlight), 0.4);
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s ease;
+  font-family: 'Courier New', Courier, monospace;
+  padding: 0;
+}
+
+.attachment-btn:hover {
+  color: var(--highlight);
 }
 
 .message-input {
@@ -377,4 +392,337 @@
 
 .input-action-btn:hover {
   color: var(--highlight);
+}
+
+/* ─── Attachment Preview (pending file in composer) ───────────────────────── */
+
+.attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 4px;
+  background: rgba(var(--rgb-highlight), 0.07);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.8);
+}
+
+.attachment-preview.hidden {
+  display: none;
+}
+
+.attachment-preview-icon {
+  flex-shrink: 0;
+}
+
+.attachment-preview-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-preview-remove {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: rgba(var(--rgb-text), 0.5);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.attachment-preview-remove:hover {
+  color: var(--highlight);
+}
+
+.attachment-preview.attachment-preview-error {
+  border-color: rgba(220, 80, 80, 0.5);
+  background: rgba(220, 80, 80, 0.06);
+}
+
+.attachment-error-text {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: rgba(220, 80, 80, 0.9);
+}
+
+/* ─── Drag-and-drop target indicator ──────────────────────────────────────── */
+
+.messages-container.drag-over {
+  outline: 2px dashed rgba(var(--rgb-highlight), 0.6);
+  outline-offset: -4px;
+  background: rgba(var(--rgb-highlight), 0.04);
+}
+
+/* ─── File attachment card (rendered in message list) ─────────────────────── */
+
+.file-card {
+  display: block;
+  margin-top: 3px;
+  padding: 4px 8px;
+  background: rgba(var(--rgb-highlight), 0.07);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.8);
+}
+
+.file-card-icon {
+  margin-right: 2px;
+}
+
+.file-card-name {
+  margin-right: 8px;
+  word-break: break-all;
+}
+
+.file-card-download {
+  border: none;
+  background: transparent;
+  color: var(--highlight);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.file-card-download:hover {
+  opacity: 0.8;
+}
+
+/* ─── Inline image attachment ─────────────────────────────────────────────── */
+
+.image-card {
+  display: block;
+  margin-top: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+}
+
+/* Wrapper holds either the status text or the loaded image */
+.image-card-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  background: rgba(var(--rgb-highlight), 0.04);
+  max-width: 400px;
+}
+
+.image-card-state-loading {
+  border-style: dashed;
+  min-width: 160px;
+  min-height: 80px;
+}
+
+.image-card-state-error {
+  border-style: dashed;
+  min-width: 160px;
+  min-height: 36px;
+}
+
+/* Status text (loading / error) */
+.image-card-status {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.35);
+  padding: 6px 10px;
+}
+
+/* Hide status and show image when loaded */
+.image-card-state-loaded .image-card-status {
+  display: none;
+}
+
+.image-card-state-loading .image-card-img,
+.image-card-state-error .image-card-img {
+  display: none;
+}
+
+.image-card-img {
+  display: block;
+  max-width: 400px;
+  max-height: 300px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.image-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border: 1px solid rgba(var(--rgb-highlight), 0.15);
+  border-top: none;
+  max-width: 400px;
+  background: rgba(var(--rgb-highlight), 0.04);
+}
+
+.image-card-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(var(--rgb-text), 0.6);
+  font-size: 11px;
+}
+
+/* ─── Image viewer lightbox ────────────────────────────────────────────────── */
+
+.image-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.image-viewer-overlay.hidden {
+  display: none;
+}
+
+.image-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.2);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.image-viewer-name {
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.image-viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.image-viewer-btn {
+  background: transparent;
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
+  color: rgba(var(--rgb-text), 0.7);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  line-height: 1;
+  width: 28px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.image-viewer-btn:hover {
+  color: var(--highlight);
+  border-color: rgba(var(--rgb-highlight), 0.6);
+}
+
+.image-viewer-close {
+  font-size: 18px;
+  width: 28px;
+}
+
+.image-viewer-zoom-label {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.45);
+  min-width: 40px;
+  text-align: center;
+}
+
+.image-viewer-stage {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  position: relative;
+}
+
+.image-viewer-stage.dragging {
+  cursor: grabbing;
+}
+
+.image-viewer-img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none; /* let stage handle all mouse events */
+}
+
+/* ─── Attachment modal ─────────────────────────────────────────────────────── */
+
+.attachment-modal-container {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.modal-close-x {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: rgba(var(--rgb-text), 0.5);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.modal-close-x:hover {
+  color: var(--text);
+}
+
+.attachment-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachment-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(var(--rgb-highlight), 0.06);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.attachment-option-btn:hover {
+  background: rgba(var(--rgb-highlight), 0.14);
+}
+
+.attachment-option-icon {
+  font-size: 16px;
 }
