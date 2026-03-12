@@ -1,0 +1,143 @@
+/* ─── GIF Picker ──────────────────────────────────────────────────────── */
+
+.gif-picker-panel {
+  position: fixed;
+  z-index: 9000;
+  width: 360px;
+  height: 420px;
+  background: var(--background-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #3a3a5c);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gif-picker-panel.hidden {
+  display: none;
+}
+
+.gif-picker-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color, #3a3a5c);
+  background: var(--background-tertiary, #16161e);
+}
+
+.gif-picker-search-input {
+  width: 100%;
+  background: var(--background-primary, #131320);
+  border: 1px solid var(--border-color, #3a3a5c);
+  border-radius: 4px;
+  color: var(--text-normal, #d4d4f0);
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.gif-picker-search-input:focus {
+  border-color: var(--accent-color, #7289da);
+}
+
+.gif-picker-search-input::placeholder {
+  color: var(--text-muted, #72727e);
+}
+
+.gif-picker-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #3a3a5c) transparent;
+  min-height: 0;
+}
+
+.gif-picker-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.gif-picker-grid::-webkit-scrollbar-thumb {
+  background: var(--border-color, #3a3a5c);
+  border-radius: 2px;
+}
+
+.gif-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted, #72727e);
+  font-size: 13px;
+  padding: 32px 16px;
+}
+
+.gif-picker-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted, #72727e);
+  font-size: 13px;
+  padding: 32px 16px;
+}
+
+.gif-picker-item {
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--background-primary, #131320);
+  border: 2px solid transparent;
+  transition: border-color 0.1s, transform 0.1s;
+  height: 120px;
+}
+
+.gif-picker-item:hover {
+  border-color: var(--accent-color, #7289da);
+  transform: scale(1.02);
+}
+
+.gif-picker-item img {
+  width: 100%;
+  height: 120px;
+  display: block;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.gif-picker-footer {
+  padding: 4px 8px;
+  border-top: 1px solid var(--border-color, #3a3a5c);
+  background: var(--background-tertiary, #16161e);
+  text-align: right;
+}
+
+.gif-picker-attribution {
+  font-size: 10px;
+  color: var(--text-muted, #72727e);
+  letter-spacing: 0.02em;
+}
+
+/* ─── GIF message in chat ─────────────────────────────────────────────── */
+
+.gif-card {
+  margin-top: 4px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: inline-block;
+  max-width: 320px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.gif-card:hover {
+  border-color: var(--accent-color, #7289da);
+}
+
+.gif-card img {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: 4px;
+}
