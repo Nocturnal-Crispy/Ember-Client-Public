@@ -6,6 +6,9 @@
 @import './base/reset.css';
 @import './base/typography.css';
 
+/* Import main layout styles */
+@import './layout/title-bar.css';
+
 /* Import login components */
 @import './components/login-chrome.css';
 @import './components/login-form.css';

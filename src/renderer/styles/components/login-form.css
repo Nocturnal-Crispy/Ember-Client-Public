@@ -8,12 +8,14 @@
 }
 
 .login-card {
-  background: #2f3136;
-  border-radius: 8px;
-  padding: 40px;
+  background: var(--background);
+  border: 2px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 0px;
+  padding: 32px;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 0 0 1px rgba(var(--rgb-highlight), 0.2);
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .login-header {
@@ -22,28 +24,39 @@
 }
 
 .login-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #ffffff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--highlight);
   margin-bottom: 8px;
+  letter-spacing: 2px;
 }
 
+.login-header h1::before { content: '-- '; }
+.login-header h1::after  { content: '--'; }
+
 .login-header p {
-  font-size: 14px;
-  color: #b9bbbe;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .error-banner {
-  background: #ed4245;
-  color: #ffffff;
+  background: rgba(var(--rgb-dnd-color), 0.2);
+  border: 1px solid var(--dnd-color);
+  color: var(--dnd-color);
   padding: 12px 16px;
-  border-radius: 4px;
+  border-radius: 0px;
   margin-bottom: 20px;
-  font-size: 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
   animation: slideDown 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .error-banner.hidden {
@@ -74,27 +87,30 @@
 }
 
 .form-group label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #b9bbbe;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--highlight);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 .form-group input {
-  background: #40444b;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: #dcddde;
-  font-size: 16px;
+  background: rgba(var(--rgb-surface), 0.5);
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 0px;
+  color: var(--text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
   padding: 12px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #5865f2;
-  background: #383a40;
+  border-color: var(--highlight);
+  background: rgba(var(--rgb-surface), 0.8);
+  box-shadow: 0 0 0 1px var(--highlight);
 }
 
 .form-group input:disabled {
@@ -103,7 +119,9 @@
 }
 
 .form-group input::placeholder {
-  color: #72767d;
+  color: var(--text-muted);
+  font-family: 'Courier New', Courier, monospace;
+  font-style: italic;
 }
 
 .password-input-wrapper {
@@ -121,18 +139,20 @@
   position: absolute;
   right: 12px;
   background: transparent;
-  border: none;
-  color: #b9bbbe;
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
+  border-radius: 0px;
 }
 
 .password-toggle:hover {
-  color: #dcddde;
+  color: var(--highlight);
+  border-color: rgba(var(--rgb-highlight), 0.4);
 }
 
 .password-toggle:focus {
@@ -140,27 +160,35 @@
 }
 
 .error-message {
-  font-size: 12px;
-  color: #ed4245;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: var(--dnd-color);
   margin-top: -4px;
   min-height: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .submit-btn {
-  background: #ed4245;
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-  font-weight: 600;
+  background: rgba(var(--rgb-highlight), 0.2);
+  border: 2px solid var(--highlight);
+  color: var(--highlight);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  font-weight: bold;
   padding: 14px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   margin-top: 8px;
+  border-radius: 0px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #e1a5a6;
+  background: rgba(var(--rgb-highlight), 0.3);
+  border-color: rgba(var(--rgb-highlight), 0.8);
+  color: var(--highlight);
 }
 
 .submit-btn:disabled {
@@ -171,25 +199,32 @@
 .form-footer {
   margin-top: 16px;
   text-align: center;
-  font-size: 14px;
-  color: #b9bbbe;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .link-btn {
   background: transparent;
-  border: none;
-  color: #5865f2;
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  color: var(--highlight);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  font-weight: bold;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
   margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 0px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .link-btn:hover {
-  color: #4752c4;
-  text-decoration: underline;
+  background: rgba(var(--rgb-highlight), 0.1);
+  border-color: var(--highlight);
+  color: var(--highlight);
 }
 
 @media (max-width: 640px) {
