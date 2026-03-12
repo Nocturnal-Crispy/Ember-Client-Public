@@ -236,6 +236,276 @@
     });
   }
 
+  // ─── Attachment composer ───────────────────────────────────────────────────
+
+  const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5 MB
+
+  function clearPendingAttachment(): void {
+    App.pendingAttachment = null;
+    const preview = document.getElementById("attachment-preview");
+    if (!preview) return;
+    if (attachmentErrorTimer !== null) { clearTimeout(attachmentErrorTimer); attachmentErrorTimer = null; }
+    preview.classList.add("hidden");
+    preview.classList.remove("attachment-preview-error");
+    while (preview.firstChild) preview.removeChild(preview.firstChild);
+  }
+
+  function renderAttachmentPreview(): void {
+    const preview = document.getElementById("attachment-preview");
+    if (!preview) return;
+    while (preview.firstChild) preview.removeChild(preview.firstChild);
+    if (!App.pendingAttachment) {
+      preview.classList.add("hidden");
+      return;
+    }
+    const icon = document.createElement("span");
+    icon.className = "attachment-preview-icon";
+    icon.textContent = "📎 ";
+    const nameEl = document.createElement("span");
+    nameEl.className = "attachment-preview-name";
+    nameEl.textContent = App.pendingAttachment.name;
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "attachment-preview-remove";
+    removeBtn.title = "Remove attachment";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", clearPendingAttachment);
+    preview.appendChild(icon);
+    preview.appendChild(nameEl);
+    preview.appendChild(removeBtn);
+    preview.classList.remove("hidden");
+  }
+
+  let attachmentErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function showAttachmentError(message: string): void {
+    const preview = document.getElementById("attachment-preview");
+    if (!preview) return;
+    if (attachmentErrorTimer !== null) clearTimeout(attachmentErrorTimer);
+    while (preview.firstChild) preview.removeChild(preview.firstChild);
+    const errEl = document.createElement("span");
+    errEl.className = "attachment-error-text";
+    errEl.textContent = message;
+    preview.appendChild(errEl);
+    preview.classList.remove("hidden");
+    preview.classList.add("attachment-preview-error");
+    attachmentErrorTimer = setTimeout(() => {
+      preview.classList.add("hidden");
+      preview.classList.remove("attachment-preview-error");
+      while (preview.firstChild) preview.removeChild(preview.firstChild);
+      attachmentErrorTimer = null;
+    }, 4000);
+  }
+
+  function setPendingAttachment(file: File): void {
+    if (file.size === 0) return;
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      log.warn("Attachment too large", { name: file.name, size: file.size });
+      showAttachmentError(`File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Maximum size is 5 MB.`);
+      return;
+    }
+    App.pendingAttachment = { file, name: file.name, size: file.size, type: file.type };
+    renderAttachmentPreview();
+  }
+
+  window.clearPendingAttachment = clearPendingAttachment;
+  (window as any).showInputError = showAttachmentError;
+
+  // ─── Image viewer lightbox ───────────────────────────────────────────────────
+
+  (function wireImageViewer(): void {
+    const overlay = document.getElementById("image-viewer-modal");
+    const stage   = document.getElementById("image-viewer-stage");
+    const img     = document.getElementById("image-viewer-img") as HTMLImageElement | null;
+    const nameEl  = document.getElementById("image-viewer-name");
+    const zoomLbl = document.getElementById("image-viewer-zoom-label");
+    const btnIn   = document.getElementById("image-viewer-zoom-in");
+    const btnOut  = document.getElementById("image-viewer-zoom-out");
+    const btnReset= document.getElementById("image-viewer-reset");
+    const btnClose= document.getElementById("image-viewer-close");
+
+    if (!overlay || !stage || !img) return;
+
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    const MIN_SCALE = 0.1;
+    const MAX_SCALE = 10;
+    const ZOOM_STEP = 0.25;
+
+    function applyTransform(): void {
+      img!.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      if (zoomLbl) zoomLbl.textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function clampPan(): void {
+      if (!img || !stage) return;
+      const sw = stage.clientWidth;
+      const sh = stage.clientHeight;
+      const iw = img.naturalWidth  * scale;
+      const ih = img.naturalHeight * scale;
+      const maxX = Math.max(0, (iw - sw) / 2);
+      const maxY = Math.max(0, (ih - sh) / 2);
+      panX = Math.max(-maxX, Math.min(maxX, panX));
+      panY = Math.max(-maxY, Math.min(maxY, panY));
+    }
+
+    function resetView(): void {
+      if (!img || !stage) return;
+      const sw = stage.clientWidth;
+      const sh = stage.clientHeight;
+      const fitScale = Math.min(sw / img.naturalWidth, sh / img.naturalHeight, 1);
+      scale = fitScale;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function zoom(delta: number, originX?: number, originY?: number): void {
+      if (!stage) return;
+      const prevScale = scale;
+      scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta));
+      if (scale === prevScale) return;
+      // Adjust pan to zoom toward the cursor position
+      if (originX !== undefined && originY !== undefined) {
+        const rect = stage.getBoundingClientRect();
+        const ox = originX - rect.left - rect.width  / 2;
+        const oy = originY - rect.top  - rect.height / 2;
+        panX = ox - (scale / prevScale) * (ox - panX);
+        panY = oy - (scale / prevScale) * (oy - panY);
+      }
+      clampPan();
+      applyTransform();
+    }
+
+    // Mouse wheel zoom
+    stage.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      zoom(delta, e.clientX, e.clientY);
+    }, { passive: false });
+
+    // Button zoom
+    btnIn?.addEventListener("click",    () => zoom(ZOOM_STEP));
+    btnOut?.addEventListener("click",   () => zoom(-ZOOM_STEP));
+    btnReset?.addEventListener("click", resetView);
+
+    // Double-click to reset
+    stage.addEventListener("dblclick", resetView);
+
+    // Drag to pan
+    let dragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    stage.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      panStartX = panX;
+      panStartY = panY;
+      stage.classList.add("dragging");
+      e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      panX = panStartX + (e.clientX - dragStartX);
+      panY = panStartY + (e.clientY - dragStartY);
+      clampPan();
+      applyTransform();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      stage.classList.remove("dragging");
+    });
+
+    // Close handlers
+    function closeViewer(): void {
+      overlay!.classList.add("hidden");
+      img!.src = "";
+    }
+
+    btnClose?.addEventListener("click", closeViewer);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeViewer();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !overlay.classList.contains("hidden")) {
+        closeViewer();
+      }
+    });
+
+    // Public API
+    (window as any).openImageViewer = function(src: string, name: string): void {
+      if (!img) return;
+      img.src = src;
+      img.alt = name;
+      if (nameEl) nameEl.textContent = name;
+      overlay.classList.remove("hidden");
+      // Wait for image dimensions then fit to screen
+      if (img.complete && img.naturalWidth) {
+        resetView();
+      } else {
+        img.onload = resetView;
+      }
+    };
+  })();
+
+  // Wire attachment button → modal
+  const attachmentBtn = document.getElementById("attachment-btn");
+  const attachmentModal = document.getElementById("attachment-modal");
+  const attachmentModalClose = document.getElementById("attachment-modal-close");
+  const uploadFileBtn = document.getElementById("upload-file-btn");
+  const fileInput = document.getElementById("attachment-file-input") as HTMLInputElement | null;
+
+  attachmentBtn?.addEventListener("click", () => {
+    attachmentModal?.classList.remove("hidden");
+  });
+
+  attachmentModalClose?.addEventListener("click", () => {
+    attachmentModal?.classList.add("hidden");
+  });
+
+  attachmentModal?.addEventListener("click", (e) => {
+    if (e.target === attachmentModal) attachmentModal.classList.add("hidden");
+  });
+
+  uploadFileBtn?.addEventListener("click", () => {
+    attachmentModal?.classList.add("hidden");
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) setPendingAttachment(file);
+    fileInput.value = "";
+  });
+
+  // Drag-and-drop onto the messages container
+  const messagesEl = document.getElementById("messages");
+  messagesEl?.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    messagesEl.classList.add("drag-over");
+  });
+  messagesEl?.addEventListener("dragleave", (e) => {
+    if (!messagesEl.contains(e.relatedTarget as Node)) {
+      messagesEl.classList.remove("drag-over");
+    }
+  });
+  messagesEl?.addEventListener("drop", (e) => {
+    e.preventDefault();
+    messagesEl.classList.remove("drag-over");
+    const file = (e as DragEvent).dataTransfer?.files[0];
+    if (file) setPendingAttachment(file);
+  });
+
+  // ─── Message input ─────────────────────────────────────────────────────────
+
   if (messageInput) {
     messageInput.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
@@ -246,7 +516,7 @@
           // Prevent default newline behavior and send message
           e.preventDefault();
           const plaintext = messageInput.value.trim();
-          if (plaintext) {
+          if (plaintext || App.pendingAttachment) {
             messageInput.value = "";
             await window.sendEncryptedMessage(plaintext);
           }

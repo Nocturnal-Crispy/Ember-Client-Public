@@ -195,6 +195,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
       preloadLog("debug", "Crypto: decryptMessage");
       return emberCrypto.decryptMessage(ciphertextBase64, emberKey);
     },
+    encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
+      const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+      const cipherBytes = nacl.secretbox(fileBytes, nonce, key);
+      const combined = new Uint8Array(nonce.length + cipherBytes.length);
+      combined.set(nonce, 0);
+      combined.set(cipherBytes, nonce.length);
+      return naclUtil.encodeBase64(combined);
+    },
+    decryptFileBytes: (encryptedBase64: string, key: Uint8Array): Uint8Array | null => {
+      const combined = naclUtil.decodeBase64(encryptedBase64);
+      const nonce = combined.slice(0, nacl.secretbox.nonceLength);
+      const cipher = combined.slice(nacl.secretbox.nonceLength);
+      return nacl.secretbox.open(cipher, nonce, key);
+    },
     encryptEmberKeyForInvite: (emberKey: Uint8Array, inviteCode: string) => {
       preloadLog("debug", "Crypto: encryptEmberKeyForInvite");
       return emberCrypto.encryptEmberKeyForInvite(emberKey, inviteCode);
@@ -295,6 +309,28 @@ contextBridge.exposeInMainWorld("electronAPI", {
         messageId,
         plaintext,
         emberKey
+      ),
+    uploadAttachment: (
+      auth: unknown,
+      channelId: string,
+      encryptedData: string,
+      meta: { name: string; size: number; mime: string }
+    ) =>
+      emberServices.uploadAttachment(
+        auth as AuthData,
+        channelId,
+        encryptedData,
+        meta
+      ),
+    downloadAttachment: (
+      auth: unknown,
+      channelId: string,
+      attachmentId: string
+    ) =>
+      emberServices.downloadAttachment(
+        auth as AuthData,
+        channelId,
+        attachmentId
       ),
   },
 

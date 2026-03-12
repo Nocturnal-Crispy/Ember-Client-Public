@@ -89,6 +89,8 @@
         modalSettings,
         overlayReconnection,
         versionDisplay,
+        modalAttachment,
+        modalImageViewer,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -111,6 +113,8 @@
         fetchFragment("modal-settings.html"),
         fetchFragment("overlay-reconnection.html"),
         fetchFragment("version-display.html"),
+        fetchFragment("modal-attachment.html"),
+        fetchFragment("modal-image-viewer.html"),
       ]);
 
       // Title bar (top-level)
@@ -144,6 +148,8 @@
       document.body.appendChild(parseFragment(modalSettings));
       document.body.appendChild(parseFragment(overlayReconnection));
       document.body.appendChild(parseFragment(versionDisplay));
+      document.body.appendChild(parseFragment(modalAttachment));
+      document.body.appendChild(parseFragment(modalImageViewer));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

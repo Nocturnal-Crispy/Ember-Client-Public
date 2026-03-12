@@ -149,6 +149,31 @@ declare global {
     decodeUTF8(str: string): Uint8Array;
   }
 
+  // ─── Attachment types ─────────────────────────────────────────────────────
+
+  interface AttachmentData {
+    id: string;
+    name: string;
+    size: number;
+    mime: string;
+  }
+
+  interface AttachmentDownloadResult {
+    id: string;
+    encrypted_data: string;
+    original_name: string;
+    content_type: string;
+    size_bytes: number;
+    created_at: number;
+  }
+
+  interface PendingAttachment {
+    file: File;
+    name: string;
+    size: number;
+    type: string;
+  }
+
   interface EmberCryptoAPI {
     generateRecoveryCode(): string;
     encryptPrivateKeyWithRecoveryCode(
@@ -185,6 +210,8 @@ declare global {
       inviteCode: string,
       saltBase64: string
     ): Promise<Uint8Array | null>;
+    encryptFileBytes(fileBytes: Uint8Array, key: Uint8Array): string;
+    decryptFileBytes(encryptedBase64: string, key: Uint8Array): Uint8Array | null;
   }
 
   interface IPCRenderer {
@@ -251,6 +278,17 @@ declare global {
       plaintext: string,
       emberKey: Uint8Array
     ): Promise<void>;
+    uploadAttachment(
+      auth: AuthData,
+      channelId: string,
+      encryptedData: string,
+      meta: { name: string; size: number; mime: string }
+    ): Promise<{ id: string; created_at: number }>;
+    downloadAttachment(
+      auth: AuthData,
+      channelId: string,
+      attachmentId: string
+    ): Promise<AttachmentDownloadResult>;
   }
 
   interface EmberServiceAPI {
@@ -318,6 +356,7 @@ declare global {
     currentIconData: string | null;
     currentIconSource: "upload" | "url";
     pendingInvite: Record<string, unknown> | null;
+    pendingAttachment: PendingAttachment | null;
     _vvSounds: Partial<Record<string, boolean>> | null;
     _micTestStream: MediaStream | null;
     _micTestAnimFrame: number | null;
@@ -375,8 +414,11 @@ declare global {
       text: string,
       timestamp?: number,
       prepend?: boolean,
-      messageId?: string
+      messageId?: string,
+      chatColor?: string,
+      attachment?: AttachmentData
     ): void;
+    clearPendingAttachment(): void;
     formatTimestamp(unixSeconds?: number): string;
     // Globals set by ember-manager.ts
     fetchEmbers(): Promise<Ember[]>;

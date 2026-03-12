@@ -12,8 +12,9 @@
   <div class="messages-container" id="messages"></div>
 
   <div class="message-input-container">
+    <input type="file" id="attachment-file-input" style="display:none">
+    <div id="attachment-preview" class="attachment-preview hidden"></div>
     <div class="message-input-wrapper">
-      <button class="attachment-btn">+</button>
       <textarea
         class="message-input"
         placeholder="Message #general"
@@ -21,6 +22,7 @@
         rows="1"
       ></textarea>
       <div class="input-actions">
+        <button class="attachment-btn" id="attachment-btn" title="Add Attachment">+</button>
         <button class="input-action-btn">😊</button>
         <button class="input-action-btn">GIF</button>
       </div>

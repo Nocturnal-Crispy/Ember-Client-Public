@@ -51,6 +51,209 @@
     oldestMessageId?: string; // Store oldest message ID for pagination
   }
 
+  // ─── Attachment message helpers ────────────────────────────────────────────
+
+  interface LocalAttachmentData {
+    id: string;
+    name: string;
+    size: number;
+    mime: string;
+  }
+
+  async function buildFileMessageText(
+    text: string,
+    auth: AuthData,
+    channelId: string,
+    emberKey: Uint8Array
+  ): Promise<string> {
+    const attachment = App.pendingAttachment!;
+    const { file, name, size, type } = attachment;
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBytes = new Uint8Array(arrayBuffer);
+    const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, emberKey);
+    const { id } = await window.electronAPI.messageService.uploadAttachment(
+      auth, channelId, encryptedBase64, { name, size, mime: type }
+    );
+    const payload: { t: string; body: string; a: LocalAttachmentData } = {
+      t: "file",
+      body: text,
+      a: { id, name, size, mime: type },
+    };
+    return JSON.stringify(payload);
+  }
+
+  function isImageMime(mime: string): boolean {
+    return typeof mime === "string" && mime.startsWith("image/");
+  }
+
+  function createFileCard(attachment: LocalAttachmentData): HTMLElement {
+    if (isImageMime(attachment.mime)) {
+      return createImageCard(attachment);
+    }
+    const card = document.createElement("div");
+    card.className = "file-card";
+    const icon = document.createElement("span");
+    icon.className = "file-card-icon";
+    icon.textContent = "📎 ";
+    const nameEl = document.createElement("span");
+    nameEl.className = "file-card-name";
+    nameEl.textContent = attachment.name;
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "file-card-download";
+    dlBtn.textContent = "[download]";
+    dlBtn.addEventListener("click", () => { downloadFileAttachment(attachment); });
+    card.appendChild(icon);
+    card.appendChild(nameEl);
+    card.appendChild(dlBtn);
+    return card;
+  }
+
+  function createImageCard(attachment: LocalAttachmentData): HTMLElement {
+    // Capture channel/ember context at creation time — channel may change before async load completes
+    const capturedChannelId = App.activeChannelId;
+    const capturedEmberId = App.activeEmberId;
+
+    const card = document.createElement("div");
+    card.className = "image-card";
+
+    const imgWrapper = document.createElement("div");
+    imgWrapper.className = "image-card-wrapper image-card-state-loading";
+
+    const statusEl = document.createElement("span");
+    statusEl.className = "image-card-status";
+    statusEl.textContent = "[loading...]";
+
+    const img = document.createElement("img");
+    img.className = "image-card-img";
+    img.alt = attachment.name;
+
+    imgWrapper.appendChild(statusEl);
+    imgWrapper.appendChild(img);
+
+    const footer = document.createElement("div");
+    footer.className = "image-card-footer";
+    const nameEl = document.createElement("span");
+    nameEl.className = "image-card-name";
+    nameEl.textContent = attachment.name;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "file-card-download";
+    saveBtn.textContent = "[save]";
+    saveBtn.addEventListener("click", () => { downloadFileAttachment(attachment, capturedChannelId, capturedEmberId); });
+    footer.appendChild(nameEl);
+    footer.appendChild(saveBtn);
+
+    card.appendChild(imgWrapper);
+    card.appendChild(footer);
+
+    if (capturedChannelId && capturedEmberId) {
+      loadImageAttachment(attachment, img, statusEl, imgWrapper, capturedChannelId, capturedEmberId);
+    } else {
+      statusEl.textContent = "[failed to load image]";
+      imgWrapper.className = "image-card-wrapper image-card-state-error";
+    }
+    return card;
+  }
+
+  function loadImageAttachment(
+    attachment: LocalAttachmentData,
+    img: HTMLImageElement,
+    statusEl: HTMLElement,
+    wrapper: HTMLElement,
+    channelId: string,
+    emberId: string
+  ): void {
+    const emberKey = App.emberKeyCache.get(emberId);
+    if (!emberKey) {
+      statusEl.textContent = "[failed to load image]";
+      wrapper.className = "image-card-wrapper image-card-state-error";
+      return;
+    }
+    ipcRenderer.invoke("get-auth").then((authUnknown: unknown) => {
+      const auth = authUnknown as AuthData | null;
+      if (!auth) {
+        statusEl.textContent = "[failed to load image]";
+        wrapper.className = "image-card-wrapper image-card-state-error";
+        return;
+      }
+      window.electronAPI.messageService.downloadAttachment(auth, channelId, attachment.id)
+        .then((resp) => {
+          const bytes = window.electronAPI.crypto.decryptFileBytes(resp.encrypted_data, emberKey);
+          if (!bytes) {
+            statusEl.textContent = "[failed to decrypt image]";
+            wrapper.className = "image-card-wrapper image-card-state-error";
+            log.error("Failed to decrypt image attachment", { id: attachment.id });
+            return;
+          }
+          const blob = new Blob([new Uint8Array(bytes)], { type: attachment.mime || "image/png" });
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            wrapper.className = "image-card-wrapper image-card-state-loaded";
+            img.addEventListener("click", () => {
+              (window as any).openImageViewer?.(url, attachment.name);
+            });
+            // The image just expanded the layout. If that expansion is what pushed
+            // the viewport away from the bottom, scroll back down. We use the
+            // image's rendered height minus the placeholder height (80px) as the
+            // expected expansion delta, plus a small buffer. If distanceFromBottom
+            // is within that range the user was effectively at the bottom before
+            // the image loaded.
+            if (messagesContainer) {
+              const distanceFromBottom =
+                messagesContainer.scrollHeight -
+                messagesContainer.scrollTop -
+                messagesContainer.clientHeight;
+              const expandedBy = Math.max(0, (img.offsetHeight || 300) - 80);
+              if (distanceFromBottom <= expandedBy + 60) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              }
+            }
+          };
+          img.onerror = () => {
+            statusEl.textContent = "[failed to load image]";
+            wrapper.className = "image-card-wrapper image-card-state-error";
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        })
+        .catch((err: Error) => {
+          statusEl.textContent = "[failed to load image]";
+          wrapper.className = "image-card-wrapper image-card-state-error";
+          log.error("Failed to load image attachment", { id: attachment.id, error: err.message });
+        });
+    });
+  }
+
+  function downloadFileAttachment(
+    attachment: LocalAttachmentData,
+    channelId = App.activeChannelId,
+    emberId = App.activeEmberId
+  ): void {
+    if (!emberId || !channelId) return;
+    const emberKey = App.emberKeyCache.get(emberId);
+    if (!emberKey) { log.error("Cannot download: no ember key"); return; }
+    ipcRenderer.invoke("get-auth").then((authUnknown: unknown) => {
+      const auth = authUnknown as AuthData | null;
+      if (!auth) return;
+      window.electronAPI.messageService.downloadAttachment(auth, channelId, attachment.id)
+        .then((resp) => {
+          const bytes = window.electronAPI.crypto.decryptFileBytes(resp.encrypted_data, emberKey);
+          if (!bytes) { log.error("Failed to decrypt attachment", { id: attachment.id }); return; }
+          const blob = new Blob([new Uint8Array(bytes)], { type: resp.content_type || "application/octet-stream" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = resp.original_name;
+          a.click();
+          URL.revokeObjectURL(url);
+        })
+        .catch((err: Error) => {
+          log.error("Failed to download attachment", { id: attachment.id, error: err.message });
+        });
+    });
+  }
+
+  // ─── Message send ──────────────────────────────────────────────────────────
+
   async function sendEncryptedMessage(plaintext: string): Promise<void> {
     if (!App.activeChannelId || !App.activeEmberId) return;
     const emberKey = App.emberKeyCache.get(App.activeEmberId);
@@ -58,17 +261,23 @@
       log.error("Cannot send message: no ember key in cache", {
         ember_id: App.activeEmberId,
       });
-      console.error("No ember key available for encryption");
       return;
     }
+    const hasPendingAttachment = !!App.pendingAttachment;
+    if (!plaintext && !hasPendingAttachment) return;
     log.debug("Sending encrypted message", { channel_id: App.activeChannelId });
     try {
       const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) return;
+      let messageText = plaintext;
+      if (hasPendingAttachment) {
+        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId, emberKey);
+        window.clearPendingAttachment?.();
+      }
       const msgData = await window.electronAPI.messageService.sendMessage(
         auth,
         App.activeChannelId,
-        plaintext,
+        messageText,
         emberKey
       );
       log.debug("Message sent successfully", {
@@ -84,7 +293,7 @@
         channel_id: App.activeChannelId ?? "",
         error: err.message,
       });
-      console.error("Error sending message:", error);
+      (window as any).showInputError?.(`Failed to send: ${err.message}`);
     }
   }
 
@@ -294,7 +503,8 @@
     timestamp?: number,
     prepend = false,
     messageId?: string,
-    chatColor?: string
+    chatColor?: string,
+    attachment?: LocalAttachmentData
   ): void {
     const messageDiv = document.createElement("div");
     messageDiv.className = "message";
@@ -329,6 +539,9 @@
     contentEl.appendChild(textEl);
     messageDiv.appendChild(avatarEl);
     messageDiv.appendChild(contentEl);
+    if (attachment) {
+      messageDiv.appendChild(createFileCard(attachment));
+    }
     messageDiv.appendChild(createActionToolbar(messageId));
     
     // Virtual scrolling temporarily disabled - use messagesContainer directly
@@ -375,6 +588,23 @@
         msg.chat_color
       );
       return;
+    }
+    if (plaintext.startsWith('{"t":"file"')) {
+      try {
+        const parsed = JSON.parse(plaintext) as { t: string; body: string; a: LocalAttachmentData };
+        addMessage(
+          msg.username ?? "Unknown",
+          parsed.body,
+          msg.created_at,
+          prepend,
+          msg.id,
+          msg.chat_color,
+          parsed.a
+        );
+        return;
+      } catch (_) {
+        // fall through to plain-text rendering
+      }
     }
     addMessage(
       msg.username ?? "Unknown",
@@ -746,6 +976,9 @@
     oldestMessageId = null;
     isLoadingOlderMessages = false;
     App.ownedMessageIds.clear();
+
+    // Clear any pending attachment when switching channels
+    window.clearPendingAttachment?.();
 
     // Invalidate stale cache so fresh messages are always fetched from the server
     messageCache.delete(channelId);
