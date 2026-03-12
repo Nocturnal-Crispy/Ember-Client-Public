@@ -252,6 +252,33 @@
     });
   }
 
+  // ─── GIF message helpers ───────────────────────────────────────────────────
+
+  interface GifMessageData {
+    t: "gif";
+    url: string;
+    title: string;
+  }
+
+  function createGifCard(gifData: GifMessageData): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "gif-card";
+    const img = document.createElement("img");
+    img.src = gifData.url;
+    img.alt = gifData.title || "GIF";
+    img.loading = "lazy";
+    img.addEventListener("click", () => {
+      (window as any).openImageViewer?.(gifData.url, gifData.title || "GIF");
+    });
+    card.appendChild(img);
+    return card;
+  }
+
+  async function sendGifMessage(url: string, title: string): Promise<void> {
+    const payload: GifMessageData = { t: "gif", url, title };
+    await sendEncryptedMessage(JSON.stringify(payload));
+  }
+
   // ─── Message send ──────────────────────────────────────────────────────────
 
   async function sendEncryptedMessage(plaintext: string): Promise<void> {
@@ -504,7 +531,8 @@
     prepend = false,
     messageId?: string,
     chatColor?: string,
-    attachment?: LocalAttachmentData
+    attachment?: LocalAttachmentData,
+    gif?: GifMessageData
   ): void {
     const messageDiv = document.createElement("div");
     messageDiv.className = "message";
@@ -541,6 +569,9 @@
     messageDiv.appendChild(contentEl);
     if (attachment) {
       messageDiv.appendChild(createFileCard(attachment));
+    }
+    if (gif) {
+      messageDiv.appendChild(createGifCard(gif));
     }
     messageDiv.appendChild(createActionToolbar(messageId));
     
@@ -600,6 +631,24 @@
           msg.id,
           msg.chat_color,
           parsed.a
+        );
+        return;
+      } catch (_) {
+        // fall through to plain-text rendering
+      }
+    }
+    if (plaintext.startsWith('{"t":"gif"')) {
+      try {
+        const parsed = JSON.parse(plaintext) as GifMessageData;
+        addMessage(
+          msg.username ?? "Unknown",
+          "",
+          msg.created_at,
+          prepend,
+          msg.id,
+          msg.chat_color,
+          undefined,
+          parsed
         );
         return;
       } catch (_) {
@@ -1398,6 +1447,7 @@
   }
 
   window.sendEncryptedMessage = sendEncryptedMessage;
+  window.sendGifMessage = sendGifMessage;
   window.displayDecryptedMessage = displayDecryptedMessage;
   window.handleEditedMessage = handleEditedMessage;
   window.escapeHtml = escapeHtml;

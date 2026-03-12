@@ -465,6 +465,22 @@
     });
   }
 
+  // Wire gif button → picker
+  const gifBtn = document.getElementById("gif-btn") as HTMLElement | null;
+  if (gifBtn) {
+    gifBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.openGifPicker(gifBtn);
+    });
+  }
+
+  // sendGif is called by gif-picker.ts when a GIF is selected
+  window.sendGif = (url: string, title: string): void => {
+    window.sendGifMessage(url, title).catch((err: Error) => {
+      log.error("Failed to send GIF", { error: err.message });
+    });
+  };
+
   // Wire attachment button → modal
   const attachmentBtn = document.getElementById("attachment-btn");
   const attachmentModal = document.getElementById("attachment-modal");

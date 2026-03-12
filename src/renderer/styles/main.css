@@ -27,6 +27,7 @@
 @import './components/version-display.css';
 @import './components/theme.css';
 @import './components/emoji-picker.css';
+@import './components/gif-picker.css';
 
 /* Utility Layer - Helper Classes */
 @import './utilities/spacing.css';

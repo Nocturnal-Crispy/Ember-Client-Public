@@ -595,5 +595,10 @@ declare global {
     closeDMScreenOnServerSwitch(): void;
     // Globals set by emoji-picker.ts
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
+    // Globals set by gif-picker.ts
+    openGifPicker(trigger: HTMLElement): void;
+    // Globals set by message-service.ts (GIF)
+    sendGifMessage(url: string, title: string): Promise<void>;
+    sendGif(url: string, title: string): void;
   }
 }
