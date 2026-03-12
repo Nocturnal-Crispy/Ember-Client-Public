@@ -682,7 +682,9 @@
 }
 
 .modal-close-x {
-  margin-left: auto;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   border: none;
   background: transparent;
   color: rgba(var(--rgb-text), 0.5);
