@@ -406,31 +406,23 @@ declare global {
     }): Promise<void>;
     registerSentMessageId(id: string): void;
     // Globals set by message-service.ts
-    sendEncryptedMessage(plaintext: string): Promise<void>;
+    sendEncryptedMessage(channelId: string, plaintext: string): Promise<string>;
+    sendGifMessage(url: string, title: string): Promise<void>;
     displayDecryptedMessage(msg: Message, prepend?: boolean): void;
-    handleEditedMessage(payload: {
-      id: string;
-      channel_id: string;
-      ciphertext: string;
-      updated_at?: number;
-    }): void;
+    handleEditedMessage(msg: Message): void;
     escapeHtml(text: string): string;
-    loadChannelMessages(channelId: string): Promise<void>;
-    fetchMessages(
-      channelId: string,
-      beforeId?: string | null
-    ): Promise<{ messages: Message[]; hasMore: boolean }>;
-    addMessage(
-      author: string,
-      text: string,
-      timestamp?: number,
-      prepend?: boolean,
-      messageId?: string,
-      chatColor?: string,
-      attachment?: AttachmentData
-    ): void;
+    loadChannelMessages(channelId: string, forceRefresh?: boolean): Promise<void>;
+    fetchMessages(channelId: string, before?: string, limit?: number): Promise<FetchResult>;
+    addMessage(author: string, text: string, timestamp?: number, prepend?: boolean, messageId?: string, chatColor?: string, attachment?: AttachmentData, gif?: { url: string; title?: string }): void;
+    // Globals set by messages-area.ts
+    createBasicMessageElement(author: string, text: string, timestamp?: number, messageId?: string, chatColor?: string, isOwn?: boolean, attachment?: AttachmentData, gif?: { url: string; title?: string }, channelId?: string, getEmberKey?: (channelId: string) => Promise<Uint8Array | null>): HTMLElement;
+    createActionToolbar(messageId?: string, isOwn?: boolean): HTMLDivElement;
+    formatTimestamp(timestamp?: number): string;
+    toChumhandle(username: string): string;
+    // Globals set by message-service.ts
+    enterEditMode(messageDiv: HTMLElement, messageId: string): void;
+    // Globals set by renderer.ts
     clearPendingAttachment(): void;
-    formatTimestamp(unixSeconds?: number): string;
     // Globals set by ember-manager.ts
     fetchEmbers(): Promise<Ember[]>;
     renderServerList(embers: Ember[]): void;
@@ -516,6 +508,9 @@ declare global {
     }>>;
     initiateKeyExchange(conversationId: string, participantId: string): Promise<void>;
     refreshAllPresenceStates(): Promise<void>;
+    // UI helpers for ember key access
+    fetchAndCacheEmberKeyForChannel(channelId: string): Promise<Uint8Array | null>;
+    getEmberIdForDmChannel(channelId: string): string | null;
     handleDmMessage(payload: {
       id: string;
       conversation_id: string;
@@ -543,6 +538,7 @@ declare global {
       unreadCount: number;
       isOnline: boolean;
       keyExchanged: boolean;
+      createdAt?: number;
     }): void;
     displayDmMessage(messageData: {
       id: string;
@@ -588,21 +584,7 @@ declare global {
     // Test functions
     testDmMessageSend(): Promise<void>;
     debugTextarea(): void;
-    // Globals set by message-service.ts (DM extensions)
-    sendDirectMessage(conversationId: string, plaintext: string): Promise<string>;
-    displayDirectMessage(messageData: {
-      id: string;
-      conversation_id: string;
-      sender_user_id: string;
-      content: string;
-      timestamp: number;
-    }): Promise<void>;
-    cacheDmConversationKey(conversationId: string, key: Uint8Array): void;
-    removeDmConversationKey(conversationId: string): void;
-    // Globals set by websocket-service.ts (DM extensions)
-    wsSubscribeToDmConversation(conversationId: string): void;
-    wsUnsubscribeFromDmConversation(conversationId: string): void;
-    // Globals set by renderer.ts (DM extensions)
+    // Globals set by renderer.ts
     closeDMScreenOnServerSwitch(): void;
     // Globals set by emoji-picker.ts
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;

@@ -46,7 +46,10 @@ beforeAll(() => {
   // 4. Stub window.wsSubscribeToChannel (called by loadChannelMessages)
   (window as any).wsSubscribeToChannel = jest.fn();
 
-  // 5. Load the IIFE — sets window.formatTimestamp, window.escapeHtml, etc.
+  // 5. Load messages-area first (sets window.createBasicMessageElement, window.formatTimestamp, etc.)
+  require('../../../src/renderer/components/messages-area');
+
+  // 6. Load message-service (sets window.escapeHtml, window.addMessage, etc.)
   require('../../../src/renderer/services/message-service');
 });
 

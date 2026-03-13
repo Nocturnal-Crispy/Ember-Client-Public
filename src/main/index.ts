@@ -55,7 +55,7 @@ function createWindow(isAuthenticated: boolean) {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "../preload/index.js"),
-      devTools: false,
+      devTools: true,
       webSecurity: true, // Always enable web security for safety
       allowRunningInsecureContent: false, // Disable insecure content
     },

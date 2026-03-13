@@ -18,6 +18,7 @@
     "../../dist/renderer/managers/app-state.js",
     "../../dist/renderer/services/voice-service.js",
     "../../dist/renderer/services/websocket-service.js",
+    "../../dist/renderer/components/messages-area.js",
     "../../dist/renderer/services/message-service.js",
     "../../dist/renderer/managers/channel-manager.js",
     "../../dist/renderer/managers/ember-manager.js",

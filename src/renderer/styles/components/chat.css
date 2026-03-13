@@ -59,6 +59,7 @@
 .messages-container::-webkit-scrollbar-thumb { background: rgba(var(--rgb-highlight), 0.2); }
 .messages-container::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-highlight), 0.5); }
 
+
 /* ─── Welcome Banner ───────────────────────────────────────────────────────── */
 
 .welcome-message {
@@ -363,6 +364,7 @@
   background: rgba(var(--rgb-highlight), 0.04);
 }
 
+
 /* ─── File attachment card (rendered in message list) ─────────────────────── */
 
 .file-card {
@@ -398,6 +400,31 @@
 
 .file-card-download:hover {
   opacity: 0.8;
+}
+
+/* DM file attachment enhancements */
+.file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: rgba(var(--rgb-text), 0.9);
+  word-break: break-all;
+}
+
+.file-size {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.6);
+}
+
+.file-caption {
+  margin-top: 4px;
+  font-style: italic;
+  color: rgba(var(--rgb-text), 0.8);
 }
 
 /* ─── Inline image attachment ─────────────────────────────────────────────── */

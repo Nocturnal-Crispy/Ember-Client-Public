@@ -196,3 +196,4 @@ describe('openAcceptInviteModal / closeAcceptInviteModal', () => {
     expect(typeof (window as any).processInviteLink).toBe('function');
   });
 });
+

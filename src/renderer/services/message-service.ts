@@ -8,9 +8,6 @@
   const log = window.emberLog.createLogger("MessageManager");
   const emberCrypto = window.electronAPI.crypto;
   
-  // Import DM crypto from ember-shared
-  const DMCrypto = (window as any).emberShared?.crypto?.directMessaging;
-
   const messagesContainer = document.getElementById("messages");
 
   // Pagination state (per channel load)
@@ -21,10 +18,7 @@
   // Current user ID and username cached for ownership checks (set in loadChannelMessages)
   let currentUserId: string | null = null;
   let currentUsername: string = '';
-  
-  // DM conversation keys cache
-  const dmConversationKeys = new Map<string, Uint8Array>();
-  
+
   // Performance optimizations
   const messageCache = new Map<string, FetchResult>(); // channelId -> FetchResult
   const messageElements = new Map<string, HTMLElement>(); // messageId -> HTMLElement
@@ -53,13 +47,6 @@
 
   // ─── Attachment message helpers ────────────────────────────────────────────
 
-  interface LocalAttachmentData {
-    id: string;
-    name: string;
-    size: number;
-    mime: string;
-  }
-
   async function buildFileMessageText(
     text: string,
     auth: AuthData,
@@ -74,182 +61,12 @@
     const { id } = await window.electronAPI.messageService.uploadAttachment(
       auth, channelId, encryptedBase64, { name, size, mime: type }
     );
-    const payload: { t: string; body: string; a: LocalAttachmentData } = {
+    const payload: { t: string; body: string; a: AttachmentData } = {
       t: "file",
       body: text,
       a: { id, name, size, mime: type },
     };
     return JSON.stringify(payload);
-  }
-
-  function isImageMime(mime: string): boolean {
-    return typeof mime === "string" && mime.startsWith("image/");
-  }
-
-  function createFileCard(attachment: LocalAttachmentData): HTMLElement {
-    if (isImageMime(attachment.mime)) {
-      return createImageCard(attachment);
-    }
-    const card = document.createElement("div");
-    card.className = "file-card";
-    const icon = document.createElement("span");
-    icon.className = "file-card-icon";
-    icon.textContent = "📎 ";
-    const nameEl = document.createElement("span");
-    nameEl.className = "file-card-name";
-    nameEl.textContent = attachment.name;
-    const dlBtn = document.createElement("button");
-    dlBtn.className = "file-card-download";
-    dlBtn.textContent = "[download]";
-    dlBtn.addEventListener("click", () => { downloadFileAttachment(attachment); });
-    card.appendChild(icon);
-    card.appendChild(nameEl);
-    card.appendChild(dlBtn);
-    return card;
-  }
-
-  function createImageCard(attachment: LocalAttachmentData): HTMLElement {
-    // Capture channel/ember context at creation time — channel may change before async load completes
-    const capturedChannelId = App.activeChannelId;
-    const capturedEmberId = App.activeEmberId;
-
-    const card = document.createElement("div");
-    card.className = "image-card";
-
-    const imgWrapper = document.createElement("div");
-    imgWrapper.className = "image-card-wrapper image-card-state-loading";
-
-    const statusEl = document.createElement("span");
-    statusEl.className = "image-card-status";
-    statusEl.textContent = "[loading...]";
-
-    const img = document.createElement("img");
-    img.className = "image-card-img";
-    img.alt = attachment.name;
-
-    imgWrapper.appendChild(statusEl);
-    imgWrapper.appendChild(img);
-
-    const footer = document.createElement("div");
-    footer.className = "image-card-footer";
-    const nameEl = document.createElement("span");
-    nameEl.className = "image-card-name";
-    nameEl.textContent = attachment.name;
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "file-card-download";
-    saveBtn.textContent = "[save]";
-    saveBtn.addEventListener("click", () => { downloadFileAttachment(attachment, capturedChannelId, capturedEmberId); });
-    footer.appendChild(nameEl);
-    footer.appendChild(saveBtn);
-
-    card.appendChild(imgWrapper);
-    card.appendChild(footer);
-
-    if (capturedChannelId && capturedEmberId) {
-      loadImageAttachment(attachment, img, statusEl, imgWrapper, capturedChannelId, capturedEmberId);
-    } else {
-      statusEl.textContent = "[failed to load image]";
-      imgWrapper.className = "image-card-wrapper image-card-state-error";
-    }
-    return card;
-  }
-
-  function loadImageAttachment(
-    attachment: LocalAttachmentData,
-    img: HTMLImageElement,
-    statusEl: HTMLElement,
-    wrapper: HTMLElement,
-    channelId: string,
-    emberId: string
-  ): void {
-    const emberKey = App.emberKeyCache.get(emberId);
-    if (!emberKey) {
-      statusEl.textContent = "[failed to load image]";
-      wrapper.className = "image-card-wrapper image-card-state-error";
-      return;
-    }
-    ipcRenderer.invoke("get-auth").then((authUnknown: unknown) => {
-      const auth = authUnknown as AuthData | null;
-      if (!auth) {
-        statusEl.textContent = "[failed to load image]";
-        wrapper.className = "image-card-wrapper image-card-state-error";
-        return;
-      }
-      window.electronAPI.messageService.downloadAttachment(auth, channelId, attachment.id)
-        .then((resp) => {
-          const bytes = window.electronAPI.crypto.decryptFileBytes(resp.encrypted_data, emberKey);
-          if (!bytes) {
-            statusEl.textContent = "[failed to decrypt image]";
-            wrapper.className = "image-card-wrapper image-card-state-error";
-            log.error("Failed to decrypt image attachment", { id: attachment.id });
-            return;
-          }
-          const blob = new Blob([new Uint8Array(bytes)], { type: attachment.mime || "image/png" });
-          const url = URL.createObjectURL(blob);
-          img.onload = () => {
-            wrapper.className = "image-card-wrapper image-card-state-loaded";
-            img.addEventListener("click", () => {
-              (window as any).openImageViewer?.(url, attachment.name);
-            });
-            // The image just expanded the layout. If that expansion is what pushed
-            // the viewport away from the bottom, scroll back down. We use the
-            // image's rendered height minus the placeholder height (80px) as the
-            // expected expansion delta, plus a small buffer. If distanceFromBottom
-            // is within that range the user was effectively at the bottom before
-            // the image loaded.
-            if (messagesContainer) {
-              const distanceFromBottom =
-                messagesContainer.scrollHeight -
-                messagesContainer.scrollTop -
-                messagesContainer.clientHeight;
-              const expandedBy = Math.max(0, (img.offsetHeight || 300) - 80);
-              if (distanceFromBottom <= expandedBy + 60) {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-              }
-            }
-          };
-          img.onerror = () => {
-            statusEl.textContent = "[failed to load image]";
-            wrapper.className = "image-card-wrapper image-card-state-error";
-            URL.revokeObjectURL(url);
-          };
-          img.src = url;
-        })
-        .catch((err: Error) => {
-          statusEl.textContent = "[failed to load image]";
-          wrapper.className = "image-card-wrapper image-card-state-error";
-          log.error("Failed to load image attachment", { id: attachment.id, error: err.message });
-        });
-    });
-  }
-
-  function downloadFileAttachment(
-    attachment: LocalAttachmentData,
-    channelId = App.activeChannelId,
-    emberId = App.activeEmberId
-  ): void {
-    if (!emberId || !channelId) return;
-    const emberKey = App.emberKeyCache.get(emberId);
-    if (!emberKey) { log.error("Cannot download: no ember key"); return; }
-    ipcRenderer.invoke("get-auth").then((authUnknown: unknown) => {
-      const auth = authUnknown as AuthData | null;
-      if (!auth) return;
-      window.electronAPI.messageService.downloadAttachment(auth, channelId, attachment.id)
-        .then((resp) => {
-          const bytes = window.electronAPI.crypto.decryptFileBytes(resp.encrypted_data, emberKey);
-          if (!bytes) { log.error("Failed to decrypt attachment", { id: attachment.id }); return; }
-          const blob = new Blob([new Uint8Array(bytes)], { type: resp.content_type || "application/octet-stream" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = resp.original_name;
-          a.click();
-          URL.revokeObjectURL(url);
-        })
-        .catch((err: Error) => {
-          log.error("Failed to download attachment", { id: attachment.id, error: err.message });
-        });
-    });
   }
 
   // ─── GIF message helpers ───────────────────────────────────────────────────
@@ -260,50 +77,42 @@
     title: string;
   }
 
-  function createGifCard(gifData: GifMessageData): HTMLElement {
-    const card = document.createElement("div");
-    card.className = "gif-card";
-    const img = document.createElement("img");
-    img.src = gifData.url;
-    img.alt = gifData.title || "GIF";
-    img.loading = "lazy";
-    img.addEventListener("click", () => {
-      (window as any).openImageViewer?.(gifData.url, gifData.title || "GIF");
-    });
-    card.appendChild(img);
-    return card;
-  }
-
   async function sendGifMessage(url: string, title: string): Promise<void> {
     const payload: GifMessageData = { t: "gif", url, title };
-    await sendEncryptedMessage(JSON.stringify(payload));
+    if (App.activeChannelId) {
+      await sendEncryptedMessage(App.activeChannelId, JSON.stringify(payload));
+    }
   }
 
   // ─── Message send ──────────────────────────────────────────────────────────
 
-  async function sendEncryptedMessage(plaintext: string): Promise<void> {
-    if (!App.activeChannelId || !App.activeEmberId) return;
+  async function sendEncryptedMessage(channelId: string, plaintext: string): Promise<string> {
+    const targetChannelId = channelId || App.activeChannelId;
+    if (!targetChannelId || !App.activeEmberId) {
+      throw new Error("No active channel or ember");
+    }
     const emberKey = App.emberKeyCache.get(App.activeEmberId);
     if (!emberKey) {
-      log.error("Cannot send message: no ember key in cache", {
+      log.error("Cannot encrypt message: ember key not in cache", {
         ember_id: App.activeEmberId,
+        channel_id: targetChannelId,
       });
-      return;
+      throw new Error("Ember key not available");
     }
     const hasPendingAttachment = !!App.pendingAttachment;
-    if (!plaintext && !hasPendingAttachment) return;
+    if (!plaintext && !hasPendingAttachment) return "";
     log.debug("Sending encrypted message", { channel_id: App.activeChannelId });
     try {
       const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
-      if (!auth || !auth.token || !auth.hostname) return;
+      if (!auth || !auth.token || !auth.hostname) return "";
       let messageText = plaintext;
       if (hasPendingAttachment) {
-        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId, emberKey);
-        window.clearPendingAttachment?.();
+        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey);
+        // clearPendingAttachment not available in message-service
       }
       const msgData = await window.electronAPI.messageService.sendMessage(
         auth,
-        App.activeChannelId,
+        App.activeChannelId!,
         messageText,
         emberKey
       );
@@ -314,6 +123,7 @@
       window.registerSentMessageId(msgData.id);
       App.ownedMessageIds.add(msgData.id);
       displayDecryptedMessage(msgData);
+      return msgData.id;
     } catch (error) {
       const err = error as Error;
       log.error("Error sending message", {
@@ -321,40 +131,8 @@
         error: err.message,
       });
       (window as any).showInputError?.(`Failed to send: ${err.message}`);
+      throw err;
     }
-  }
-
-  function formatTimestamp(unixSeconds?: number): string {
-    const date = unixSeconds ? new Date(unixSeconds * 1000) : new Date();
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-    const timeStr = date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    if (isToday) return `Today at ${timeStr}`;
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString())
-      return `Yesterday at ${timeStr}`;
-    return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${timeStr}`;
-  }
-
-  function createActionButton(
-    icon: string,
-    title: string,
-    onClick: () => void
-  ): HTMLButtonElement {
-    const btn = document.createElement("button");
-    btn.className = "message-action-btn";
-    btn.title = title;
-    btn.textContent = icon;
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      onClick();
-    });
-    return btn;
   }
 
   function markMessageAsEdited(messageDiv: HTMLElement): void {
@@ -491,39 +269,6 @@
     markMessageAsEdited(messageDiv);
   }
 
-  function createActionToolbar(messageId?: string): HTMLDivElement {
-    const toolbar = document.createElement("div");
-    toolbar.className = "message-action-bar";
-    const isOwn = !!messageId && App.ownedMessageIds.has(messageId);
-    toolbar.appendChild(
-      createActionButton("😊", "Add Reaction", () => {
-        log.debug("Reaction clicked", { message_id: messageId ?? "" });
-      })
-    );
-    if (isOwn) {
-      toolbar.appendChild(
-        createActionButton("✏", "Edit", () => {
-          const msgDiv = toolbar.closest(".message") as HTMLElement | null;
-          if (msgDiv && messageId) enterEditMode(msgDiv, messageId);
-        })
-      );
-    }
-    toolbar.appendChild(
-      createActionButton("↗", "Forward", () => {
-        log.debug("Forward clicked", { message_id: messageId ?? "" });
-      })
-    );
-    return toolbar;
-  }
-
-  function toChumhandle(username: string): string {
-    const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
-    if (words.length >= 2) {
-      return (words[0][0] + words[1][0]).toUpperCase();
-    }
-    return username.slice(0, 2).toUpperCase();
-  }
-
   function addMessage(
     author: string,
     text: string,
@@ -531,56 +276,36 @@
     prepend = false,
     messageId?: string,
     chatColor?: string,
-    attachment?: LocalAttachmentData,
-    gif?: GifMessageData
+    attachment?: AttachmentData,
+    gif?: { url: string; title?: string }
   ): void {
-    const messageDiv = document.createElement("div");
-    messageDiv.className = "message";
-    if (messageId) messageDiv.dataset["messageId"] = messageId;
-    messageDiv.dataset["chumhandle"] = "[" + toChumhandle(author) + "]: ";
-    if (currentUsername && author === currentUsername) {
-      messageDiv.classList.add("own");
-    }
-    if (chatColor) {
-      messageDiv.style.color = chatColor;
-    }
-    const timeString = formatTimestamp(timestamp);
-    const avatarEl = document.createElement("div");
-    avatarEl.className = "message-avatar";
-    avatarEl.textContent = author.charAt(0).toUpperCase();
-    const contentEl = document.createElement("div");
-    contentEl.className = "message-content";
-    const headerEl = document.createElement("div");
-    headerEl.className = "message-header";
-    const authorEl = document.createElement("span");
-    authorEl.className = "message-author";
-    authorEl.textContent = author;
-    const tsEl = document.createElement("span");
-    tsEl.className = "message-timestamp";
-    tsEl.textContent = timeString;
-    headerEl.appendChild(authorEl);
-    headerEl.appendChild(tsEl);
-    const textEl = document.createElement("div");
-    textEl.className = "message-text";
-    textEl.textContent = text;
-    contentEl.appendChild(headerEl);
-    contentEl.appendChild(textEl);
-    messageDiv.appendChild(avatarEl);
-    messageDiv.appendChild(contentEl);
-    if (attachment) {
-      messageDiv.appendChild(createFileCard(attachment));
-    }
-    if (gif) {
-      messageDiv.appendChild(createGifCard(gif));
-    }
-    messageDiv.appendChild(createActionToolbar(messageId));
+    const capturedEmberId = App.activeEmberId;
+    const capturedChannelId = App.activeChannelId;
+    const getEmberKey = async (_cid: string): Promise<Uint8Array | null> =>
+      capturedEmberId ? (App.emberKeyCache.get(capturedEmberId) ?? null) : null;
+    const messageDiv = window.createBasicMessageElement(
+      author,
+      text,
+      timestamp,
+      messageId,
+      chatColor,
+      !!(currentUsername && author === currentUsername),
+      attachment,
+      gif,
+      capturedChannelId ?? undefined,
+      getEmberKey
+    );
     
     // Virtual scrolling temporarily disabled - use messagesContainer directly
     if (messagesContainer) {
       if (prepend) {
         const banner = messagesContainer.querySelector(".channel-welcome-banner");
         const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
-        messagesContainer.insertBefore(messageDiv, referenceNode);
+        if (referenceNode) {
+          messagesContainer.insertBefore(messageDiv, referenceNode);
+        } else {
+          messagesContainer.appendChild(messageDiv);
+        }
       } else {
         messagesContainer.appendChild(messageDiv);
         // Scroll to bottom if not prepending (new message)
@@ -622,7 +347,7 @@
     }
     if (plaintext.startsWith('{"t":"file"')) {
       try {
-        const parsed = JSON.parse(plaintext) as { t: string; body: string; a: LocalAttachmentData };
+        const parsed = JSON.parse(plaintext) as { t: string; body: string; a: AttachmentData };
         addMessage(
           msg.username ?? "Unknown",
           parsed.body,
@@ -860,52 +585,6 @@
     }
   }
   
-  /**
-   * Optimize message rendering with document fragments
-   */
-  function createMessageFragment(messages: Message[]): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-    
-    messages.forEach(message => {
-      const messageElement = createMessageElement(message);
-      if (messageElement) {
-        fragment.appendChild(messageElement);
-      }
-    });
-    
-    return fragment;
-  }
-  
-  /**
-   * Create optimized message element
-   */
-  function createMessageElement(message: Message): HTMLElement | null {
-    if (!App.activeEmberId) return null;
-    
-    // Check if element already exists
-    let messageElement = messageElements.get(message.id);
-    if (messageElement) {
-      return messageElement;
-    }
-    
-    // Create new element
-    messageElement = document.createElement('div');
-    messageElement.className = 'message';
-    messageElement.setAttribute('data-message-id', message.id);
-    messageElement.setAttribute('data-content-loaded', 'false');
-    
-    // Store reference
-    messageElements.set(message.id, messageElement);
-    renderedMessageIds.add(message.id);
-    
-    // Add to intersection observer for lazy loading
-    if (intersectionObserver) {
-      intersectionObserver.observe(messageElement);
-    }
-    
-    return messageElement;
-  }
-
   async function fetchMessages(
     channelId: string,
     beforeId: string | null = null
@@ -1027,7 +706,7 @@
     App.ownedMessageIds.clear();
 
     // Clear any pending attachment when switching channels
-    window.clearPendingAttachment?.();
+    // clearPendingAttachment not available in message-service
 
     // Invalidate stale cache so fresh messages are always fetched from the server
     messageCache.delete(channelId);
@@ -1113,14 +792,9 @@
       if (currentUserId && msg.sender_user_id === currentUserId) {
         App.ownedMessageIds.add(msg.id);
       }
-      
-      // Create message element and add to batch
-      const messageElement = createMessageElement(msg);
-      if (messageElement) {
-        updates.push(() => {
-          displayDecryptedMessage(msg);
-        });
-      }
+      updates.push(() => {
+        displayDecryptedMessage(msg);
+      });
     });
     
     // Execute all DOM updates in a single batch
@@ -1281,141 +955,6 @@
     });
   }
 
-  // ─── Direct Messaging Functions ───────────────────────────────────────────
-
-  /**
-   * Send an encrypted direct message
-   */
-  async function sendDirectMessage(conversationId: string, plaintext: string): Promise<string> {
-    if (!DMCrypto) {
-      log.error("DM crypto not available");
-      throw new Error("Direct messaging crypto not available");
-    }
-    
-    const conversationKey = dmConversationKeys.get(conversationId);
-    if (!conversationKey) {
-      log.error("Cannot send DM: no conversation key", { conversationId });
-      throw new Error("Conversation key not available for encryption");
-    }
-    
-    log.debug("Sending encrypted direct message", { conversationId });
-    try {
-      // Encrypt message using ember-shared DM crypto
-      const encryptedContent = DMCrypto.encryptDirectMessage(plaintext, conversationKey);
-      
-      // Send via WebSocket
-      const auth = (await ipcRenderer.invoke("get-auth")) as {
-        token?: string;
-        hostname?: string;
-      } | null;
-      
-      if (!auth || !auth.token || !auth.hostname) {
-        throw new Error("Authentication required");
-      }
-      
-      // This would send through the WebSocket connection
-      // For now, we'll use the existing WebSocket infrastructure
-      const messageData = {
-        conversation_id: conversationId,
-        content: encryptedContent,
-        timestamp: Date.now()
-      };
-      
-      // Send through existing WebSocket
-      if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN) {
-        App.wsConnection.send(JSON.stringify({
-          type: "dm_message",
-          payload: messageData
-        }));
-      }
-      
-      // Return a temporary message ID (in a real implementation, this would come from the server)
-      return `temp_${Date.now()}`;
-    } catch (error) {
-      const err = error as Error;
-      log.error("Error sending direct message", {
-        conversationId,
-        error: err.message,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Decrypt and display a direct message
-   */
-  async function displayDirectMessage(messageData: {
-    id: string;
-    conversation_id: string;
-    sender_user_id: string;
-    content: string;
-    timestamp: number;
-  }): Promise<void> {
-    if (!DMCrypto) {
-      log.error("DM crypto not available");
-      return;
-    }
-    
-    const conversationKey = dmConversationKeys.get(messageData.conversation_id);
-    if (!conversationKey) {
-      log.warn("Cannot decrypt DM: no conversation key", { 
-        conversationId: messageData.conversation_id 
-      });
-      return;
-    }
-    
-    try {
-      // Decrypt message using ember-shared DM crypto
-      const decryptedContent = DMCrypto.decryptDirectMessage(
-        messageData.content, 
-        conversationKey
-      );
-      
-      // Create message object for display
-      const displayData = {
-        id: messageData.id,
-        channel_id: messageData.conversation_id,
-        sender_user_id: messageData.sender_user_id,
-        content: decryptedContent,
-        sender_username: "User", // This would be resolved from user data
-        created_at: Math.floor(messageData.timestamp / 1000),
-        sender_id: messageData.sender_user_id,
-        ciphertext: messageData.content // Original encrypted content
-      };
-      
-      // Display using existing message display function
-      displayDecryptedMessage(displayData as any);
-      
-      log.debug("Direct message displayed", { 
-        messageId: messageData.id,
-        conversationId: messageData.conversation_id 
-      });
-    } catch (error) {
-      const err = error as Error;
-      log.error("Failed to decrypt direct message", {
-        messageId: messageData.id,
-        conversationId: messageData.conversation_id,
-        error: err.message
-      });
-    }
-  }
-
-  /**
-   * Cache a DM conversation key
-   */
-  function cacheDmConversationKey(conversationId: string, key: Uint8Array): void {
-    dmConversationKeys.set(conversationId, key);
-    log.debug("DM conversation key cached", { conversationId });
-  }
-
-  /**
-   * Remove a DM conversation key from cache
-   */
-  function removeDmConversationKey(conversationId: string): void {
-    dmConversationKeys.delete(conversationId);
-    log.debug("DM conversation key removed from cache", { conversationId });
-  }
-
   if (messagesContainer) {
     let scrollTimeout: NodeJS.Timeout | null = null;
     
@@ -1450,18 +989,12 @@
   window.sendGifMessage = sendGifMessage;
   window.displayDecryptedMessage = displayDecryptedMessage;
   window.handleEditedMessage = handleEditedMessage;
+  window.enterEditMode = enterEditMode;
   window.escapeHtml = escapeHtml;
   window.loadChannelMessages = loadChannelMessages;
   window.fetchMessages = fetchMessages;
   window.addMessage = addMessage;
-  window.formatTimestamp = formatTimestamp;
-  
-  // DM-specific functions
-  window.sendDirectMessage = sendDirectMessage;
-  window.displayDirectMessage = displayDirectMessage;
-  window.cacheDmConversationKey = cacheDmConversationKey;
-  window.removeDmConversationKey = removeDmConversationKey;
-  
+
   // Performance optimization functions
   window.getCachedMessages = getCachedMessages;
   window.cacheMessages = cacheMessages;

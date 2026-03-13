@@ -5,7 +5,7 @@
 (function (): void {
   const App = window.App;
   const log = window.emberLog.createLogger("DirectMessagingUI");
-  
+
   // UI state
   let dmSidebarElement: HTMLElement | null = null;
   let dmChatContainer: HTMLElement | null = null;
@@ -24,6 +24,7 @@
     unreadCount: number;
     isOnline: boolean;
     keyExchanged: boolean;
+    createdAt?: number;
     element?: HTMLElement;
   }
   
@@ -489,20 +490,9 @@
       }
       
       // Start conversation via Direct Messaging manager
+      // Note: the manager calls window.addDmConversationToList internally, so no need to add here
       if (typeof window.startDmConversation === 'function') {
         const conversationId = await window.startDmConversation(userId, username);
-        
-        // Add to UI
-        addConversationToList({
-          id: conversationId,
-          participantId: userId,
-          participantUsername: username,
-          unreadCount: 0,
-          isOnline: false, // Default to offline, will be updated by presence updates
-          keyExchanged: false
-        });
-        
-        // Set as active
         setActiveConversation(conversationId);
       } else {
         log.error("Direct Messaging manager not available");
@@ -599,7 +589,7 @@
     
     // Hide chat header and input areas
     const chatHeader = dmChatContainer.querySelector('.dm-chat-header') as HTMLElement;
-    const messagesArea = dmChatContainer.querySelector('.dm-messages') as HTMLElement;
+    const messagesArea = dmChatContainer.querySelector('.messages-container') as HTMLElement;
     const inputContainer = dmChatContainer.querySelector('.dm-input-container') as HTMLElement;
     const typingIndicator = dmChatContainer.querySelector('.dm-typing-indicator') as HTMLElement;
     const chatEmptyState = dmChatContainer.querySelector('#dm-chat-empty-state') as HTMLElement;
@@ -672,7 +662,7 @@
       if (typeof window.fetchConversationMessages === 'function') {
         const messages = await window.fetchConversationMessages(conversationId);
         
-        // Display messages in chronological order
+        // Display messages in chronological order (prepend for historical messages)
         messages.forEach((message: any) => {
           displayMessage({
             id: message.id,
@@ -681,7 +671,7 @@
             content: message.content,
             timestamp: message.timestamp,
             isOwn: message.isOwn
-          });
+          }, true); // prepend=true for historical messages
         });
         
         log.info("Conversation messages loaded successfully", { conversationId, count: messages.length });
@@ -734,7 +724,7 @@
       
       // Show chat components
       const chatHeader = dmChatContainer.querySelector('.dm-chat-header') as HTMLElement;
-      const messagesArea = dmChatContainer.querySelector('.dm-messages') as HTMLElement;
+      const messagesArea = dmChatContainer.querySelector('.messages-container') as HTMLElement;
       const inputContainer = dmChatContainer.querySelector('.dm-input-container') as HTMLElement;
       
       if (chatHeader) chatHeader.style.display = 'flex';
@@ -769,10 +759,26 @@
     if (headerAvatar) headerAvatar.textContent = conversation.participantUsername[0].toUpperCase();
     if (headerStatus) headerStatus.textContent = conversation.isOnline ? 'Online' : 'Offline';
     
-    // Clear messages
-    const messagesContainer = dmChatContainer.querySelector('.dm-messages') as HTMLElement;
+    // Clear messages and add welcome banner
+    const messagesContainer = dmChatContainer.querySelector('.messages-container') as HTMLElement;
     if (messagesContainer) {
-      messagesContainer.innerHTML = '';
+      messagesContainer.replaceChildren();
+      
+      // Add DM welcome banner
+      const banner = document.createElement('div');
+      banner.className = 'channel-welcome-banner';
+      
+      const heading = document.createElement('h2');
+      heading.className = 'channel-welcome-heading';
+      const startTime = conversation.createdAt ? new Date(conversation.createdAt).toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      }) : 'unknown time';
+      heading.textContent = `${ownUsername} [${window.toChumhandle(ownUsername)}] began chatting with ${conversation.participantUsername} [${window.toChumhandle(conversation.participantUsername)}] at ${startTime}`;
+      
+      banner.appendChild(heading);
+      messagesContainer.appendChild(banner);
     }
     
     // Reset input and attachment
@@ -836,17 +842,29 @@
         const arrayBuffer = await file.arrayBuffer();
         const fileBytes = new Uint8Array(arrayBuffer);
         
-        // For DM attachments, we need to encrypt with the conversation key
-        // Get conversation key from cache
-        const conversationKeys = (window as any).dmConversationKeys as Map<string, Uint8Array>;
-        const conversationKey = conversationKeys?.get(activeConversationId);
+        // For DM attachments, we need to encrypt with the ember key
+        // Get ember key via the DM manager (it maps channel->ember and uses App.emberKeyCache)
+        const emberKey = await (async (): Promise<Uint8Array | null> => {
+          // Directly call the DM manager's key fetch function if available
+          if (typeof (window as any).fetchAndCacheEmberKeyForChannel === 'function') {
+            return (window as any).fetchAndCacheEmberKeyForChannel(activeConversationId);
+          }
+          // Fallback: find emberId via the DM manager's internal map and fetch via ember-key-cache
+          if (typeof (window as any).getEmberIdForDmChannel === 'function') {
+            const emberId = (window as any).getEmberIdForDmChannel(activeConversationId);
+            if (emberId && window.App.emberKeyCache.has(emberId)) {
+              return window.App.emberKeyCache.get(emberId) ?? null;
+            }
+          }
+          return null;
+        })();
         
-        if (!conversationKey) {
-          throw new Error("Conversation key not available for encryption");
+        if (!emberKey) {
+          throw new Error("Ember key not available for encryption");
         }
 
-        const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, conversationKey);
-        const { id } = await window.electronAPI.messageService.uploadDMAttachment(
+        const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, emberKey);
+        const { id } = await window.electronAPI.messageService.uploadAttachment(
           auth, activeConversationId, encryptedBase64, { name, size: file.size, mime: file.type }
         );
         
@@ -878,10 +896,10 @@
     }
   }
   
-  function tryParseMessageContent(content: string): { t: string; url?: string; title?: string } | null {
+  function tryParseMessageContent(content: string): { t: string; url?: string; title?: string; body?: string; a?: AttachmentData } | null {
     try {
-      const parsed = JSON.parse(content) as { t?: string; url?: string; title?: string };
-      return parsed?.t ? (parsed as { t: string; url?: string; title?: string }) : null;
+      const parsed = JSON.parse(content) as { t?: string; url?: string; title?: string; body?: string; a?: AttachmentData };
+      return parsed?.t ? (parsed as { t: string; url?: string; title?: string; body?: string; a?: AttachmentData }) : null;
     } catch {
       return null;
     }
@@ -921,16 +939,12 @@
     previewEl.classList.remove('hidden');
   }
 
-  /**
-   * Derive a 2-letter chat handle abbreviation from a username.
-   * Splits on camelCase word boundaries; falls back to first 2 letters.
-   */
-  function toChumhandle(username: string): string {
-    const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
-    if (words.length >= 2) {
-      return (words[0][0] + words[1][0]).toUpperCase();
-    }
-    return username.slice(0, 2).toUpperCase();
+  function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   /**
@@ -944,128 +958,57 @@
     timestamp: number;
     isOwn: boolean;
     chatColor?: string;
-  }): void {
+  }, prepend = false): void {
     if (!dmChatContainer || messageData.conversationId !== activeConversationId) return;
-    
-    const messagesContainer = dmChatContainer.querySelector('.dm-messages') as HTMLElement;
+
+    const messagesContainer = dmChatContainer.querySelector('.messages-container') as HTMLElement;
     if (!messagesContainer) return;
-    
-    // Get conversation info for avatar
+
     const conversation = conversations.get(messageData.conversationId);
-
-    const messageElement = document.createElement('div');
-    messageElement.className = `dm-message ${messageData.isOwn ? 'own' : ''}`;
-    messageElement.setAttribute('data-message-id', messageData.id);
-
-    // Always set handle abbreviation — used by CSS ::before for the terminal-style prefix
     const senderName = messageData.isOwn
       ? ownUsername
       : (conversation?.participantUsername || 'User');
-    messageElement.dataset['chumhandle'] = '[' + toChumhandle(senderName) + ']: ';
-    if (messageData.chatColor) {
-      messageElement.style.color = messageData.chatColor;
-    }
 
-    // Avatar element
-    const msgAvatarEl = document.createElement('div');
-    msgAvatarEl.className = 'dm-message-avatar';
-    if (messageData.isOwn) {
-      msgAvatarEl.textContent = 'You';
-    } else if (conversation?.participantAvatar) {
-      const img = document.createElement('img');
-      img.src = conversation.participantAvatar;
-      img.alt = conversation.participantUsername;
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-      msgAvatarEl.appendChild(img);
-    } else {
-      msgAvatarEl.textContent = conversation ? conversation.participantUsername[0].toUpperCase() : 'U';
-    }
-
-    // Content element
-    const contentEl = document.createElement('div');
-    contentEl.className = 'dm-message-content';
-
-    const headerEl = document.createElement('div');
-    headerEl.className = 'dm-message-header';
-    if (!messageData.isOwn) {
-      const nameEl = document.createElement('span');
-      nameEl.className = 'dm-message-name';
-      nameEl.textContent = conversation?.participantUsername || 'User';
-      headerEl.appendChild(nameEl);
-    }
-    const timeEl = document.createElement('span');
-    timeEl.className = 'dm-message-time';
-    timeEl.textContent = formatMessageTime(messageData.timestamp);
-    headerEl.appendChild(timeEl);
-
-    const textEl = document.createElement('div');
-    textEl.className = 'dm-message-text';
     const parsedContent = tryParseMessageContent(messageData.content);
-    if (parsedContent?.t === 'gif' && parsedContent.url) {
-      const gifCard = document.createElement('div');
-      gifCard.className = 'gif-card';
-      const gifImg = document.createElement('img');
-      gifImg.src = parsedContent.url;
-      gifImg.alt = parsedContent.title || 'GIF';
-      gifImg.addEventListener('click', () => {
-        (window as any).openImageViewer?.(parsedContent.url, parsedContent.title || 'GIF');
-      });
-      gifCard.appendChild(gifImg);
-      textEl.appendChild(gifCard);
-    } else {
-      textEl.textContent = messageData.content;
+    let text = messageData.content;
+    let attachment: AttachmentData | undefined;
+    let gif: { url: string; title?: string } | undefined;
+    if (parsedContent?.t === 'file' && parsedContent.a) {
+      text = parsedContent.body ?? '';
+      attachment = parsedContent.a as AttachmentData;
+    } else if (parsedContent?.t === 'gif' && parsedContent.url) {
+      text = '';
+      gif = { url: parsedContent.url, title: parsedContent.title };
     }
 
-    contentEl.appendChild(headerEl);
-    contentEl.appendChild(textEl);
-    messageElement.appendChild(msgAvatarEl);
-    messageElement.appendChild(contentEl);
-    
-    messagesContainer.appendChild(messageElement);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    // Add message actions (reactions, edit, etc.)
-    addMessageActions(messageElement, messageData);
-  }
-  
-  /**
-   * Add message action buttons and context menu
-   */
-  function addMessageActions(messageElement: HTMLElement, messageData: {
-    id: string;
-    conversationId: string;
-    senderId: string;
-    content: string;
-    timestamp: number;
-    isOwn: boolean;
-    chatColor?: string;
-  }): void {
-    // Add context menu support
-    messageElement.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      
-      const items: ContextMenuItem[] = [
-        { action: 'reply', label: 'Reply', icon: '↩️' },
-        { action: 'copy', label: 'Copy', icon: '📋' }
-      ];
-      
-      // Add edit option for own messages
-      if (messageData.isOwn) {
-        items.push({ action: 'edit', label: 'Edit', icon: '✏️', separator: true });
-        items.push({ action: 'delete', label: 'Delete', icon: '🗑️', danger: true });
+    const getEmberKey = (cid: string): Promise<Uint8Array | null> =>
+      (window as any).fetchAndCacheEmberKeyForChannel(cid) as Promise<Uint8Array | null>;
+
+    const messageElement = window.createBasicMessageElement(
+      senderName,
+      text,
+      messageData.timestamp,
+      messageData.id,
+      messageData.chatColor,
+      messageData.isOwn,
+      attachment,
+      gif,
+      messageData.conversationId,
+      getEmberKey
+    );
+
+    if (prepend) {
+      const banner = messagesContainer.querySelector('.channel-welcome-banner');
+      const referenceNode = banner ? banner.nextSibling : messagesContainer.firstChild;
+      if (referenceNode) {
+        messagesContainer.insertBefore(messageElement, referenceNode);
+      } else {
+        messagesContainer.appendChild(messageElement);
       }
-      
-      showContextMenu(e.clientX, e.clientY, items);
-    });
-    
-    // Add hover effects
-    messageElement.addEventListener('mouseenter', () => {
-      messageElement.classList.add('hovered');
-    });
-    
-    messageElement.addEventListener('mouseleave', () => {
-      messageElement.classList.remove('hovered');
-    });
+    } else {
+      messagesContainer.appendChild(messageElement);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   }
   
   /**
@@ -1213,7 +1156,7 @@
     if (!statusElement) {
       statusElement = document.createElement('div');
       statusElement.className = 'dm-message-status';
-      const messageContent = messageElement.querySelector('.dm-message-content');
+      const messageContent = messageElement.querySelector('.message-content');
       if (messageContent) {
         messageContent.appendChild(statusElement);
       }
@@ -1410,12 +1353,38 @@
       });
     }
     
-    // Add keyboard navigation to messages
-    const messagesContainer = dmChatContainer.querySelector('.dm-messages') as HTMLElement;
+    // Add drag-and-drop support
+    const messagesContainer = dmChatContainer.querySelector('.messages-container') as HTMLElement;
     if (messagesContainer) {
       messagesContainer.setAttribute('role', 'log');
       messagesContainer.setAttribute('aria-live', 'polite');
       messagesContainer.setAttribute('aria-label', 'Messages');
+      
+      // Drag-and-drop files onto DM messages
+      messagesContainer.addEventListener('dragover', (e: DragEvent) => {
+        e.preventDefault();
+        messagesContainer.classList.add('drag-over');
+      });
+      messagesContainer.addEventListener('dragleave', (e: DragEvent) => {
+        if (!messagesContainer.contains(e.relatedTarget as Node)) {
+          messagesContainer.classList.remove('drag-over');
+        }
+      });
+      messagesContainer.addEventListener('drop', (e: DragEvent) => {
+        e.preventDefault();
+        messagesContainer.classList.remove('drag-over');
+        const file = e.dataTransfer?.files[0];
+        if (file) {
+          dmPendingAttachment = { file, name: file.name };
+          // Show attachment preview
+          const sendAttachmentPreviewEl = dmChatContainer?.querySelector('#dm-attachment-preview') as HTMLElement | null;
+          if (sendAttachmentPreviewEl) {
+            sendAttachmentPreviewEl.style.display = 'flex';
+            const fileNameEl = sendAttachmentPreviewEl.querySelector('.attachment-filename') as HTMLElement;
+            if (fileNameEl) fileNameEl.textContent = file.name;
+          }
+        }
+      });
       
       // Make messages focusable
       const messages = messagesContainer.querySelectorAll('.dm-message');

@@ -543,7 +543,7 @@
           const plaintext = messageInput.value.trim();
           if (plaintext || App.pendingAttachment) {
             messageInput.value = "";
-            await window.sendEncryptedMessage(plaintext);
+            await window.sendEncryptedMessage(App.activeChannelId, plaintext);
           }
         }
       }

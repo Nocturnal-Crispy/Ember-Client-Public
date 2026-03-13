@@ -1,35 +1,29 @@
 /**
  * @jest-environment node
  *
- * End-to-end integration tests for Direct Messaging crypto workflow.
+ * Integration tests for DM message crypto.
  *
- * Tests cover the core DM crypto functionality:
- *   - Conversation key generation and exchange
- *   - Message encryption/decryption
- *   - Key exchange payloads
- *   - Conversation key rotation
- *   - Multi-user conversation scenarios
+ * DM channels use the same ember-channel crypto as server text channels:
+ *   - generateEmberKey  — produce the shared channel key
+ *   - encryptEmberKeyForUser / decryptEmberKeyForUser — key exchange via NaCl box
+ *   - encryptMessage / decryptMessage — per-message secretbox encryption
+ *
+ * Tests cover the same scenarios as before (key exchange, message encryption,
+ * key rotation, multi-user flows) but use only the shared ember-channel API.
  */
 
 import {
   generateEmberKey,
-  encryptDirectMessage,
-  decryptDirectMessage,
-  generateConversationKey,
-  encryptConversationKeyForUser,
-  decryptConversationKeyForUser,
-  generateKeyExchangePayload,
-  extractConversationKeyFromPayload,
-  rotateConversationKey,
+  encryptEmberKeyForUser,
+  decryptEmberKeyForUser,
+  encryptMessage,
+  decryptMessage,
 } from 'ember-shared';
 
 import * as nacl from 'tweetnacl';
-import * as naclUtil from 'tweetnacl-util';
 
-// Test configuration
 const TEST_TIMEOUT = 30000;
 
-// Test utilities
 class TestUser {
   public userId: string;
   public keypair: nacl.BoxKeyPair;
@@ -40,391 +34,224 @@ class TestUser {
   }
 }
 
-describe('Direct Messaging Crypto Integration', () => {
+describe('DM Channel Crypto Integration', () => {
   let alice: TestUser;
   let bob: TestUser;
   let charlie: TestUser;
 
   beforeAll(() => {
-    // Initialize test users
     alice = new TestUser('alice');
     bob = new TestUser('bob');
     charlie = new TestUser('charlie');
   });
 
-  describe('Conversation Key Generation and Exchange', () => {
-    test('generates unique conversation keys', () => {
-      const key1 = generateConversationKey();
-      const key2 = generateConversationKey();
+  describe('Ember Key Generation', () => {
+    test('generates unique ember keys', () => {
+      const key1 = generateEmberKey();
+      const key2 = generateEmberKey();
 
-      expect(key1).toHaveLength(32); // NaCl key size
-      expect(key2).toHaveLength(32); // NaCl key size
-      expect(key1).not.toEqual(key2); // Should be unique
+      expect(key1).toHaveLength(32);
+      expect(key2).toHaveLength(32);
+      expect(key1).not.toEqual(key2);
     });
+  });
 
-    test('encrypts and decrypts conversation keys for users', () => {
-      const conversationKey = generateConversationKey();
+  describe('Key Exchange (encryptEmberKeyForUser / decryptEmberKeyForUser)', () => {
+    test('alice can encrypt a key for bob and bob can decrypt it', () => {
+      const emberKey = generateEmberKey();
 
-      // Alice encrypts key for Bob
-      const encryptedKey = encryptConversationKeyForUser(
-        conversationKey,
+      const encrypted = encryptEmberKeyForUser(
+        emberKey,
         bob.keypair.publicKey,
         alice.keypair.secretKey
       );
 
-      expect(typeof encryptedKey).toBe('string');
-      expect(encryptedKey.length).toBeGreaterThan(0);
+      expect(typeof encrypted).toBe('string');
 
-      // Bob decrypts the key
-      const decryptedKey = decryptConversationKeyForUser(
-        encryptedKey,
+      const decrypted = decryptEmberKeyForUser(
+        encrypted,
         alice.keypair.publicKey,
         bob.keypair.secretKey
       );
 
-      expect(decryptedKey).not.toBeNull();
-      expect(decryptedKey).toEqual(conversationKey);
+      expect(decrypted).not.toBeNull();
+      expect(decrypted).toEqual(emberKey);
     });
 
-    test('fails to decrypt with wrong keys', () => {
-      const conversationKey = generateConversationKey();
+    test('decryption fails with the wrong private key', () => {
+      const emberKey = generateEmberKey();
 
-      // Alice encrypts key for Bob
-      const encryptedKey = encryptConversationKeyForUser(
-        conversationKey,
+      const encrypted = encryptEmberKeyForUser(
+        emberKey,
         bob.keypair.publicKey,
         alice.keypair.secretKey
       );
 
-      // Charlie tries to decrypt (should fail)
-      const decryptedKey = decryptConversationKeyForUser(
-        encryptedKey,
+      const decrypted = decryptEmberKeyForUser(
+        encrypted,
         alice.keypair.publicKey,
-        charlie.keypair.secretKey
+        charlie.keypair.secretKey // wrong key
       );
 
-      expect(decryptedKey).toBeNull();
-    });
-  });
-
-  describe('Key Exchange Payloads', () => {
-    test('generates complete key exchange payload', () => {
-      const conversationKey = generateConversationKey();
-
-      const payload = generateKeyExchangePayload(
-        conversationKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey
-      );
-
-      expect(payload).toHaveProperty('initiator_encrypted_key');
-      expect(payload).toHaveProperty('recipient_encrypted_key');
-      expect(typeof payload.initiator_encrypted_key).toBe('string');
-      expect(typeof payload.recipient_encrypted_key).toBe('string');
+      expect(decrypted).toBeNull();
     });
 
-    test('extracts conversation key from payload', () => {
-      const conversationKey = generateConversationKey();
+    test('both participants can hold their own copy of the ember key', () => {
+      const emberKey = generateEmberKey();
 
-      // Alice generates payload for Bob
-      const payload = generateKeyExchangePayload(
-        conversationKey,
+      // Alice self-seals her copy (same key pair as sender and recipient)
+      const aliceEncrypted = encryptEmberKeyForUser(
+        emberKey,
         alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey
+        alice.keypair.secretKey
+      );
+      // Bob receives a copy encrypted by Alice
+      const bobEncrypted = encryptEmberKeyForUser(
+        emberKey,
+        bob.keypair.publicKey,
+        alice.keypair.secretKey
       );
 
-      // Bob extracts his copy of the key
-      const extractedKey = extractConversationKeyFromPayload(
-        payload,
+      const aliceKey = decryptEmberKeyForUser(
+        aliceEncrypted,
+        alice.keypair.publicKey,
+        alice.keypair.secretKey
+      );
+      const bobKey = decryptEmberKeyForUser(
+        bobEncrypted,
         alice.keypair.publicKey,
         bob.keypair.secretKey
       );
 
-      expect(extractedKey).not.toBeNull();
-      expect(extractedKey).toEqual(conversationKey);
+      expect(aliceKey).toEqual(emberKey);
+      expect(bobKey).toEqual(emberKey);
     });
 
-    test('payload extraction fails with wrong keys', () => {
-      const conversationKey = generateConversationKey();
+    test('alice can also encrypt a key for charlie', () => {
+      const emberKey = generateEmberKey();
 
-      // Alice generates payload for Bob
-      const payload = generateKeyExchangePayload(
-        conversationKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey
-      );
+      const bobEncrypted = encryptEmberKeyForUser(emberKey, bob.keypair.publicKey, alice.keypair.secretKey);
+      const charlieEncrypted = encryptEmberKeyForUser(emberKey, charlie.keypair.publicKey, alice.keypair.secretKey);
 
-      // Charlie tries to extract Bob's key (should fail)
-      const extractedKey = extractConversationKeyFromPayload(
-        payload,
-        alice.keypair.publicKey,
-        charlie.keypair.secretKey
-      );
+      const bobKey = decryptEmberKeyForUser(bobEncrypted, alice.keypair.publicKey, bob.keypair.secretKey);
+      const charlieKey = decryptEmberKeyForUser(charlieEncrypted, alice.keypair.publicKey, charlie.keypair.secretKey);
 
-      expect(extractedKey).toBeNull();
+      expect(bobKey).toEqual(emberKey);
+      expect(charlieKey).toEqual(emberKey);
     });
   });
 
-  describe('Message Encryption and Decryption', () => {
-    test('encrypts and decrypts messages with conversation key', () => {
-      const conversationKey = generateConversationKey();
+  describe('Message Encryption (encryptMessage / decryptMessage)', () => {
+    test('encrypts and decrypts a message with the ember key', () => {
+      const emberKey = generateEmberKey();
       const plaintext = 'Hello, this is a secret message!';
 
-      // Encrypt message
-      const ciphertext = encryptDirectMessage(plaintext, conversationKey);
+      const ciphertext = encryptMessage(plaintext, emberKey);
 
       expect(typeof ciphertext).toBe('string');
       expect(ciphertext).not.toBe(plaintext);
-      expect(ciphertext.length).toBeGreaterThan(plaintext.length);
 
-      // Decrypt message
-      const decryptedText = decryptDirectMessage(ciphertext, conversationKey);
-
-      expect(decryptedText).toBe(plaintext);
+      const decrypted = decryptMessage(ciphertext, emberKey);
+      expect(decrypted).toBe(plaintext);
     });
 
-    test('fails to decrypt with wrong conversation key', () => {
-      const correctKey = generateConversationKey();
-      const wrongKey = generateConversationKey();
-      const plaintext = 'Secret message';
+    test('decryption fails with the wrong ember key', () => {
+      const correctKey = generateEmberKey();
+      const wrongKey = generateEmberKey();
 
-      // Encrypt with correct key
-      const ciphertext = encryptDirectMessage(plaintext, correctKey);
-
-      // Try to decrypt with wrong key
-      const decryptedText = decryptDirectMessage(ciphertext, wrongKey);
-
-      expect(decryptedText).toBeNull();
+      const ciphertext = encryptMessage('Secret message', correctKey);
+      expect(decryptMessage(ciphertext, wrongKey)).toBeNull();
     });
 
     test('handles empty messages', () => {
-      const conversationKey = generateConversationKey();
-      const plaintext = '';
-
-      const ciphertext = encryptDirectMessage(plaintext, conversationKey);
-      const decryptedText = decryptDirectMessage(ciphertext, conversationKey);
-
-      expect(decryptedText).toBe(plaintext);
+      const emberKey = generateEmberKey();
+      const ciphertext = encryptMessage('', emberKey);
+      expect(decryptMessage(ciphertext, emberKey)).toBe('');
     });
 
-    test('handles special characters in messages', () => {
-      const conversationKey = generateConversationKey();
+    test('handles special characters and emoji', () => {
+      const emberKey = generateEmberKey();
       const plaintext = 'Special chars: 🚀 é ñ 中文 🌟';
+      expect(decryptMessage(encryptMessage(plaintext, emberKey), emberKey)).toBe(plaintext);
+    });
 
-      const ciphertext = encryptDirectMessage(plaintext, conversationKey);
-      const decryptedText = decryptDirectMessage(ciphertext, conversationKey);
-
-      expect(decryptedText).toBe(plaintext);
+    test('handles large messages', () => {
+      const emberKey = generateEmberKey();
+      const plaintext = 'A'.repeat(10000);
+      const decrypted = decryptMessage(encryptMessage(plaintext, emberKey), emberKey);
+      expect(decrypted).toBe(plaintext);
+      expect(decrypted!.length).toBe(10000);
     });
   });
 
-  describe('Conversation Key Rotation', () => {
-    test('rotates conversation keys for both users', () => {
-      const newConversationKey = generateConversationKey();
+  describe('Key Rotation', () => {
+    test('rotating the ember key — each user gets an independently decryptable copy', () => {
+      const newKey = generateEmberKey();
 
-      const rotatedKeys = rotateConversationKey(
-        newConversationKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey,
-        bob.keypair.secretKey
-      );
+      // Each user self-seals their copy of the rotated key
+      const aliceEncrypted = encryptEmberKeyForUser(newKey, alice.keypair.publicKey, alice.keypair.secretKey);
+      const bobEncrypted = encryptEmberKeyForUser(newKey, bob.keypair.publicKey, bob.keypair.secretKey);
 
-      expect(rotatedKeys).toHaveProperty('user1_encrypted_key');
-      expect(rotatedKeys).toHaveProperty('user2_encrypted_key');
-      expect(typeof rotatedKeys.user1_encrypted_key).toBe('string');
-      expect(typeof rotatedKeys.user2_encrypted_key).toBe('string');
-    });
+      const aliceKey = decryptEmberKeyForUser(aliceEncrypted, alice.keypair.publicKey, alice.keypair.secretKey);
+      const bobKey = decryptEmberKeyForUser(bobEncrypted, bob.keypair.publicKey, bob.keypair.secretKey);
 
-    test('both users can decrypt rotated keys', () => {
-      const newConversationKey = generateConversationKey();
-
-      // Rotate keys
-      const rotatedKeys = rotateConversationKey(
-        newConversationKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey,
-        bob.keypair.secretKey
-      );
-
-      // Alice decrypts her copy
-      const aliceKey = decryptConversationKeyForUser(
-        rotatedKeys.user1_encrypted_key,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey
-      );
-
-      // Bob decrypts his copy
-      const bobKey = decryptConversationKeyForUser(
-        rotatedKeys.user2_encrypted_key,
-        bob.keypair.publicKey,
-        bob.keypair.secretKey
-      );
-
-      expect(aliceKey).toEqual(newConversationKey);
-      expect(bobKey).toEqual(newConversationKey);
+      expect(aliceKey).toEqual(newKey);
+      expect(bobKey).toEqual(newKey);
     });
   });
 
-  describe('Complete Conversation Flow', () => {
-    test('full conversation workflow from key exchange to messaging', () => {
-      // 1. Alice generates conversation key
-      const conversationKey = generateConversationKey();
+  describe('Full DM Channel Flow', () => {
+    test('end-to-end: key exchange → encrypt → decrypt', () => {
+      // 1. Alice generates the DM channel ember key
+      const emberKey = generateEmberKey();
 
-      // 2. Alice creates key exchange payload
-      const payload = generateKeyExchangePayload(
-        conversationKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey
-      );
+      // 2. Alice seals a copy for Bob
+      const bobEncrypted = encryptEmberKeyForUser(emberKey, bob.keypair.publicKey, alice.keypair.secretKey);
 
-      // 3. Bob extracts the conversation key
-      const bobConversationKey = extractConversationKeyFromPayload(
-        payload,
-        alice.keypair.publicKey,
-        bob.keypair.secretKey
-      );
+      // 3. Bob decrypts his copy
+      const bobKey = decryptEmberKeyForUser(bobEncrypted, alice.keypair.publicKey, bob.keypair.secretKey);
+      expect(bobKey).toEqual(emberKey);
 
-      expect(bobConversationKey).toEqual(conversationKey);
+      // 4. Alice sends a message
+      const aliceMsg = 'Hi Bob!';
+      const ciphertext = encryptMessage(aliceMsg, emberKey);
 
-      // 4. Alice sends message to Bob
-      const aliceMessage = 'Hi Bob! This is encrypted.';
-      const encryptedMessage = encryptDirectMessage(aliceMessage, conversationKey);
+      // 5. Bob decrypts it
+      expect(decryptMessage(ciphertext, bobKey!)).toBe(aliceMsg);
 
-      // 5. Bob decrypts the message
-      const decryptedByBob = decryptDirectMessage(encryptedMessage, bobConversationKey!);
-
-      expect(decryptedByBob).toBe(aliceMessage);
-
-      // 6. Bob replies to Alice
-      const bobMessage = 'Hi Alice! Message received and decrypted!';
-      const encryptedReply = encryptDirectMessage(bobMessage, conversationKey);
-
-      // 7. Alice decrypts Bob's reply
-      const decryptedByAlice = decryptDirectMessage(encryptedReply, conversationKey);
-
-      expect(decryptedByAlice).toBe(bobMessage);
+      // 6. Bob replies; Alice decrypts
+      const bobMsg = 'Hi Alice!';
+      expect(decryptMessage(encryptMessage(bobMsg, emberKey), emberKey)).toBe(bobMsg);
     });
 
-    test('multi-user conversation scenario', () => {
-      // Alice creates group conversation
-      const conversationKey = generateConversationKey();
-
-      // Alice encrypts key for Bob
-      const bobEncryptedKey = encryptConversationKeyForUser(
-        conversationKey,
-        bob.keypair.publicKey,
-        alice.keypair.secretKey
-      );
-
-      // Alice encrypts key for Charlie
-      const charlieEncryptedKey = encryptConversationKeyForUser(
-        conversationKey,
-        charlie.keypair.publicKey,
-        alice.keypair.secretKey
-      );
-
-      // Bob and Charlie decrypt their keys
-      const bobKey = decryptConversationKeyForUser(
-        bobEncryptedKey,
-        alice.keypair.publicKey,
-        bob.keypair.secretKey
-      );
-
-      const charlieKey = decryptConversationKeyForUser(
-        charlieEncryptedKey,
-        alice.keypair.publicKey,
-        charlie.keypair.secretKey
-      );
-
-      expect(bobKey).toEqual(conversationKey);
-      expect(charlieKey).toEqual(conversationKey);
-
-      // Alice sends message to group
-      const groupMessage = 'Hello group!';
-      const encryptedGroupMessage = encryptDirectMessage(groupMessage, conversationKey);
-
-      // Everyone can decrypt
-      const decryptedByAlice = decryptDirectMessage(encryptedGroupMessage, conversationKey);
-      const decryptedByBob = decryptDirectMessage(encryptedGroupMessage, bobKey!);
-      const decryptedByCharlie = decryptDirectMessage(encryptedGroupMessage, charlieKey!);
-
-      expect(decryptedByAlice).toBe(groupMessage);
-      expect(decryptedByBob).toBe(groupMessage);
-      expect(decryptedByCharlie).toBe(groupMessage);
-    });
-  });
-
-  describe('Security and Edge Cases', () => {
-    test('different conversations have different keys', () => {
-      const aliceBobKey = generateConversationKey();
-      const aliceCharlieKey = generateConversationKey();
+    test('independent DM channels have different keys', () => {
+      const aliceBobKey = generateEmberKey();
+      const aliceCharlieKey = generateEmberKey();
 
       expect(aliceBobKey).not.toEqual(aliceCharlieKey);
 
-      // Messages encrypted with different keys
-      const message = 'Test message';
-      const ciphertext1 = encryptDirectMessage(message, aliceBobKey);
-      const ciphertext2 = encryptDirectMessage(message, aliceCharlieKey);
+      const msg = 'Test';
+      const ct1 = encryptMessage(msg, aliceBobKey);
+      const ct2 = encryptMessage(msg, aliceCharlieKey);
 
-      expect(ciphertext1).not.toEqual(ciphertext2);
-
-      // Can't decrypt with wrong key
-      expect(decryptDirectMessage(ciphertext1, aliceCharlieKey)).toBeNull();
-      expect(decryptDirectMessage(ciphertext2, aliceBobKey)).toBeNull();
-    });
-
-    test('large messages are handled correctly', () => {
-      const conversationKey = generateConversationKey();
-      const largeMessage = 'A'.repeat(10000); // 10KB message
-
-      const ciphertext = encryptDirectMessage(largeMessage, conversationKey);
-      const decryptedText = decryptDirectMessage(ciphertext, conversationKey);
-
-      expect(decryptedText).toBe(largeMessage);
-      expect(decryptedText.length).toBe(10000);
+      expect(ct1).not.toEqual(ct2);
+      expect(decryptMessage(ct1, aliceCharlieKey)).toBeNull();
+      expect(decryptMessage(ct2, aliceBobKey)).toBeNull();
     });
 
     test('concurrent key exchanges work independently', () => {
-      // Alice-Bob conversation
-      const aliceBobKey = generateConversationKey();
-      const aliceBobPayload = generateKeyExchangePayload(
-        aliceBobKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        bob.keypair.publicKey
-      );
+      const aliceBobKey = generateEmberKey();
+      const aliceCharlieKey = generateEmberKey();
 
-      // Alice-Charlie conversation
-      const aliceCharlieKey = generateConversationKey();
-      const aliceCharliePayload = generateKeyExchangePayload(
-        aliceCharlieKey,
-        alice.keypair.publicKey,
-        alice.keypair.secretKey,
-        charlie.keypair.publicKey
-      );
+      const bobEncrypted = encryptEmberKeyForUser(aliceBobKey, bob.keypair.publicKey, alice.keypair.secretKey);
+      const charlieEncrypted = encryptEmberKeyForUser(aliceCharlieKey, charlie.keypair.publicKey, alice.keypair.secretKey);
 
-      // Extract keys independently
-      const bobExtractedKey = extractConversationKeyFromPayload(
-        aliceBobPayload,
-        alice.keypair.publicKey,
-        bob.keypair.secretKey
-      );
+      const bobKey = decryptEmberKeyForUser(bobEncrypted, alice.keypair.publicKey, bob.keypair.secretKey);
+      const charlieKey = decryptEmberKeyForUser(charlieEncrypted, alice.keypair.publicKey, charlie.keypair.secretKey);
 
-      const charlieExtractedKey = extractConversationKeyFromPayload(
-        aliceCharliePayload,
-        alice.keypair.publicKey,
-        charlie.keypair.secretKey
-      );
-
-      expect(bobExtractedKey).toEqual(aliceBobKey);
-      expect(charlieExtractedKey).toEqual(aliceCharlieKey);
-      expect(bobExtractedKey).not.toEqual(charlieExtractedKey);
+      expect(bobKey).toEqual(aliceBobKey);
+      expect(charlieKey).toEqual(aliceCharlieKey);
+      expect(bobKey).not.toEqual(charlieKey);
     });
   });
 }, TEST_TIMEOUT);
