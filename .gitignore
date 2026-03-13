@@ -10,3 +10,7 @@ public/src/js/*
 # Exclude compiled JavaScript files from src directory
 src/**/*.js
 !src/**/*.tsbuildinfo
+# API key files - keep out of source control
+.klipy-api-key
+src/main/api-key.ts
+!src/main/api-key-template.ts
