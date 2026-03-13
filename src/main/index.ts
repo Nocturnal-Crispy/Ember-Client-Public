@@ -4,6 +4,7 @@ import Store from "electron-store";
 import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
 import { isDev } from "./dev";
+import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema } from "../shared/types";
 const { IPC_CHANNELS } = require("../shared/constants");
 
@@ -392,6 +393,13 @@ ipcMain.handle("check-for-update", async (): Promise<UpdateInfo> => {
       error: String(err),
     };
   }
+});
+
+ipcMain.handle("get-klipy-api-key", () => {
+  log.debug("IPC: get-klipy-api-key");
+  // Return the obfuscated API key - this is available to all users
+  // The key is obfuscated in the source code to make casual extraction harder
+  return KLIPPY_API_KEY;
 });
 
 ipcMain.handle("open-external-url", (_event, url: unknown) => {

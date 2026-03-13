@@ -51,6 +51,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "check-for-update",
   "open-external-url",
   "get-pending-invite",
+  "get-klipy-api-key",
 ];
 
 const ALLOWED_ON: readonly string[] = ["handle-invite-link"];
@@ -373,6 +374,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     buildWsUrl: (hostname: string, token: string) =>
       emberServices.buildWsUrl(hostname, token),
   },
+
+  getKlipyApiKey: () => ipcRenderer.invoke("get-klipy-api-key"),
 
 });
 
