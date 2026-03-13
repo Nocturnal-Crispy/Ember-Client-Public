@@ -662,8 +662,10 @@
       if (typeof window.fetchConversationMessages === 'function') {
         const messages = await window.fetchConversationMessages(conversationId);
         
-        // Display messages in chronological order (prepend for historical messages)
-        messages.forEach((message: any) => {
+        // Display messages in reverse order and prepend to match channel behavior
+        // This ensures oldest messages appear at top, newest at bottom
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const message = messages[i];
           displayMessage({
             id: message.id,
             conversationId: message.conversationId,
@@ -672,7 +674,17 @@
             timestamp: message.timestamp,
             isOwn: message.isOwn
           }, true); // prepend=true for historical messages
-        });
+        }
+        
+        // Scroll to bottom to show newest messages (after all loading is complete)
+        // Match channel scrolling behavior exactly
+        const messagesContainer = dmChatContainer?.querySelector('.messages-container') as HTMLElement;
+        if (messagesContainer) {
+          // Use requestAnimationFrame to ensure DOM is fully updated
+          requestAnimationFrame(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          });
+        }
         
         log.info("Conversation messages loaded successfully", { conversationId, count: messages.length });
       } else {
@@ -1007,7 +1019,32 @@
       }
     } else {
       messagesContainer.appendChild(messageElement);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // For GIF messages, wait for images to load before scrolling
+      if (gif) {
+        const gifImg = messageElement.querySelector('.gif-card img') as HTMLImageElement;
+        if (gifImg) {
+          if (gifImg.complete && gifImg.naturalHeight !== 0) {
+            // Image already loaded, scroll immediately
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          } else {
+            // Wait for image to load before scrolling
+            gifImg.addEventListener('load', () => {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
+            // Fallback timeout in case image load takes too long or fails
+            setTimeout(() => {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 1000);
+          }
+        } else {
+          // Fallback if GIF image not found
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+      } else {
+        // Non-GIF messages scroll immediately
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
     }
   }
   
