@@ -63,6 +63,17 @@ function createWindow(isAuthenticated: boolean) {
     titleBarStyle: "hidden",
   });
 
+  // Force all window.open calls to open in external browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    log.info("Window open request intercepted", { url });
+    // Only allow HTTPS URLs to open externally
+    if (url.startsWith("https://")) {
+      shell.openExternal(url);
+    } else {
+      log.warn("Blocked non-HTTPS URL from opening", { url });
+    }
+    return { action: 'deny' }; // Prevent the window from opening in Electron
+  });
 
   if (isAuthenticated) {
     log.debug("Loading main app window");
