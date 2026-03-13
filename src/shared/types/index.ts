@@ -60,9 +60,3 @@ export interface DeviceIdentity {
   private_key?: string;
 }
 
-export interface LogEntry {
-  level: string;
-  context: string;
-  message: string;
-  data?: Record<string, unknown>;
-}
