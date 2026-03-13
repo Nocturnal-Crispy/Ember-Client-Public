@@ -309,7 +309,31 @@
       } else {
         messagesContainer.appendChild(messageDiv);
         // Scroll to bottom if not prepending (new message)
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // For GIF messages, wait for images to load before scrolling
+        if (gif) {
+          const gifImg = messageDiv.querySelector('.gif-card img') as HTMLImageElement;
+          if (gifImg) {
+            if (gifImg.complete && gifImg.naturalHeight !== 0) {
+              // Image already loaded, scroll immediately
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } else {
+              // Wait for image to load before scrolling
+              gifImg.addEventListener('load', () => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              });
+              // Fallback timeout in case image load takes too long or fails
+              setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              }, 1000);
+            }
+          } else {
+            // Fallback if GIF image not found
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+        } else {
+          // Non-GIF messages scroll immediately
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
       }
     }
   }
@@ -727,6 +751,13 @@
       window.wsUnsubscribeFromChannel(prevChannelId);
     }
     window.wsSubscribeToChannel(channelId);
+
+    // Reset window.sendGif to use channel routing (fixes DM->channel GIF routing bug)
+    window.sendGif = (url: string, title: string): void => {
+      window.sendGifMessage(url, title).catch((err: Error) => {
+        log.error("Failed to send GIF", { error: err.message });
+      });
+    };
 
     // Channel welcome banner — reads name from header (set by updateChatHeader before this call)
     const channelName =
