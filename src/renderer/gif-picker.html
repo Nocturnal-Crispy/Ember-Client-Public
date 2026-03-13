@@ -7,12 +7,17 @@
       id="gif-picker-search-input"
       placeholder="Search GIFs..."
       autocomplete="off"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-controls="gif-picker-autocomplete"
+      aria-expanded="false"
     />
+    <ul class="gif-picker-autocomplete hidden" id="gif-picker-autocomplete" role="listbox" aria-label="Autocomplete suggestions"></ul>
   </div>
   <div class="gif-picker-grid" id="gif-picker-grid">
     <div class="gif-picker-empty" id="gif-picker-empty">Search for GIFs above</div>
   </div>
   <div class="gif-picker-footer">
-    <span class="gif-picker-attribution">Powered by Giphy</span>
+    <span class="gif-picker-attribution">Powered by Klipy</span>
   </div>
 </div>
