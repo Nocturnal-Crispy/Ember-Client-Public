@@ -174,6 +174,7 @@
       accentRgb: preset.accentRgb,
       backgroundRgb: preset.backgroundRgb,
       surfaceRgb: preset.surfaceRgb,
+      chatColor: pendingSettings.chatColor ?? "",
     };
     applyThemeToDom(pendingSettings);
     updateActiveCard();

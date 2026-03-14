@@ -14,6 +14,7 @@
 
   const SCRIPTS: string[] = [
     "../../dist/renderer/utils/logger.js",
+    "../../dist/renderer/managers/theme-manager.js",
     "../../dist/renderer/utils/auth-loader.js",
     "../../dist/renderer/managers/app-state.js",
     "../../dist/renderer/services/voice-service.js",
@@ -23,7 +24,6 @@
     "../../dist/renderer/managers/channel-manager.js",
     "../../dist/renderer/managers/ember-manager.js",
     "../../dist/renderer/managers/invite-manager.js",
-    "../../dist/renderer/managers/theme-manager.js",
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/update-notifier.js",
     "../../dist/renderer/managers/version-display.js",

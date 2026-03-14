@@ -28,6 +28,34 @@ function preloadLog(
 
 preloadLog("info", "Preload script initializing");
 
+// Apply the saved theme synchronously before the page renders to prevent a flash of
+// default colors. Uses sendSync so the CSS variables are set before any stylesheet
+// or renderer script runs.
+try {
+  const savedTheme = ipcRenderer.sendSync("get-theme-settings-sync") as {
+    accentRgb: string;
+    backgroundRgb: string;
+    surfaceRgb: string;
+    chatColor?: string;
+  } | null;
+  if (savedTheme && document.documentElement) {
+    const root = document.documentElement;
+    root.style.setProperty("--rgb-highlight", savedTheme.accentRgb);
+    root.style.setProperty("--rgb-background", savedTheme.backgroundRgb);
+    root.style.setProperty("--rgb-surface", savedTheme.surfaceRgb);
+    const hoverParts = savedTheme.surfaceRgb
+      .split(",")
+      .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
+    root.style.setProperty("--rgb-surface-hover", hoverParts.join(", "));
+    if (savedTheme.chatColor) {
+      root.style.setProperty("--chat-color", savedTheme.chatColor);
+    }
+    preloadLog("debug", "Theme applied synchronously in preload");
+  }
+} catch (e) {
+  preloadLog("warn", "Failed to apply theme synchronously in preload", { error: String(e) });
+}
+
 // Store pending invite data to work around context bridge argument passing issues
 let pendingInvite: { code: string; hostname: string | null } | null = null;
 

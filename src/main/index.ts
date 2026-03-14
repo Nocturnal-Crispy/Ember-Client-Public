@@ -339,6 +339,14 @@ ipcMain.handle(
   }
 );
 
+// Synchronous handler used by the preload to apply the theme before the page renders,
+// preventing a flash of default colors on startup.
+ipcMain.on("get-theme-settings-sync", (event) => {
+  log.debug("IPC: get-theme-settings-sync");
+  const saved = store.get("themeSettings") ?? {} as Partial<ThemeSettings>;
+  event.returnValue = { ...defaultThemeSettings, ...saved };
+});
+
 // ─── IPC: Update check ────────────────────────────────────────────────────────
 
 interface UpdateInfo {
