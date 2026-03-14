@@ -829,6 +829,18 @@
 
       showAccountStatus("settings-username-status", "Username updated!", "success");
       log.info("Username updated", { username: newUsername });
+
+      // Refresh member list so the users section shows the new username
+      if (App.activeEmberId) {
+        window.fetchMembers(App.activeEmberId)
+          .then((members) => window.renderMemberList(members))
+          .catch(() => { /* non-critical */ });
+      }
+
+      // Sync the DM module's cached own-username
+      if (typeof window.refreshDmUsername === "function") {
+        window.refreshDmUsername(newUsername);
+      }
     } catch (e) {
       showAccountStatus("settings-username-status", "Network error. Try again.", "error");
       log.error("Failed to save username", { error: String(e) });
