@@ -43,6 +43,10 @@
           });
           wsSubscribeToEmber(App.activeEmberId);
         }
+        if (typeof window.resubscribeDmChannels === "function") {
+          log.debug("Re-subscribing to DM channels");
+          window.resubscribeDmChannels();
+        }
       };
 
       App.wsConnection.onmessage = (event: MessageEvent) => {

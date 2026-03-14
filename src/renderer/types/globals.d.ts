@@ -511,6 +511,7 @@ declare global {
     // UI helpers for ember key access
     fetchAndCacheEmberKeyForChannel(channelId: string): Promise<Uint8Array | null>;
     getEmberIdForDmChannel(channelId: string): string | null;
+    resubscribeDmChannels(): void;
     handleDmMessage(payload: {
       id: string;
       conversation_id: string;
