@@ -20,6 +20,9 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# Create directories
+mkdir -p "$RELEASE_DIR"
+
 CURRENT_VERSION=$(node -p "require('$PROJECT_DIR/package.json').version")
 echo "Current version: $CURRENT_VERSION"
 
@@ -34,6 +37,56 @@ npm install
 echo "Running tests..."
 npm test
 echo "Tests passed."
+
+# Generate release notes in memory
+echo "Generating release notes..."
+PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+RELEASE_NOTES=""
+
+# Build release notes string
+RELEASE_NOTES="# Release v$NEW_VERSION - $(date +%Y-%m-%d)
+
+## 🎉 New Features
+"
+
+if [ -n "$PREVIOUS_TAG" ]; then
+    RELEASE_NOTES+="$(git log --oneline "$PREVIOUS_TAG..HEAD" --grep="feat:" --pretty=format:"- %s" | sed 's/feat: //')
+"
+else
+    RELEASE_NOTES+="- Initial release
+"
+fi
+
+RELEASE_NOTES+="
+## 🐛 Bug Fixes
+"
+
+if [ -n "$PREVIOUS_TAG" ]; then
+    RELEASE_NOTES+="$(git log --oneline "$PREVIOUS_TAG..HEAD" --grep="fix:" --pretty=format:"- %s" | sed 's/fix: //')
+"
+else
+    RELEASE_NOTES+="- No bug fixes
+"
+fi
+
+RELEASE_NOTES+="
+## 🔧 Improvements
+- Version bump to $NEW_VERSION
+
+## 📦 Installation
+\`\`\`bash
+npm install
+\`\`\`
+
+## 🔄 Upgrade Instructions
+- From v$CURRENT_VERSION: Download the new version from releases page
+
+## 🏷️ Version Information
+- Client Version: $NEW_VERSION
+- Release Date: $(date +%Y-%m-%d)
+- Git Tag: v$NEW_VERSION"
+
+echo "Release notes generated for GitHub release"
 
 echo "Bumping version to $NEW_VERSION..."
 node -e "
@@ -75,17 +128,18 @@ if [ -f "$DEB_SRC" ]; then
     echo "  Created Ember.deb"
 fi
 
-echo "Creating GitHub pre-release v$NEW_VERSION..."
+echo "Creating GitHub release v$NEW_VERSION..."
 ASSETS=""
 [ -f "Ember-Portable.exe" ] && ASSETS="$ASSETS Ember-Portable.exe"
 [ -f "EmberSetup.exe" ] && ASSETS="$ASSETS EmberSetup.exe"
 [ -f "Ember.AppImage" ] && ASSETS="$ASSETS Ember.AppImage"
 [ -f "Ember.deb" ] && ASSETS="$ASSETS Ember.deb"
 
+# Use the generated release notes directly for GitHub release
 gh release create "v$NEW_VERSION" \
     --repo "$REPO" \
-    --title "Pre-Release" \
-    --notes "Ember Client v$NEW_VERSION" \
+    --title "Ember Client v$NEW_VERSION" \
+    --notes "$RELEASE_NOTES" \
     --latest \
     $ASSETS
 
@@ -93,7 +147,11 @@ cd "$PROJECT_DIR"
 echo "Committing version bump..."
 git add package.json
 git add package-lock.json
-git commit -m "Bump version to $NEW_VERSION"
+git commit -m "release: v$NEW_VERSION - $(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo '')..HEAD --grep="feat\|fix" | wc -l | tr -d ' ') commits"
+
+echo "Creating and pushing git tag..."
+git tag "v$NEW_VERSION"
+git push origin "v$NEW_VERSION"
 git push
 
 echo ""
