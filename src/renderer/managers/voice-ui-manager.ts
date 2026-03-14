@@ -283,6 +283,16 @@
       const avatarEl = document.createElement("div");
       avatarEl.className = "voice-avatar";
       avatarEl.dataset["userId"] = userId;
+      // Re-apply speaking state so the indicator is correct after DOM re-render.
+      // Without this, remote users' speaking indicators disappear whenever the
+      // participant list is rebuilt (e.g. on join/leave), because the server
+      // only sends voice_speaking when the state *changes* — not continuously.
+      const vmStates = (
+        App.voiceManager as { speakingStates?: Map<string, boolean> } | null
+      )?.speakingStates;
+      if (vmStates?.get(userId)) {
+        avatarEl.classList.add("speaking");
+      }
       const avatarData = getMemberAvatar(userId);
       if (avatarData) {
         const img = document.createElement("img");
@@ -336,11 +346,17 @@
   }
 
   function updateSpeakingIndicator(userId: string, isSpeaking: boolean): void {
-    document
-      .querySelectorAll<HTMLElement>(`.voice-avatar[data-user-id="${userId}"]`)
-      .forEach((el) => {
-        el.classList.toggle("speaking", isSpeaking);
-      });
+    const elements = document.querySelectorAll<HTMLElement>(
+      `.voice-avatar[data-user-id="${userId}"]`
+    );
+    log.debug("updateSpeakingIndicator", {
+      user_id: userId,
+      is_speaking: isSpeaking,
+      elements_found: elements.length,
+    });
+    elements.forEach((el) => {
+      el.classList.toggle("speaking", isSpeaking);
+    });
   }
 
   function showVoiceControls(channelName: string): void {
