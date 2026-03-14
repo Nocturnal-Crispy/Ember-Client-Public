@@ -9,8 +9,8 @@
 
 // @jest-environment node
 
-import { getTokenExpiry, isTokenExpiringSoon } from '../../../src/renderer/utils/token-utils';
-import { refreshToken } from '../../../src/renderer/services/token-refresh-service';
+import { getTokenExpiry, isTokenExpiringSoon } from '../../../src/preload/utils/token-utils';
+import { refreshToken } from '../../../src/preload/services/token-refresh-service';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 

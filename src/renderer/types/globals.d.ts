@@ -544,6 +544,7 @@ declare global {
       typing: boolean;
     }): void;
     // Globals set by direct-messaging-ui.ts
+    refreshDmUsername(username: string): void;
     initializeDirectMessagingUI(): void;
     addDmConversationToList(conversation: {
       id: string;

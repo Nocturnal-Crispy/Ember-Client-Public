@@ -1706,7 +1706,8 @@
   window.addDmNotificationBadge = addNotificationBadge;
   window.removeDmConversation = removeConversationFromList;
   window.handleDmPresenceUpdate = handleDmPresenceUpdate;
-  
+  window.refreshDmUsername = (username: string) => { ownUsername = username; };
+
   // Accessibility functions
   window.announceToScreenReader = announceToScreenReader;
   window.updateScreenReaderStatus = updateScreenReaderStatus;
