@@ -173,3 +173,71 @@ describe("createBasicMessageElement — URL rendering", () => {
     expect(textEl.querySelector(".url-image-card")).not.toBeNull();
   });
 });
+
+describe("createActionToolbar", () => {
+  beforeEach(() => {
+    (window as any).App.ownedMessageIds = new Set<string>();
+  });
+
+  it("returns a div with class message-action-bar", () => {
+    const toolbar = window.createActionToolbar("msg-1", false);
+    expect(toolbar.tagName).toBe("DIV");
+    expect(toolbar.className).toBe("message-action-bar");
+  });
+
+  it("does not include a react button", () => {
+    const toolbar = window.createActionToolbar("msg-1", false);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).not.toContain("Add Reaction");
+  });
+
+  it("does not include a forward button", () => {
+    const toolbar = window.createActionToolbar("msg-1", false);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).not.toContain("Forward");
+  });
+
+  it("does not include a delete button for non-owned messages (isOwn=false)", () => {
+    const toolbar = window.createActionToolbar("msg-1", false);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).not.toContain("Delete");
+  });
+
+  it("includes a delete button for owned messages (isOwn=true)", () => {
+    const toolbar = window.createActionToolbar("msg-1", true);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).toContain("Delete");
+  });
+
+  it("includes an edit button for owned messages (isOwn=true)", () => {
+    const toolbar = window.createActionToolbar("msg-1", true);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).toContain("Edit");
+  });
+
+  it("does not include an edit button for non-owned messages (isOwn=false)", () => {
+    const toolbar = window.createActionToolbar("msg-1", false);
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).not.toContain("Edit");
+  });
+
+  it("falls back to App.ownedMessageIds when isOwn is omitted", () => {
+    (window as any).App.ownedMessageIds.add("msg-owned");
+    const toolbar = window.createActionToolbar("msg-owned");
+    const buttons = toolbar.querySelectorAll("button");
+    const titles = Array.from(buttons).map((b) => b.title);
+    expect(titles).toContain("Delete");
+  });
+
+  it("shows no buttons for non-owned messages when isOwn is omitted", () => {
+    const toolbar = window.createActionToolbar("msg-not-owned");
+    const buttons = toolbar.querySelectorAll("button");
+    expect(buttons.length).toBe(0);
+  });
+});

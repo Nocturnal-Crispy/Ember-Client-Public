@@ -553,11 +553,63 @@
     ?.addEventListener("click", () => {
       document.getElementById("delete-confirm-modal")?.classList.add("hidden");
       App.contextMenuTarget = null;
+      (window as any).pendingMessageDelete = null;
     });
 
   document
     .getElementById("delete-modal-confirm-btn")
     ?.addEventListener("click", async () => {
+      // Handle message deletion (set by createActionToolbar delete button)
+      const pendingMsgDelete = (window as any).pendingMessageDelete as {
+        messageId: string;
+        channelId: string;
+      } | null;
+      if (pendingMsgDelete) {
+        (window as any).pendingMessageDelete = null;
+        const msgDeleteBtn = document.getElementById(
+          "delete-modal-confirm-btn"
+        ) as HTMLButtonElement | null;
+        if (msgDeleteBtn) msgDeleteBtn.disabled = true;
+        try {
+          const auth = (await ipcRenderer.invoke("get-auth")) as {
+            token?: string;
+            hostname?: string;
+          } | null;
+          if (!auth || !auth.token || !auth.hostname) return;
+          const res = await fetch(
+            `${auth.hostname}/api/v1/channels/${pendingMsgDelete.channelId}/messages/${pendingMsgDelete.messageId}`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${auth.token}` },
+            }
+          );
+          if (res.ok) {
+            log.info("Message deleted", { message_id: pendingMsgDelete.messageId });
+            const msgEl = document.querySelector(
+              `[data-message-id="${pendingMsgDelete.messageId}"]`
+            );
+            msgEl?.remove();
+            App.ownedMessageIds.delete(pendingMsgDelete.messageId);
+            document
+              .getElementById("delete-confirm-modal")
+              ?.classList.add("hidden");
+          } else {
+            const err = (await res.json().catch(() => ({}))) as {
+              error?: string;
+            };
+            log.error("Message delete failed", {
+              message_id: pendingMsgDelete.messageId,
+              error: err.error ?? "",
+            });
+          }
+        } catch (err) {
+          log.error("Message delete error", { error: String(err) });
+        } finally {
+          if (msgDeleteBtn) msgDeleteBtn.disabled = false;
+        }
+        return;
+      }
+
       if (!App.contextMenuTarget) return;
       const ctxTarget = App.contextMenuTarget;
       const btn = document.getElementById(
