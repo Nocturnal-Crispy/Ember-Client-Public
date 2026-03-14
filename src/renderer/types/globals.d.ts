@@ -284,6 +284,11 @@ declare global {
       plaintext: string,
       emberKey: Uint8Array
     ): Promise<Message>;
+    deleteMessage(
+      auth: AuthData,
+      channelId: string,
+      messageId: string,
+    ): Promise<void>;
     editMessage(
       auth: AuthData,
       channelId: string,

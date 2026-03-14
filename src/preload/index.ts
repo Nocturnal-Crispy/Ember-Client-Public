@@ -335,6 +335,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
         plaintext,
         emberKey
       ),
+    deleteMessage: (
+      auth: unknown,
+      channelId: string,
+      messageId: string,
+    ) =>
+      emberServices.deleteMessage(
+        auth as AuthData,
+        channelId,
+        messageId,
+      ),
     editMessage: (
       auth: unknown,
       channelId: string,

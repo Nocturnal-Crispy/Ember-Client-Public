@@ -387,6 +387,18 @@
   }
 
   /**
+   * Configure and show the delete-confirm modal for a message deletion.
+   */
+  function showDeleteMessageModal(messageId: string, channelId: string): void {
+    (window as any).pendingMessageDelete = { messageId, channelId };
+    const titleEl = document.getElementById("delete-modal-title");
+    const msgEl = document.getElementById("delete-modal-message");
+    if (titleEl) titleEl.textContent = "Delete Message";
+    if (msgEl) msgEl.textContent = "Are you sure you want to delete this message? This cannot be undone.";
+    document.getElementById("delete-confirm-modal")?.classList.remove("hidden");
+  }
+
+  /**
    * Build the hover action toolbar.
    *
    * @param messageId - The message ID (used for ownedMessageIds lookup and edit).
@@ -406,12 +418,6 @@
         ? isOwn
         : !!messageId && App.ownedMessageIds.has(messageId);
 
-    toolbar.appendChild(
-      createActionButton("😊", "Add Reaction", () => {
-        log.debug("Reaction clicked", { message_id: messageId ?? "" });
-      })
-    );
-
     if (owned) {
       toolbar.appendChild(
         createActionButton("✏", "Edit", () => {
@@ -424,13 +430,16 @@
           }
         })
       );
-    }
 
-    toolbar.appendChild(
-      createActionButton("↗", "Forward", () => {
-        log.debug("Forward clicked", { message_id: messageId ?? "" });
-      })
-    );
+      toolbar.appendChild(
+        createActionButton("🗑", "Delete", () => {
+          if (messageId) {
+            const channelId = App.activeChannelId ?? "";
+            showDeleteMessageModal(messageId, channelId);
+          }
+        })
+      );
+    }
 
     return toolbar;
   }
