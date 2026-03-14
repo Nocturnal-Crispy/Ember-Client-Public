@@ -1028,6 +1028,8 @@
     const channelDesc = chatHeader.querySelector(".channel-description");
     if (channelTitle) channelTitle.textContent = channelName;
     if (channelDesc) channelDesc.textContent = description ?? "";
+    const messageInput = document.getElementById("messageInput") as HTMLTextAreaElement | null;
+    if (messageInput && channelName) messageInput.placeholder = `Message #${channelName}`;
   }
 
   function hideWelcomeScreen(): void {
