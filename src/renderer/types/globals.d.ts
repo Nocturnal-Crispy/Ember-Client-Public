@@ -586,6 +586,8 @@ declare global {
     debugTextarea(): void;
     // Globals set by renderer.ts
     closeDMScreenOnServerSwitch(): void;
+    // Globals set by renderer.ts (external link modal)
+    openExternalLinkModal(url: string): void;
     // Globals set by emoji-picker.ts
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
     // Globals set by gif-picker.ts

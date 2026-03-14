@@ -49,6 +49,93 @@
     return typeof mime === "string" && mime.startsWith("image/");
   }
 
+  // ─── URL detection ─────────────────────────────────────────────────────────
+
+  const URL_REGEX_SOURCE = "https?:\\/\\/[^\\s<>\"']+";
+  const IMAGE_URL_REGEX = /^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg|bmp)(\?[^\s]*)?$/i;
+
+  function isImageUrl(url: string): boolean {
+    return IMAGE_URL_REGEX.test(url);
+  }
+
+  function createUrlImageCard(url: string): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "url-image-card";
+
+    const img = document.createElement("img");
+    img.className = "url-image-img";
+    img.loading = "lazy";
+    img.alt = "Image";
+
+    img.onerror = () => {
+      wrapper.className = "url-image-card url-image-card-error";
+      const errSpan = document.createElement("span");
+      errSpan.textContent = "[failed to load image]";
+      wrapper.replaceChildren(errSpan);
+    };
+
+    img.onload = () => {
+      img.addEventListener("click", () => {
+        (window as any).openImageViewer?.(url, url);
+      });
+      const scrollContainer = img.closest(
+        ".messages-container, #messages"
+      ) as HTMLElement | null;
+      if (scrollContainer) {
+        const dist =
+          scrollContainer.scrollHeight -
+          scrollContainer.scrollTop -
+          scrollContainer.clientHeight;
+        const expanded = Math.max(0, (img.offsetHeight || 300) - 80);
+        if (dist <= expanded + 60) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      }
+    };
+
+    img.src = url;
+    wrapper.appendChild(img);
+    return wrapper;
+  }
+
+  function renderTextWithLinks(text: string, container: HTMLElement): void {
+    if (!text) return;
+
+    const regex = new RegExp(URL_REGEX_SOURCE, "g");
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        container.appendChild(
+          document.createTextNode(text.slice(lastIndex, match.index))
+        );
+      }
+
+      const url = match[0];
+
+      if (isImageUrl(url)) {
+        container.appendChild(createUrlImageCard(url));
+      } else {
+        const link = document.createElement("a");
+        link.className = "message-link";
+        link.textContent = url;
+        link.href = "#";
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          (window as any).openExternalLinkModal?.(url);
+        });
+        container.appendChild(link);
+      }
+
+      lastIndex = match.index + url.length;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
   // ─── GIF card ──────────────────────────────────────────────────────────────
 
   function createGifCard(gifData: { url: string; title?: string }): HTMLElement {
@@ -406,7 +493,7 @@
 
     const textEl = document.createElement("div");
     textEl.className = "message-text";
-    textEl.textContent = text;
+    renderTextWithLinks(text, textEl);
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(textEl);
