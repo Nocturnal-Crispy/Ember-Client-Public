@@ -10,11 +10,42 @@
   const recentMessageIds = new Set<string>();
   const DEDUP_MAX_SIZE = 50;
 
+  /** Refresh the stored token if it is expiring within 1 hour. */
+  async function refreshTokenIfNeeded(): Promise<void> {
+    try {
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        token?: string;
+        hostname?: string;
+        user_id?: string;
+        device_id?: string;
+        username?: string;
+      } | null;
+      if (!auth || !auth.token || !auth.hostname) return;
+      const REFRESH_THRESHOLD_SECONDS = 3600; // 1 hour
+      if (!window.electronAPI.tokenUtils.isTokenExpiringSoon(auth.token, REFRESH_THRESHOLD_SECONDS)) {
+        return;
+      }
+      log.info("Token expiring soon, refreshing");
+      const refreshed = await window.electronAPI.authService.refreshToken(auth.hostname, auth.token);
+      await ipcRenderer.invoke("save-auth", {
+        token: refreshed.token,
+        user_id: refreshed.user_id,
+        device_id: refreshed.device_id,
+        hostname: auth.hostname,
+        username: refreshed.username,
+      });
+      log.info("Token refreshed successfully");
+    } catch (err) {
+      log.warn("Token refresh failed, continuing with existing token", { error: String(err) });
+    }
+  }
+
   async function connectWebSocket(): Promise<void> {
     if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN)
       return;
     log.debug("Connecting WebSocket");
     try {
+      await refreshTokenIfNeeded();
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         token?: string;
         hostname?: string;
