@@ -456,6 +456,47 @@
     };
   })();
 
+  // ─── External link confirmation modal ───────────────────────────────────────
+
+  (function wireExternalLinkModal(): void {
+    const modal = document.getElementById("external-link-modal");
+    const urlEl = document.getElementById("external-link-url");
+    const cancelBtn = document.getElementById("external-link-cancel");
+    const openBtn = document.getElementById("external-link-open");
+
+    if (!modal) return;
+
+    let pendingUrl = "";
+
+    (window as any).openExternalLinkModal = function (url: string): void {
+      pendingUrl = url;
+      if (urlEl) urlEl.textContent = url;
+      modal.classList.remove("hidden");
+    };
+
+    cancelBtn?.addEventListener("click", () => {
+      modal.classList.add("hidden");
+      pendingUrl = "";
+    });
+
+    openBtn?.addEventListener("click", () => {
+      modal.classList.add("hidden");
+      if (pendingUrl) {
+        ipcRenderer.invoke("open-external-url", pendingUrl).catch((err: Error) => {
+          log.error("Failed to open external URL", { error: err.message });
+        });
+      }
+      pendingUrl = "";
+    });
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        modal.classList.add("hidden");
+        pendingUrl = "";
+      }
+    });
+  })();
+
   // Wire emoji button → picker
   const emojiBtn = document.getElementById("emoji-btn") as HTMLElement | null;
   if (emojiBtn && messageInput) {
@@ -545,6 +586,20 @@
             messageInput.value = "";
             await window.sendEncryptedMessage(App.activeChannelId, plaintext);
           }
+        }
+      }
+    });
+
+    // Paste image from clipboard
+    messageInput.addEventListener("paste", (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) setPendingAttachment(file);
+          break;
         }
       }
     });
