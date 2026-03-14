@@ -223,6 +223,18 @@ declare global {
     ): void;
   }
 
+  interface RefreshTokenResponse {
+    readonly token: string;
+    readonly user_id: string;
+    readonly device_id: string;
+    readonly username: string;
+  }
+
+  interface TokenUtilsAPI {
+    getTokenExpiry(token: string): number | null;
+    isTokenExpiringSoon(token: string, thresholdSeconds: number): boolean;
+  }
+
   interface AuthServiceAPI {
     generateDeviceIdentity(): DeviceIdentity;
     login(
@@ -257,6 +269,7 @@ declare global {
       password: string,
       confirmPassword: string
     ): string | null;
+    refreshToken(hostname: string, currentToken: string): Promise<RefreshTokenResponse>;
   }
 
   interface MessageServiceAPI {
@@ -332,6 +345,7 @@ declare global {
     emberService: EmberServiceAPI;
     channelService: ChannelServiceAPI;
     wsService: WsServiceAPI;
+    tokenUtils: TokenUtilsAPI;
     onCssHotReload: (callback: (message: { path: string; content: string }) => void) => void;
   }
 
@@ -511,6 +525,7 @@ declare global {
     // UI helpers for ember key access
     fetchAndCacheEmberKeyForChannel(channelId: string): Promise<Uint8Array | null>;
     getEmberIdForDmChannel(channelId: string): string | null;
+    resubscribeDmChannels(): void;
     handleDmMessage(payload: {
       id: string;
       conversation_id: string;

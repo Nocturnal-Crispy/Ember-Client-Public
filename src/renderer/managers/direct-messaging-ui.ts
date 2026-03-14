@@ -1678,8 +1678,26 @@
     }
   }
   
+  /**
+   * Handle a presence update from the WebSocket for a DM participant.
+   * Updates the avatar online indicator in the sidebar and, if this
+   * conversation is currently open, the header status text.
+   */
+  function handleDmPresenceUpdate(payload: { user_id: string; username: string; status: string }): void {
+    const isOnline = payload.status === 'online';
+    conversations.forEach((conversation, conversationId) => {
+      if (conversation.participantId !== payload.user_id) return;
+      updateConversation(conversationId, { isOnline });
+      if (conversationId === activeConversationId) {
+        const headerStatus = dmChatContainer?.querySelector('.dm-chat-header-status') as HTMLElement | null;
+        if (headerStatus) headerStatus.textContent = isOnline ? 'Online' : 'Offline';
+      }
+    });
+  }
+
   // Expose functions to global scope
   window.initializeDirectMessagingUI = initializeDirectMessagingUI;
+  window.addDmConversationToList = addConversationToList;
   window.displayDmMessage = displayMessage;
   window.updateDmConversation = updateConversation;
   window.showDmTypingIndicator = showTypingIndicator;
@@ -1687,6 +1705,7 @@
   window.updateDmMessageStatus = updateMessageStatus;
   window.addDmNotificationBadge = addNotificationBadge;
   window.removeDmConversation = removeConversationFromList;
+  window.handleDmPresenceUpdate = handleDmPresenceUpdate;
   
   // Accessibility functions
   window.announceToScreenReader = announceToScreenReader;

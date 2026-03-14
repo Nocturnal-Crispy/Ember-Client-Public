@@ -54,10 +54,15 @@
         headers: { Authorization: `Bearer ${auth.token}` },
       });
       if (!res.ok) return null;
-      const data = (await res.json()) as { encrypted_key: string };
+      const data = (await res.json()) as { encrypted_key: string; sender_public_key?: string };
+      // For DM embers where this user is not the creator, the server returns the
+      // creator's public key so we can decrypt the asymmetrically-boxed ember key.
+      const senderPubKey = data.sender_public_key
+        ? naclUtil.decodeBase64(data.sender_public_key)
+        : naclUtil.decodeBase64(device.public_key);
       const key = emberCrypto.decryptEmberKeyForUser(
         data.encrypted_key,
-        naclUtil.decodeBase64(device.public_key),
+        senderPubKey,
         naclUtil.decodeBase64(device.private_key),
       );
       if (key) App.emberKeyCache.set(emberId, key);
@@ -105,6 +110,7 @@
             keyExchanged: true,
             createdAt: Date.now(),
           });
+          window.wsSubscribeToChannel(entry.textChannelId);
         }
       }
     } catch (err) {
@@ -333,6 +339,14 @@
     });
   }
 
+  // ─── Re-subscribe to all DM channels (called after WS reconnect) ──────────
+
+  function resubscribeDmChannels(): void {
+    dmByTextChannel.forEach((_, channelId) => {
+      window.wsSubscribeToChannel(channelId);
+    });
+  }
+
   // ─── No-op stubs for backwards-compat ─────────────────────────────────────
 
   async function initiateKeyExchange(_channelId: string, _participantId: string): Promise<void> {
@@ -373,6 +387,8 @@
   window.fetchConversationMessages = fetchConversationMessages;
   window.initiateKeyExchange = initiateKeyExchange;
   window.refreshAllPresenceStates = refreshAllPresenceStates;
+
+  window.resubscribeDmChannels = resubscribeDmChannels;
 
   // UI helpers for ember key access
   window.fetchAndCacheEmberKeyForChannel = async (channelId: string): Promise<Uint8Array | null> => {

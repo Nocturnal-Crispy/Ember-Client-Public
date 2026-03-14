@@ -1011,6 +1011,14 @@
         memberList.appendChild(memberEl);
       });
     });
+
+    // Sync DM online status with the freshly loaded member presence data
+    if (typeof window.handleDmPresenceUpdate === "function") {
+      members.forEach((member) => {
+        const status = member.status === "invisible" ? "offline" : (member.status ?? "offline");
+        window.handleDmPresenceUpdate({ user_id: member.user_id, username: member.username ?? "", status });
+      });
+    }
   }
 
   function updateChatHeader(channelName: string, description: string): void {

@@ -4,6 +4,8 @@ import * as nacl from "tweetnacl";
 import * as naclUtil from "tweetnacl-util";
 import * as emberCrypto from "ember-shared";
 import * as emberServices from "ember-shared";
+import { refreshToken } from "../renderer/services/token-refresh-service";
+import { getTokenExpiry, isTokenExpiringSoon } from "../renderer/utils/token-utils";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
@@ -280,6 +282,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
         password,
         confirmPassword
       ),
+    refreshToken: (hostname: string, currentToken: string) =>
+      refreshToken(hostname, currentToken),
+  },
+
+  tokenUtils: {
+    getTokenExpiry: (token: string) => getTokenExpiry(token),
+    isTokenExpiringSoon: (token: string, thresholdSeconds: number) =>
+      isTokenExpiringSoon(token, thresholdSeconds),
   },
 
   messageService: {
