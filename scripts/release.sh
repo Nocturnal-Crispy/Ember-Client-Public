@@ -40,7 +40,11 @@ echo "Tests passed."
 
 # Generate release notes in memory
 echo "Generating release notes..."
-PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+# Find the most recent version tag (excluding Pre-Release)
+PREVIOUS_TAG=$(git tag --list "v*" --sort=-version:refname | grep -v "Pre-Release" | head -n1)
+if [ -z "$PREVIOUS_TAG" ]; then
+    PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+fi
 RELEASE_NOTES=""
 
 # Build release notes string
@@ -49,7 +53,7 @@ RELEASE_NOTES="# Release v$NEW_VERSION - $(date +%Y-%m-%d)
 ## 🎉 New Features
 "
 
-if [ -n "$PREVIOUS_TAG" ]; then
+if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "HEAD" ]; then
     RELEASE_NOTES+="$(git log --oneline "$PREVIOUS_TAG..HEAD" --grep="feat:" --pretty=format:"- %s" | sed 's/feat: //')
 "
 else
@@ -61,7 +65,7 @@ RELEASE_NOTES+="
 ## 🐛 Bug Fixes
 "
 
-if [ -n "$PREVIOUS_TAG" ]; then
+if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "HEAD" ]; then
     RELEASE_NOTES+="$(git log --oneline "$PREVIOUS_TAG..HEAD" --grep="fix:" --pretty=format:"- %s" | sed 's/fix: //')
 "
 else
