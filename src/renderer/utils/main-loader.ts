@@ -97,6 +97,7 @@
         emojiPicker,
         gifPicker,
         modalExternalLink,
+        modalCustomStatus,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -124,6 +125,7 @@
         fetchFragment("emoji-picker.html"),
         fetchFragment("gif-picker.html"),
         fetchFragment("modal-external-link.html"),
+        fetchFragment("modal-custom-status.html"),
       ]);
 
       // Title bar (top-level)
@@ -162,6 +164,7 @@
       document.body.appendChild(parseFragment(emojiPicker));
       document.body.appendChild(parseFragment(gifPicker));
       document.body.appendChild(parseFragment(modalExternalLink));
+      document.body.appendChild(parseFragment(modalCustomStatus));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

@@ -770,6 +770,7 @@
       // Populate username input
       const usernameInput = document.getElementById("settings-username-input") as HTMLInputElement | null;
       if (usernameInput) usernameInput.value = username;
+
     } catch (e) {
       log.error("Failed to populate settings account", { error: String(e) });
     }
@@ -996,6 +997,7 @@
   usernameInput?.addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key === "Enter") handleSaveUsername();
   });
+
 
   settingsNavItems.forEach((item) =>
     item.addEventListener("click", () =>

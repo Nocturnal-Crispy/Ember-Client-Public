@@ -778,7 +778,7 @@
   }
 
   if (statusSubmenu) {
-    const statusOptions = statusSubmenu.querySelectorAll(".status-option");
+    const statusOptions = statusSubmenu.querySelectorAll(".status-option[data-status]");
     statusOptions.forEach((option) => {
       option.addEventListener("click", async () => {
         const displayStatus =
@@ -795,13 +795,28 @@
         await updateUserStatus(apiStatus, displayStatus);
       });
     });
+
+    const setCustomStatusBtn = document.getElementById("set-custom-status-btn");
+    setCustomStatusBtn?.addEventListener("click", () => {
+      userMenu?.classList.add("hidden");
+      statusSubmenu.classList.add("hidden");
+      openCustomStatusModal();
+    });
   }
+
+  // Track current custom status locally so presence-only changes preserve it
+  let currentCustomStatus = "";
+  let currentStatusEmoji = "";
 
   async function updateUserStatus(
     apiStatus: string,
-    displayStatus: string
+    displayStatus: string,
+    customStatus?: string,
+    statusEmoji?: string
   ): Promise<void> {
     log.debug("Updating user status", { status: apiStatus });
+    const cs = customStatus ?? currentCustomStatus;
+    const se = statusEmoji ?? currentStatusEmoji;
     try {
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         token?: string;
@@ -816,19 +831,22 @@
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth.token}`,
         },
-        body: JSON.stringify({ status: apiStatus }),
+        body: JSON.stringify({ status: apiStatus, custom_status: cs, status_emoji: se }),
       });
       if (response.ok) {
-        log.info("User status updated", {
-          status: apiStatus,
-          user_id: auth.user_id,
-        });
-        if (userStatusText) userStatusText.textContent = displayStatus;
+        currentCustomStatus = cs;
+        currentStatusEmoji = se;
+        log.info("User status updated", { status: apiStatus, user_id: auth.user_id });
+        if (userStatusText) {
+          userStatusText.textContent = cs ? `${se ? se + " " : ""}${cs}` : displayStatus;
+        }
         updateUserPanelStatusColor(apiStatus);
         window.handlePresenceUpdate({
           user_id: auth.user_id ?? "",
           username: auth.username ?? "",
           status: apiStatus,
+          custom_status: cs,
+          status_emoji: se,
         });
       } else {
         log.warn("Failed to update user status", {
@@ -839,9 +857,129 @@
     } catch (error) {
       const err = error as Error;
       log.error("Error updating user status", { error: err.message });
-      console.error("Error updating status:", error);
     }
   }
+
+  // ── Custom Status Modal ───────────────────────────────────────────────────
+
+  function openCustomStatusModal(): void {
+    const modal = document.getElementById("custom-status-modal");
+    if (!modal) return;
+
+    // Pre-populate with current values
+    const presenceSelect = document.getElementById("custom-status-presence") as HTMLSelectElement | null;
+    const emojiInput = document.getElementById("custom-status-emoji-input") as HTMLInputElement | null;
+    const textInput = document.getElementById("custom-status-text-input") as HTMLInputElement | null;
+    const charCount = document.getElementById("custom-status-char-count");
+    const errorEl = document.getElementById("custom-status-error");
+
+    if (presenceSelect) {
+      const currentApiStatus = getCurrentApiStatus();
+      presenceSelect.value = currentApiStatus;
+    }
+    if (emojiInput) emojiInput.value = currentStatusEmoji;
+    if (textInput) {
+      textInput.value = currentCustomStatus;
+      if (charCount) charCount.textContent = String(currentCustomStatus.length);
+    }
+
+    // Update emoji button face
+    const emojiBtn = document.getElementById("custom-status-emoji-btn");
+    if (emojiBtn) emojiBtn.textContent = currentStatusEmoji || "😊";
+
+    if (errorEl) errorEl.classList.add("hidden");
+
+    modal.classList.remove("hidden");
+    textInput?.focus();
+  }
+
+  function closeCustomStatusModal(): void {
+    document.getElementById("custom-status-modal")?.classList.add("hidden");
+  }
+
+  function getCurrentApiStatus(): string {
+    const statusEl = document.getElementById("user-status-text");
+    const text = statusEl?.textContent ?? "Online";
+    const map: Record<string, string> = {
+      Online: "online", Away: "idle", Idle: "idle",
+      "Do Not Disturb": "dnd", Invisible: "invisible",
+    };
+    // Try to match known display names; fall back to "online"
+    for (const [display, api] of Object.entries(map)) {
+      if (text.startsWith(display)) return api;
+    }
+    return "online";
+  }
+
+  function initCustomStatusModal(): void {
+    const modal = document.getElementById("custom-status-modal");
+    if (!modal) return;
+
+    const emojiBtn = document.getElementById("custom-status-emoji-btn");
+    const emojiInput = document.getElementById("custom-status-emoji-input") as HTMLInputElement | null;
+    const textInput = document.getElementById("custom-status-text-input") as HTMLInputElement | null;
+    const charCount = document.getElementById("custom-status-char-count");
+    const saveBtn = document.getElementById("custom-status-save-btn");
+    const clearBtn = document.getElementById("custom-status-clear-btn");
+    const cancelBtn = document.getElementById("custom-status-cancel-btn");
+
+    // Emoji button → open picker targeting the emoji input
+    emojiBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!emojiInput) return;
+      emojiInput.value = "";
+      (window as any).openEmojiPicker(emojiBtn, emojiInput);
+    });
+
+    // When emoji picker inserts into the hidden input, mirror to button face
+    emojiInput?.addEventListener("input", () => {
+      if (emojiBtn) emojiBtn.textContent = emojiInput.value || "😊";
+    });
+
+    // Character counter for custom status text
+    textInput?.addEventListener("input", () => {
+      if (charCount) charCount.textContent = String(textInput.value.length);
+    });
+
+    saveBtn?.addEventListener("click", async () => {
+      const presenceSelect = document.getElementById("custom-status-presence") as HTMLSelectElement | null;
+      const apiStatus = presenceSelect?.value ?? "online";
+      const displayMap: Record<string, string> = {
+        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible",
+      };
+      const customStatus = (textInput?.value ?? "").trim();
+      const statusEmoji = (emojiInput?.value ?? "").trim();
+
+      closeCustomStatusModal();
+      await updateUserStatus(apiStatus, displayMap[apiStatus] ?? "Online", customStatus, statusEmoji);
+    });
+
+    clearBtn?.addEventListener("click", async () => {
+      const presenceSelect = document.getElementById("custom-status-presence") as HTMLSelectElement | null;
+      const apiStatus = presenceSelect?.value ?? "online";
+      const displayMap: Record<string, string> = {
+        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible",
+      };
+      closeCustomStatusModal();
+      await updateUserStatus(apiStatus, displayMap[apiStatus] ?? "Online", "", "");
+    });
+
+    cancelBtn?.addEventListener("click", closeCustomStatusModal);
+
+    // Close on overlay click
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeCustomStatusModal();
+    });
+
+    // Close on Escape
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+        closeCustomStatusModal();
+      }
+    });
+  }
+
+  initCustomStatusModal();
 
   function updateUserPanelStatusColor(status: string): void {
     const statusEl = document.getElementById("user-status-text");
@@ -1008,12 +1146,26 @@
         statusIcon.alt = key;
         avatarEl.appendChild(statusIcon);
 
+        const nameWrapEl = document.createElement("div");
+        nameWrapEl.className = "member-name-wrap";
+
         const nameEl = document.createElement("span");
         nameEl.className = "member-name";
         nameEl.textContent = member.username ?? "Unknown";
+        nameWrapEl.appendChild(nameEl);
+
+        if (member.custom_status) {
+          const customStatusEl = document.createElement("span");
+          customStatusEl.className = "member-custom-status";
+          const text = member.status_emoji
+            ? `${member.status_emoji} ${member.custom_status}`
+            : member.custom_status;
+          customStatusEl.textContent = text;
+          nameWrapEl.appendChild(customStatusEl);
+        }
 
         memberEl.appendChild(avatarEl);
-        memberEl.appendChild(nameEl);
+        memberEl.appendChild(nameWrapEl);
         memberList.appendChild(memberEl);
       });
     });

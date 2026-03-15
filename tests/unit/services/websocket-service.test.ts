@@ -155,6 +155,51 @@ describe('handlePresenceUpdate', () => {
     expect((window as any).App.currentMembers[1].status).toBe('dnd');
   });
 
+  it('updates custom_status and status_emoji for an existing member', () => {
+    (window as any).App.currentMembers = [
+      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
+    ];
+
+    (window as any).handlePresenceUpdate({
+      user_id: 'user-1',
+      username: 'Alice',
+      status: 'online',
+      custom_status: 'Working on Ember',
+      status_emoji: '💻',
+    });
+
+    expect((window as any).App.currentMembers[0].custom_status).toBe('Working on Ember');
+    expect((window as any).App.currentMembers[0].status_emoji).toBe('💻');
+    expect(mockRenderMemberList).toHaveBeenCalled();
+  });
+
+  it('includes custom_status and status_emoji when appending a new member', () => {
+    (window as any).App.currentMembers = [];
+
+    (window as any).handlePresenceUpdate({
+      user_id: 'user-3',
+      username: 'Carol',
+      status: 'idle',
+      custom_status: 'On a break',
+      status_emoji: '☕',
+    });
+
+    expect((window as any).App.currentMembers).toHaveLength(1);
+    expect((window as any).App.currentMembers[0].custom_status).toBe('On a break');
+    expect((window as any).App.currentMembers[0].status_emoji).toBe('☕');
+  });
+
+  it('handles presence update without custom_status gracefully', () => {
+    (window as any).App.currentMembers = [
+      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member', custom_status: 'old status', status_emoji: '🎯' },
+    ];
+
+    (window as any).handlePresenceUpdate({ user_id: 'user-1', username: 'Alice', status: 'idle' });
+
+    // Status updates, custom_status preserved (not cleared unless explicitly sent)
+    expect((window as any).App.currentMembers[0].status).toBe('idle');
+  });
+
   it('calls renderMemberList with the updated members array', () => {
     (window as any).App.currentMembers = [
       { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },

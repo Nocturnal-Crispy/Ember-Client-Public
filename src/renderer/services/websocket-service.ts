@@ -263,15 +263,23 @@
     user_id: string;
     username: string;
     status: string;
+    custom_status?: string;
+    status_emoji?: string;
   }): void {
-    const { user_id, username, status } = payload;
+    const { user_id, username, status, custom_status, status_emoji } = payload;
     const memberIdx = App.currentMembers.findIndex(
       (m) => m.user_id === user_id
     );
     if (memberIdx !== -1) {
       App.currentMembers[memberIdx].status = status;
+      if (custom_status !== undefined) {
+        App.currentMembers[memberIdx].custom_status = custom_status;
+      }
+      if (status_emoji !== undefined) {
+        App.currentMembers[memberIdx].status_emoji = status_emoji;
+      }
     } else {
-      App.currentMembers.push({ user_id, username, status, role: "member" });
+      App.currentMembers.push({ user_id, username, status, role: "member", custom_status, status_emoji });
     }
     window.renderMemberList(App.currentMembers);
     

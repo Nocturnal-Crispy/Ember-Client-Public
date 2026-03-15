@@ -91,6 +91,12 @@
 
 /* ─── Member Name ──────────────────────────────────────────────────────────── */
 
+.member-name-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .member-name {
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
@@ -102,4 +108,13 @@
 
 .member:hover .member-name {
   color: var(--highlight);
+}
+
+.member-custom-status {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  color: rgba(var(--rgb-text), 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
