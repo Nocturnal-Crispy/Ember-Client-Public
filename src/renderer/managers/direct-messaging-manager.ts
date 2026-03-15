@@ -100,6 +100,16 @@
         if (entry.textChannelId) {
           dmByTextChannel.set(entry.textChannelId, entry);
           dmByEmberId.set(entry.emberId, entry);
+          
+          // Cache the ember key for this DM to enable message decryption
+          // This is critical for DMs created by other users
+          fetchAndCacheEmberKey(entry.emberId).catch((err) => {
+            log.warn("Failed to cache ember key for loaded DM", { 
+              emberId: entry.emberId, 
+              error: err.message 
+            });
+          });
+          
           window.addDmConversationToList({
             id: entry.textChannelId,
             participantId: entry.partnerId,
@@ -243,7 +253,13 @@
     if (!auth || !entry) return [];
 
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) return [];
+    if (!emberKey) {
+      log.error("Cannot fetch DM messages: ember key unavailable", { 
+        emberId: entry.emberId, 
+        channelId 
+      });
+      return [];
+    }
 
     try {
       const res = await fetch(
@@ -258,7 +274,22 @@
       };
       const currentUserId = auth.user_id;
       return (data.messages ?? []).map((msg) => {
-        const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey) ?? "";
+        const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
+        if (plaintext === null) {
+          log.warn("DM message decryption failed", { 
+            message_id: msg.id, 
+            channel_id: channelId 
+          });
+          // Return empty string with error indicator to match channel behavior
+          return {
+            id: msg.id,
+            conversationId: channelId,
+            senderId: msg.sender_user_id,
+            content: "[Failed to decrypt message]",
+            timestamp: typeof msg.created_at === "number" ? msg.created_at : new Date(msg.created_at).getTime() / 1000,
+            isOwn: msg.sender_user_id === currentUserId,
+          };
+        }
         return {
           id: msg.id,
           conversationId: channelId,
@@ -324,16 +355,32 @@
     const auth = await getAuth();
     if (!auth) return;
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) return;
+    if (!emberKey) {
+      log.error("Cannot handle incoming DM message: ember key unavailable", { 
+        emberId: entry.emberId, 
+        channelId 
+      });
+      return;
+    }
     const ciphertext = String(payload["ciphertext"] ?? "");
-    const plaintext = emberCrypto.decryptMessage(ciphertext, emberKey) ?? "";
+    const plaintext = emberCrypto.decryptMessage(ciphertext, emberKey);
     const senderId = String(payload["sender_user_id"] ?? "");
     const createdAt = Number(payload["created_at"] ?? 0);
+    
+    // Handle decryption failure consistently with channels
+    const messageContent = plaintext === null ? "[Failed to decrypt message]" : plaintext;
+    if (plaintext === null) {
+      log.warn("Incoming DM message decryption failed", { 
+        message_id: String(payload["id"] ?? ""),
+        channel_id: channelId 
+      });
+    }
+    
     window.displayDmMessage({
       id: String(payload["id"] ?? ""),
       conversationId: channelId,
       senderId,
-      content: plaintext,
+      content: messageContent,
       timestamp: createdAt,
       isOwn: senderId === auth.user_id,
     });
