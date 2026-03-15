@@ -471,6 +471,12 @@
     (window as any).openExternalLinkModal = function (url: string): void {
       pendingUrl = url;
       if (urlEl) urlEl.textContent = url;
+      if (openBtn) {
+        const isSteam =
+          url.startsWith("https://store.steampowered.com/") ||
+          url.startsWith("https://steamcommunity.com/");
+        openBtn.textContent = isSteam ? "Open in Steam" : "Open in Browser";
+      }
       modal.classList.remove("hidden");
     };
 
