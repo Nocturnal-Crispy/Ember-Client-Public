@@ -38,7 +38,24 @@ try {
     surfaceRgb: string;
     chatColor?: string;
   } | null;
-  if (savedTheme && document.documentElement) {
+
+  function isValidPreloadRgb(value: unknown): value is string {
+    if (typeof value !== 'string' || value.trim() === '') return false;
+    const parts = value.split(',');
+    if (parts.length !== 3) return false;
+    return parts.every(part => {
+      const n = parseInt(part.trim(), 10);
+      return !isNaN(n) && n >= 0 && n <= 255;
+    });
+  }
+
+  if (
+    savedTheme &&
+    document.documentElement &&
+    isValidPreloadRgb(savedTheme.accentRgb) &&
+    isValidPreloadRgb(savedTheme.backgroundRgb) &&
+    isValidPreloadRgb(savedTheme.surfaceRgb)
+  ) {
     const root = document.documentElement;
     root.style.setProperty("--rgb-highlight", savedTheme.accentRgb);
     root.style.setProperty("--rgb-background", savedTheme.backgroundRgb);
@@ -51,6 +68,8 @@ try {
       root.style.setProperty("--chat-color", savedTheme.chatColor);
     }
     preloadLog("debug", "Theme applied synchronously in preload");
+  } else if (savedTheme) {
+    preloadLog("warn", "Theme settings failed validation in preload; skipping early application");
   }
 } catch (e) {
   preloadLog("warn", "Failed to apply theme synchronously in preload", { error: String(e) });
