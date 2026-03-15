@@ -80,6 +80,27 @@
 
   // ─── Utilities ─────────────────────────────────────────────────────────────
 
+  function isValidRgbStr(value: unknown): boolean {
+    if (typeof value !== 'string' || value.trim() === '') return false;
+    const parts = value.split(',');
+    if (parts.length !== 3) return false;
+    return parts.every(part => {
+      const n = parseInt(part.trim(), 10);
+      return !isNaN(n) && n >= 0 && n <= 255;
+    });
+  }
+
+  function isValidThemeSettings(settings: unknown): settings is ThemeSettings {
+    if (!settings || typeof settings !== 'object') return false;
+    const s = settings as Record<string, unknown>;
+    return (
+      typeof s['themeId'] === 'string' && s['themeId'].length > 0 &&
+      isValidRgbStr(s['accentRgb']) &&
+      isValidRgbStr(s['backgroundRgb']) &&
+      isValidRgbStr(s['surfaceRgb'])
+    );
+  }
+
   function hexToRgbStr(hex: string): string {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -123,11 +144,20 @@
       const saved = (await ipcRenderer.invoke(
         "get-theme-settings"
       )) as ThemeSettings;
-      pendingSettings = { ...saved };
+      if (!isValidThemeSettings(saved)) {
+        log.warn("Theme settings failed integrity check on startup; using defaults", {
+          received: JSON.stringify(saved),
+        });
+        pendingSettings = { ...DEFAULT_SETTINGS };
+      } else {
+        pendingSettings = { ...saved };
+      }
       applyThemeToDom(pendingSettings);
       log.debug("Theme applied on startup", { themeId: pendingSettings.themeId });
     } catch (e) {
-      log.error("Failed to load theme on startup", { error: String(e) });
+      log.error("Failed to load theme on startup; using defaults", { error: String(e) });
+      pendingSettings = { ...DEFAULT_SETTINGS };
+      applyThemeToDom(pendingSettings);
     }
   }
 

@@ -10,6 +10,66 @@ const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
 
+// ─── Theme defaults and validation ────────────────────────────────────────────
+
+const defaultThemeSettings: ThemeSettings = {
+  themeId: 'ember',
+  accentRgb: '255, 120, 80',
+  backgroundRgb: '20, 20, 25',
+  surfaceRgb: '30, 30, 35',
+  chatColor: '',
+};
+
+function isValidRgbString(value: unknown): boolean {
+  if (typeof value !== 'string' || value.trim() === '') return false;
+  const parts = value.split(',');
+  if (parts.length !== 3) return false;
+  return parts.every(part => {
+    const n = parseInt(part.trim(), 10);
+    return !isNaN(n) && n >= 0 && n <= 255;
+  });
+}
+
+function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
+  const result: ThemeSettings = { ...defaultThemeSettings };
+  let repairedFields: string[] = [];
+
+  if (typeof saved.themeId === 'string' && saved.themeId.length > 0) {
+    result.themeId = saved.themeId;
+  } else if (saved.themeId !== undefined) {
+    repairedFields.push('themeId');
+  }
+
+  if (isValidRgbString(saved.accentRgb)) {
+    result.accentRgb = saved.accentRgb!;
+  } else if (saved.accentRgb !== undefined) {
+    repairedFields.push('accentRgb');
+  }
+
+  if (isValidRgbString(saved.backgroundRgb)) {
+    result.backgroundRgb = saved.backgroundRgb!;
+  } else if (saved.backgroundRgb !== undefined) {
+    repairedFields.push('backgroundRgb');
+  }
+
+  if (isValidRgbString(saved.surfaceRgb)) {
+    result.surfaceRgb = saved.surfaceRgb!;
+  } else if (saved.surfaceRgb !== undefined) {
+    repairedFields.push('surfaceRgb');
+  }
+
+  // chatColor is optional; accept empty string or any non-null string value
+  if (typeof saved.chatColor === 'string') {
+    result.chatColor = saved.chatColor;
+  }
+
+  if (repairedFields.length > 0) {
+    log.warn('Theme settings had invalid values; defaults applied', { repairedFields });
+  }
+
+  return result;
+}
+
 const store = new Store<StoreSchema>();
 
 const defaultVoiceVideoSettings: VoiceVideoSettings = {
@@ -315,26 +375,21 @@ ipcMain.handle(
 
 // ─── IPC: Theme settings ──────────────────────────────────────────────────────
 
-const defaultThemeSettings: ThemeSettings = {
-  themeId: 'ember',
-  accentRgb: '255, 120, 80',
-  backgroundRgb: '20, 20, 25',
-  surfaceRgb: '30, 30, 35',
-  chatColor: '',
-};
-
 ipcMain.handle("get-theme-settings", () => {
   log.debug("IPC: get-theme-settings");
-  const saved = store.get("themeSettings") ?? {} as Partial<ThemeSettings>;
-  return { ...defaultThemeSettings, ...saved };
+  const saved = (store.get("themeSettings") ?? {}) as Partial<ThemeSettings>;
+  const settings = sanitizeThemeSettings(saved);
+  log.debug("Theme settings loaded", { themeId: settings.themeId });
+  return settings;
 });
 
 ipcMain.handle(
   "save-theme-settings",
   (_event, settings: ThemeSettings) => {
     log.debug("IPC: save-theme-settings");
-    store.set("themeSettings", settings);
-    log.info("Theme settings saved");
+    const sanitized = sanitizeThemeSettings(settings as Partial<ThemeSettings>);
+    store.set("themeSettings", sanitized);
+    log.info("Theme settings saved", { themeId: sanitized.themeId });
     return true;
   }
 );
@@ -343,8 +398,8 @@ ipcMain.handle(
 // preventing a flash of default colors on startup.
 ipcMain.on("get-theme-settings-sync", (event) => {
   log.debug("IPC: get-theme-settings-sync");
-  const saved = store.get("themeSettings") ?? {} as Partial<ThemeSettings>;
-  event.returnValue = { ...defaultThemeSettings, ...saved };
+  const saved = (store.get("themeSettings") ?? {}) as Partial<ThemeSettings>;
+  event.returnValue = sanitizeThemeSettings(saved);
 });
 
 // ─── IPC: Update check ────────────────────────────────────────────────────────
