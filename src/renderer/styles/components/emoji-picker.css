@@ -2,7 +2,7 @@
 
 .emoji-picker-panel {
   position: fixed;
-  z-index: 9000;
+  z-index: 10001;
   width: 320px;
   height: 300px;
   background: var(--background-secondary, #1e1e2e);
