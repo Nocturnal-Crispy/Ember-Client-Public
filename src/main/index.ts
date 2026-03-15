@@ -3,6 +3,7 @@ import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
+import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema } from "../shared/types";
@@ -129,7 +130,13 @@ function createWindow(isAuthenticated: boolean) {
     log.info("Window open request intercepted", { url });
     // Only allow HTTPS URLs to open externally
     if (url.startsWith("https://")) {
-      shell.openExternal(url);
+      const target = isSteamUrl(url) ? toSteamProtocolUrl(url) : url;
+      shell.openExternal(target).catch(() => {
+        if (isSteamUrl(url)) {
+          log.warn("Steam client not available, falling back to browser", { url });
+          shell.openExternal(url).catch(() => undefined);
+        }
+      });
     } else {
       log.warn("Blocked non-HTTPS URL from opening", { url });
     }
@@ -465,9 +472,17 @@ ipcMain.handle("get-klipy-api-key", () => {
   return KLIPPY_API_KEY;
 });
 
-ipcMain.handle("open-external-url", (_event, url: unknown) => {
+ipcMain.handle("open-external-url", async (_event, url: unknown) => {
   if (typeof url !== "string" || !url.startsWith("https://")) return;
-  shell.openExternal(url);
+  if (isSteamUrl(url)) {
+    try {
+      await shell.openExternal(toSteamProtocolUrl(url));
+      return;
+    } catch {
+      log.warn("Steam client not available, falling back to browser", { url });
+    }
+  }
+  await shell.openExternal(url);
 });
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────

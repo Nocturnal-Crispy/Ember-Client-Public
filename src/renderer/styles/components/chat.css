@@ -709,32 +709,48 @@
 /* ─── External link modal ──────────────────────────────────────────────────── */
 
 .external-link-modal-container {
-  min-width: 300px;
-  max-width: 480px;
+  min-width: 320px;
+  max-width: 500px;
+}
+
+.external-link-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.external-link-icon {
+  flex-shrink: 0;
+  color: var(--highlight);
+  opacity: 0.85;
 }
 
 .external-link-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .external-link-warning {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-  color: rgba(var(--rgb-text), 0.7);
+  font-size: 14px;
+  color: rgba(var(--rgb-text), 0.75);
   margin: 0;
+  line-height: 1.5;
 }
 
 .external-link-url-box {
-  padding: 6px 10px;
-  background: rgba(var(--rgb-highlight), 0.07);
-  border: 1px solid rgba(var(--rgb-highlight), 0.2);
-  word-break: break-all;
+  padding: 10px 14px;
+  background: rgba(var(--rgb-highlight), 0.06);
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
 }
 
 .external-link-url-text {
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
-  color: var(--highlight);
+  color: rgba(var(--rgb-highlight), 0.9);
+  user-select: text;
 }
