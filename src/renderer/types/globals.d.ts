@@ -76,6 +76,15 @@ declare global {
     avatar?: string;
   };
 
+  // ─── GIF Favorites ────────────────────────────────────────────────────────
+
+  interface GifFavorite {
+    url: string;
+    title: string;
+    thumbnailUrl: string;
+    addedAt: number;
+  }
+
   // ─── Theme settings ───────────────────────────────────────────────────────
 
   interface ThemeSettings {
@@ -387,6 +396,7 @@ declare global {
     currentIconSource: "upload" | "url";
     pendingInvite: Record<string, unknown> | null;
     pendingAttachment: PendingAttachment | null;
+    gifFavorites: GifFavorite[];
     _vvSounds: Partial<Record<string, boolean>> | null;
     _micTestStream: MediaStream | null;
     _micTestAnimFrame: number | null;
@@ -613,6 +623,10 @@ declare global {
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
     // Globals set by gif-picker.ts
     openGifPicker(trigger: HTMLElement): void;
+    getGifFavorites(): GifFavorite[];
+    addGifFavorite(favorite: GifFavorite): void;
+    removeGifFavorite(url: string): void;
+    isGifFavorited(url: string): boolean;
     // Globals set by message-service.ts (GIF)
     sendGifMessage(url: string, title: string): Promise<void>;
     sendGif(url: string, title: string): void;

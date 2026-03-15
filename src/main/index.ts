@@ -6,7 +6,7 @@ import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
-import { VoiceVideoSettings, ThemeSettings, StoreSchema } from "../shared/types";
+import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../shared/types";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
@@ -470,6 +470,23 @@ ipcMain.handle("get-klipy-api-key", () => {
   // Return the obfuscated API key - this is available to all users
   // The key is obfuscated in the source code to make casual extraction harder
   return KLIPPY_API_KEY;
+});
+
+// ─── IPC: GIF favorites ───────────────────────────────────────────────────────
+
+ipcMain.handle("get-gif-favorites", () => {
+  log.debug("IPC: get-gif-favorites");
+  return store.get("gifFavorites") ?? [];
+});
+
+ipcMain.handle("save-gif-favorites", (_event, favorites: unknown) => {
+  log.debug("IPC: save-gif-favorites");
+  if (!Array.isArray(favorites)) {
+    log.warn("save-gif-favorites: invalid payload, expected array");
+    return false;
+  }
+  store.set("gifFavorites", favorites as GifFavorite[]);
+  return true;
 });
 
 ipcMain.handle("open-external-url", async (_event, url: unknown) => {
