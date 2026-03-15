@@ -55,16 +55,36 @@
       });
       if (!res.ok) return null;
       const data = (await res.json()) as { encrypted_key: string; sender_public_key?: string };
-      // For DM embers where this user is not the creator, the server returns the
-      // creator's public key so we can decrypt the asymmetrically-boxed ember key.
-      const senderPubKey = data.sender_public_key
-        ? naclUtil.decodeBase64(data.sender_public_key)
-        : naclUtil.decodeBase64(device.public_key);
-      const key = emberCrypto.decryptEmberKeyForUser(
-        data.encrypted_key,
-        senderPubKey,
-        naclUtil.decodeBase64(device.private_key),
-      );
+      const ownPub = naclUtil.decodeBase64(device.public_key);
+      const ownPriv = naclUtil.decodeBase64(device.private_key);
+
+      let key: Uint8Array | null = null;
+
+      if (data.sender_public_key) {
+        // Peer case: key was stored as an asymmetric box by the creator.
+        // Decrypt it, then re-encrypt as a self-box and persist — making future
+        // fetches identical to regular ember channels (self-box with own keys).
+        const senderPubKey = naclUtil.decodeBase64(data.sender_public_key);
+        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, senderPubKey, ownPriv);
+        if (key) {
+          const selfBox = emberCrypto.encryptEmberKeyForUser(key, ownPub, ownPriv);
+          // Fire-and-forget: migrate stored key to self-box format.
+          fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({ encrypted_key: selfBox }),
+          }).catch((err: Error) =>
+            log.warn("Failed to migrate DM key to self-box", { emberId, error: err.message }),
+          );
+        }
+      } else {
+        // Creator case (or already migrated): self-box, same path as regular embers.
+        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, ownPub, ownPriv);
+      }
+
       if (key) App.emberKeyCache.set(emberId, key);
       return key ?? null;
     } catch (err) {
@@ -180,17 +200,22 @@
       partnerPublicKey = devData.devices?.[0]?.public_key ?? null;
     }
 
+    if (!partnerPublicKey) {
+      // The peer has no registered device — we cannot encrypt the DM key for them.
+      // Without the peer's public key the asymmetric box would be wrong and the peer
+      // would never be able to decrypt messages. The user should try again once the
+      // peer has logged in at least once so their device key is registered.
+      throw new Error(
+        `${participantUsername} has no registered device. Ask them to log in first, then try again.`,
+      );
+    }
+
     const emberKey = emberCrypto.generateEmberKey();
     const selfPub = naclUtil.decodeBase64(device.public_key);
     const selfPriv = naclUtil.decodeBase64(device.private_key);
     const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, selfPub, selfPriv);
-    let encryptedKeyPeer: string;
-    if (partnerPublicKey) {
-      const peerPub = naclUtil.decodeBase64(partnerPublicKey);
-      encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, peerPub, selfPriv);
-    } else {
-      encryptedKeyPeer = encryptedKeySelf;
-    }
+    const peerPub = naclUtil.decodeBase64(partnerPublicKey);
+    const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, peerPub, selfPriv);
 
     const createRes = await fetch(`${auth.hostname}/api/v1/dms`, {
       method: "POST",
@@ -343,7 +368,12 @@
     window.wsSubscribeToChannel(channelId);
 
     const entry = dmByTextChannel.get(channelId);
-    if (entry) fetchAndCacheEmberKey(entry.emberId).catch(() => null);
+    if (entry) {
+      // Mirror the regular ember flow: set activeEmberId so displayDecryptedMessage
+      // and sendEncryptedMessage can use the same code path as text channels.
+      App.activeEmberId = entry.emberId;
+      fetchAndCacheEmberKey(entry.emberId).catch(() => null);
+    }
   }
 
   // ─── Incoming WS messages ──────────────────────────────────────────────────
