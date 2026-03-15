@@ -35,6 +35,13 @@ export interface ThemeSettings {
   chatColor?: string;
 }
 
+export interface GifFavorite {
+  url: string;
+  title: string;
+  thumbnailUrl: string;
+  addedAt: number;
+}
+
 export interface StoreSchema {
   auth?: AuthData;
   device?: DeviceIdentity;
@@ -44,6 +51,7 @@ export interface StoreSchema {
   };
   voiceVideoSettings?: VoiceVideoSettings;
   themeSettings?: ThemeSettings;
+  gifFavorites?: GifFavorite[];
 }
 
 export interface AuthData {

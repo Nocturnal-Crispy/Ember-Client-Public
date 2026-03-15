@@ -14,8 +14,15 @@
     />
     <ul class="gif-picker-autocomplete hidden" id="gif-picker-autocomplete" role="listbox" aria-label="Autocomplete suggestions"></ul>
   </div>
+  <div class="gif-picker-tabs" role="tablist">
+    <button class="gif-picker-tab gif-picker-tab--active" id="gif-picker-tab-search" role="tab" aria-selected="true">Search</button>
+    <button class="gif-picker-tab" id="gif-picker-tab-favorites" role="tab" aria-selected="false">&#9825; Favorites</button>
+  </div>
   <div class="gif-picker-grid" id="gif-picker-grid">
     <div class="gif-picker-empty" id="gif-picker-empty">Search for GIFs above</div>
+  </div>
+  <div class="gif-picker-favorites-grid hidden" id="gif-picker-favorites-grid">
+    <div class="gif-picker-empty" id="gif-picker-favorites-empty">No favorites yet. Hover a GIF and click &#9825; to save it.</div>
   </div>
   <div class="gif-picker-footer">
     <span class="gif-picker-attribution">Powered by Klipy</span>

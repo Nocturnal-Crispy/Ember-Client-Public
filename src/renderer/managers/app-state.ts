@@ -54,6 +54,9 @@ window.App = {
   // ── Attachment composer ───────────────────────────────────────────────────
   pendingAttachment: null,
 
+  // ── GIF favorites ────────────────────────────────────────────────────────
+  gifFavorites: [] as GifFavorite[],
+
   // ── Voice & Video settings ───────────────────────────────────────────────
   _vvSounds: null,
   _micTestStream: null,

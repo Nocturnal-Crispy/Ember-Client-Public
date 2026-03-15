@@ -101,6 +101,8 @@ const ALLOWED_INVOKE: readonly string[] = [
   "open-external-url",
   "get-pending-invite",
   "get-klipy-api-key",
+  "get-gif-favorites",
+  "save-gif-favorites",
 ];
 
 const ALLOWED_ON: readonly string[] = ["handle-invite-link"];

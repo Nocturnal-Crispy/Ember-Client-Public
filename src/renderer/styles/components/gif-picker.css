@@ -4,7 +4,7 @@
   position: fixed;
   z-index: 9000;
   width: 360px;
-  height: 420px;
+  height: 450px;
   background: var(--background-secondary, #1e1e2e);
   border: 1px solid var(--border-color, #3a3a5c);
   border-radius: 8px;
@@ -43,6 +43,10 @@
 
 .gif-picker-search-input::placeholder {
   color: var(--text-muted, #72727e);
+}
+
+.gif-picker-grid.hidden {
+  display: none;
 }
 
 .gif-picker-grid {
@@ -171,7 +175,73 @@
   color: var(--text-normal, #d4d4f0);
 }
 
+/* ─── Tabs ────────────────────────────────────────────────────────────────── */
+
+.gif-picker-tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-color, #3a3a5c);
+  background: var(--background-tertiary, #16161e);
+  flex-shrink: 0;
+}
+
+.gif-picker-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #72727e);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.gif-picker-tab:hover {
+  color: var(--text-normal, #d4d4f0);
+}
+
+.gif-picker-tab--active {
+  color: var(--accent-color, #7289da);
+  border-bottom-color: var(--accent-color, #7289da);
+}
+
+/* ─── Favorites grid ──────────────────────────────────────────────────────── */
+
+.gif-picker-favorites-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #3a3a5c) transparent;
+  min-height: 0;
+}
+
+.gif-picker-favorites-grid.hidden {
+  display: none;
+}
+
+.gif-picker-favorites-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.gif-picker-favorites-grid::-webkit-scrollbar-thumb {
+  background: var(--border-color, #3a3a5c);
+  border-radius: 2px;
+}
+
+/* ─── GIF item ────────────────────────────────────────────────────────────── */
+
 .gif-picker-item {
+  position: relative;
   border-radius: 4px;
   overflow: hidden;
   cursor: pointer;
@@ -192,6 +262,39 @@
   display: block;
   object-fit: cover;
   border-radius: 4px;
+}
+
+/* ─── Heart button ────────────────────────────────────────────────────────── */
+
+.gif-picker-heart-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  z-index: 1;
+  padding: 0;
+}
+
+.gif-picker-item:hover .gif-picker-heart-btn {
+  opacity: 1;
+}
+
+.gif-picker-heart-btn--active {
+  color: #ff4d6d;
+  opacity: 1;
 }
 
 .gif-picker-footer {
