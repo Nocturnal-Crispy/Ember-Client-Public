@@ -306,3 +306,61 @@ describe('markChannelUnread', () => {
     expect(el.classList.contains('has-unread')).toBe(false);
   });
 });
+
+// ─── clearAllChannelUnread ────────────────────────────────────────────────────
+
+describe('clearAllChannelUnread', () => {
+  let channelsContainer: HTMLDivElement;
+
+  beforeEach(() => {
+    channelsContainer = document.createElement('div');
+    channelsContainer.className = 'channels';
+    document.body.appendChild(channelsContainer);
+  });
+
+  afterEach(() => {
+    document.body.removeChild(channelsContainer);
+  });
+
+  it('is exposed on window', () => {
+    expect(typeof (window as any).clearAllChannelUnread).toBe('function');
+  });
+
+  it('removes has-unread class from all channel elements', () => {
+    (window as any).renderChannels(
+      [
+        { id: 'ch-ra-1', ember_id: 'e-1', name: 'general', type: 'text' as const },
+        { id: 'ch-ra-2', ember_id: 'e-1', name: 'random', type: 'text' as const },
+      ],
+      []
+    );
+    (window as any).markChannelUnread('ch-ra-1');
+    (window as any).markChannelUnread('ch-ra-2');
+
+    (window as any).clearAllChannelUnread();
+
+    const unread = channelsContainer.querySelectorAll('.channel.has-unread');
+    expect(unread.length).toBe(0);
+  });
+
+  it('removes all ember-unread-badge elements from the document', () => {
+    const iconEl = document.createElement('div');
+    iconEl.className = 'server-icon';
+    iconEl.dataset['emberId'] = 'e-badge-test';
+    const badge = document.createElement('div');
+    badge.className = 'ember-unread-badge';
+    badge.textContent = '3';
+    iconEl.appendChild(badge);
+    document.body.appendChild(iconEl);
+
+    (window as any).clearAllChannelUnread();
+
+    expect(document.querySelectorAll('.ember-unread-badge').length).toBe(0);
+
+    document.body.removeChild(iconEl);
+  });
+
+  it('does not throw when there are no unread channels or badges', () => {
+    expect(() => (window as any).clearAllChannelUnread()).not.toThrow();
+  });
+});

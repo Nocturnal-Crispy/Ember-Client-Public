@@ -349,11 +349,11 @@
     const elements = document.querySelectorAll<HTMLElement>(
       `.voice-avatar[data-user-id="${userId}"]`
     );
-    log.debug("updateSpeakingIndicator", {
-      user_id: userId,
-      is_speaking: isSpeaking,
-      elements_found: elements.length,
-    });
+    // log.debug("updateSpeakingIndicator", {
+    //   user_id: userId,
+    //   is_speaking: isSpeaking,
+    //   elements_found: elements.length,
+    // });
     elements.forEach((el) => {
       el.classList.toggle("speaking", isSpeaking);
     });

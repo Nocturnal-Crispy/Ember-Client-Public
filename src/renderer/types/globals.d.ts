@@ -111,6 +111,12 @@ declare global {
     messageSound: boolean;
   }
 
+  // ─── Plugin settings ──────────────────────────────────────────────────────
+
+  interface PluginSettings {
+    readAllButton: boolean;
+  }
+
   // ─── Update check ─────────────────────────────────────────────────────────
 
   interface UpdateInfo {
@@ -508,6 +514,7 @@ declare global {
     ): void;
     hideChannelContextMenu(): void;
     markChannelUnread(channelId: string): void;
+    clearAllChannelUnread(): void;
     // Globals set by invite-manager.ts
     openJoinServerModal(): void;
     closeJoinServerModal(): void;
@@ -540,6 +547,9 @@ declare global {
     playVoiceSound(type: string): void;
     playNotificationSound(type: string): void;
     initNotifSettings(): void;
+    // Globals set by plugin-settings.ts
+    initPluginSettings(): void;
+    getPluginSettings(): PluginSettings;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;
@@ -607,6 +617,7 @@ declare global {
       typing: boolean;
     }): void;
     // Globals set by direct-messaging-ui.ts
+    clearAllDmUnread(): void;
     refreshDmUsername(username: string): void;
     initializeDirectMessagingUI(): void;
     loadAndShowDmRequests(): Promise<void>;
@@ -672,6 +683,8 @@ declare global {
     // Test functions
     testDmMessageSend(): Promise<void>;
     debugTextarea(): void;
+    // Globals set by read-all-manager.ts
+    readAll(): void;
     // Globals set by renderer.ts
     closeDMScreenOnServerSwitch(): void;
     // Globals set by renderer.ts (DM screen)

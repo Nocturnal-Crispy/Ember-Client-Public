@@ -154,3 +154,59 @@ describe('handleDmPresenceUpdate', () => {
     }).not.toThrow();
   });
 });
+
+// ─── clearAllDmUnread ─────────────────────────────────────────────────────────
+
+describe('clearAllDmUnread', () => {
+  let dmIcon: HTMLElement;
+
+  beforeEach(() => {
+    dmIcon = document.createElement('div');
+    dmIcon.id = 'dm-icon';
+    document.body.appendChild(dmIcon);
+  });
+
+  afterEach(() => {
+    document.body.removeChild(dmIcon);
+  });
+
+  it('is exposed on window', () => {
+    expect(typeof (window as any).clearAllDmUnread).toBe('function');
+  });
+
+  it('removes dm-icon-badge when conversations have unread counts', () => {
+    (window as any).addDmConversationToList({
+      id: 'conv-ra-1',
+      participantId: 'user-ra-1',
+      participantUsername: 'ReadAllUser1',
+      unreadCount: 3,
+      isOnline: false,
+      keyExchanged: true,
+    });
+
+    (window as any).clearAllDmUnread();
+
+    const badge = dmIcon.querySelector('.dm-icon-badge');
+    expect(badge).toBeNull();
+  });
+
+  it('removes dm-unread-count badges from conversation elements', () => {
+    (window as any).addDmConversationToList({
+      id: 'conv-ra-2',
+      participantId: 'user-ra-2',
+      participantUsername: 'ReadAllUser2',
+      unreadCount: 5,
+      isOnline: false,
+      keyExchanged: true,
+    });
+
+    (window as any).clearAllDmUnread();
+
+    const unreadBadges = document.querySelectorAll('[data-conversation-id="conv-ra-2"] .dm-unread-count');
+    expect(unreadBadges.length).toBe(0);
+  });
+
+  it('does not throw when no conversations exist', () => {
+    expect(() => (window as any).clearAllDmUnread()).not.toThrow();
+  });
+});
