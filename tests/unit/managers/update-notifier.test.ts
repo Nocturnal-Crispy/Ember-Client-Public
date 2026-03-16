@@ -46,7 +46,10 @@ beforeEach(() => {
   // Clean up any leftover notification
   document.getElementById('ember-update-notification')?.remove();
 
-  mockIpcInvoke.mockClear();
+  // Reset the dismissed version by clearing the module cache
+  delete require.cache[require.resolve('../../../src/renderer/managers/update-notifier')];
+
+  mockIpcInvoke.mockReset();
   jest.resetModules();
   (window as any).electronAPI.ipc.invoke = mockIpcInvoke;
 });
@@ -57,7 +60,9 @@ afterEach(() => {
 
 describe('checkForUpdate', () => {
   test('does not create a notification when no update is available', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: '0.0.13' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: '0.0.13' });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -66,7 +71,9 @@ describe('checkForUpdate', () => {
   });
 
   test('creates a notification when an update is available', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -75,7 +82,9 @@ describe('checkForUpdate', () => {
   });
 
   test('notification is inserted before the minimize button', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -88,7 +97,9 @@ describe('checkForUpdate', () => {
   });
 
   test('notification displays the correct version string', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -98,7 +109,9 @@ describe('checkForUpdate', () => {
   });
 
   test('does not create notification when IPC call fails', async () => {
-    mockIpcInvoke.mockRejectedValueOnce(new Error('network error'));
+    mockIpcInvoke
+      .mockRejectedValueOnce(new Error('network error')) // get-skipped-version
+      .mockRejectedValueOnce(new Error('network error')); // check-for-update-details
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -109,10 +122,12 @@ describe('checkForUpdate', () => {
 
 describe('dismissUpdateNotification', () => {
   test('removes the notification element', async () => {
-    mockIpcInvoke.mockResolvedValue({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay
 
     expect(document.getElementById('ember-update-notification')).not.toBeNull();
 
@@ -122,12 +137,19 @@ describe('dismissUpdateNotification', () => {
   });
 
   test('dismissing same version prevents re-showing', async () => {
-    mockIpcInvoke.mockResolvedValue({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
 
     (window as any).dismissUpdateNotification();
+
+    // Mock the IPC calls for the manual checkForUpdate call
+    mockIpcInvoke
+      .mockResolvedValueOnce('0.0.14') // get-skipped-version returns the dismissed version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     await (window as any).checkForUpdate();
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -136,17 +158,21 @@ describe('dismissUpdateNotification', () => {
   });
 
   test('a different newer version shows notification after dismiss', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
 
     require('../../../src/renderer/managers/update-notifier');
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay
 
     (window as any).dismissUpdateNotification();
 
-    mockIpcInvoke.mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.15' });
+    mockIpcInvoke
+      .mockResolvedValueOnce(null) // get-skipped-version for second check
+      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.15' });
 
     await (window as any).checkForUpdate();
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay
 
     const el = document.getElementById('ember-update-notification');
     expect(el).not.toBeNull();
