@@ -121,18 +121,24 @@
 
 /* ─── Read All Button ──────────────────────────────────────────────────────── */
 
-.server-icon.read-all-btn {
-  font-size: 18px;
-  color: rgba(var(--rgb-highlight), 0.4);
-  border-style: dashed;
-  border-color: rgba(var(--rgb-highlight), 0.2);
+.read-all-btn {
+  background: none;
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
+  color: rgba(var(--rgb-highlight), 0.6);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 5px 4px;
+  width: calc(100% - 16px);
+  text-align: center;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
-.server-icon.read-all-btn:hover {
+.read-all-btn:hover {
   border-color: var(--highlight);
-  border-style: solid;
-  background-color: rgba(var(--rgb-highlight), 0.1);
   color: var(--highlight);
+  background-color: rgba(var(--rgb-highlight), 0.1);
 }
 
 /* ─── Drag-and-drop ────────────────────────────────────────────────────────── */
