@@ -557,8 +557,9 @@
     
     conversation.element = conversationElement;
     conversationList.appendChild(conversationElement);
+    updateDmIconBadge();
   }
-  
+
   /**
    * Remove a conversation from the list
    */
@@ -573,7 +574,8 @@
     
     // Remove from conversations map
     conversations.delete(conversationId);
-    
+    updateDmIconBadge();
+
     // Show empty state if no conversations left
     if (conversations.size === 0) {
       showEmptyState();
@@ -700,6 +702,12 @@
    * Set active conversation
    */
   function setActiveConversation(conversationId: string): void {
+    // Clear unread count for the conversation being opened
+    const prevConv = conversations.get(conversationId);
+    if (prevConv && prevConv.unreadCount > 0) {
+      updateConversation(conversationId, { unreadCount: 0 });
+    }
+
     // Update UI state
     activeConversationId = conversationId;
     
@@ -971,7 +979,18 @@
     isOwn: boolean;
     chatColor?: string;
   }, prepend = false): void {
-    if (!dmChatContainer || messageData.conversationId !== activeConversationId) return;
+    if (messageData.conversationId !== activeConversationId) {
+      // Increment unread count for non-active conversations (not own, not historical)
+      if (!messageData.isOwn && !prepend) {
+        const conv = conversations.get(messageData.conversationId);
+        if (conv) {
+          conv.unreadCount += 1;
+          updateConversation(messageData.conversationId, {});
+        }
+      }
+      return;
+    }
+    if (!dmChatContainer) return;
 
     const messagesContainer = dmChatContainer.querySelector('.messages-container') as HTMLElement;
     if (!messagesContainer) return;
@@ -1068,7 +1087,28 @@
     div.textContent = text;
     return div.innerHTML;
   }
-  
+
+  /**
+   * Update the DM icon badge in the server list with the total unread count.
+   */
+  function updateDmIconBadge(): void {
+    let total = 0;
+    conversations.forEach((c) => { total += c.unreadCount; });
+    const iconEl = document.getElementById('dm-icon');
+    if (!iconEl) return;
+    let badge = iconEl.querySelector<HTMLElement>('.dm-icon-badge');
+    if (total <= 0) {
+      badge?.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'dm-icon-badge';
+      iconEl.appendChild(badge);
+    }
+    badge.textContent = total > 99 ? '99+' : String(total);
+  }
+
   /**
    * Update conversation in list
    */
@@ -1102,13 +1142,17 @@
       if (conversation.unreadCount > 0) {
         unreadElement.className = 'dm-unread-count';
         unreadElement.textContent = conversation.unreadCount.toString();
-      } else if (conversation.unreadCount === 1) {
-        unreadElement.className = 'dm-unread-indicator';
-        unreadElement.textContent = '';
       } else {
         unreadElement.remove();
       }
+    } else if (conversation.unreadCount > 0 && conversation.element) {
+      const newBadge = document.createElement('div');
+      newBadge.className = 'dm-unread-count';
+      newBadge.textContent = conversation.unreadCount.toString();
+      conversation.element.appendChild(newBadge);
     }
+
+    updateDmIconBadge();
   }
   
   /**

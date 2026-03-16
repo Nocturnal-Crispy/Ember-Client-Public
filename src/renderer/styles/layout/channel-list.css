@@ -145,6 +145,12 @@
   background-color: var(--highlight);
   margin-left: auto;
   flex-shrink: 0;
+  animation: channelUnreadPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes channelUnreadPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.75); }
 }
 
 /* ─── Drag-and-drop ────────────────────────────────────────────────────────── */

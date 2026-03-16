@@ -92,10 +92,22 @@
       <!-- Notifications -->
       <div class="settings-page hidden" id="settings-page-notifications">
         <h2 class="settings-page-title">Notifications</h2>
-        <p class="settings-placeholder-text">Notification preferences will be configurable here.</p>
-        <div class="settings-card settings-placeholder-card">
-          <span class="settings-placeholder-icon">🔔</span>
-          <span>Notification settings coming soon.</span>
+
+        <h3 class="settings-subsection-title">Message Sounds</h3>
+        <p class="settings-placeholder-text">Play a sound when new messages arrive.</p>
+
+        <div class="sound-row">
+          <span class="sound-label">Message</span>
+          <button class="sound-preview-btn" id="notif-message-preview">&#9654;</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="notif-message-sound" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="vv-save-row">
+          <button class="modal-btn modal-btn-primary" id="notif-save-btn">Save Changes</button>
+          <span class="vv-save-status" id="notif-save-status"></span>
         </div>
       </div>
 

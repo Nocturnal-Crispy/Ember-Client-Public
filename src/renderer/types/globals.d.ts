@@ -103,6 +103,12 @@ declare global {
     surfaceRgb: string;
   }
 
+  // ─── Notification settings ────────────────────────────────────────────────
+
+  interface NotifSettings {
+    messageSound: boolean;
+  }
+
   // ─── Update check ─────────────────────────────────────────────────────────
 
   interface UpdateInfo {
@@ -509,6 +515,10 @@ declare global {
     closeSettingsModal(): void;
     switchSettingsPage(page: string): void;
     playVoiceSound(type: string): void;
+    playNotificationSound(type: string): void;
+    initNotifSettings(): void;
+    getNotifSettings(): NotifSettings;
+    saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;
