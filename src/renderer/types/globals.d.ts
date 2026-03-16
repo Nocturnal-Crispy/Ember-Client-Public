@@ -78,6 +78,22 @@ declare global {
     avatar?: string;
   };
 
+  // ─── Screen sharing types ─────────────────────────────────────────────────
+
+  interface ScreenSource {
+    id: string;
+    name: string;
+    thumbnailDataUrl: string;
+    type: 'screen' | 'window';
+  }
+
+  interface ScreenShareSettings {
+    sourceId: string;
+    includeAudio: boolean;
+    resolution: '720p' | '1080p' | '1440p';
+    frameRate: 15 | 30 | 60;
+  }
+
   // ─── GIF Favorites ────────────────────────────────────────────────────────
 
   interface GifFavorite {
@@ -391,6 +407,31 @@ declare global {
     buildWsUrl(hostname: string, token: string): string;
   }
 
+  // ─── Audio capture types ──────────────────────────────────────────────────
+
+  interface AudioCaptureSupport {
+    supported: boolean;
+    platform: 'win32-wasapi' | 'linux-pipewire' | 'linux-pulseaudio' | 'none';
+    reason?: string;
+  }
+
+  interface DesktopCapturerAPI {
+    getSources(): Promise<Array<{
+      id: string;
+      name: string;
+      display_id: string;
+      thumbnail: string;
+      pipeWireNodeId: number | null;
+    }>>;
+  }
+
+  interface AudioCaptureAPI {
+    checkSupport(): Promise<AudioCaptureSupport>;
+    setup(): Promise<{ success: boolean; platform?: string; reason?: string }>;
+    frames(): Promise<null>;
+    teardown(): Promise<void>;
+  }
+
   interface ElectronAPI {
     ipc: IPCRenderer;
     nacl: NaClAPI;
@@ -403,6 +444,8 @@ declare global {
     wsService: WsServiceAPI;
     tokenUtils: TokenUtilsAPI;
     onCssHotReload: (callback: (message: { path: string; content: string }) => void) => void;
+    desktopCapturer: DesktopCapturerAPI;
+    audioCapture: AudioCaptureAPI;
   }
 
   // ─── App state ────────────────────────────────────────────────────────────
@@ -425,6 +468,8 @@ declare global {
     localCameraOn: boolean;
     videoGridVisible: boolean;
     activeView: "text" | "voice";
+    localScreenShareOn: boolean;
+    screenShareParticipants: Set<string>;
     healthcheckInterval: ReturnType<typeof setInterval> | null;
     reconnectionTimeout: ReturnType<typeof setTimeout> | null;
     reconnectionStartTime: number | null;
@@ -547,6 +592,9 @@ declare global {
     showVoiceControls(channelName: string): void;
     hideVoiceControls(): void;
     toggleCamera(): Promise<void>;
+    toggleScreenShare(): Promise<void>;
+    handleVoiceScreenShareStarted(userId: string): void;
+    handleVoiceScreenShareStopped(userId: string): void;
     showVoiceChannelView(): void;
     showTextChannelView(): void;
     openSettingsModal(page?: string): void;
@@ -567,6 +615,13 @@ declare global {
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;
+    // Globals set by screen-share-modal.ts
+    openScreenShareModal(
+      sources: ScreenSource[],
+      audioAvailable: boolean,
+      onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
+    ): void;
+    hideScreenShareModal(): void;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;
     // Globals set by update-notifier.ts
@@ -708,6 +763,13 @@ declare global {
     openDmWithUser(userId: string, username: string): Promise<void>;
     // Globals set by renderer.ts (external link modal)
     openExternalLinkModal(url: string): void;
+    // Globals set by screen-share-modal.ts
+    openScreenShareModal(
+      sources: ScreenSource[],
+      audioAvailable: boolean,
+      onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
+    ): void;
+    hideScreenShareModal(): void;
     // Globals set by user-details-modal.ts
     openUserDetailsModal(userId: string, username: string): void;
     closeUserDetailsModal(): void;

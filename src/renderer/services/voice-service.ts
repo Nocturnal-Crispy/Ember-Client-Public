@@ -57,6 +57,12 @@ class VoiceManager {
   _pttKeydownHandler: ((e: KeyboardEvent) => void) | null;
   _pttKeyupHandler: ((e: KeyboardEvent) => void) | null;
 
+  // ─── Screen share ───────────────────────────────────────────────────────────
+  localScreenStream: MediaStream | null;
+  isScreenSharing: boolean;
+  onScreenShareStarted: ((userId: string) => void) | null;
+  onScreenShareStopped: ((userId: string) => void) | null;
+
   constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
     _voiceLog.info("VoiceManager created");
     this.ws = wsConnection;
@@ -93,6 +99,12 @@ class VoiceManager {
     this._pttKey = "Backquote";
     this._pttKeydownHandler = null;
     this._pttKeyupHandler = null;
+
+    // Screen share
+    this.localScreenStream = null;
+    this.isScreenSharing = false;
+    this.onScreenShareStarted = null;
+    this.onScreenShareStopped = null;
   }
 
   async fetchICEServers(): Promise<void> {
@@ -322,6 +334,12 @@ class VoiceManager {
     );
     this.remoteVideoStreams.clear();
     this.isCameraOn = false;
+
+    if (this.localScreenStream) {
+      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+    }
+    this.isScreenSharing = false;
 
     if (this._audioCtx) {
       this._audioCtx.close().catch(() => {
@@ -686,6 +704,11 @@ class VoiceManager {
     this._subscriberRemoteDescSet = false;
     this._subscriberIceQueue = [];
     this.isCameraOn = false;
+    if (this.localScreenStream) {
+      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+    }
+    this.isScreenSharing = false;
     const channelId = this.channelId;
     this.channelId = null;
     return channelId;
@@ -777,6 +800,134 @@ class VoiceManager {
             false
           );
         break;
+      case "screen_share_start":
+        if (this.onScreenShareStarted)
+          this.onScreenShareStarted(String(msg.payload["user_id"] ?? ""));
+        break;
+      case "screen_share_stop":
+        if (this.onScreenShareStopped)
+          this.onScreenShareStopped(String(msg.payload["user_id"] ?? ""));
+        break;
+      case "voice_renegotiate_answer": {
+        const raw = msg.payload["sdp"] as Record<string, unknown>;
+        if (
+          this.peerConnection &&
+          raw &&
+          typeof raw["type"] === "string" &&
+          typeof raw["sdp"] === "string"
+        ) {
+          this.peerConnection
+            .setRemoteDescription(
+              new RTCSessionDescription({
+                type: raw["type"] as RTCSdpType,
+                sdp: raw["sdp"],
+              })
+            )
+            .catch((err: unknown) =>
+              _voiceLog.error("voice_renegotiate_answer setRemoteDescription failed", {
+                error: String(err),
+              })
+            );
+        }
+        break;
+      }
+    }
+  }
+
+  // ─── Screen share methods ──────────────────────────────────────────────────
+
+  async startScreenShare(
+    sourceId: string,
+    settings: ScreenShareSettings
+  ): Promise<boolean> {
+    if (!this.channelId || !this.peerConnection) {
+      _voiceLog.warn("startScreenShare: not in a voice channel or no peerConnection");
+      return false;
+    }
+
+    const resolutionMap: Record<string, { maxWidth: number; maxHeight: number }> = {
+      "720p":  { maxWidth: 1280, maxHeight: 720  },
+      "1080p": { maxWidth: 1920, maxHeight: 1080 },
+      "1440p": { maxWidth: 2560, maxHeight: 1440 },
+    };
+    const res = resolutionMap[settings.resolution] ?? resolutionMap["720p"];
+
+    const constraints = {
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: sourceId,
+          maxWidth: res.maxWidth,
+          maxHeight: res.maxHeight,
+          maxFrameRate: settings.frameRate,
+        },
+      },
+    } as unknown as MediaStreamConstraints;
+
+    let stream: MediaStream;
+    try {
+      _voiceLog.info("Requesting screen capture stream", { sourceId });
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+      _voiceLog.error("Screen capture getUserMedia failed", { error: String(e) });
+      return false;
+    }
+
+    this.localScreenStream = stream;
+
+    const videoTrack = stream.getVideoTracks()[0];
+    this.peerConnection.addTransceiver(videoTrack, {
+      direction: "sendonly",
+      streams: [stream],
+    });
+
+    let offer: RTCSessionDescriptionInit;
+    try {
+      offer = await this.peerConnection.createOffer();
+      await this.peerConnection.setLocalDescription(offer);
+    } catch (e) {
+      _voiceLog.error("startScreenShare: createOffer failed", { error: String(e) });
+      stream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+      return false;
+    }
+
+    this.ws.send(
+      JSON.stringify({
+        type: "voice_renegotiate",
+        channel_id: this.channelId,
+        offer: { type: offer.type, sdp: offer.sdp },
+      })
+    );
+
+    this.isScreenSharing = true;
+    _voiceLog.info("Screen share started, renegotiation offer sent");
+    return true;
+  }
+
+  async stopScreenShare(): Promise<void> {
+    if (!this.isScreenSharing || !this.localScreenStream) return;
+
+    _voiceLog.info("Stopping screen share");
+    this.localScreenStream.getTracks().forEach((t) => t.stop());
+    this.localScreenStream = null;
+    this.isScreenSharing = false;
+
+    if (this.peerConnection && this.channelId) {
+      try {
+        const offer = await this.peerConnection.createOffer();
+        await this.peerConnection.setLocalDescription(offer);
+        this.ws.send(
+          JSON.stringify({
+            type: "voice_renegotiate",
+            channel_id: this.channelId,
+            offer: { type: offer.type, sdp: offer.sdp },
+          })
+        );
+      } catch (e) {
+        _voiceLog.warn("stopScreenShare: renegotiation offer failed", { error: String(e) });
+      }
     }
   }
 

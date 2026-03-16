@@ -104,6 +104,10 @@
         handleRemoteCameraStateChanged(userId, isOn);
       vm.onVideoStreamAdded = (streamId: string, stream: MediaStream) =>
         handleRemoteVideoStream(streamId, stream);
+      vm.onScreenShareStarted = (userId: string) =>
+        handleVoiceScreenShareStarted(userId);
+      vm.onScreenShareStopped = (userId: string) =>
+        handleVoiceScreenShareStopped(userId);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
@@ -165,8 +169,13 @@
     if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
       App.wsConnection.send(JSON.stringify({ type: "voice_camera_off" }));
     }
+    if (App.localScreenShareOn && App.wsConnection?.readyState === WebSocket.OPEN) {
+      App.wsConnection.send(JSON.stringify({ type: "screen_share_stop" }));
+    }
     App.localCameraOn = false;
+    App.localScreenShareOn = false;
     App.videoParticipants.clear();
+    App.screenShareParticipants.clear();
     if (App.activeView === "voice") showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById(
@@ -177,6 +186,14 @@
       cameraBtn.title = "Start Camera";
       cameraBtn.textContent = "📷";
       cameraBtn.disabled = false;
+    }
+    const screenShareBtn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (screenShareBtn) {
+      screenShareBtn.classList.remove("active");
+      screenShareBtn.title = "Share Screen";
+      screenShareBtn.disabled = false;
     }
     await (
       App.voiceManager as { leaveChannel(): Promise<void> }
@@ -409,6 +426,10 @@
     .getElementById("voice-camera-btn")
     ?.addEventListener("click", () => toggleCamera());
 
+  document
+    .getElementById("voice-screen-share-btn")
+    ?.addEventListener("click", () => toggleScreenShare());
+
   // ─── View Switching Functions ──────────────────────────────────────────────
 
   function showVoiceChannelView(): void {
@@ -514,6 +535,113 @@
     } finally {
       if (btn) btn.disabled = false;
     }
+  }
+
+  // ─── Screen Share Functions ────────────────────────────────────────────────
+
+  async function toggleScreenShare(): Promise<void> {
+    if (!App.voiceManager || !App.activeVoiceChannelId) return;
+    const btn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    try {
+      if (!App.localScreenShareOn) {
+        await openScreenSharePicker();
+      } else {
+        await (App.voiceManager as { stopScreenShare(): Promise<void> }).stopScreenShare();
+        App.localScreenShareOn = false;
+        App.screenShareParticipants.delete("__self__");
+        if (App.wsConnection?.readyState === WebSocket.OPEN)
+          App.wsConnection.send(JSON.stringify({ type: "screen_share_stop" }));
+        if (btn) {
+          btn.classList.remove("active");
+          btn.title = "Share Screen";
+        }
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function openScreenSharePicker(): Promise<void> {
+    let rawSources: Array<{
+      id: string;
+      name: string;
+      display_id: string;
+      thumbnail: string;
+      pipeWireNodeId: number | null;
+    }>;
+    try {
+      rawSources = await window.electronAPI.desktopCapturer.getSources();
+    } catch (e) {
+      log.error("Failed to get screen sources", { error: String(e) });
+      return;
+    }
+
+    const sources: ScreenSource[] = rawSources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      thumbnailDataUrl: s.thumbnail,
+      type: s.display_id ? "screen" : "window",
+    }));
+
+    let audioAvailable = false;
+    try {
+      const support = await window.electronAPI.audioCapture.checkSupport();
+      audioAvailable = support.supported;
+    } catch (e) {
+      log.warn("Audio capture check failed", { error: String(e) });
+    }
+
+    if (typeof window.openScreenShareModal === "function") {
+      window.openScreenShareModal(sources, audioAvailable, handleScreenShareConfirmed);
+    } else {
+      log.error("openScreenShareModal not available — modal script not loaded");
+    }
+  }
+
+  async function handleScreenShareConfirmed(
+    source: ScreenSource,
+    settings: ScreenShareSettings
+  ): Promise<void> {
+    if (!App.voiceManager || !App.activeVoiceChannelId) return;
+    log.info("Screen share source confirmed", { sourceId: source.id });
+
+    const started = await (
+      App.voiceManager as {
+        startScreenShare(sourceId: string, settings: ScreenShareSettings): Promise<boolean>;
+      }
+    ).startScreenShare(source.id, settings);
+
+    if (!started) {
+      log.error("startScreenShare returned false — aborting");
+      return;
+    }
+
+    App.localScreenShareOn = true;
+    App.screenShareParticipants.add("__self__");
+    if (App.wsConnection?.readyState === WebSocket.OPEN)
+      App.wsConnection.send(JSON.stringify({ type: "screen_share_start" }));
+
+    const btn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (btn) {
+      btn.classList.add("active");
+      btn.title = "Stop Sharing";
+      btn.disabled = false;
+    }
+  }
+
+  function handleVoiceScreenShareStarted(userId: string): void {
+    log.info("Remote screen share started", { user_id: userId });
+    App.screenShareParticipants.add(userId);
+  }
+
+  function handleVoiceScreenShareStopped(userId: string): void {
+    log.info("Remote screen share stopped", { user_id: userId });
+    App.screenShareParticipants.delete(userId);
   }
 
   function updateVideoGridVisibility(): void {
@@ -1494,7 +1622,9 @@
       channel_id: App.activeVoiceChannelId,
     });
     App.localCameraOn = false;
+    App.localScreenShareOn = false;
     App.videoParticipants.clear();
+    App.screenShareParticipants.clear();
     if (App.activeView === "voice") showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById(
@@ -1505,6 +1635,14 @@
       cameraBtn.title = "Start Camera";
       cameraBtn.textContent = "\u{1F4F7}";
       cameraBtn.disabled = false;
+    }
+    const screenShareBtn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (screenShareBtn) {
+      screenShareBtn.classList.remove("active");
+      screenShareBtn.title = "Share Screen";
+      screenShareBtn.disabled = false;
     }
     (App.voiceManager as { _cleanup(): void })._cleanup();
     App.activeVoiceChannelId = null;
@@ -1547,4 +1685,7 @@
   window.switchSettingsPage = switchSettingsPage;
   window.playVoiceSound = playVoiceSound;
   window.cleanupVoiceOnDisconnect = cleanupVoiceOnDisconnect;
+  window.toggleScreenShare = toggleScreenShare;
+  window.handleVoiceScreenShareStarted = handleVoiceScreenShareStarted;
+  window.handleVoiceScreenShareStopped = handleVoiceScreenShareStopped;
 })();

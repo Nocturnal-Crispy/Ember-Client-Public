@@ -29,6 +29,7 @@
     "../../dist/renderer/managers/ember-manager.js",
     "../../dist/renderer/managers/invite-manager.js",
     "../../dist/renderer/managers/voice-ui-manager.js",
+    "../../dist/renderer/components/screen-share-modal.js",
     "../../dist/renderer/managers/notification-settings.js",
     "../../dist/renderer/managers/plugin-settings.js",
     "../../dist/renderer/managers/app-lock-manager.js",
@@ -110,6 +111,7 @@
         modalUserDetails,
         modalUpdate,
         modalAppLock,
+        modalScreenShare,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -141,6 +143,7 @@
         fetchFragment("modal-user-details.html"),
         fetchFragment("modal-update.html"),
         fetchFragment("modal-app-lock.html"),
+        fetchFragment("modal-screen-share.html"),
       ]);
 
       // Title bar (top-level)
@@ -183,6 +186,7 @@
       document.body.appendChild(parseFragment(modalUserDetails));
       document.body.appendChild(parseFragment(modalUpdate));
       document.body.appendChild(parseFragment(modalAppLock));
+      document.body.appendChild(parseFragment(modalScreenShare));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {
