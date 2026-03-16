@@ -98,41 +98,316 @@
     return wrapper;
   }
 
-  function renderTextWithLinks(text: string, container: HTMLElement): void {
-    if (!text) return;
+  // ─── Markdown types ──────────────────────────────────────────────────────────
 
-    const regex = new RegExp(URL_REGEX_SOURCE, "g");
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
+  type InlineToken =
+    | { type: "text"; value: string }
+    | { type: "url"; value: string }
+    | { type: "bold"; children: InlineToken[] }
+    | { type: "italic"; children: InlineToken[] }
+    | { type: "strike"; children: InlineToken[] }
+    | { type: "code"; value: string };
 
-    while ((match = regex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        container.appendChild(
-          document.createTextNode(text.slice(lastIndex, match.index))
-        );
-      }
+  type Block =
+    | { type: "paragraph"; text: string }
+    | { type: "heading"; level: number; text: string }
+    | { type: "codeblock"; code: string }
+    | { type: "ul"; items: string[] }
+    | { type: "ol"; items: string[] }
+    | { type: "blockquote"; text: string };
 
-      const url = match[0];
+  // ─── Inline tokenizer ─────────────────────────────────────────────────────
 
-      if (isImageUrl(url)) {
-        container.appendChild(createUrlImageCard(url));
+  function scanUrlEnd(text: string, start: number): number {
+    let end = start;
+    while (end < text.length && !/[\s<>"']/.test(text[end])) end++;
+    return end;
+  }
+
+  function tokenizeInline(text: string): InlineToken[] {
+    const tokens: InlineToken[] = [];
+    let i = 0;
+
+    function pushText(value: string): void {
+      const last = tokens[tokens.length - 1];
+      if (last && last.type === "text") {
+        last.value += value;
       } else {
-        const link = document.createElement("a");
-        link.className = "message-link";
-        link.textContent = url;
-        link.href = "#";
-        link.addEventListener("click", (e) => {
-          e.preventDefault();
-          (window as any).openExternalLinkModal?.(url);
-        });
-        container.appendChild(link);
+        tokens.push({ type: "text", value });
       }
-
-      lastIndex = match.index + url.length;
     }
 
-    if (lastIndex < text.length) {
-      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    while (i < text.length) {
+      // Code span: `...`
+      if (text[i] === "`") {
+        const closingTick = text.indexOf("`", i + 1);
+        if (closingTick !== -1) {
+          tokens.push({ type: "code", value: text.slice(i + 1, closingTick) });
+          i = closingTick + 1;
+          continue;
+        }
+      }
+
+      // Bold: **...**
+      if (text[i] === "*" && text[i + 1] === "*") {
+        const closingBold = text.indexOf("**", i + 2);
+        if (closingBold !== -1) {
+          tokens.push({ type: "bold", children: tokenizeInline(text.slice(i + 2, closingBold)) });
+          i = closingBold + 2;
+          continue;
+        }
+      }
+
+      // Strikethrough: ~~...~~
+      if (text[i] === "~" && text[i + 1] === "~") {
+        const closingStrike = text.indexOf("~~", i + 2);
+        if (closingStrike !== -1) {
+          tokens.push({ type: "strike", children: tokenizeInline(text.slice(i + 2, closingStrike)) });
+          i = closingStrike + 2;
+          continue;
+        }
+      }
+
+      // Italic: *...* (not preceded or followed by *)
+      if (text[i] === "*" && text[i + 1] !== "*") {
+        let closingItalic = -1;
+        for (let j = i + 1; j < text.length; j++) {
+          if (text[j] === "*" && text[j + 1] !== "*") {
+            closingItalic = j;
+            break;
+          }
+        }
+        if (closingItalic !== -1) {
+          tokens.push({ type: "italic", children: tokenizeInline(text.slice(i + 1, closingItalic)) });
+          i = closingItalic + 1;
+          continue;
+        }
+      }
+
+      // URL
+      if (text.startsWith("https://", i) || text.startsWith("http://", i)) {
+        const urlEnd = scanUrlEnd(text, i);
+        tokens.push({ type: "url", value: text.slice(i, urlEnd) });
+        i = urlEnd;
+        continue;
+      }
+
+      // Plain text — accumulate until next special character
+      const start = i;
+      while (i < text.length) {
+        if (text[i] === "`") break;
+        if (text[i] === "*") break;
+        if (text[i] === "~" && text[i + 1] === "~") break;
+        if (text.startsWith("https://", i) || text.startsWith("http://", i)) break;
+        i++;
+      }
+      if (i > start) {
+        pushText(text.slice(start, i));
+      } else {
+        // Unmatched special char — consume as literal text
+        pushText(text[i]);
+        i++;
+      }
+    }
+
+    return tokens;
+  }
+
+  // ─── Inline renderer ──────────────────────────────────────────────────────
+
+  function renderInlineTokens(tokens: InlineToken[], container: HTMLElement): void {
+    for (const token of tokens) {
+      if (token.type === "text") {
+        container.appendChild(document.createTextNode(token.value));
+      } else if (token.type === "url") {
+        if (isImageUrl(token.value)) {
+          container.appendChild(createUrlImageCard(token.value));
+        } else {
+          const link = document.createElement("a");
+          link.className = "message-link";
+          link.textContent = token.value;
+          link.href = "#";
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            (window as any).openExternalLinkModal?.(token.value);
+          });
+          container.appendChild(link);
+        }
+      } else if (token.type === "bold") {
+        const el = document.createElement("strong");
+        renderInlineTokens(token.children, el);
+        container.appendChild(el);
+      } else if (token.type === "italic") {
+        const el = document.createElement("em");
+        renderInlineTokens(token.children, el);
+        container.appendChild(el);
+      } else if (token.type === "strike") {
+        const el = document.createElement("s");
+        renderInlineTokens(token.children, el);
+        container.appendChild(el);
+      } else if (token.type === "code") {
+        const el = document.createElement("code");
+        el.textContent = token.value;
+        container.appendChild(el);
+      }
+    }
+  }
+
+  // ─── Block parser ─────────────────────────────────────────────────────────
+
+  function parseBlocks(text: string): Block[] {
+    const blocks: Block[] = [];
+    const lines = text.split("\n");
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Code fence: ```
+      if (line.startsWith("```")) {
+        const codeLines: string[] = [];
+        i++;
+        while (i < lines.length && !lines[i].startsWith("```")) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) i++; // consume closing ```
+        blocks.push({ type: "codeblock", code: codeLines.join("\n") });
+        continue;
+      }
+
+      // Heading: # to ######
+      const hMatch = /^(#{1,6})\s+(.+)$/.exec(line);
+      if (hMatch) {
+        blocks.push({ type: "heading", level: hMatch[1].length, text: hMatch[2] });
+        i++;
+        continue;
+      }
+
+      // Unordered list: - item or * item
+      if (/^[-*]\s+/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^[-*]\s+/, ""));
+          i++;
+        }
+        blocks.push({ type: "ul", items });
+        continue;
+      }
+
+      // Ordered list: 1. item
+      if (/^\d+\.\s+/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\d+\.\s+/, ""));
+          i++;
+        }
+        blocks.push({ type: "ol", items });
+        continue;
+      }
+
+      // Blockquote: > text
+      if (line.startsWith("> ")) {
+        const qLines: string[] = [];
+        while (i < lines.length && lines[i].startsWith("> ")) {
+          qLines.push(lines[i].slice(2));
+          i++;
+        }
+        blocks.push({ type: "blockquote", text: qLines.join("\n") });
+        continue;
+      }
+
+      // Blank line — skip
+      if (line.trim() === "") {
+        i++;
+        continue;
+      }
+
+      // Paragraph — accumulate consecutive non-special lines
+      const pLines: string[] = [];
+      while (i < lines.length) {
+        const l = lines[i];
+        if (
+          l.startsWith("```") ||
+          /^#{1,6}\s/.test(l) ||
+          /^[-*]\s/.test(l) ||
+          /^\d+\.\s/.test(l) ||
+          l.startsWith("> ") ||
+          l.trim() === ""
+        ) break;
+        pLines.push(l);
+        i++;
+      }
+      if (pLines.length > 0) {
+        blocks.push({ type: "paragraph", text: pLines.join("\n") });
+      }
+    }
+
+    return blocks;
+  }
+
+  // ─── Block renderer ───────────────────────────────────────────────────────
+
+  function renderBlock(block: Block, container: HTMLElement): void {
+    if (block.type === "paragraph") {
+      const p = document.createElement("p");
+      renderInlineTokens(tokenizeInline(block.text), p);
+      container.appendChild(p);
+    } else if (block.type === "heading") {
+      const level = Math.min(block.level, 6);
+      const tag = `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+      const h = document.createElement(tag);
+      renderInlineTokens(tokenizeInline(block.text), h);
+      container.appendChild(h);
+    } else if (block.type === "codeblock") {
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = block.code;
+      pre.appendChild(code);
+      container.appendChild(pre);
+    } else if (block.type === "ul") {
+      const ul = document.createElement("ul");
+      for (const item of block.items) {
+        const li = document.createElement("li");
+        renderInlineTokens(tokenizeInline(item), li);
+        ul.appendChild(li);
+      }
+      container.appendChild(ul);
+    } else if (block.type === "ol") {
+      const ol = document.createElement("ol");
+      for (const item of block.items) {
+        const li = document.createElement("li");
+        renderInlineTokens(tokenizeInline(item), li);
+        ol.appendChild(li);
+      }
+      container.appendChild(ol);
+    } else if (block.type === "blockquote") {
+      const bq = document.createElement("blockquote");
+      const p = document.createElement("p");
+      renderInlineTokens(tokenizeInline(block.text), p);
+      bq.appendChild(p);
+      container.appendChild(bq);
+    }
+  }
+
+  // ─── Markdown renderer (replaces renderTextWithLinks) ─────────────────────
+
+  function renderMarkdownWithLinks(text: string, container: HTMLElement): void {
+    if (!text) return;
+
+    const blocks = parseBlocks(text);
+    if (blocks.length === 0) return;
+
+    // Single paragraph: render inline to preserve terminal-log display style
+    if (blocks.length === 1 && blocks[0].type === "paragraph") {
+      renderInlineTokens(tokenizeInline(blocks[0].text), container);
+      return;
+    }
+
+    // Block-level content: switch container to block display
+    container.classList.add("message-text--block");
+    for (const block of blocks) {
+      renderBlock(block, container);
     }
   }
 
@@ -502,7 +777,7 @@
 
     const textEl = document.createElement("div");
     textEl.className = "message-text";
-    renderTextWithLinks(text, textEl);
+    renderMarkdownWithLinks(text, textEl);
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(textEl);

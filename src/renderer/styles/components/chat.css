@@ -706,6 +706,92 @@
   color: rgba(var(--rgb-text), 0.35);
 }
 
+/* ─── Markdown rendering in messages ──────────────────────────────────────── */
+
+/* Switch to block layout when a message contains block-level markdown */
+.message-text.message-text--block {
+  display: block;
+  white-space: normal;
+}
+
+.message-text strong { font-weight: bold; }
+.message-text em     { font-style: italic; }
+.message-text s      { text-decoration: line-through; }
+
+.message-text code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  background: rgba(var(--rgb-highlight), 0.1);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  padding: 1px 3px;
+}
+
+.message-text pre {
+  display: block;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  background: rgba(var(--rgb-highlight), 0.06);
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  padding: 8px 10px;
+  margin: 4px 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.message-text pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.message-text h1,
+.message-text h2,
+.message-text h3,
+.message-text h4,
+.message-text h5,
+.message-text h6 {
+  display: block;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  color: var(--highlight);
+  margin: 4px 0 2px;
+  line-height: 1.4;
+}
+
+.message-text h1 { font-size: 16px; }
+.message-text h2 { font-size: 14px; }
+.message-text h3,
+.message-text h4,
+.message-text h5,
+.message-text h6 { font-size: 13px; }
+
+.message-text ul,
+.message-text ol {
+  display: block;
+  margin: 2px 0 2px 16px;
+  padding: 0;
+}
+
+.message-text li       { display: list-item; }
+.message-text ul       { list-style-type: disc; }
+.message-text ol       { list-style-type: decimal; }
+
+.message-text blockquote {
+  display: block;
+  border-left: 2px solid rgba(var(--rgb-highlight), 0.5);
+  margin: 2px 0;
+  padding: 2px 8px;
+  color: rgba(var(--rgb-text), 0.65);
+  font-style: italic;
+}
+
+.message-text blockquote p,
+.message-text p {
+  display: block;
+  margin: 2px 0;
+}
+
 /* ─── External link modal ──────────────────────────────────────────────────── */
 
 .external-link-modal-container {

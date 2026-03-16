@@ -174,6 +174,167 @@ describe("createBasicMessageElement — URL rendering", () => {
   });
 });
 
+describe("createBasicMessageElement — markdown inline rendering", () => {
+  function createElement(text: string): HTMLElement {
+    return window.createBasicMessageElement("Alice", text, undefined, "msg-md");
+  }
+
+  function getTextEl(el: HTMLElement): HTMLElement {
+    return el.querySelector(".message-text") as HTMLElement;
+  }
+
+  it("renders **bold** as <strong> element", () => {
+    const el = createElement("Hello **world**");
+    const strong = getTextEl(el).querySelector("strong");
+    expect(strong).not.toBeNull();
+    expect(strong!.textContent).toBe("world");
+  });
+
+  it("renders *italic* as <em> element", () => {
+    const el = createElement("Hello *world*");
+    const em = getTextEl(el).querySelector("em");
+    expect(em).not.toBeNull();
+    expect(em!.textContent).toBe("world");
+  });
+
+  it("renders `code` as <code> element", () => {
+    const el = createElement("Use `console.log()`");
+    const code = getTextEl(el).querySelector("code");
+    expect(code).not.toBeNull();
+    expect(code!.textContent).toBe("console.log()");
+  });
+
+  it("renders ~~strikethrough~~ as <s> element", () => {
+    const el = createElement("This is ~~deleted~~ text");
+    const s = getTextEl(el).querySelector("s");
+    expect(s).not.toBeNull();
+    expect(s!.textContent).toBe("deleted");
+  });
+
+  it("code span preserves literal content — **not bold** inside backticks", () => {
+    const el = createElement("`**not bold**`");
+    const textEl = getTextEl(el);
+    const code = textEl.querySelector("code");
+    expect(code).not.toBeNull();
+    expect(code!.textContent).toBe("**not bold**");
+    expect(textEl.querySelector("strong")).toBeNull();
+  });
+
+  it("renders URL inside bold as a link within <strong>", () => {
+    const el = createElement("**Visit https://example.com now**");
+    const strong = getTextEl(el).querySelector("strong");
+    expect(strong).not.toBeNull();
+    expect(strong!.querySelector("a.message-link")).not.toBeNull();
+  });
+
+  it("does not create a script element from XSS attempt", () => {
+    const el = createElement("<script>alert(1)</script>");
+    expect(el.querySelector("script")).toBeNull();
+  });
+
+  it("renders < and > as literal text, not HTML elements", () => {
+    const el = createElement("<b>not a tag</b>");
+    const textEl = getTextEl(el);
+    expect(textEl.querySelector("b")).toBeNull();
+    expect(textEl.textContent).toContain("<b>not a tag</b>");
+  });
+
+  it("renders plain text without any markdown elements", () => {
+    const el = createElement("Just plain text");
+    const textEl = getTextEl(el);
+    expect(textEl.querySelector("strong, em, code, s")).toBeNull();
+    expect(textEl.textContent).toBe("Just plain text");
+  });
+});
+
+describe("createBasicMessageElement — markdown block rendering", () => {
+  function createElement(text: string): HTMLElement {
+    return window.createBasicMessageElement("Alice", text, undefined, "msg-block");
+  }
+
+  function getTextEl(el: HTMLElement): HTMLElement {
+    return el.querySelector(".message-text") as HTMLElement;
+  }
+
+  it("renders # Heading as <h1>", () => {
+    const el = createElement("# Hello World");
+    const h1 = getTextEl(el).querySelector("h1");
+    expect(h1).not.toBeNull();
+    expect(h1!.textContent).toBe("Hello World");
+  });
+
+  it("renders ## Heading as <h2>", () => {
+    const el = createElement("## Section Title");
+    const h2 = getTextEl(el).querySelector("h2");
+    expect(h2).not.toBeNull();
+    expect(h2!.textContent).toBe("Section Title");
+  });
+
+  it("renders ### Heading as <h3>", () => {
+    const el = createElement("### Subsection");
+    expect(getTextEl(el).querySelector("h3")).not.toBeNull();
+  });
+
+  it("renders code block (triple backtick) as <pre><code>", () => {
+    const el = createElement("```\nconsole.log('hello')\n```");
+    const textEl = getTextEl(el);
+    expect(textEl.querySelector("pre")).not.toBeNull();
+    const code = textEl.querySelector("pre code");
+    expect(code).not.toBeNull();
+    expect(code!.textContent).toContain("console.log");
+  });
+
+  it("code block content is literal — **not bold** inside fences", () => {
+    const el = createElement("```\n**not bold**\n```");
+    const textEl = getTextEl(el);
+    const code = textEl.querySelector("pre code");
+    expect(code).not.toBeNull();
+    expect(code!.textContent).toContain("**not bold**");
+    expect(textEl.querySelector("strong")).toBeNull();
+  });
+
+  it("renders - list items as <ul><li>", () => {
+    const el = createElement("- item one\n- item two\n- item three");
+    const textEl = getTextEl(el);
+    const ul = textEl.querySelector("ul");
+    expect(ul).not.toBeNull();
+    const items = ul!.querySelectorAll("li");
+    expect(items.length).toBe(3);
+    expect(items[0].textContent).toBe("item one");
+    expect(items[1].textContent).toBe("item two");
+  });
+
+  it("renders 1. ordered list items as <ol><li>", () => {
+    const el = createElement("1. first\n2. second\n3. third");
+    const textEl = getTextEl(el);
+    const ol = textEl.querySelector("ol");
+    expect(ol).not.toBeNull();
+    const items = ol!.querySelectorAll("li");
+    expect(items.length).toBe(3);
+    expect(items[0].textContent).toBe("first");
+  });
+
+  it("renders > blockquote as <blockquote>", () => {
+    const el = createElement("> This is a quote");
+    const textEl = getTextEl(el);
+    const bq = textEl.querySelector("blockquote");
+    expect(bq).not.toBeNull();
+    expect(bq!.textContent).toContain("This is a quote");
+  });
+
+  it("adds message-text--block class for block-level content", () => {
+    const el = createElement("# Heading");
+    const textEl = getTextEl(el);
+    expect(textEl.classList.contains("message-text--block")).toBe(true);
+  });
+
+  it("does not add message-text--block class for plain text", () => {
+    const el = createElement("Just plain text");
+    const textEl = getTextEl(el);
+    expect(textEl.classList.contains("message-text--block")).toBe(false);
+  });
+});
+
 describe("createActionToolbar", () => {
   beforeEach(() => {
     (window as any).App.ownedMessageIds = new Set<string>();
