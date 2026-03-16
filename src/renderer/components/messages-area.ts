@@ -18,22 +18,27 @@
   // ─── Utilities ─────────────────────────────────────────────────────────────
 
   function toChumhandle(username: string): string {
-  const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
+  // Split on capital letters to get CamelCase words
+  const words = username.split(/(?=[A-Z])/).filter(word => word.length > 0);
   
-  // Extract letters from the beginning of each word
-  let handle = "";
-  for (let i = 0; i < words.length && handle.length < 4; i++) {
-    const word = words[i];
-    // Take up to 2 letters from each word to reach 4 total
-    const lettersNeeded = Math.min(4 - handle.length, word.length);
-    handle += word.slice(0, lettersNeeded).toUpperCase();
+  // If no capital letters found, treat as single word
+  if (words.length === 1) {
+    return username.slice(0, Math.min(4, username.length)).toUpperCase();
   }
   
-  // If we couldn't get 4 letters from word beginnings, take more from the username
+  // Take first letter of each word up to 4 characters
+  let handle = "";
+  for (let i = 0; i < words.length && handle.length < 4; i++) {
+    handle += words[i][0].toUpperCase();
+  }
+  
+  // If we still need more letters, take them from the first words
   if (handle.length < 4) {
-    const remaining = username.slice(handle.length);
-    const lettersNeeded = Math.min(4 - handle.length, remaining.length);
-    handle += remaining.slice(0, lettersNeeded).toUpperCase();
+    for (let i = 0; i < words.length && handle.length < 4; i++) {
+      const word = words[i];
+      const lettersNeeded = Math.min(4 - handle.length, word.length - 1);
+      handle += word.slice(1, 1 + lettersNeeded).toUpperCase();
+    }
   }
   
   return handle;
