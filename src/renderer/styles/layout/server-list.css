@@ -129,8 +129,10 @@
   font-size: 9px;
   font-weight: bold;
   cursor: pointer;
-  padding: 5px 4px;
+  padding: 1px 0;
   width: calc(100% - 16px);
+  display: block;
+  margin: 0 auto;
   text-align: center;
   transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
