@@ -262,7 +262,7 @@
   function handlePresenceUpdate(payload: {
     user_id: string;
     username: string;
-    status: string;
+    status: UserStatus;
     custom_status?: string;
     status_emoji?: string;
   }): void {

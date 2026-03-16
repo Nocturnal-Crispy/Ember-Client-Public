@@ -83,11 +83,18 @@
   position: absolute;
   bottom: -3px;
   right: -3px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   border: 2px solid var(--background);
   pointer-events: none;
+  background: rgba(var(--rgb-text), 0.3);
 }
+
+.status-icon.status-online  { background: var(--online-color); }
+.status-icon.status-idle    { background: var(--afk-color); }
+.status-icon.status-dnd     { background: var(--dnd-color); }
+.status-icon.status-offline { background: rgba(var(--rgb-text), 0.3); }
 
 /* ─── Member Name ──────────────────────────────────────────────────────────── */
 

@@ -948,8 +948,8 @@
       `#member-list .member[data-user-id="${CSS.escape(userId)}"] .member-avatar`
     ) as HTMLElement | null;
     if (!memberEl) return;
-    // Remove existing letter text, keep the status-icon img
-    const statusIcon = memberEl.querySelector("img.status-icon") as HTMLImageElement | null;
+    // Remove existing letter text, keep the status-icon bubble
+    const statusIcon = memberEl.querySelector("span.status-icon") as HTMLElement | null;
     memberEl.textContent = "";
     if (avatarData) {
       const img = document.createElement("img");

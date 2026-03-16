@@ -18,6 +18,7 @@ import type {
   Channel,
   Category,
   Member,
+  UserStatus,
   ChannelReorderUpdate,
   CategoryReorderUpdate,
   DragItem,
@@ -49,6 +50,7 @@ declare global {
   type Channel = import("ember-shared").Channel;
   type Category = import("ember-shared").Category;
   type Member = import("ember-shared").Member;
+  type UserStatus = import("ember-shared").UserStatus;
   type ChannelReorderUpdate = import("ember-shared").ChannelReorderUpdate;
   type CategoryReorderUpdate = import("ember-shared").CategoryReorderUpdate;
   type DragItem = import("ember-shared").DragItem;
