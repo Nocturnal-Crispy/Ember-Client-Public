@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net, shell } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen } from "electron";
 import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
@@ -113,9 +113,45 @@ let pendingInviteLink: string | null = null;
 
 function createWindow(isAuthenticated: boolean) {
   log.info("Creating browser window", { authenticated: isAuthenticated });
+  
+  // Get all displays to understand the setup
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+  
+  log.info("Display information", {
+    totalDisplays: displays.length,
+    primaryDisplayId: primaryDisplay.id,
+    primaryDisplayBounds: primaryDisplay.bounds,
+    primaryWorkArea: primaryDisplay.workAreaSize,
+    allDisplays: displays.map(d => ({
+      id: d.id,
+      bounds: d.bounds,
+      workArea: d.workAreaSize,
+      isPrimary: d.id === primaryDisplay.id
+    }))
+  });
+  
+  // Calculate window position to center on primary display
+  const windowWidth = 1200;
+  const windowHeight = 800;
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const x = primaryDisplay.workArea.x + Math.floor((screenWidth - windowWidth) / 2);
+  const y = primaryDisplay.workArea.y + Math.floor((screenHeight - windowHeight) / 2);
+  
+  log.info("Calculated window position", {
+    windowWidth,
+    windowHeight,
+    screenWidth,
+    screenHeight,
+    calculatedX: x,
+    calculatedY: y,
+    workAreaX: primaryDisplay.workArea.x,
+    workAreaY: primaryDisplay.workArea.y
+  });
+  
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: windowWidth,
+    height: windowHeight,
     minWidth: 800,
     minHeight: 600,
     backgroundColor: "#36393f",
@@ -132,6 +168,50 @@ function createWindow(isAuthenticated: boolean) {
     frame: false,
     titleBarStyle: "hidden",
   });
+  
+  // Try multiple positioning approaches
+  try {
+    // Method 1: Set position directly
+    mainWindow.setPosition(x, y);
+    log.info("Set window position directly", { x, y });
+    
+    // Method 2: If that didn't work, try centering on primary display
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const currentBounds = mainWindow.getBounds();
+        log.info("Current window bounds after positioning", {
+          x: currentBounds.x,
+          y: currentBounds.y,
+          width: currentBounds.width,
+          height: currentBounds.height
+        });
+        
+        // If window is still not on primary display, try centering
+        if (currentBounds.x < primaryDisplay.workArea.x || 
+            currentBounds.x > primaryDisplay.workArea.x + primaryDisplay.workArea.width) {
+          log.info("Window not on primary display, trying center() method");
+          mainWindow.center();
+          
+          // Check final position
+          setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              const finalBounds = mainWindow.getBounds();
+              log.info("Final window bounds after center()", {
+                x: finalBounds.x,
+                y: finalBounds.y,
+                width: finalBounds.width,
+                height: finalBounds.height
+              });
+            }
+          }, 100);
+        }
+      }
+    }, 500);
+  } catch (error) {
+    log.error("Error positioning window", { error: String(error) });
+    // Fallback to center
+    mainWindow.center();
+  }
 
   // Force all window.open calls to open in external browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
