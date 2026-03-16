@@ -45,6 +45,119 @@
     })} at ${timeStr}`;
   }
 
+  function formatRelativeTimestamp(unixSeconds?: number): string {
+    if (!unixSeconds) return formatTimestamp();
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - unixSeconds;
+    
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+    
+    return formatTimestamp(unixSeconds);
+  }
+
+  // ─── Timestamp tooltip management ───────────────────────────────────────────────
+
+  let activeTooltip: HTMLElement | null = null;
+  let tooltipTimeout: number | null = null;
+
+  function createTimestampTooltip(timestamp: number): HTMLElement {
+    const tooltip = document.createElement("div");
+    tooltip.className = "message-timestamp-tooltip";
+    
+    const relativeTime = document.createElement("div");
+    relativeTime.className = "tooltip-relative-time";
+    relativeTime.textContent = formatRelativeTimestamp(timestamp);
+    
+    const absoluteTime = document.createElement("div");
+    absoluteTime.className = "tooltip-absolute-time";
+    absoluteTime.textContent = formatTimestamp(timestamp);
+    
+    tooltip.appendChild(relativeTime);
+    tooltip.appendChild(absoluteTime);
+    
+    return tooltip;
+  }
+
+  function showTimestampTooltip(messageElement: HTMLElement, timestamp: number): void {
+    // Clear any existing timeout
+    if (tooltipTimeout) {
+      clearTimeout(tooltipTimeout);
+      tooltipTimeout = null;
+    }
+    
+    // Remove existing tooltip
+    if (activeTooltip && activeTooltip.parentNode) {
+      activeTooltip.parentNode.removeChild(activeTooltip);
+      activeTooltip = null;
+    }
+    
+    // Create new tooltip
+    const tooltip = createTimestampTooltip(timestamp);
+    activeTooltip = tooltip;
+    
+    // Add to document temporarily to measure dimensions
+    tooltip.style.visibility = "hidden";
+    tooltip.style.position = "absolute";
+    tooltip.style.top = "0";
+    tooltip.style.left = "0";
+    tooltip.style.zIndex = "1000";
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip
+    const rect = messageElement.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    
+    // Try to position above the message first
+    let top = rect.top + scrollTop - tooltip.offsetHeight - 8;
+    let left = rect.left + scrollLeft + (rect.width / 2) - (tooltip.offsetWidth / 2);
+    
+    // If tooltip would go above viewport, position below instead
+    if (top < scrollTop + 10) {
+      top = rect.bottom + scrollTop + 8;
+    }
+    
+    // Ensure tooltip stays within viewport horizontally
+    if (left < scrollLeft + 10) {
+      left = scrollLeft + 10;
+    } else if (left + tooltip.offsetWidth > scrollLeft + window.innerWidth - 10) {
+      left = scrollLeft + window.innerWidth - tooltip.offsetWidth - 10;
+    }
+    
+    // Apply final position
+    tooltip.style.visibility = "visible";
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+    
+    // Add a small delay before showing to prevent flickering
+    tooltipTimeout = setTimeout(() => {
+      tooltip.classList.add("visible");
+    }, 100) as unknown as number;
+  }
+
+  function hideTimestampTooltip(): void {
+    if (tooltipTimeout) {
+      clearTimeout(tooltipTimeout);
+      tooltipTimeout = null;
+    }
+    
+    if (activeTooltip && activeTooltip.parentNode) {
+      activeTooltip.parentNode.removeChild(activeTooltip);
+      activeTooltip = null;
+    }
+  }
+
+  // Cleanup function to prevent memory leaks
+  function cleanupTimestampTooltips(): void {
+    hideTimestampTooltip();
+  }
+
+  // Add cleanup on page unload
+  window.addEventListener('beforeunload', cleanupTimestampTooltips);
+
   function isImageMime(mime: string): boolean {
     return typeof mime === "string" && mime.startsWith("image/");
   }
@@ -803,6 +916,17 @@
 
     messageDiv.appendChild(createActionToolbar(messageId, isOwn));
 
+    // Add timestamp hover functionality if timestamp is available
+    if (timestamp) {
+      messageDiv.addEventListener("mouseenter", () => {
+        showTimestampTooltip(messageDiv, timestamp);
+      });
+      
+      messageDiv.addEventListener("mouseleave", () => {
+        hideTimestampTooltip();
+      });
+    }
+
     return messageDiv;
   }
 
@@ -811,5 +935,6 @@
   window.createBasicMessageElement = createBasicMessageElement;
   window.createActionToolbar = createActionToolbar;
   window.formatTimestamp = formatTimestamp;
+  window.formatRelativeTimestamp = formatRelativeTimestamp;
   window.toChumhandle = toChumhandle;
 })();
