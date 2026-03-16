@@ -842,3 +842,98 @@
   transition: opacity 0.4s;
   font-family: 'Courier New', Courier, monospace;
 }
+
+/* ─── Creator Info Section ─────────────────────────────────────────────────── */
+.creator-info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: rgba(var(--rgb-highlight), 0.05);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.creator-profile-image {
+  flex-shrink: 0;
+}
+
+.creator-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--highlight);
+}
+
+.creator-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.creator-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+.creator-description {
+  font-size: 14px;
+  color: var(--highlight);
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.creator-account-info {
+  font-size: 13px;
+  color: rgba(var(--rgb-text), 0.7);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.creator-support-section {
+  padding: 16px;
+  background-color: rgba(var(--rgb-highlight), 0.02);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.creator-support-text {
+  font-size: 14px;
+  color: rgba(var(--rgb-text), 0.8);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.creator-support-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background-color: #FF7850;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.creator-support-btn:hover {
+  background-color: #e56940;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 120, 80, 0.3);
+}
+
+.creator-support-btn:active {
+  transform: translateY(0);
+}
+
+.bmc-logo {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1);
+}
