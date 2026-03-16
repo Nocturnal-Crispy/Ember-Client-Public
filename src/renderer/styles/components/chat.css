@@ -812,6 +812,7 @@
   z-index: 1000;
   min-width: 120px;
   text-align: center;
+  backdrop-filter: none;
 }
 
 .message-timestamp-tooltip.visible {
