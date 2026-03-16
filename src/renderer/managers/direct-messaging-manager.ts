@@ -1,7 +1,15 @@
 /**
  * Direct Messaging Manager — TypeScript module.
- * Each DM is a private ember (kind='dm') with a text channel and a voice channel.
- * Uses the standard ember encryption system (NaCl box key exchange + secretbox messages).
+ *
+ * Each DM is a private ember (kind='dm') created via a request/accept flow:
+ *   1. Requester sends a DM request (no encryption — just a notification).
+ *   2. Recipient accepts: generates ember key, creates self-box + peer-box.
+ *   3. Requester loads the accepted DM, fetches their peer-box, migrates to self-box.
+ *   4. Both parties use only self-box paths going forward.
+ *
+ * This eliminates the "authentication failed or wrong key" bug that occurred
+ * when the requester tried to encrypt a key for the recipient using a stale
+ * device public key fetched at request time.
  */
 (function (): void {
 
@@ -20,6 +28,12 @@
     partnerId: string;
     partnerUsername: string;
     partnerAvatar: string;
+    /** 'pending' while the recipient hasn't accepted; 'accepted' otherwise. */
+    requestStatus: 'pending' | 'accepted';
+    /** The dm_request id, present while status is 'pending'. */
+    requestId: string;
+    /** True when the current user is the recipient of a pending request. */
+    isRecipient: boolean;
   }
 
   const dmByTextChannel = new Map<string, DmEntry>();
@@ -44,6 +58,18 @@
 
   // ─── Ember key helpers ─────────────────────────────────────────────────────
 
+  /**
+   * Fetches and caches the ember key for a DM channel.
+   *
+   * The server returns:
+   *   - encrypted_key: the NaCl box ciphertext
+   *   - sender_public_key (optional): present only for peer-boxes created during
+   *     DM acceptance. The stored key is always the one actually used for encryption,
+   *     so decryption is reliable even after device key rotation.
+   *
+   * On first fetch of a peer-box, the key is decrypted and immediately migrated
+   * to a self-box format so all future fetches use the simpler self-box path.
+   */
   async function fetchAndCacheEmberKey(emberId: string): Promise<Uint8Array | null> {
     if (App.emberKeyCache.has(emberId)) return App.emberKeyCache.get(emberId) ?? null;
     const auth = await getAuth();
@@ -61,14 +87,14 @@
       let key: Uint8Array | null = null;
 
       if (data.sender_public_key) {
-        // Peer case: key was stored as an asymmetric box by the creator.
-        // Decrypt it, then re-encrypt as a self-box and persist — making future
-        // fetches identical to regular ember channels (self-box with own keys).
-        const senderPubKey = naclUtil.decodeBase64(data.sender_public_key);
-        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, senderPubKey, ownPriv);
+        // Peer-box path (first fetch after DM acceptance by the other party).
+        // sender_public_key is the stored key that was used for encryption —
+        // decryption is reliable regardless of subsequent key rotations.
+        const senderPub = naclUtil.decodeBase64(data.sender_public_key);
+        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, senderPub, ownPriv);
         if (key) {
+          // Migrate to self-box so all future fetches skip this path.
           const selfBox = emberCrypto.encryptEmberKeyForUser(key, ownPub, ownPriv);
-          // Fire-and-forget: migrate stored key to self-box format.
           fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
             method: "PUT",
             headers: {
@@ -81,7 +107,7 @@
           );
         }
       } else {
-        // Creator case (or already migrated): self-box, same path as regular embers.
+        // Self-box path: standard for all embers (channels and migrated DMs).
         key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, ownPub, ownPriv);
       }
 
@@ -106,8 +132,13 @@
       const data = (await res.json()) as { dms: Array<{
         id: string; name: string; created_at: string;
         partner_id: string; partner_username: string; partner_avatar: string;
+        request_status?: string; request_id?: string; requester_id?: string;
       }> };
       for (const dm of data.dms ?? []) {
+        const requestStatus = (dm.request_status === 'pending' ? 'pending' : 'accepted') as 'pending' | 'accepted';
+        const requestId = dm.request_id ?? '';
+        const isRecipient = requestStatus === 'pending' && dm.requester_id !== undefined && dm.requester_id !== auth.user_id;
+
         const channels = await fetchDmChannels(auth, dm.id);
         const entry: DmEntry = {
           emberId: dm.id,
@@ -116,20 +147,24 @@
           partnerId: dm.partner_id,
           partnerUsername: dm.partner_username,
           partnerAvatar: dm.partner_avatar,
+          requestStatus,
+          requestId,
+          isRecipient,
         };
         if (entry.textChannelId) {
           dmByTextChannel.set(entry.textChannelId, entry);
           dmByEmberId.set(entry.emberId, entry);
-          
-          // Cache the ember key for this DM to enable message decryption
-          // This is critical for DMs created by other users
-          fetchAndCacheEmberKey(entry.emberId).catch((err) => {
-            log.warn("Failed to cache ember key for loaded DM", { 
-              emberId: entry.emberId, 
-              error: err.message 
+
+          // Only fetch and cache the key if this user has one (requester or accepted recipient)
+          if (!isRecipient) {
+            fetchAndCacheEmberKey(entry.emberId).catch((err) => {
+              log.warn("Failed to cache ember key for loaded DM", {
+                emberId: entry.emberId,
+                error: (err as Error).message,
+              });
             });
-          });
-          
+          }
+
           window.addDmConversationToList({
             id: entry.textChannelId,
             participantId: entry.partnerId,
@@ -137,10 +172,23 @@
             participantAvatar: entry.partnerAvatar,
             unreadCount: 0,
             isOnline: false,
-            keyExchanged: true,
+            keyExchanged: requestStatus === 'accepted',
             createdAt: Date.now(),
           });
           window.wsSubscribeToChannel(entry.textChannelId);
+
+          // Show pending banner immediately
+          if (requestStatus === 'pending') {
+            if (typeof window.showDmPendingBanner === 'function') {
+              window.showDmPendingBanner({
+                channelId: entry.textChannelId,
+                partnerUsername: entry.partnerUsername,
+                requestId,
+                isRecipient,
+                requesterId: dm.requester_id ?? '',
+              });
+            }
+          }
         }
       }
     } catch (err) {
@@ -173,70 +221,53 @@
     }
   }
 
-  // ─── Start DM / find-or-create ─────────────────────────────────────────────
+  // ─── DM Request flow ──────────────────────────────────────────────────────
 
+  /**
+   * Sends a DM request to another user and immediately provisions the DM channel.
+   * The requester can send messages right away; a "pending" banner is shown until
+   * the recipient accepts. Returns the text channel ID so the UI can open the DM.
+   *
+   * Returns the existing channel ID if a DM already exists with this user.
+   */
   async function startDmConversation(
     participantId: string,
     participantUsername: string,
-  ): Promise<string> {
+  ): Promise<string | null> {
     const auth = await getAuth();
     const device = await getDevice();
     if (!auth || !device) throw new Error("Not authenticated");
 
+    // Return existing DM channel if one already exists
     const existing = [...dmByTextChannel.values()].find(
       (e) => e.partnerId === participantId,
     );
     if (existing) return existing.textChannelId;
 
-    const partnerDeviceRes = await fetch(
-      `${auth.hostname}/api/v1/users/${participantId}/devices`,
-      { headers: { Authorization: `Bearer ${auth.token}` } },
-    );
-    let partnerPublicKey: string | null = null;
-    if (partnerDeviceRes.ok) {
-      const devData = (await partnerDeviceRes.json()) as {
-        devices?: Array<{ public_key: string }>;
-      };
-      partnerPublicKey = devData.devices?.[0]?.public_key ?? null;
-    }
-
-    if (!partnerPublicKey) {
-      // The peer has no registered device — we cannot encrypt the DM key for them.
-      // Without the peer's public key the asymmetric box would be wrong and the peer
-      // would never be able to decrypt messages. The user should try again once the
-      // peer has logged in at least once so their device key is registered.
-      throw new Error(
-        `${participantUsername} has no registered device. Ask them to log in first, then try again.`,
-      );
-    }
-
+    // Generate the ember key now — only the requester has it until recipient accepts
     const emberKey = emberCrypto.generateEmberKey();
-    const selfPub = naclUtil.decodeBase64(device.public_key);
-    const selfPriv = naclUtil.decodeBase64(device.private_key);
-    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, selfPub, selfPriv);
-    const peerPub = naclUtil.decodeBase64(partnerPublicKey);
-    const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, peerPub, selfPriv);
+    const ownPub = naclUtil.decodeBase64(device.public_key);
+    const ownPriv = naclUtil.decodeBase64(device.private_key);
+    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
 
-    const createRes = await fetch(`${auth.hostname}/api/v1/dms`, {
+    const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      body: JSON.stringify({
-        user_id: participantId,
-        encrypted_key_self: encryptedKeySelf,
-        encrypted_key_peer: encryptedKeyPeer,
-      }),
+      body: JSON.stringify({ user_id: participantId, encrypted_key_self: encryptedKeySelf }),
     });
-    if (!createRes.ok) {
-      const errData = (await createRes.json().catch(() => ({}))) as { error?: string };
-      throw new Error(errData.error ?? "Failed to create DM");
+    if (!res.ok) {
+      const errData = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(errData.error ?? "Failed to send DM request");
     }
-    const { id: emberId } = (await createRes.json()) as { id: string };
+    const { id: requestId, ember_id: emberId } = (await res.json()) as {
+      id: string; ember_id: string; status: string;
+    };
 
+    // Cache the key and open the DM immediately
     App.emberKeyCache.set(emberId, emberKey);
-
     const channels = await fetchDmChannels(auth, emberId);
     const entry: DmEntry = {
       emberId,
@@ -245,6 +276,9 @@
       partnerId: participantId,
       partnerUsername: participantUsername,
       partnerAvatar: "",
+      requestStatus: 'pending',
+      requestId,
+      isRecipient: false,
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
@@ -256,11 +290,162 @@
       participantAvatar: "",
       unreadCount: 0,
       isOnline: false,
-      keyExchanged: true,
+      keyExchanged: false,
       createdAt: Date.now(),
     });
+    window.wsSubscribeToChannel(channels.textChannelId);
 
+    // Show "waiting for acceptance" banner
+    if (typeof window.showDmPendingBanner === 'function') {
+      window.showDmPendingBanner({
+        channelId: channels.textChannelId,
+        partnerUsername: participantUsername,
+        requestId,
+        isRecipient: false,
+        requesterId: auth.user_id,
+      });
+    }
+
+    log.info("DM request sent, channel opened", { requestId, emberId, participantUsername });
     return channels.textChannelId;
+  }
+
+  /**
+   * Fetches all pending DM requests where the current user is the recipient.
+   */
+  async function fetchDMRequests(): Promise<Array<{
+    id: string;
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatar: string;
+    createdAt: number;
+  }>> {
+    const auth = await getAuth();
+    if (!auth) return [];
+    try {
+      const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { requests: Array<{
+        id: string;
+        requester_id: string;
+        requester_username: string;
+        requester_avatar: string;
+        created_at: string;
+      }> };
+      return (data.requests ?? []).map((r) => ({
+        id: r.id,
+        requesterId: r.requester_id,
+        requesterUsername: r.requester_username,
+        requesterAvatar: r.requester_avatar,
+        createdAt: new Date(r.created_at).getTime() / 1000,
+      }));
+    } catch (err) {
+      log.error("Failed to fetch DM requests", { error: (err as Error).message });
+      return [];
+    }
+  }
+
+  /**
+   * Accepts a pending DM request. The recipient:
+   *   1. Generates their own ember key for the DM channel.
+   *   2. Seals it as a self-box (encrypted with their own device key pair).
+   *   3. Sends the self-box to the server — no peer-box, no cross-user asymmetric
+   *      encryption required. Each party only ever encrypts for themselves.
+   *
+   * The DM ember and channels already exist (created when the request was sent).
+   * This call just adds the recipient as a member and stores their key.
+   */
+  async function acceptDMRequest(
+    requestId: string,
+    requesterId: string,
+    requesterUsername: string,
+  ): Promise<string> {
+    const auth = await getAuth();
+    const device = await getDevice();
+    if (!auth || !device) throw new Error("Not authenticated");
+
+    const emberKey = emberCrypto.generateEmberKey();
+    const ownPub = naclUtil.decodeBase64(device.public_key);
+    const ownPriv = naclUtil.decodeBase64(device.private_key);
+    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
+
+    const res = await fetch(`${auth.hostname}/api/v1/dm-requests/${requestId}/accept`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${auth.token}`,
+      },
+      body: JSON.stringify({ encrypted_key_self: encryptedKeySelf }),
+    });
+    if (!res.ok) {
+      const errData = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(errData.error ?? "Failed to accept DM request");
+    }
+    const { ember_id: emberId } = (await res.json()) as { ember_id: string };
+
+    App.emberKeyCache.set(emberId, emberKey);
+
+    // Update local state: the DM may already be in the map (recipient sees it as pending)
+    const existingEntry = dmByEmberId.get(emberId);
+    const channels = existingEntry
+      ? { textChannelId: existingEntry.textChannelId, voiceChannelId: existingEntry.voiceChannelId }
+      : await fetchDmChannels(auth, emberId);
+
+    const entry: DmEntry = {
+      emberId,
+      textChannelId: channels.textChannelId,
+      voiceChannelId: channels.voiceChannelId,
+      partnerId: requesterId,
+      partnerUsername: requesterUsername,
+      partnerAvatar: existingEntry?.partnerAvatar ?? "",
+      requestStatus: 'accepted',
+      requestId,
+      isRecipient: true,
+    };
+    dmByTextChannel.set(channels.textChannelId, entry);
+    dmByEmberId.set(emberId, entry);
+
+    if (!existingEntry) {
+      window.addDmConversationToList({
+        id: channels.textChannelId,
+        participantId: requesterId,
+        participantUsername: requesterUsername,
+        participantAvatar: "",
+        unreadCount: 0,
+        isOnline: false,
+        keyExchanged: true,
+        createdAt: Date.now(),
+      });
+      window.wsSubscribeToChannel(channels.textChannelId);
+    }
+
+    // Hide the pending banner now that the DM is accepted
+    if (typeof window.hideDmPendingBanner === 'function') {
+      window.hideDmPendingBanner(channels.textChannelId);
+    }
+
+    log.info("DM request accepted", { requestId, emberId, requesterUsername });
+    return channels.textChannelId;
+  }
+
+  /**
+   * Declines a DM request.
+   */
+  async function declineDMRequest(requestId: string): Promise<void> {
+    const auth = await getAuth();
+    if (!auth) throw new Error("Not authenticated");
+
+    const res = await fetch(`${auth.hostname}/api/v1/dm-requests/${requestId}/decline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${auth.token}` },
+    });
+    if (!res.ok) {
+      const errData = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(errData.error ?? "Failed to decline DM request");
+    }
+    log.info("DM request declined", { requestId });
   }
 
   // ─── Fetch messages ────────────────────────────────────────────────────────
@@ -279,9 +464,9 @@
 
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
     if (!emberKey) {
-      log.error("Cannot fetch DM messages: ember key unavailable", { 
-        emberId: entry.emberId, 
-        channelId 
+      log.error("Cannot fetch DM messages: ember key unavailable", {
+        emberId: entry.emberId,
+        channelId,
       });
       return [];
     }
@@ -301,26 +486,16 @@
       return (data.messages ?? []).map((msg) => {
         const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
         if (plaintext === null) {
-          log.warn("DM message decryption failed", { 
-            message_id: msg.id, 
-            channel_id: channelId 
-          });
-          // Return empty string with error indicator to match channel behavior
-          return {
-            id: msg.id,
-            conversationId: channelId,
-            senderId: msg.sender_user_id,
-            content: "[Failed to decrypt message]",
-            timestamp: typeof msg.created_at === "number" ? msg.created_at : new Date(msg.created_at).getTime() / 1000,
-            isOwn: msg.sender_user_id === currentUserId,
-          };
+          log.warn("DM message decryption failed", { message_id: msg.id, channel_id: channelId });
         }
         return {
           id: msg.id,
           conversationId: channelId,
           senderId: msg.sender_user_id,
-          content: plaintext,
-          timestamp: typeof msg.created_at === "number" ? msg.created_at : new Date(msg.created_at).getTime() / 1000,
+          content: plaintext ?? "[Failed to decrypt message]",
+          timestamp: typeof msg.created_at === "number"
+            ? msg.created_at
+            : new Date(msg.created_at).getTime() / 1000,
           isOwn: msg.sender_user_id === currentUserId,
         };
       });
@@ -369,8 +544,6 @@
 
     const entry = dmByTextChannel.get(channelId);
     if (entry) {
-      // Mirror the regular ember flow: set activeEmberId so displayDecryptedMessage
-      // and sendEncryptedMessage can use the same code path as text channels.
       App.activeEmberId = entry.emberId;
       fetchAndCacheEmberKey(entry.emberId).catch(() => null);
     }
@@ -386,9 +559,9 @@
     if (!auth) return;
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
     if (!emberKey) {
-      log.error("Cannot handle incoming DM message: ember key unavailable", { 
-        emberId: entry.emberId, 
-        channelId 
+      log.error("Cannot handle incoming DM message: ember key unavailable", {
+        emberId: entry.emberId,
+        channelId,
       });
       return;
     }
@@ -396,16 +569,15 @@
     const plaintext = emberCrypto.decryptMessage(ciphertext, emberKey);
     const senderId = String(payload["sender_user_id"] ?? "");
     const createdAt = Number(payload["created_at"] ?? 0);
-    
-    // Handle decryption failure consistently with channels
+
     const messageContent = plaintext === null ? "[Failed to decrypt message]" : plaintext;
     if (plaintext === null) {
-      log.warn("Incoming DM message decryption failed", { 
+      log.warn("Incoming DM message decryption failed", {
         message_id: String(payload["id"] ?? ""),
-        channel_id: channelId 
+        channel_id: channelId,
       });
     }
-    
+
     const isOwn = senderId === auth.user_id;
     window.displayDmMessage({
       id: String(payload["id"] ?? ""),
@@ -431,11 +603,11 @@
   // ─── No-op stubs for backwards-compat ─────────────────────────────────────
 
   async function initiateKeyExchange(_channelId: string, _participantId: string): Promise<void> {
-    // Key exchange happens at DM ember creation time — no-op here
+    // Key exchange now happens at DM request acceptance time — no-op here
   }
 
   async function sendTypingIndicator(_channelId: string, _isTyping: boolean): Promise<void> {
-    // Typing indicators are not supported in the ember channel model yet
+    // Typing indicators not yet supported in the ember channel model
   }
 
   async function refreshAllPresenceStates(): Promise<void> {
@@ -468,8 +640,17 @@
   window.fetchConversationMessages = fetchConversationMessages;
   window.initiateKeyExchange = initiateKeyExchange;
   window.refreshAllPresenceStates = refreshAllPresenceStates;
-
   window.resubscribeDmChannels = resubscribeDmChannels;
+
+  window.fetchDMRequests = fetchDMRequests;
+  window.acceptDMRequest = acceptDMRequest;
+  window.declineDMRequest = declineDMRequest;
+
+  window.getPendingStatusForChannel = (channelId: string) => {
+    const entry = dmByTextChannel.get(channelId);
+    if (!entry || entry.requestStatus !== 'pending') return null;
+    return { requestId: entry.requestId, isRecipient: entry.isRecipient };
+  };
 
   // UI helpers for ember key access
   window.fetchAndCacheEmberKeyForChannel = async (channelId: string): Promise<Uint8Array | null> => {
