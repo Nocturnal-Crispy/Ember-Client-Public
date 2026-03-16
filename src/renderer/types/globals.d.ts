@@ -508,6 +508,7 @@ declare global {
     ): void;
     hideChannelContextMenu(): void;
     markChannelUnread(channelId: string): void;
+    clearAllChannelUnread(): void;
     // Globals set by invite-manager.ts
     openJoinServerModal(): void;
     closeJoinServerModal(): void;
@@ -607,6 +608,7 @@ declare global {
       typing: boolean;
     }): void;
     // Globals set by direct-messaging-ui.ts
+    clearAllDmUnread(): void;
     refreshDmUsername(username: string): void;
     initializeDirectMessagingUI(): void;
     loadAndShowDmRequests(): Promise<void>;
@@ -672,6 +674,8 @@ declare global {
     // Test functions
     testDmMessageSend(): Promise<void>;
     debugTextarea(): void;
+    // Globals set by read-all-manager.ts
+    readAll(): void;
     // Globals set by renderer.ts
     closeDMScreenOnServerSwitch(): void;
     // Globals set by renderer.ts (DM screen)

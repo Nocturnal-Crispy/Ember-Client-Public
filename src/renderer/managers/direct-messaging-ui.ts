@@ -2129,6 +2129,14 @@
     }
   }
 
+  function clearAllDmUnread(): void {
+    conversations.forEach((conv) => {
+      conv.unreadCount = 0;
+      conv.element?.querySelector('.dm-unread-count')?.remove();
+    });
+    updateDmIconBadge();
+  }
+
   // Expose functions to global scope
   window.addDmConversationToList = addConversationToList;
   window.initializeDirectMessagingUI = initializeDirectMessagingUI;
@@ -2137,4 +2145,5 @@
   window.onDmRequestSent = handleDmRequestSent;
   window.showDmPendingBanner = showDmPendingBanner;
   window.hideDmPendingBanner = hideDmPendingBanner;
+  window.clearAllDmUnread = clearAllDmUnread;
 })();

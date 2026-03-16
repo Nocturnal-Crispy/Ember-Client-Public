@@ -35,6 +35,7 @@
     "../../dist/renderer/managers/version-display.js",
     "../../dist/renderer/managers/direct-messaging-manager.js",
     "../../dist/renderer/managers/direct-messaging-ui.js",
+    "../../dist/renderer/managers/read-all-manager.js",
     "../../dist/renderer/managers/emoji-picker.js",
     "../../dist/renderer/managers/gif-picker.js",
     "../../dist/renderer/managers/renderer.js",

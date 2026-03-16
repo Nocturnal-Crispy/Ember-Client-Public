@@ -119,6 +119,22 @@
   margin: 2px 0;
 }
 
+/* ─── Read All Button ──────────────────────────────────────────────────────── */
+
+.server-icon.read-all-btn {
+  font-size: 18px;
+  color: rgba(var(--rgb-highlight), 0.4);
+  border-style: dashed;
+  border-color: rgba(var(--rgb-highlight), 0.2);
+}
+
+.server-icon.read-all-btn:hover {
+  border-color: var(--highlight);
+  border-style: solid;
+  background-color: rgba(var(--rgb-highlight), 0.1);
+  color: var(--highlight);
+}
+
 /* ─── Drag-and-drop ────────────────────────────────────────────────────────── */
 
 .server-icon.drag-over-ember {

@@ -946,6 +946,16 @@
     }
   }
 
+  function clearAllChannelUnread(): void {
+    unreadChannelIds.clear();
+    document.querySelectorAll<HTMLElement>(".channel.has-unread").forEach((el) => {
+      el.classList.remove("has-unread");
+    });
+    document.querySelectorAll<HTMLElement>(".ember-unread-badge").forEach((el) => {
+      el.remove();
+    });
+  }
+
   window.fetchChannels = fetchChannels;
   window.fetchCategories = fetchCategories;
   window.renderChannels = renderChannels;
@@ -954,4 +964,5 @@
   window.showChannelContextMenu = showChannelContextMenu;
   window.hideChannelContextMenu = hideChannelContextMenu;
   window.markChannelUnread = markChannelUnread;
+  window.clearAllChannelUnread = clearAllChannelUnread;
 })();
