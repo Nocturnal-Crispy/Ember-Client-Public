@@ -53,10 +53,18 @@ export function selectAssetForPlatform(assets: readonly GitHubAsset[]): GitHubAs
     );
   }
 
-  // Linux
+  // Linux — prefer the format that matches the current installation.
+  // AppImages set the APPIMAGE env var; .deb installs do not.
+  if (process.env.APPIMAGE) {
+    return (
+      assets.find(a => a.name.endsWith('.AppImage')) ??
+      assets.find(a => a.name.endsWith('.deb')) ??
+      null
+    );
+  }
   return (
-    assets.find(a => a.name.endsWith('.AppImage')) ??
     assets.find(a => a.name.endsWith('.deb')) ??
+    assets.find(a => a.name.endsWith('.AppImage')) ??
     null
   );
 }
