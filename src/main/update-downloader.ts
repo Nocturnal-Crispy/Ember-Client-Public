@@ -144,11 +144,11 @@ export function cancelActiveDownload(): void {
 export async function launchInstaller(filePath: string): Promise<void> {
   log.info('Launching installer', { platform: process.platform });
 
-  if (process.platform === 'linux' && filePath.endsWith('.AppImage')) {
+  if (process.platform === 'linux') {
     try {
       fs.chmodSync(filePath, 0o755);
     } catch {
-      log.warn('Failed to chmod AppImage');
+      log.warn('Failed to set executable permission on installer', { filePath });
     }
   }
 
