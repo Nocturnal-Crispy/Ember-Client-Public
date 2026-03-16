@@ -9,7 +9,7 @@
   const STORAGE_KEY = "ember_plugin_settings";
 
   const DEFAULT_SETTINGS: PluginSettings = {
-    readAllButton: true,
+    readAllButton: false,
   };
 
   function loadSettings(): PluginSettings {
