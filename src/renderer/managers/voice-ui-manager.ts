@@ -552,8 +552,6 @@
         await (App.voiceManager as { stopScreenShare(): Promise<void> }).stopScreenShare();
         App.localScreenShareOn = false;
         App.screenShareParticipants.delete("__self__");
-        if (App.wsConnection?.readyState === WebSocket.OPEN)
-          App.wsConnection.send(JSON.stringify({ type: "screen_share_stop" }));
         if (btn) {
           btn.classList.remove("active");
           btn.title = "Share Screen";
@@ -621,8 +619,6 @@
 
     App.localScreenShareOn = true;
     App.screenShareParticipants.add("__self__");
-    if (App.wsConnection?.readyState === WebSocket.OPEN)
-      App.wsConnection.send(JSON.stringify({ type: "screen_share_start" }));
 
     const btn = document.getElementById(
       "voice-screen-share-btn"

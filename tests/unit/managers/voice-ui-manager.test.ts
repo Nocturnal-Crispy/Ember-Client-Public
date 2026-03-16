@@ -9,6 +9,9 @@
  *   - updateSpeakingIndicator: removes 'speaking' class when isSpeaking=false
  *   - updateSpeakingIndicator: does nothing when no matching element exists
  *   - updateSpeakingIndicator: updates all matching elements across multiple lists
+ *   - toggleScreenShare (stop): calls voiceManager.stopScreenShare, no duplicate WS send
+ *   - toggleScreenShare (start): calls openScreenShareModal with sources and audioAvailable
+ *   - handleScreenShareConfirmed callback: calls startScreenShare, no duplicate WS send
  */
 
 let mockIpcInvoke: jest.Mock;
@@ -241,6 +244,163 @@ describe('updateSpeakingIndicator', () => {
 
     const el = document.querySelector<HTMLElement>('.voice-avatar');
     expect(el!.classList.contains('speaking')).toBe(false);
+  });
+});
+
+// ─── Phase 5: toggleScreenShare — stop path ───────────────────────────────────
+
+describe('toggleScreenShare — stop path', () => {
+  let mockWsSend: jest.Mock;
+  let mockStopScreenShare: jest.Mock;
+
+  beforeEach(() => {
+    const App = (window as any).App;
+    mockWsSend = jest.fn();
+    mockStopScreenShare = jest.fn().mockResolvedValue(undefined);
+
+    App.activeVoiceChannelId = 'ch-voice-1';
+    App.localScreenShareOn = true;
+    App.screenShareParticipants = new Set(['__self__']);
+    App.wsConnection = { send: mockWsSend, readyState: WebSocket.OPEN };
+    App.voiceManager = { stopScreenShare: mockStopScreenShare };
+  });
+
+  it('calls voiceManager.stopScreenShare()', async () => {
+    await (window as any).toggleScreenShare();
+    expect(mockStopScreenShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('sets App.localScreenShareOn to false', async () => {
+    await (window as any).toggleScreenShare();
+    expect((window as any).App.localScreenShareOn).toBe(false);
+  });
+
+  it('does NOT send screen_share_stop via wsConnection (VoiceManager owns WS sends)', async () => {
+    await (window as any).toggleScreenShare();
+    const screenShareStopSent = mockWsSend.mock.calls.some(
+      (args: unknown[]) => {
+        try { return JSON.parse(args[0] as string).type === 'screen_share_stop'; }
+        catch { return false; }
+      }
+    );
+    expect(screenShareStopSent).toBe(false);
+  });
+});
+
+// ─── Phase 5: toggleScreenShare — start path (openScreenSharePicker) ──────────
+
+describe('toggleScreenShare — start path', () => {
+  let mockOpenScreenShareModal: jest.Mock;
+  let mockCheckSupport: jest.Mock;
+  let mockGetSources: jest.Mock;
+
+  const FAKE_SOURCE = {
+    id: 'screen:0:0',
+    name: 'Entire Screen',
+    display_id: '0',
+    thumbnail: 'data:image/png;base64,abc',
+    pipeWireNodeId: null,
+  };
+
+  beforeEach(() => {
+    const App = (window as any).App;
+
+    App.activeVoiceChannelId = 'ch-voice-1';
+    App.localScreenShareOn = false;
+    App.screenShareParticipants = new Set();
+    App.wsConnection = { send: jest.fn(), readyState: WebSocket.OPEN };
+    App.voiceManager = {};
+
+    mockGetSources = jest.fn().mockResolvedValue([FAKE_SOURCE]);
+    mockCheckSupport = jest.fn().mockResolvedValue({ supported: false });
+    mockOpenScreenShareModal = jest.fn();
+
+    (window as any).electronAPI.desktopCapturer = { getSources: mockGetSources };
+    (window as any).electronAPI.audioCapture = { checkSupport: mockCheckSupport };
+    (window as any).openScreenShareModal = mockOpenScreenShareModal;
+  });
+
+  it('calls window.openScreenShareModal with the source list', async () => {
+    await (window as any).toggleScreenShare();
+    expect(mockOpenScreenShareModal).toHaveBeenCalledTimes(1);
+    const sources = mockOpenScreenShareModal.mock.calls[0][0] as Array<{ id: string }>;
+    expect(sources).toHaveLength(1);
+    expect(sources[0].id).toBe(FAKE_SOURCE.id);
+  });
+
+  it('passes audioAvailable=false when checkSupport returns supported=false', async () => {
+    mockCheckSupport.mockResolvedValue({ supported: false });
+    await (window as any).toggleScreenShare();
+    expect(mockOpenScreenShareModal.mock.calls[0][1]).toBe(false);
+  });
+
+  it('passes audioAvailable=true when checkSupport returns supported=true', async () => {
+    mockCheckSupport.mockResolvedValue({ supported: true });
+    await (window as any).toggleScreenShare();
+    expect(mockOpenScreenShareModal.mock.calls[0][1]).toBe(true);
+  });
+
+  it('handleScreenShareConfirmed callback calls voiceManager.startScreenShare()', async () => {
+    const mockStartScreenShare = jest.fn().mockResolvedValue(true);
+    (window as any).App.voiceManager = { startScreenShare: mockStartScreenShare };
+    (window as any).App.wsConnection = { send: jest.fn(), readyState: WebSocket.OPEN };
+
+    await (window as any).toggleScreenShare();
+
+    // Capture and invoke the callback passed as third arg to openScreenShareModal
+    const onSelect = mockOpenScreenShareModal.mock.calls[0][2] as (
+      source: { id: string; name: string; thumbnailDataUrl: string; type: string },
+      settings: { fps: number; resolution: string; includeAudio: boolean }
+    ) => Promise<void>;
+
+    await onSelect(
+      { id: FAKE_SOURCE.id, name: FAKE_SOURCE.name, thumbnailDataUrl: '', type: 'screen' },
+      { fps: 15, resolution: '1080p', includeAudio: false }
+    );
+
+    expect(mockStartScreenShare).toHaveBeenCalledWith(FAKE_SOURCE.id, {
+      fps: 15,
+      resolution: '1080p',
+      includeAudio: false,
+    });
+  });
+
+  it('handleScreenShareConfirmed callback sets App.localScreenShareOn=true on success', async () => {
+    const mockStartScreenShare = jest.fn().mockResolvedValue(true);
+    const mockWsSend = jest.fn();
+    (window as any).App.voiceManager = { startScreenShare: mockStartScreenShare };
+    (window as any).App.wsConnection = { send: mockWsSend, readyState: WebSocket.OPEN };
+
+    await (window as any).toggleScreenShare();
+    const onSelect = mockOpenScreenShareModal.mock.calls[0][2] as Function;
+    await onSelect(
+      { id: FAKE_SOURCE.id, name: FAKE_SOURCE.name, thumbnailDataUrl: '', type: 'screen' },
+      { fps: 15, resolution: '1080p', includeAudio: false }
+    );
+
+    expect((window as any).App.localScreenShareOn).toBe(true);
+  });
+
+  it('handleScreenShareConfirmed callback does NOT send screen_share_start (VoiceManager owns WS sends)', async () => {
+    const mockStartScreenShare = jest.fn().mockResolvedValue(true);
+    const mockWsSend = jest.fn();
+    (window as any).App.voiceManager = { startScreenShare: mockStartScreenShare };
+    (window as any).App.wsConnection = { send: mockWsSend, readyState: WebSocket.OPEN };
+
+    await (window as any).toggleScreenShare();
+    const onSelect = mockOpenScreenShareModal.mock.calls[0][2] as Function;
+    await onSelect(
+      { id: FAKE_SOURCE.id, name: FAKE_SOURCE.name, thumbnailDataUrl: '', type: 'screen' },
+      { fps: 15, resolution: '1080p', includeAudio: false }
+    );
+
+    const screenShareStartSent = mockWsSend.mock.calls.some(
+      (args: unknown[]) => {
+        try { return JSON.parse(args[0] as string).type === 'screen_share_start'; }
+        catch { return false; }
+      }
+    );
+    expect(screenShareStartSent).toBe(false);
   });
 });
 
