@@ -63,6 +63,14 @@ class VoiceManager {
   onScreenShareStarted: ((userId: string) => void) | null;
   onScreenShareStopped: ((userId: string) => void) | null;
 
+  // ─── Audio capture (Phase 4) ────────────────────────────────────────────────
+  _audioCaptureSetup: boolean;
+  _audioCaptureInterval: ReturnType<typeof setInterval> | null;
+  _audioCapturePCMBuffer: Int16Array[];
+  _audioCtxCapture: AudioContext | null;
+  _audioCaptureScriptNode: ScriptProcessorNode | null;
+  _audioCaptureDestination: MediaStreamAudioDestinationNode | null;
+
   constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
     _voiceLog.info("VoiceManager created");
     this.ws = wsConnection;
@@ -105,6 +113,14 @@ class VoiceManager {
     this.isScreenSharing = false;
     this.onScreenShareStarted = null;
     this.onScreenShareStopped = null;
+
+    // Audio capture (Phase 4)
+    this._audioCaptureSetup = false;
+    this._audioCaptureInterval = null;
+    this._audioCapturePCMBuffer = [];
+    this._audioCtxCapture = null;
+    this._audioCaptureScriptNode = null;
+    this._audioCaptureDestination = null;
   }
 
   async fetchICEServers(): Promise<void> {
@@ -340,6 +356,7 @@ class VoiceManager {
       this.localScreenStream = null;
     }
     this.isScreenSharing = false;
+    this._stopAudioCapture().catch(() => { /* ignore */ });
 
     if (this._audioCtx) {
       this._audioCtx.close().catch(() => {
@@ -709,6 +726,7 @@ class VoiceManager {
       this.localScreenStream = null;
     }
     this.isScreenSharing = false;
+    this._stopAudioCapture().catch(() => { /* ignore */ });
     const channelId = this.channelId;
     this.channelId = null;
     return channelId;
@@ -834,6 +852,119 @@ class VoiceManager {
     }
   }
 
+  // ─── Audio capture (Phase 4) ───────────────────────────────────────────────
+
+  /**
+   * _startAudioCapture — attempt to start system audio capture via the
+   * main-process IPC bridge. Returns the audio MediaStream on success,
+   * or null if the platform does not support capture or setup fails.
+   * Safe to call even when audio capture stubs are not yet implemented
+   * (Phase 9); the pipeline is wired but will deliver silence until the
+   * native addon is present.
+   */
+  async _startAudioCapture(): Promise<MediaStream | null> {
+    let setupResult: { success: boolean; reason?: string };
+    try {
+      setupResult = await (window.electronAPI as unknown as {
+        audioCapture: { setup(): Promise<{ success: boolean; reason?: string }> };
+      }).audioCapture.setup();
+    } catch (e) {
+      _voiceLog.warn("Audio capture setup threw", { error: String(e) });
+      return null;
+    }
+
+    if (!setupResult.success) {
+      _voiceLog.warn("Audio capture setup failed", {
+        reason: setupResult.reason ?? "unknown",
+      });
+      return null;
+    }
+
+    this._audioCaptureSetup = true;
+
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    const scriptNode = ctx.createScriptProcessor(4096, 0, 1);
+    const destination = ctx.createMediaStreamDestination();
+    scriptNode.connect(destination);
+
+    // Feed queued PCM frames (Int16) into the WebRTC audio pipeline.
+    scriptNode.onaudioprocess = (e: AudioProcessingEvent) => {
+      const outData = e.outputBuffer.getChannelData(0);
+      const frame = this._audioCapturePCMBuffer.shift();
+      if (frame) {
+        const len = Math.min(outData.length, frame.length);
+        for (let i = 0; i < len; i++) {
+          outData[i] = frame[i] / 32768.0;
+        }
+      }
+      // else: output buffer is already zeroed (silence)
+    };
+
+    this._audioCtxCapture = ctx;
+    this._audioCaptureScriptNode = scriptNode;
+    this._audioCaptureDestination = destination;
+
+    // Poll frames from the main process at ~50 fps. When the native addon
+    // is not yet present (Phase 9), frames() returns null and the
+    // ScriptProcessor outputs silence.
+    this._audioCaptureInterval = setInterval(() => {
+      (window.electronAPI as unknown as {
+        audioCapture: { frames(): Promise<Int16Array | null> };
+      }).audioCapture
+        .frames()
+        .then((frames) => {
+          if (frames && frames.length > 0) {
+            this._audioCapturePCMBuffer.push(new Int16Array(frames));
+            // Limit buffer to avoid unbounded growth if rendering falls behind.
+            while (this._audioCapturePCMBuffer.length > 5) {
+              this._audioCapturePCMBuffer.shift();
+            }
+          }
+        })
+        .catch(() => {
+          /* ignore transient frame errors */
+        });
+    }, 20);
+
+    _voiceLog.info("Audio capture pipeline started");
+    return destination.stream;
+  }
+
+  /** _stopAudioCapture — tear down the audio capture pipeline. */
+  async _stopAudioCapture(): Promise<void> {
+    if (this._audioCaptureInterval !== null) {
+      clearInterval(this._audioCaptureInterval);
+      this._audioCaptureInterval = null;
+    }
+    this._audioCapturePCMBuffer = [];
+
+    if (this._audioCaptureScriptNode) {
+      this._audioCaptureScriptNode.disconnect();
+      this._audioCaptureScriptNode = null;
+    }
+    if (this._audioCaptureDestination) {
+      this._audioCaptureDestination.disconnect();
+      this._audioCaptureDestination = null;
+    }
+    if (this._audioCtxCapture) {
+      await this._audioCtxCapture.close().catch(() => {
+        /* ignore */
+      });
+      this._audioCtxCapture = null;
+    }
+    if (this._audioCaptureSetup) {
+      try {
+        await (window.electronAPI as unknown as {
+          audioCapture: { teardown(): Promise<void> };
+        }).audioCapture.teardown();
+      } catch (e) {
+        _voiceLog.warn("Audio capture teardown failed", { error: String(e) });
+      }
+      this._audioCaptureSetup = false;
+    }
+    _voiceLog.info("Audio capture pipeline stopped");
+  }
+
   // ─── Screen share methods ──────────────────────────────────────────────────
 
   async startScreenShare(
@@ -876,6 +1007,23 @@ class VoiceManager {
 
     this.localScreenStream = stream;
 
+    // Attempt system audio capture when requested (Phase 4).
+    // Gracefully degrades to video-only when setup() returns {success: false}
+    // (as it always does before Phase 9 native addon integration).
+    if (settings.includeAudio) {
+      const audioStream = await this._startAudioCapture();
+      if (audioStream) {
+        const audioTrack = audioStream.getAudioTracks()[0];
+        if (audioTrack) {
+          this.peerConnection.addTransceiver(audioTrack, {
+            direction: "sendonly",
+            streams: [audioStream],
+          });
+          _voiceLog.info("Audio track added for screen share");
+        }
+      }
+    }
+
     const videoTrack = stream.getVideoTracks()[0];
     this.peerConnection.addTransceiver(videoTrack, {
       direction: "sendonly",
@@ -913,6 +1061,8 @@ class VoiceManager {
     this.localScreenStream.getTracks().forEach((t) => t.stop());
     this.localScreenStream = null;
     this.isScreenSharing = false;
+
+    await this._stopAudioCapture();
 
     if (this.peerConnection && this.channelId) {
       try {
