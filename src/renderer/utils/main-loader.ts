@@ -19,6 +19,9 @@
     "../../dist/renderer/managers/app-state.js",
     "../../dist/renderer/services/voice-service.js",
     "../../dist/renderer/services/websocket-service.js",
+    "../../dist/renderer/services/user-service.js",
+    "../../dist/renderer/components/user-details-modal.js",
+    "../../dist/renderer/utils/username-click-handler.js",
     "../../dist/renderer/components/messages-area.js",
     "../../dist/renderer/services/message-service.js",
     "../../dist/renderer/managers/channel-manager.js",
@@ -99,6 +102,7 @@
         gifPicker,
         modalExternalLink,
         modalCustomStatus,
+        modalUserDetails,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -127,6 +131,7 @@
         fetchFragment("gif-picker.html"),
         fetchFragment("modal-external-link.html"),
         fetchFragment("modal-custom-status.html"),
+        fetchFragment("modal-user-details.html"),
       ]);
 
       // Title bar (top-level)
@@ -166,6 +171,7 @@
       document.body.appendChild(parseFragment(gifPicker));
       document.body.appendChild(parseFragment(modalExternalLink));
       document.body.appendChild(parseFragment(modalCustomStatus));
+      document.body.appendChild(parseFragment(modalUserDetails));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

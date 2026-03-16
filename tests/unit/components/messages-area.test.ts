@@ -48,7 +48,14 @@ beforeAll(() => {
   // 5. Mock openImageViewer
   (window as any).openImageViewer = jest.fn();
 
-  // 6. Load the IIFE module
+  // 6. Mock user-service and username-click-handler globals
+  (window as any).getUserDetailsByUsername = jest.fn().mockReturnValue(null);
+  (window as any).makeUsernameClickable = jest.fn().mockImplementation(
+    (el: HTMLElement) => { el.classList.add('username-clickable'); }
+  );
+  (window as any).openUserDetailsModal = jest.fn();
+
+  // 7. Load the IIFE module
   require("../../../src/renderer/components/messages-area");
 });
 
@@ -400,5 +407,39 @@ describe("createActionToolbar", () => {
     const toolbar = window.createActionToolbar("msg-not-owned");
     const buttons = toolbar.querySelectorAll("button");
     expect(buttons.length).toBe(0);
+  });
+});
+
+describe("createBasicMessageElement — chumhandle span", () => {
+  it("renders a .message-chumhandle span with the correct chumhandle text", () => {
+    const el = window.createBasicMessageElement("Alice", "hello", undefined, "msg-ch");
+    const ch = el.querySelector(".message-chumhandle") as HTMLElement;
+    expect(ch).not.toBeNull();
+    // toChumhandle('Alice') → 'AL'
+    expect(ch.textContent).toBe("[AL]: ");
+  });
+
+  it("always calls makeUsernameClickable with empty userId to avoid race condition", () => {
+    const mockMakeClickable = (window as any).makeUsernameClickable as jest.Mock;
+    mockMakeClickable.mockClear();
+
+    window.createBasicMessageElement("Alice", "hello", undefined, "msg-click");
+
+    expect(mockMakeClickable).toHaveBeenCalledTimes(1);
+    const [calledEl, calledId, calledName] = mockMakeClickable.mock.calls[0];
+    expect(calledEl.classList.contains('message-chumhandle')).toBe(true);
+    // userId is '' — resolved lazily in openUserDetailsModal at click time
+    expect(calledId).toBe('');
+    expect(calledName).toBe('Alice');
+  });
+
+  it("calls makeUsernameClickable even when currentMembers is empty", () => {
+    const mockMakeClickable = (window as any).makeUsernameClickable as jest.Mock;
+    mockMakeClickable.mockClear();
+    (window as any).App.currentMembers = [];
+
+    window.createBasicMessageElement("Unknown", "hello", undefined, "msg-unknown");
+
+    expect(mockMakeClickable).toHaveBeenCalledTimes(1);
   });
 });
