@@ -4,6 +4,14 @@ import Store from "electron-store";
 import { createLogger } from "./logger";
 import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
+import {
+  selectAssetForPlatform,
+  downloadAsset,
+  cancelActiveDownload,
+  launchInstaller,
+  scheduleInstallOnExit,
+  getInstallOnExitPath,
+} from "./update-downloader";
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../shared/types";
@@ -465,6 +473,169 @@ ipcMain.handle("check-for-update", async (): Promise<UpdateInfo> => {
   }
 });
 
+interface UpdateDetails {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseNotes: string | null;
+  publishedAt: string | null;
+  downloadUrl: string | null;
+  downloadSize: number | null;
+  assetName: string | null;
+  error?: string;
+}
+
+ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
+  const currentVersion = app.getVersion();
+  try {
+    const response = await net.fetch(
+      "https://api.github.com/repos/Nocturnal-Crispy/Ember-Client-Public/releases/latest",
+      { headers: { "User-Agent": "ember-client" } }
+    );
+    if (!response.ok) {
+      return {
+        updateAvailable: false,
+        currentVersion,
+        latestVersion: null,
+        releaseNotes: null,
+        publishedAt: null,
+        downloadUrl: null,
+        downloadSize: null,
+        assetName: null,
+        error: `HTTP ${response.status}`,
+      };
+    }
+    const data = (await response.json()) as {
+      tag_name?: string;
+      body?: string;
+      published_at?: string;
+      assets?: Array<{ name: string; browser_download_url: string; size: number }>;
+    };
+    const tag = data?.tag_name;
+    if (typeof tag !== "string" || !/^\d+\.\d+\.\d+$/.test(tag.replace(/^v/, ""))) {
+      return {
+        updateAvailable: false,
+        currentVersion,
+        latestVersion: null,
+        releaseNotes: null,
+        publishedAt: null,
+        downloadUrl: null,
+        downloadSize: null,
+        assetName: null,
+        error: "Invalid tag format",
+      };
+    }
+    const latestVersion = tag.replace(/^v/, "");
+    const updateAvailable = isNewerVersion(currentVersion, latestVersion);
+    const assets = Array.isArray(data.assets) ? data.assets : [];
+    const selected = selectAssetForPlatform(assets);
+    log.debug("Update details fetched", {
+      currentVersion,
+      latestVersion,
+      updateAvailable,
+      assetName: selected?.name ?? null,
+    });
+    return {
+      updateAvailable,
+      currentVersion,
+      latestVersion,
+      releaseNotes: typeof data.body === "string" ? data.body : null,
+      publishedAt: typeof data.published_at === "string" ? data.published_at : null,
+      downloadUrl: selected?.browser_download_url ?? null,
+      downloadSize: selected?.size ?? null,
+      assetName: selected?.name ?? null,
+    };
+  } catch (err) {
+    log.debug("check-for-update-details failed");
+    return {
+      updateAvailable: false,
+      currentVersion,
+      latestVersion: null,
+      releaseNotes: null,
+      publishedAt: null,
+      downloadUrl: null,
+      downloadSize: null,
+      assetName: null,
+      error: String(err),
+    };
+  }
+});
+
+ipcMain.handle(
+  "download-update",
+  async (
+    _event,
+    downloadUrl: unknown,
+    assetName: unknown,
+    assetSize: unknown
+  ): Promise<{ filePath: string } | { error: string }> => {
+    if (
+      typeof downloadUrl !== "string" ||
+      typeof assetName !== "string" ||
+      typeof assetSize !== "number"
+    ) {
+      return { error: "Invalid parameters" };
+    }
+    try {
+      const result = await downloadAsset(
+        { name: assetName, browser_download_url: downloadUrl, size: assetSize },
+        (progress) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("update-download-progress", progress);
+          }
+        }
+      );
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("update-download-complete", {
+          filePath: result.filePath,
+          assetName,
+        });
+      }
+      return { filePath: result.filePath };
+    } catch (err) {
+      const error = String(err);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("update-download-error", { error });
+      }
+      return { error };
+    }
+  }
+);
+
+ipcMain.handle("cancel-download", () => {
+  cancelActiveDownload();
+  return true;
+});
+
+ipcMain.handle("install-update", async (_event, filePath: unknown) => {
+  if (typeof filePath !== "string") return { error: "Invalid filePath" };
+  try {
+    await launchInstaller(filePath);
+    // Give the OS a moment to open the installer before quitting
+    setTimeout(() => app.quit(), 1500);
+    return { success: true };
+  } catch (err) {
+    return { error: String(err) };
+  }
+});
+
+ipcMain.handle("schedule-install-on-exit", (_event, filePath: unknown) => {
+  if (typeof filePath !== "string") return false;
+  scheduleInstallOnExit(filePath);
+  return true;
+});
+
+ipcMain.handle("skip-version", (_event, version: unknown) => {
+  if (typeof version !== "string") return false;
+  store.set("skippedUpdateVersion", version);
+  log.info("Update version skipped", { version });
+  return true;
+});
+
+ipcMain.handle("get-skipped-version", () => {
+  return store.get("skippedUpdateVersion") ?? null;
+});
+
 ipcMain.handle("get-klipy-api-key", () => {
   log.debug("IPC: get-klipy-api-key");
   // Return the obfuscated API key - this is available to all users
@@ -627,5 +798,17 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     log.info("Quitting application");
     app.quit();
+  }
+});
+
+app.on("before-quit", async () => {
+  const installPath = getInstallOnExitPath();
+  if (installPath) {
+    log.info("Running scheduled update install before quit");
+    try {
+      await launchInstaller(installPath);
+    } catch (err) {
+      log.warn("Scheduled install failed", { error: String(err) });
+    }
   }
 });

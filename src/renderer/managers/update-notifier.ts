@@ -1,12 +1,11 @@
 (function (): void {
   const log = window.emberLog.createLogger("UpdateNotifier");
 
-  /** Version that was dismissed by the user — skip showing it again. */
+  /** Version that was dismissed by the user — skip showing it again this session. */
   let dismissedVersion: string | null = null;
 
   const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
   const NOTIFICATION_ID = "ember-update-notification";
-  const DOWNLOAD_URL = "https://ember-chat.com";
 
   function createNotificationElement(latestVersion: string): HTMLElement {
     const container = document.createElement("button");
@@ -14,10 +13,10 @@
     container.className = "update-notification";
     container.setAttribute(
       "aria-label",
-      `Update available: v${latestVersion}. Click to download.`
+      `Update available: v${latestVersion}. Click to view details.`
     );
     container.addEventListener("click", () => {
-      window.electronAPI.ipc.invoke("open-external-url", DOWNLOAD_URL);
+      openUpdateDetails();
     });
 
     const icon = document.createElement("span");
@@ -82,20 +81,42 @@
     }
   }
 
+  /** Cached details from the last successful check — used when user clicks the notification. */
+  let cachedDetails: UpdateDetails | null = null;
+
+  function openUpdateDetails(): void {
+    if (cachedDetails && typeof window.openUpdateModal === "function") {
+      window.openUpdateModal(cachedDetails);
+    }
+  }
+
   async function checkForUpdate(): Promise<void> {
     try {
-      const info = (await window.electronAPI.ipc.invoke(
-        "check-for-update"
-      )) as UpdateInfo;
-      if (info.updateAvailable && info.latestVersion) {
-        if (info.latestVersion === dismissedVersion) {
-          log.debug("Skipping notification for dismissed version", {
-            version: dismissedVersion,
+      // Fetch the skipped version once to compare
+      const skippedVersion = (await window.electronAPI.ipc.invoke(
+        "get-skipped-version"
+      )) as string | null;
+
+      const details = (await window.electronAPI.ipc.invoke(
+        "check-for-update-details"
+      )) as UpdateDetails;
+
+      if (details.updateAvailable && details.latestVersion) {
+        // Respect both session-dismissed and permanently-skipped versions
+        if (
+          details.latestVersion === dismissedVersion ||
+          details.latestVersion === skippedVersion
+        ) {
+          log.debug("Skipping notification for dismissed/skipped version", {
+            version: details.latestVersion,
           });
+          removeNotification();
           return;
         }
-        showNotification(info.latestVersion);
+        cachedDetails = details;
+        showNotification(details.latestVersion);
       } else {
+        cachedDetails = null;
         removeNotification();
       }
     } catch (err) {
