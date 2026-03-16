@@ -797,7 +797,7 @@
 
 .message-timestamp-tooltip {
   position: absolute;
-  background: var(--surface);
+  background: rgba(var(--rgb-surface), 0.95);
   border: 1px solid rgba(var(--rgb-highlight), 0.3);
   border-radius: 4px;
   padding: 6px 8px;
