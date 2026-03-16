@@ -98,14 +98,26 @@ const ALLOWED_INVOKE: readonly string[] = [
   "get-theme-settings",
   "save-theme-settings",
   "check-for-update",
+  "check-for-update-details",
   "open-external-url",
   "get-pending-invite",
   "get-klipy-api-key",
   "get-gif-favorites",
   "save-gif-favorites",
+  "download-update",
+  "cancel-download",
+  "install-update",
+  "schedule-install-on-exit",
+  "skip-version",
+  "get-skipped-version",
 ];
 
-const ALLOWED_ON: readonly string[] = ["handle-invite-link"];
+const ALLOWED_ON: readonly string[] = [
+  "handle-invite-link",
+  "update-download-progress",
+  "update-download-complete",
+  "update-download-error",
+];
 
 preloadLog("debug", "Setting up contextBridge API");
 

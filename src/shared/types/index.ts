@@ -52,6 +52,7 @@ export interface StoreSchema {
   voiceVideoSettings?: VoiceVideoSettings;
   themeSettings?: ThemeSettings;
   gifFavorites?: GifFavorite[];
+  skippedUpdateVersion?: string;
 }
 
 export interface AuthData {

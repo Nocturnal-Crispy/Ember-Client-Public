@@ -30,6 +30,7 @@
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/notification-settings.js",
     "../../dist/renderer/managers/update-notifier.js",
+    "../../dist/renderer/components/update-modal.js",
     "../../dist/renderer/managers/version-display.js",
     "../../dist/renderer/managers/direct-messaging-manager.js",
     "../../dist/renderer/managers/direct-messaging-ui.js",
@@ -103,6 +104,7 @@
         modalExternalLink,
         modalCustomStatus,
         modalUserDetails,
+        modalUpdate,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -132,6 +134,7 @@
         fetchFragment("modal-external-link.html"),
         fetchFragment("modal-custom-status.html"),
         fetchFragment("modal-user-details.html"),
+        fetchFragment("modal-update.html"),
       ]);
 
       // Title bar (top-level)
@@ -172,6 +175,7 @@
       document.body.appendChild(parseFragment(modalExternalLink));
       document.body.appendChild(parseFragment(modalCustomStatus));
       document.body.appendChild(parseFragment(modalUserDetails));
+      document.body.appendChild(parseFragment(modalUpdate));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

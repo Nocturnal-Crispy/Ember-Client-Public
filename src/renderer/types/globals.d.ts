@@ -118,6 +118,24 @@ declare global {
     error?: string;
   }
 
+  interface UpdateDetails {
+    updateAvailable: boolean;
+    currentVersion: string;
+    latestVersion: string | null;
+    releaseNotes: string | null;
+    publishedAt: string | null;
+    downloadUrl: string | null;
+    downloadSize: number | null;
+    assetName: string | null;
+    error?: string;
+  }
+
+  interface DownloadProgress {
+    bytesDownloaded: number;
+    totalBytes: number;
+    percentage: number;
+  }
+
   // ─── Electron bridge APIs ─────────────────────────────────────────────────
 
   interface EmberLogger {
@@ -525,6 +543,9 @@ declare global {
     // Globals set by update-notifier.ts
     checkForUpdate(): Promise<void>;
     dismissUpdateNotification(): void;
+    // Globals set by update-modal.ts
+    openUpdateModal(details: UpdateDetails): void;
+    closeUpdateModal(): void;
     // Globals set by renderer.ts
     fetchMembers(emberId: string): Promise<Member[]>;
     renderMemberList(members: Member[]): void;

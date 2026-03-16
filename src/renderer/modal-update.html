@@ -1,0 +1,34 @@
+<!-- Update Available Modal -->
+<div id="update-modal" class="modal-overlay hidden update-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="update-modal-version">
+  <div class="update-modal-container">
+    <button class="update-modal-close" id="update-modal-close" aria-label="Close update notification">&#x2715;</button>
+
+    <div class="update-modal-header">
+      <div class="update-modal-icon" aria-hidden="true">&#x2191;</div>
+      <div>
+        <div class="update-modal-title">Update Available</div>
+        <div class="update-modal-version" id="update-modal-version"></div>
+      </div>
+    </div>
+
+    <div class="update-modal-meta" id="update-modal-meta"></div>
+
+    <div class="update-modal-notes-label">Release Notes</div>
+    <div class="update-modal-notes" id="update-modal-notes"></div>
+
+    <div class="update-modal-progress hidden" id="update-modal-progress">
+      <div class="update-modal-progress-track">
+        <div class="update-modal-progress-fill" id="update-modal-progress-fill"></div>
+      </div>
+      <div class="update-modal-progress-text" id="update-modal-progress-text">0%</div>
+    </div>
+
+    <div class="update-modal-status hidden" id="update-modal-status"></div>
+
+    <div class="update-modal-actions" id="update-modal-actions">
+      <button class="update-modal-btn update-modal-btn--primary" id="update-modal-download-btn">Download &amp; Install</button>
+      <button class="update-modal-btn update-modal-btn--secondary" id="update-modal-exit-btn">Install on Exit</button>
+      <button class="update-modal-btn update-modal-btn--ghost" id="update-modal-skip-btn">Skip This Version</button>
+    </div>
+  </div>
+</div>
