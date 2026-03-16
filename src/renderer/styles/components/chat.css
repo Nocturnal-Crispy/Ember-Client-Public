@@ -793,6 +793,43 @@
   margin: 2px 0;
 }
 
+/* ─── Message Timestamp Tooltip ───────────────────────────────────────────── */
+
+.message-timestamp-tooltip {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+  z-index: 1000;
+  min-width: 120px;
+  text-align: center;
+}
+
+.message-timestamp-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tooltip-relative-time {
+  font-weight: bold;
+  color: var(--highlight);
+  margin-bottom: 2px;
+}
+
+.tooltip-absolute-time {
+  font-size: 10px;
+  color: rgba(var(--rgb-text), 0.7);
+}
+
 /* ─── External link modal ──────────────────────────────────────────────────── */
 
 .external-link-modal-container {

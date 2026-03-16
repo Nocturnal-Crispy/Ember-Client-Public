@@ -473,6 +473,7 @@ declare global {
     createBasicMessageElement(author: string, text: string, timestamp?: number, messageId?: string, chatColor?: string, isOwn?: boolean, attachment?: AttachmentData, gif?: { url: string; title?: string }, channelId?: string, getEmberKey?: (channelId: string) => Promise<Uint8Array | null>): HTMLElement;
     createActionToolbar(messageId?: string, isOwn?: boolean): HTMLDivElement;
     formatTimestamp(timestamp?: number): string;
+    formatRelativeTimestamp(timestamp?: number): string;
     toChumhandle(username: string): string;
     // Globals set by message-service.ts
     enterEditMode(messageDiv: HTMLElement, messageId: string): void;
