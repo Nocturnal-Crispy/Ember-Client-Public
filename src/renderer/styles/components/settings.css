@@ -453,10 +453,6 @@
   cursor: pointer;
 }
 
-.settings-range::-webkit-slider-thumb:hover {
-  /* no scale transform — terminal style */
-}
-
 .settings-range::-moz-range-thumb {
   width: 16px;
   height: 16px;
@@ -936,4 +932,30 @@
   width: 20px;
   height: 20px;
   filter: brightness(0) invert(1);
+}
+
+/* ─── App Lock Conditional Visibility ───────────────────────────────────── */
+.app-lock-dependent {
+  transition: all 0.15s ease;
+}
+
+.app-lock-dependent.hidden {
+  display: none;
+}
+
+/* ─── App Lock PIN Warning ───────────────────────────────────────────────── */
+.app-lock-pin-warning {
+  color: #ed4245;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 4px 0;
+  padding: 6px 8px;
+  background-color: rgba(237, 66, 69, 0.1);
+  border: 1px solid rgba(237, 66, 69, 0.3);
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.app-lock-pin-warning.hidden {
+  display: none;
 }

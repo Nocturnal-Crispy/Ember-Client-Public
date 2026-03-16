@@ -65,9 +65,25 @@
     if (lockoutEl) lockoutEl.classList.add("hidden");
   }
 
-  function lockApp(): void {
+  async function lockApp(): Promise<void> {
     if (!currentSettings.enabled) return;
     if (locked) return;
+
+    // Check if PIN is set before allowing lock
+    try {
+      const hasPin = (await window.electronAPI.ipc.invoke("has-pin")) as boolean;
+      if (!hasPin) {
+        // Show bold red alert for missing PIN
+        alert("🚨 SECURITY ALERT: No PIN set!\n\nApp Lock cannot be enabled without setting a PIN first.\n\nPlease set a PIN in Settings > Plugins > App Lock before enabling this feature.");
+        log.warn("App lock blocked - no PIN set");
+        return;
+      }
+    } catch (err) {
+      log.error("Failed to check PIN status", { error: String(err) });
+      // Don't proceed if we can't verify PIN status
+      return;
+    }
+
     locked = true;
     failedAttempts = 0;
     lockedOutUntil = null;
@@ -155,11 +171,11 @@
     if (!currentSettings.enabled) return;
 
     const timeoutMs = currentSettings.idleTimeoutMinutes * 60_000;
-    idleIntervalId = setInterval(() => {
+    idleIntervalId = setInterval(async () => {
       if (locked) return;
       if (Date.now() - lastActivityTime >= timeoutMs) {
         log.info("Idle timeout reached — locking application");
-        lockApp();
+        await lockApp();
       }
     }, IDLE_CHECK_INTERVAL_MS);
   }
@@ -176,8 +192,8 @@
   function handleBlur(): void {
     if (!currentSettings.enabled || !currentSettings.lockOnFocusLoss) return;
     if (locked) return;
-    focusLossTimerId = setTimeout(() => {
-      lockApp();
+    focusLossTimerId = setTimeout(async () => {
+      await lockApp();
     }, currentSettings.focusLossDelaySeconds * 1_000);
   }
 

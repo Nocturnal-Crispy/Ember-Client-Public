@@ -81,10 +81,24 @@
     const appLockSavePinBtn = document.getElementById("plugin-app-lock-save-pin-btn") as HTMLButtonElement | null;
     const appLockPinError = document.getElementById("plugin-app-lock-pin-error") as HTMLElement | null;
     const appLockHasPinText = document.getElementById("plugin-app-lock-has-pin-text") as HTMLElement | null;
+    const appLockPinWarning = document.getElementById("plugin-app-lock-pin-warning") as HTMLElement | null;
+
+    function updateAppLockDependentVisibility(): void {
+      const isEnabled = appLockEnableToggle?.checked ?? false;
+      const dependentElements = document.querySelectorAll(".app-lock-dependent");
+      
+      dependentElements.forEach((element) => {
+        if (isEnabled) {
+          element.classList.remove("hidden");
+        } else {
+          element.classList.add("hidden");
+        }
+      });
+    }
 
     if (appLockEnableToggle) {
       appLockEnableToggle.checked = settings.appLock.enabled;
-      appLockEnableToggle.addEventListener("change", () => {
+      appLockEnableToggle.addEventListener("change", async () => {
         settings = {
           ...settings,
           appLock: { ...settings.appLock, enabled: appLockEnableToggle.checked },
@@ -93,6 +107,7 @@
         if (typeof window.updateAppLockSettings === "function") {
           window.updateAppLockSettings({ enabled: settings.appLock.enabled });
         }
+        updateAppLockDependentVisibility();
         log.info("App lock enabled setting changed", { enabled: String(settings.appLock.enabled) });
       });
     }
@@ -184,6 +199,7 @@
           await window.electronAPI.ipc.invoke("set-pin", pin);
           if (appLockPinSetup) appLockPinSetup.classList.add("hidden");
           if (appLockHasPinText) appLockHasPinText.textContent = "PIN is set.";
+          if (appLockPinWarning) appLockPinWarning.classList.add("hidden");
           log.info("App lock PIN saved");
         } catch (err) {
           if (appLockPinError) {
@@ -200,6 +216,7 @@
         try {
           await window.electronAPI.ipc.invoke("clear-pin");
           if (appLockHasPinText) appLockHasPinText.textContent = "No PIN set.";
+          if (appLockPinWarning) appLockPinWarning.classList.remove("hidden");
           log.info("App lock PIN cleared");
         } catch (err) {
           log.error("Failed to clear PIN", { error: String(err) });
@@ -214,10 +231,20 @@
         if (appLockHasPinText) {
           appLockHasPinText.textContent = hasPin ? "PIN is set." : "No PIN set.";
         }
+        if (appLockPinWarning) {
+          if (hasPin) {
+            appLockPinWarning.classList.add("hidden");
+          } else {
+            appLockPinWarning.classList.remove("hidden");
+          }
+        }
       } catch {
         // non-fatal
       }
     })();
+
+    // Initialize visibility state
+    updateAppLockDependentVisibility();
   }
 
   window.initPluginSettings = initPluginSettings;
