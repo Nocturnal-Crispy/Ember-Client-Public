@@ -126,7 +126,7 @@
   border: 1px solid rgba(var(--rgb-highlight), 0.25);
   color: rgba(var(--rgb-highlight), 0.6);
   font-family: 'Courier New', Courier, monospace;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: bold;
   cursor: pointer;
   padding: 5px 4px;
