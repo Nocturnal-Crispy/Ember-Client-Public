@@ -784,13 +784,13 @@
       option.addEventListener("click", async () => {
         const displayStatus =
           (option as HTMLElement).getAttribute("data-status") ?? "Online";
-        const statusMap: Record<string, string> = {
+        const statusMap: Record<string, UserStatus> = {
           Online: "online",
           Idle: "idle",
           "Do Not Disturb": "dnd",
           Invisible: "invisible",
         };
-        const apiStatus = statusMap[displayStatus] ?? "online";
+        const apiStatus: UserStatus = statusMap[displayStatus] ?? "online";
         userMenu?.classList.add("hidden");
         statusSubmenu.classList.add("hidden");
         await updateUserStatus(apiStatus, displayStatus);
@@ -810,7 +810,7 @@
   let currentStatusEmoji = "";
 
   async function updateUserStatus(
-    apiStatus: string,
+    apiStatus: UserStatus,
     displayStatus: string,
     customStatus?: string,
     statusEmoji?: string
@@ -944,9 +944,11 @@
 
     saveBtn?.addEventListener("click", async () => {
       const presenceSelect = document.getElementById("custom-status-presence") as HTMLSelectElement | null;
-      const apiStatus = presenceSelect?.value ?? "online";
-      const displayMap: Record<string, string> = {
-        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible",
+      const validStatuses: UserStatus[] = ["online", "idle", "dnd", "invisible"];
+      const rawStatus = presenceSelect?.value ?? "online";
+      const apiStatus: UserStatus = (validStatuses.includes(rawStatus as UserStatus) ? rawStatus : "online") as UserStatus;
+      const displayMap: Record<UserStatus, string> = {
+        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible", offline: "Offline",
       };
       const customStatus = (textInput?.value ?? "").trim();
       const statusEmoji = (emojiInput?.value ?? "").trim();
@@ -957,9 +959,11 @@
 
     clearBtn?.addEventListener("click", async () => {
       const presenceSelect = document.getElementById("custom-status-presence") as HTMLSelectElement | null;
-      const apiStatus = presenceSelect?.value ?? "online";
-      const displayMap: Record<string, string> = {
-        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible",
+      const validStatuses: UserStatus[] = ["online", "idle", "dnd", "invisible"];
+      const rawStatus = presenceSelect?.value ?? "online";
+      const apiStatus: UserStatus = (validStatuses.includes(rawStatus as UserStatus) ? rawStatus : "online") as UserStatus;
+      const displayMap: Record<UserStatus, string> = {
+        online: "Online", idle: "Away", dnd: "Do Not Disturb", invisible: "Invisible", offline: "Offline",
       };
       closeCustomStatusModal();
       await updateUserStatus(apiStatus, displayMap[apiStatus] ?? "Online", "", "");
@@ -999,22 +1003,17 @@
       offline: "status-offline",
     };
     statusEl.classList.add(classMap[status] ?? "status-online");
-    const iconMap: Record<string, string> = {
-      online: "assets/icons/ember_connected.png",
-      idle: "assets/icons/ember_idle.gif",
-      dnd: "assets/icons/ember_error.png",
-      invisible: "assets/icons/ember_disconnected.png",
-      offline: "assets/icons/ember_disconnected.png",
-    };
-    const iconSrc = iconMap[status] ?? "assets/icons/ember_connected.png";
-    const userStatusIcon = document.getElementById(
-      "user-status-icon"
-    ) as HTMLImageElement | null;
-    if (userStatusIcon) userStatusIcon.src = iconSrc;
-    const menuStatusIcon = document.getElementById(
-      "menu-status-icon"
-    ) as HTMLImageElement | null;
-    if (menuStatusIcon) menuStatusIcon.src = iconSrc;
+    const bubbleClass = classMap[status] ?? "status-online";
+    const userStatusBubble = document.getElementById("user-status-bubble");
+    if (userStatusBubble) {
+      userStatusBubble.classList.remove("status-online", "status-idle", "status-dnd", "status-offline");
+      userStatusBubble.classList.add(bubbleClass);
+    }
+    const menuStatusBubble = document.getElementById("menu-status-bubble");
+    if (menuStatusBubble) {
+      menuStatusBubble.classList.remove("status-online", "status-idle", "status-dnd", "status-offline");
+      menuStatusBubble.classList.add(bubbleClass);
+    }
   }
 
   menuEditProfile?.addEventListener("click", () => {
@@ -1109,12 +1108,6 @@
           : (member.status ?? "offline");
       (groups[key] ?? groups["offline"]).members.push(member);
     });
-    const statusIconMap: Record<string, string> = {
-      online: "assets/icons/ember_connected.png",
-      idle: "assets/icons/ember_idle.gif",
-      dnd: "assets/icons/ember_error.png",
-      offline: "assets/icons/ember_disconnected.png",
-    };
     (["online", "idle", "dnd", "offline"] as const).forEach((key) => {
       const group = groups[key];
       if (group.members.length === 0) return;
@@ -1128,7 +1121,6 @@
         memberEl.dataset["userId"] = member.user_id;
         if (key === "offline") memberEl.classList.add("offline");
         const statusClass = key === "dnd" ? "dnd" : key;
-        const iconSrc = statusIconMap[key] ?? "assets/icons/ember_disconnected.png";
 
         const avatarEl = document.createElement("div");
         avatarEl.className = `member-avatar ${statusClass}`;
@@ -1141,10 +1133,8 @@
         } else {
           avatarEl.textContent = (member.username ?? "?").charAt(0).toUpperCase();
         }
-        const statusIcon = document.createElement("img");
-        statusIcon.className = "status-icon";
-        statusIcon.src = iconSrc;
-        statusIcon.alt = key;
+        const statusIcon = document.createElement("span");
+        statusIcon.className = `status-icon status-${key === "offline" ? "offline" : key}`;
         avatarEl.appendChild(statusIcon);
 
         const nameWrapEl = document.createElement("div");
