@@ -533,7 +533,19 @@ declare global {
     showWelcomeScreen(): void;
     // Globals set by direct-messaging-manager.ts
     initializeDirectMessaging(): Promise<void>;
-    startDmConversation(participantId: string, participantUsername: string): Promise<string>;
+    startDmConversation(participantId: string, participantUsername: string): Promise<string | null>;
+    fetchDMRequests(): Promise<Array<{
+      id: string;
+      requesterId: string;
+      requesterUsername: string;
+      requesterAvatar: string;
+      createdAt: number;
+    }>>;
+    acceptDMRequest(requestId: string, requesterId: string, requesterUsername: string): Promise<string>;
+    declineDMRequest(requestId: string): Promise<void>;
+    /** Called when user sends a DM request; channel is now open but pending. */
+    onDmRequestSent?(payload: { requestId: string; participantId: string; participantUsername: string }): void;
+    getPendingStatusForChannel(channelId: string): { requestId: string; isRecipient: boolean } | null;
     sendDirectMessage(conversationId: string, plaintext: string): Promise<string>;
     setActiveDmConversation(conversationId: string): void;
     sendTypingIndicator(conversationId: string, isTyping: boolean): Promise<void>;
@@ -571,6 +583,15 @@ declare global {
     // Globals set by direct-messaging-ui.ts
     refreshDmUsername(username: string): void;
     initializeDirectMessagingUI(): void;
+    loadAndShowDmRequests(): Promise<void>;
+    showDmPendingBanner(payload: {
+      channelId: string;
+      partnerUsername: string;
+      requestId: string;
+      isRecipient: boolean;
+      requesterId: string;
+    }): void;
+    hideDmPendingBanner(channelId: string): void;
     addDmConversationToList(conversation: {
       id: string;
       participantId: string;

@@ -509,7 +509,11 @@
       // Note: the manager calls window.addDmConversationToList internally, so no need to add here
       if (typeof window.startDmConversation === 'function') {
         const conversationId = await window.startDmConversation(userId, username);
-        setActiveConversation(conversationId);
+        if (conversationId) {
+          setActiveConversation(conversationId);
+        }
+        // conversationId is null when a new DM request was sent — the DM will
+        // appear once the recipient accepts. onDmRequestSent notifies the UI.
       } else {
         log.error("Direct Messaging manager not available");
       }
@@ -770,7 +774,14 @@
     
     // Fetch and display messages for this conversation
     loadConversationMessages(conversationId);
-    
+
+    // Render pending banner if this channel is in a pending state
+    removePendingBanner();
+    const bannerPayload = pendingBannerPayloads.get(conversationId);
+    if (bannerPayload) {
+      renderPendingBanner(bannerPayload);
+    }
+
     // Notify Direct Messaging manager
     if (typeof window.setActiveDmConversation === 'function') {
       window.setActiveDmConversation(conversationId);
@@ -1897,8 +1908,233 @@
     }
   }
   
+  // ─── Pending DM Banner ──────────────────────────────────────────────────────
+
+  const PENDING_BANNER_ID = 'dm-pending-banner';
+
+  /**
+   * Shows a sticky banner at the top of the DM chat area.
+   * - Requester sees: "Waiting for [username] to accept your DM request"
+   * - Recipient sees: "[username] wants to DM you — Accept / Decline"
+   */
+  function showDmPendingBanner(payload: {
+    channelId: string;
+    partnerUsername: string;
+    requestId: string;
+    isRecipient: boolean;
+    requesterId: string;
+  }): void {
+    if (!dmChatContainer) return;
+
+    // Only show the banner when this channel is the active conversation
+    if (activeConversationId !== payload.channelId) {
+      // Store for later rendering when channel is activated
+      pendingBannerPayloads.set(payload.channelId, payload);
+      return;
+    }
+    renderPendingBanner(payload);
+  }
+
+  // Store pending banner payloads keyed by channelId
+  const pendingBannerPayloads = new Map<string, Parameters<typeof showDmPendingBanner>[0]>();
+
+  function renderPendingBanner(payload: Parameters<typeof showDmPendingBanner>[0]): void {
+    if (!dmChatContainer) return;
+    removePendingBanner();
+
+    const banner = document.createElement('div');
+    banner.id = PENDING_BANNER_ID;
+    banner.className = 'dm-pending-banner';
+
+    if (payload.isRecipient) {
+      const text = document.createElement('span');
+      text.className = 'dm-pending-banner-text';
+      text.textContent = `${payload.partnerUsername} wants to DM you`;
+      banner.appendChild(text);
+
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'dm-pending-accept-btn';
+      acceptBtn.textContent = 'Accept';
+      acceptBtn.addEventListener('click', async () => {
+        acceptBtn.disabled = true;
+        declineBtn.disabled = true;
+        try {
+          await window.acceptDMRequest?.(payload.requestId, payload.requesterId, payload.partnerUsername);
+          removePendingBanner();
+          pendingBannerPayloads.delete(payload.channelId);
+        } catch (err) {
+          log.error("Failed to accept DM request", { error: (err as Error).message });
+          acceptBtn.disabled = false;
+          declineBtn.disabled = false;
+        }
+      });
+
+      const declineBtn = document.createElement('button');
+      declineBtn.className = 'dm-pending-decline-btn';
+      declineBtn.textContent = 'Decline';
+      declineBtn.addEventListener('click', async () => {
+        acceptBtn.disabled = true;
+        declineBtn.disabled = true;
+        try {
+          await window.declineDMRequest?.(payload.requestId);
+          removePendingBanner();
+          pendingBannerPayloads.delete(payload.channelId);
+        } catch (err) {
+          log.error("Failed to decline DM request", { error: (err as Error).message });
+          acceptBtn.disabled = false;
+          declineBtn.disabled = false;
+        }
+      });
+
+      banner.appendChild(acceptBtn);
+      banner.appendChild(declineBtn);
+    } else {
+      const text = document.createElement('span');
+      text.className = 'dm-pending-banner-text';
+      text.textContent = `${payload.partnerUsername} hasn't accepted your DM request yet`;
+      banner.appendChild(text);
+    }
+
+    // Insert at the top of the chat messages area
+    const messagesArea = dmChatContainer.querySelector('.dm-messages-area, .messages-area, .chat-messages');
+    if (messagesArea) {
+      messagesArea.insertBefore(banner, messagesArea.firstChild);
+    } else {
+      dmChatContainer.insertBefore(banner, dmChatContainer.firstChild);
+    }
+  }
+
+  function removePendingBanner(): void {
+    dmChatContainer?.querySelector(`#${PENDING_BANNER_ID}`)?.remove();
+  }
+
+  /**
+   * Hides the pending banner for a channel (called after acceptance).
+   */
+  function hideDmPendingBanner(channelId: string): void {
+    pendingBannerPayloads.delete(channelId);
+    if (activeConversationId === channelId) {
+      removePendingBanner();
+    }
+  }
+
+  // ─── DM Request UI ──────────────────────────────────────────────────────────
+
+  /**
+   * Shows or hides the pending-requests badge on the DM requests button.
+   * A count of 0 removes the badge entirely.
+   */
+  function showDmRequestsBadge(count: number): void {
+    const btn = dmSidebarElement?.querySelector<HTMLElement>('.dm-requests-btn');
+    if (!btn) return;
+    let badge = btn.querySelector<HTMLElement>('.dm-requests-badge');
+    if (count <= 0) {
+      badge?.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'dm-requests-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+  }
+
+  /**
+   * Renders pending DM requests in a panel inside the sidebar.
+   * Fetches from the manager and builds accept/decline controls.
+   */
+  async function loadAndShowDmRequests(): Promise<void> {
+    if (!dmSidebarElement) return;
+    const requests = await window.fetchDMRequests?.() ?? [];
+
+    showDmRequestsBadge(requests.length);
+
+    let panel = dmSidebarElement.querySelector<HTMLElement>('.dm-requests-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'dm-requests-panel';
+      dmSidebarElement.prepend(panel);
+    }
+
+    if (requests.length === 0) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+    panel.replaceChildren(); // clear old content
+
+    const title = document.createElement('div');
+    title.className = 'dm-requests-title';
+    title.textContent = `DM Requests (${requests.length})`;
+    panel.appendChild(title);
+
+    for (const req of requests) {
+      const item = document.createElement('div');
+      item.className = 'dm-request-item';
+
+      const name = document.createElement('span');
+      name.className = 'dm-request-username';
+      name.textContent = req.requesterUsername;
+      item.appendChild(name);
+
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'dm-request-accept-btn';
+      acceptBtn.textContent = 'Accept';
+      acceptBtn.addEventListener('click', async () => {
+        try {
+          acceptBtn.disabled = true;
+          await window.acceptDMRequest?.(req.id, req.requesterId, req.requesterUsername);
+          item.remove();
+          await loadAndShowDmRequests();
+        } catch (err) {
+          log.error("Failed to accept DM request", { id: req.id, error: (err as Error).message });
+          acceptBtn.disabled = false;
+        }
+      });
+
+      const declineBtn = document.createElement('button');
+      declineBtn.className = 'dm-request-decline-btn';
+      declineBtn.textContent = 'Decline';
+      declineBtn.addEventListener('click', async () => {
+        try {
+          declineBtn.disabled = true;
+          await window.declineDMRequest?.(req.id);
+          item.remove();
+          await loadAndShowDmRequests();
+        } catch (err) {
+          log.error("Failed to decline DM request", { id: req.id, error: (err as Error).message });
+          declineBtn.disabled = false;
+        }
+      });
+
+      item.appendChild(acceptBtn);
+      item.appendChild(declineBtn);
+      panel.appendChild(item);
+    }
+  }
+
+  /**
+   * Called by the manager when the current user sends a DM request.
+   * Shows a brief status message in the UI.
+   */
+  function handleDmRequestSent(payload: {
+    requestId: string;
+    participantId: string;
+    participantUsername: string;
+  }): void {
+    log.info("DM request sent", { to: payload.participantUsername });
+    if (typeof window.announceToScreenReader === 'function') {
+      window.announceToScreenReader(`DM request sent to ${payload.participantUsername}`);
+    }
+  }
+
   // Expose functions to global scope
   window.addDmConversationToList = addConversationToList;
   window.initializeDirectMessagingUI = initializeDirectMessagingUI;
   window.openDmWithUser = startDmConversation;
+  window.loadAndShowDmRequests = loadAndShowDmRequests;
+  window.onDmRequestSent = handleDmRequestSent;
+  window.showDmPendingBanner = showDmPendingBanner;
+  window.hideDmPendingBanner = hideDmPendingBanner;
 })();
