@@ -61,11 +61,14 @@
     const { id } = await window.electronAPI.messageService.uploadAttachment(
       auth, channelId, encryptedBase64, { name, size, mime: type }
     );
-    const payload: { t: string; body: string; a: AttachmentData } = {
+    const payload: { t: string; body: string; spoiler?: boolean; a: AttachmentData } = {
       t: "file",
       body: text,
       a: { id, name, size, mime: type },
     };
+    if (attachment.spoiler) {
+      payload.spoiler = true;
+    }
     return JSON.stringify(payload);
   }
 
@@ -108,7 +111,7 @@
       let messageText = plaintext;
       if (hasPendingAttachment) {
         messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey);
-        // clearPendingAttachment not available in message-service
+        window.clearPendingAttachment();
       }
       const msgData = await window.electronAPI.messageService.sendMessage(
         auth,
@@ -371,7 +374,10 @@
     }
     if (plaintext.startsWith('{"t":"file"')) {
       try {
-        const parsed = JSON.parse(plaintext) as { t: string; body: string; a: AttachmentData };
+        const parsed = JSON.parse(plaintext) as { t: string; body: string; spoiler?: boolean; a: AttachmentData };
+        const attachment: AttachmentData = parsed.spoiler
+          ? { ...parsed.a, spoiler: true }
+          : parsed.a;
         addMessage(
           msg.username ?? "Unknown",
           parsed.body,
@@ -379,7 +385,7 @@
           prepend,
           msg.id,
           msg.chat_color,
-          parsed.a
+          attachment
         );
         return;
       } catch (_) {
@@ -730,7 +736,7 @@
     App.ownedMessageIds.clear();
 
     // Clear any pending attachment when switching channels
-    // clearPendingAttachment not available in message-service
+    window.clearPendingAttachment();
 
     // Invalidate stale cache so fresh messages are always fetched from the server
     messageCache.delete(channelId);

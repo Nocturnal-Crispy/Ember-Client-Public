@@ -93,3 +93,45 @@
 .input-action-btn:hover {
   color: var(--highlight);
 }
+
+/* ─── Floating format toolbar ─────────────────────────────────────────────── */
+
+.format-toolbar {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(var(--rgb-surface), 0.97);
+  border: 1px solid rgba(var(--rgb-highlight), 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+}
+
+.format-toolbar--hidden {
+  display: none;
+}
+
+.format-toolbar-btn {
+  background: none;
+  border: none;
+  color: rgba(var(--rgb-highlight), 0.65);
+  cursor: pointer;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 3px 7px;
+  line-height: 1;
+  transition: background 0.1s ease, color 0.1s ease;
+  white-space: nowrap;
+}
+
+.format-toolbar-btn:hover {
+  background: rgba(var(--rgb-highlight), 0.12);
+  color: rgba(var(--rgb-highlight), 1);
+}
+
+.format-toolbar-btn:not(:last-child) {
+  border-right: 1px solid rgba(var(--rgb-highlight), 0.15);
+}

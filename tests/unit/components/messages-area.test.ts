@@ -415,8 +415,8 @@ describe("createBasicMessageElement — chumhandle span", () => {
     const el = window.createBasicMessageElement("Alice", "hello", undefined, "msg-ch");
     const ch = el.querySelector(".message-chumhandle") as HTMLElement;
     expect(ch).not.toBeNull();
-    // toChumhandle('Alice') → 'AL'
-    expect(ch.textContent).toBe("[AL]: ");
+    // toChumhandle('Alice') → 'ALIC' (4-letter expansion)
+    expect(ch.textContent).toBe("[ALIC]: ");
   });
 
   it("always calls makeUsernameClickable with empty userId to avoid race condition", () => {
@@ -441,5 +441,197 @@ describe("createBasicMessageElement — chumhandle span", () => {
     window.createBasicMessageElement("Unknown", "hello", undefined, "msg-unknown");
 
     expect(mockMakeClickable).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createBasicMessageElement — spoiler text (||...||)", () => {
+  beforeEach(() => {
+    localStorage.removeItem("ember:spoiler-revealed");
+  });
+
+  function createElement(text: string): HTMLElement {
+    return window.createBasicMessageElement("Alice", text, undefined, "msg-spoiler");
+  }
+
+  function getTextEl(el: HTMLElement): HTMLElement {
+    return el.querySelector(".message-text") as HTMLElement;
+  }
+
+  it("renders ||spoiler|| as a .spoiler-text span", () => {
+    const el = createElement("||hidden||");
+    const textEl = getTextEl(el);
+    const span = textEl.querySelector(".spoiler-text") as HTMLElement;
+    expect(span).not.toBeNull();
+  });
+
+  it("spoiler text content is rendered inside the span", () => {
+    const el = createElement("||secret||");
+    const span = getTextEl(el).querySelector(".spoiler-text") as HTMLElement;
+    expect(span.textContent).toBe("secret");
+  });
+
+  it("spoiler span starts unrevealed (data-revealed=false)", () => {
+    const el = createElement("||hidden||");
+    const span = getTextEl(el).querySelector(".spoiler-text") as HTMLElement;
+    expect(span.dataset["revealed"]).toBe("false");
+    expect(span.classList.contains("spoiler-text--revealed")).toBe(false);
+  });
+
+  it("clicking spoiler span reveals content", () => {
+    const el = createElement("||secret text||");
+    const span = getTextEl(el).querySelector(".spoiler-text") as HTMLElement;
+    span.click();
+    expect(span.classList.contains("spoiler-text--revealed")).toBe(true);
+  });
+
+  it("renders text before and after spoiler correctly", () => {
+    const el = createElement("before ||hidden|| after");
+    const textEl = getTextEl(el);
+    expect(textEl.textContent).toContain("before ");
+    expect(textEl.textContent).toContain(" after");
+    expect(textEl.querySelector(".spoiler-text")).not.toBeNull();
+  });
+
+  it("renders multiple spoilers in one message", () => {
+    const el = createElement("||one|| and ||two||");
+    const textEl = getTextEl(el);
+    const spoilers = textEl.querySelectorAll(".spoiler-text");
+    expect(spoilers.length).toBe(2);
+  });
+
+  it("spoiler span has aria-label for accessibility", () => {
+    const el = createElement("||secret||");
+    const span = getTextEl(el).querySelector(".spoiler-text") as HTMLElement;
+    expect(span.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("unmatched || is rendered as literal text", () => {
+    const el = createElement("price is ||5");
+    const textEl = getTextEl(el);
+    expect(textEl.querySelector(".spoiler-text")).toBeNull();
+    expect(textEl.textContent).toContain("||5");
+  });
+});
+
+describe("createBasicMessageElement — spoiler image attachment", () => {
+  function createSpoilerAttachmentEl(): HTMLElement {
+    const spoilerAttachment: AttachmentData = {
+      id: "att-1",
+      name: "secret.jpg",
+      size: 1024,
+      mime: "image/jpeg",
+      spoiler: true,
+    };
+    const getEmberKey = jest.fn().mockResolvedValue(null);
+    return window.createBasicMessageElement(
+      "Alice",
+      "",
+      undefined,
+      "msg-spoiler-img",
+      undefined,
+      false,
+      spoilerAttachment,
+      undefined,
+      "channel-1",
+      getEmberKey
+    );
+  }
+
+  it("renders a .spoiler-image-overlay when attachment.spoiler is true", () => {
+    const el = createSpoilerAttachmentEl();
+    expect(el.querySelector(".spoiler-image-overlay")).not.toBeNull();
+  });
+
+  it("spoiler overlay is visible before clicking (no --revealed class)", () => {
+    const el = createSpoilerAttachmentEl();
+    const overlay = el.querySelector(".spoiler-image-overlay") as HTMLElement;
+    expect(overlay).not.toBeNull();
+    expect(overlay.classList.contains("spoiler-image-overlay--revealed")).toBe(false);
+  });
+
+  it("clicking spoiler overlay adds --revealed class and removes spoiler-image-overlay", () => {
+    const el = createSpoilerAttachmentEl();
+    const overlay = el.querySelector(".spoiler-image-overlay") as HTMLElement;
+    overlay.click();
+    // The wrapper transitions: spoiler-image-overlay removed, --revealed added
+    expect(overlay.classList.contains("spoiler-image-overlay")).toBe(false);
+    expect(overlay.classList.contains("spoiler-image-overlay--revealed")).toBe(true);
+  });
+
+  it("non-spoiler image attachment does not have .spoiler-image-overlay", () => {
+    const normalAttachment: AttachmentData = {
+      id: "att-2",
+      name: "normal.jpg",
+      size: 1024,
+      mime: "image/jpeg",
+    };
+    const el = window.createBasicMessageElement(
+      "Alice",
+      "",
+      undefined,
+      "msg-normal-img",
+      undefined,
+      false,
+      normalAttachment,
+      undefined,
+      "channel-1",
+      jest.fn().mockResolvedValue(null)
+    );
+    expect(el.querySelector(".spoiler-image-overlay")).toBeNull();
+  });
+});
+
+describe("spoiler persistence — localStorage", () => {
+  const STORAGE_KEY = "ember:spoiler-revealed";
+
+  beforeEach(() => {
+    localStorage.removeItem(STORAGE_KEY);
+  });
+
+  it("clicking a text spoiler saves the message ID to localStorage", () => {
+    const el = window.createBasicMessageElement("Alice", "||secret||", undefined, "persist-msg-1");
+    const span = el.querySelector(".spoiler-text") as HTMLElement;
+    span.click();
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    expect(stored).toContain("persist-msg-1");
+  });
+
+  it("clicking an image spoiler saves the message ID to localStorage", () => {
+    const attachment: AttachmentData = { id: "a1", name: "img.jpg", size: 100, mime: "image/jpeg", spoiler: true };
+    const el = window.createBasicMessageElement(
+      "Alice", "", undefined, "persist-img-1", undefined, false,
+      attachment, undefined, "ch-1", jest.fn().mockResolvedValue(null)
+    );
+    const overlay = el.querySelector(".spoiler-image-overlay") as HTMLElement;
+    overlay.click();
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    expect(stored).toContain("persist-img-1");
+  });
+
+  it("text spoiler is auto-revealed when message ID is already in localStorage", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(["already-revealed"]));
+    const el = window.createBasicMessageElement("Alice", "||secret||", undefined, "already-revealed");
+    const span = el.querySelector(".spoiler-text") as HTMLElement;
+    expect(span.classList.contains("spoiler-text--revealed")).toBe(true);
+    expect(span.dataset["revealed"]).toBe("true");
+  });
+
+  it("image spoiler is auto-revealed when message ID is already in localStorage", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(["img-already-revealed"]));
+    const attachment: AttachmentData = { id: "a2", name: "img.jpg", size: 100, mime: "image/jpeg", spoiler: true };
+    const el = window.createBasicMessageElement(
+      "Alice", "", undefined, "img-already-revealed", undefined, false,
+      attachment, undefined, "ch-1", jest.fn().mockResolvedValue(null)
+    );
+    // After auto-reveal, the overlay should no longer have spoiler-image-overlay class
+    const wrapper = el.querySelector(".image-card-wrapper") as HTMLElement;
+    expect(wrapper.classList.contains("spoiler-image-overlay")).toBe(false);
+    expect(wrapper.classList.contains("spoiler-image-overlay--revealed")).toBe(true);
+  });
+
+  it("unrevealed message does not appear in localStorage", () => {
+    window.createBasicMessageElement("Alice", "||secret||", undefined, "not-yet-revealed");
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    expect(stored).not.toContain("not-yet-revealed");
   });
 });

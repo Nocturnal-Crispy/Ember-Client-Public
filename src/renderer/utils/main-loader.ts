@@ -23,6 +23,7 @@
     "../../dist/renderer/components/user-details-modal.js",
     "../../dist/renderer/utils/username-click-handler.js",
     "../../dist/renderer/components/messages-area.js",
+    "../../dist/renderer/components/format-toolbar.js",
     "../../dist/renderer/services/message-service.js",
     "../../dist/renderer/managers/channel-manager.js",
     "../../dist/renderer/managers/ember-manager.js",
