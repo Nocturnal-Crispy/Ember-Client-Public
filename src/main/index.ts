@@ -163,6 +163,16 @@ function createWindow(isAuthenticated: boolean) {
     log.info("Main window closed");
     mainWindow = null;
   });
+
+  mainWindow.on("blur", () => {
+    log.debug("Main window lost focus");
+    mainWindow?.webContents.send("window-blur");
+  });
+
+  mainWindow.on("focus", () => {
+    log.debug("Main window gained focus");
+    mainWindow?.webContents.send("window-focus");
+  });
 }
 
 function checkAuthentication(): boolean {
@@ -671,6 +681,38 @@ ipcMain.handle("open-external-url", async (_event, url: unknown) => {
     }
   }
   await shell.openExternal(url);
+});
+
+// ─── IPC: App lock PIN ────────────────────────────────────────────────────────
+
+ipcMain.handle("has-pin", () => {
+  log.debug("IPC: has-pin");
+  return !!store.get("appLockPin");
+});
+
+ipcMain.handle("set-pin", (_event, pin: unknown) => {
+  if (typeof pin !== "string" || pin.length < 4) {
+    log.warn("IPC: set-pin rejected — invalid PIN");
+    return false;
+  }
+  const encrypted = encryptPrivateKey(pin);
+  store.set("appLockPin", encrypted);
+  log.info("IPC: app lock PIN saved");
+  return true;
+});
+
+ipcMain.handle("verify-pin", (_event, pin: unknown) => {
+  if (typeof pin !== "string") return false;
+  const stored = store.get("appLockPin") as string | undefined;
+  if (!stored) return false;
+  const decrypted = decryptPrivateKey(stored);
+  return decrypted === pin;
+});
+
+ipcMain.handle("clear-pin", () => {
+  log.info("IPC: app lock PIN cleared");
+  store.delete("appLockPin");
+  return true;
 });
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────

@@ -110,6 +110,10 @@ const ALLOWED_INVOKE: readonly string[] = [
   "schedule-install-on-exit",
   "skip-version",
   "get-skipped-version",
+  "verify-pin",
+  "set-pin",
+  "has-pin",
+  "clear-pin",
 ];
 
 const ALLOWED_ON: readonly string[] = [
@@ -117,6 +121,8 @@ const ALLOWED_ON: readonly string[] = [
   "update-download-progress",
   "update-download-complete",
   "update-download-error",
+  "window-blur",
+  "window-focus",
 ];
 
 preloadLog("debug", "Setting up contextBridge API");
