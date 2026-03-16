@@ -322,6 +322,12 @@ body.dm-screen-open .user-panel .user-status-icon {
   min-width: 18px;
   text-align: center;
   flex-shrink: 0;
+  animation: dmUnreadPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes dmUnreadPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(0.9); }
 }
 
 /* ─── Main Chat Area ───────────────────────────────────────────────────────── */

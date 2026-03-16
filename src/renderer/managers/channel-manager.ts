@@ -9,6 +9,28 @@
 
   const messagesContainer = document.getElementById("messages");
 
+  // ─── Unread channel tracking ────────────────────────────────────────────────
+  const unreadChannelIds = new Set<string>();
+
+  function updateEmberBadge(emberId: string | null, count: number): void {
+    if (!emberId) return;
+    const iconEl = document.querySelector<HTMLElement>(
+      `.server-icon[data-ember-id="${emberId}"]`
+    );
+    if (!iconEl) return;
+    let badge = iconEl.querySelector<HTMLElement>(".ember-unread-badge");
+    if (count <= 0) {
+      badge?.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.className = "ember-unread-badge";
+      iconEl.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? "99+" : String(count);
+  }
+
   // ─── Channel / category API fetches ────────────────────────────────────────
 
   async function fetchChannelsAndCategories(
@@ -60,6 +82,8 @@
     const channelsContainer = channelsContainerEl;
 
     channelsContainer.replaceChildren();
+    unreadChannelIds.clear();
+    updateEmberBadge(App.activeEmberId, 0);
 
     const channelsByCategory: Record<string, Channel[]> = {};
     const uncategorized: Channel[] = [];
@@ -101,6 +125,8 @@
           .forEach((el) => el.classList.remove("active"));
         channelEl.classList.add("active");
         channelEl.classList.remove("has-unread");
+        unreadChannelIds.delete(channel.id);
+        updateEmberBadge(App.activeEmberId, unreadChannelIds.size);
         if (channel.type === "voice") {
           window.updateChatHeader(channel.name, channel.description ?? "");
           window.showVoiceChannelView();
@@ -910,7 +936,14 @@
     const el = document.querySelector<HTMLElement>(
       `.channel[data-channel-id="${channelId}"]`
     );
-    if (el) el.classList.add("has-unread");
+    if (!el) return;
+    const wasAlreadyUnread = unreadChannelIds.has(channelId);
+    el.classList.add("has-unread");
+    unreadChannelIds.add(channelId);
+    updateEmberBadge(App.activeEmberId, unreadChannelIds.size);
+    if (!wasAlreadyUnread && typeof window.playNotificationSound === "function") {
+      window.playNotificationSound("channelMessage");
+    }
   }
 
   window.fetchChannels = fetchChannels;

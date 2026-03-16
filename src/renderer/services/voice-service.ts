@@ -915,6 +915,18 @@ const _soundDefs: Record<string, SoundDef> = {
     dur: [0.1, 0.15],
     vol: 0.2,
   },
+  dmMessage: {
+    type: "sine",
+    freq: [880, 1318, 1760],
+    dur: [0.04, 0.04, 0.07],
+    vol: 0.2,
+  },
+  channelMessage: {
+    type: "sine",
+    freq: [880, 1318, 1760],
+    dur: [0.04, 0.04, 0.07],
+    vol: 0.2,
+  },
 };
 
 function generateNotificationSound(type: string): void {

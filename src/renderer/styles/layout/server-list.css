@@ -29,6 +29,34 @@
   font-weight: bold;
   font-size: 14px;
   color: rgba(var(--rgb-highlight), 0.6);
+  position: relative;
+}
+
+/* ─── Ember / DM Unread Badge ──────────────────────────────────────────────── */
+
+.ember-unread-badge,
+.dm-icon-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--dnd-color, #f04747);
+  color: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 4px;
+  min-width: 14px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+  line-height: 14px;
+  animation: badgePop 0.2s ease-out;
+}
+
+@keyframes badgePop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .server-icon:hover {

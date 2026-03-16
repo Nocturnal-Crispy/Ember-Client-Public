@@ -406,14 +406,18 @@
       });
     }
     
+    const isOwn = senderId === auth.user_id;
     window.displayDmMessage({
       id: String(payload["id"] ?? ""),
       conversationId: channelId,
       senderId,
       content: messageContent,
       timestamp: createdAt,
-      isOwn: senderId === auth.user_id,
+      isOwn,
     });
+    if (!isOwn && typeof window.playNotificationSound === "function") {
+      window.playNotificationSound("dmMessage");
+    }
   }
 
   // ─── Re-subscribe to all DM channels (called after WS reconnect) ──────────
