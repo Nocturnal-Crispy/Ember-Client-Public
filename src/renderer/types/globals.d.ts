@@ -593,6 +593,7 @@ declare global {
     }>>;
     acceptDMRequest(requestId: string, requesterId: string, requesterUsername: string): Promise<string>;
     declineDMRequest(requestId: string): Promise<void>;
+    loadAndShowDmRequests(): Promise<void>;
     /** Called when user sends a DM request; channel is now open but pending. */
     onDmRequestSent?(payload: { requestId: string; participantId: string; participantUsername: string }): void;
     getPendingStatusForChannel(channelId: string): { requestId: string; isRecipient: boolean } | null;

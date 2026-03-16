@@ -165,6 +165,13 @@
                 data.payload as Parameters<typeof window.handleMemberUpdate>[0]
               );
             }
+          } else if (data.type === "dm_request_received") {
+            log.info("WebSocket: dm_request_received");
+            if (typeof window.loadAndShowDmRequests === "function") {
+              window.loadAndShowDmRequests().catch((err: Error) =>
+                log.error("Failed to load DM requests after WS notification", { error: err.message }),
+              );
+            }
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
