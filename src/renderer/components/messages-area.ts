@@ -18,12 +18,26 @@
   // ─── Utilities ─────────────────────────────────────────────────────────────
 
   function toChumhandle(username: string): string {
-    const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
-    if (words.length >= 2) {
-      return (words[0][0] + words[1][0]).toUpperCase();
-    }
-    return username.slice(0, 2).toUpperCase();
+  const words = username.match(/[A-Z]?[a-z]+|[0-9]+|[A-Z]+/g) || [username];
+  
+  // Extract letters from the beginning of each word
+  let handle = "";
+  for (let i = 0; i < words.length && handle.length < 4; i++) {
+    const word = words[i];
+    // Take up to 2 letters from each word to reach 4 total
+    const lettersNeeded = Math.min(4 - handle.length, word.length);
+    handle += word.slice(0, lettersNeeded).toUpperCase();
   }
+  
+  // If we couldn't get 4 letters from word beginnings, take more from the username
+  if (handle.length < 4) {
+    const remaining = username.slice(handle.length);
+    const lettersNeeded = Math.min(4 - handle.length, remaining.length);
+    handle += remaining.slice(0, lettersNeeded).toUpperCase();
+  }
+  
+  return handle;
+}
 
   function formatTimestamp(unixSeconds?: number): string {
     const date = unixSeconds ? new Date(unixSeconds * 1000) : new Date();
