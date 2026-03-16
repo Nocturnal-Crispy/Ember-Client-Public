@@ -627,8 +627,21 @@ declare global {
     debugTextarea(): void;
     // Globals set by renderer.ts
     closeDMScreenOnServerSwitch(): void;
+    // Globals set by renderer.ts (DM screen)
+    openDMScreen(): void;
+    // Globals set by direct-messaging-ui.ts
+    openDmWithUser(userId: string, username: string): Promise<void>;
     // Globals set by renderer.ts (external link modal)
     openExternalLinkModal(url: string): void;
+    // Globals set by user-details-modal.ts
+    openUserDetailsModal(userId: string, username: string): void;
+    closeUserDetailsModal(): void;
+    // Globals set by username-click-handler.ts
+    makeUsernameClickable(el: HTMLElement, userId: string, username: string): void;
+    // Globals set by user-service.ts
+    getUserDetails(userId: string): Member | null;
+    getUserDetailsByUsername(username: string): Member | null;
+    getUserVoiceChannel(userId: string): { channelId: string; channelName: string } | null;
     // Globals set by emoji-picker.ts
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
     // Globals set by gif-picker.ts

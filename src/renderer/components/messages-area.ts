@@ -750,13 +750,21 @@
     const messageDiv = document.createElement("div");
     messageDiv.className = "message";
     if (messageId) messageDiv.dataset["messageId"] = messageId;
-    messageDiv.dataset["chumhandle"] = "[" + toChumhandle(author) + "]: ";
     if (isOwn) messageDiv.classList.add("own");
     if (chatColor) messageDiv.style.color = chatColor;
 
     const avatarEl = document.createElement("div");
     avatarEl.className = "message-avatar";
     avatarEl.textContent = author.charAt(0).toUpperCase();
+
+    // Real DOM element for the chumhandle prefix — replaces the CSS ::before pseudo-element
+    // so that it can receive click events to open the user details modal.
+    // userId is NOT looked up here to avoid a race condition where currentMembers hasn't
+    // loaded yet. openUserDetailsModal resolves the userId lazily at click time.
+    const chumhandleEl = document.createElement("span");
+    chumhandleEl.className = "message-chumhandle";
+    chumhandleEl.textContent = "[" + toChumhandle(author) + "]: ";
+    (window as any).makeUsernameClickable?.(chumhandleEl, "", author);
 
     const contentEl = document.createElement("div");
     contentEl.className = "message-content";
@@ -781,6 +789,7 @@
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(textEl);
+    messageDiv.appendChild(chumhandleEl);
     messageDiv.appendChild(avatarEl);
     messageDiv.appendChild(contentEl);
 

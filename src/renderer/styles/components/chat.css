@@ -128,12 +128,13 @@
   background: rgba(var(--rgb-highlight), 0.04);
 }
 
-/* Chumhandle prefix via data attribute */
-.message::before {
-  content: attr(data-chumhandle);
+/* Chumhandle prefix — real DOM span for clickability */
+.message-chumhandle {
+  display: inline;
   font-weight: bold;
   font-family: 'Courier New', Courier, monospace;
 }
+
 
 /* Hide the bubble sub-elements */
 .message-avatar  { display: none; }

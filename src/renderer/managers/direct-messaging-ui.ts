@@ -83,7 +83,23 @@
    */
   function setupEventListeners(): void {
     if (!dmSidebarElement || !dmChatContainer) return;
-    
+
+    // DM chat header — clicking the header info area opens the user details modal.
+    // We add one persistent listener that reads the active conversation at click time.
+    const headerInfo = dmChatContainer.querySelector('.dm-chat-header-info') as HTMLElement | null;
+    if (headerInfo) {
+      headerInfo.style.cursor = 'pointer';
+      headerInfo.classList.add('username-clickable');
+      headerInfo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!activeConversationId) return;
+        const conv = conversations.get(activeConversationId);
+        if (conv) {
+          (window as any).openUserDetailsModal?.(conv.participantId, conv.participantUsername);
+        }
+      });
+    }
+
     // Search input
     const searchInput = dmSidebarElement.querySelector('.dm-search-input') as HTMLInputElement;
     if (searchInput) {
@@ -1884,4 +1900,5 @@
   // Expose functions to global scope
   window.addDmConversationToList = addConversationToList;
   window.initializeDirectMessagingUI = initializeDirectMessagingUI;
+  window.openDmWithUser = startDmConversation;
 })();

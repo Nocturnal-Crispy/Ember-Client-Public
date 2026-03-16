@@ -203,6 +203,7 @@
   
   // Expose globally for other modules to call
   window.closeDMScreenOnServerSwitch = closeDMScreenOnServerSwitch;
+  window.openDMScreen = openDMScreen;
 
   const logoutBtn = document.getElementById("logout-btn");
   const logoutModal = document.getElementById("logout-modal");
@@ -1153,6 +1154,8 @@
         nameEl.className = "member-name";
         nameEl.textContent = member.username ?? "Unknown";
         nameWrapEl.appendChild(nameEl);
+        // Make the entire member div clickable to open the user details modal.
+        (window as any).makeUsernameClickable?.(memberEl, member.user_id, member.username ?? "");
 
         if (member.custom_status) {
           const customStatusEl = document.createElement("span");
