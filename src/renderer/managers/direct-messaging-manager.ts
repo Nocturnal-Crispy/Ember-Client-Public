@@ -262,9 +262,17 @@
       const errData = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(errData.error ?? "Failed to send DM request");
     }
-    const { id: requestId, ember_id: emberId } = (await res.json()) as {
+    const { id: requestId, ember_id: emberId, status: responseStatus } = (await res.json()) as {
       id: string; ember_id: string; status: string;
     };
+
+    // Server found an existing pending/accepted DM — open it directly without
+    // creating a duplicate local entry. If it's already in our map (from
+    // loadDmEmbers), return it; otherwise fall through to register it fresh.
+    if (responseStatus === 'accepted' || responseStatus === 'pending') {
+      const existingByEmber = dmByEmberId.get(emberId);
+      if (existingByEmber) return existingByEmber.textChannelId;
+    }
 
     // Cache the key and open the DM immediately
     App.emberKeyCache.set(emberId, emberKey);
@@ -614,11 +622,83 @@
     // Presence is handled by the presence system — no DM-specific action needed
   }
 
+  // ─── DM request polling ────────────────────────────────────────────────────
+
+  /**
+   * Loads any pending DM requests that the current user hasn't seen yet and
+   * shows the pending banner for each. Called on init and every 30 s as a
+   * fallback for missed WebSocket notifications.
+   */
+  async function loadAndShowDmRequests(): Promise<void> {
+    const auth = await getAuth();
+    if (!auth) return;
+    try {
+      const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { requests: Array<{
+        id: string; requester_id: string; requester_username: string;
+        requester_avatar: string; ember_id: string; created_at: string;
+      }> };
+      for (const r of data.requests ?? []) {
+        if (dmByEmberId.has(r.ember_id)) continue; // already loaded
+        const channels = await fetchDmChannels(auth, r.ember_id);
+        if (!channels.textChannelId) continue;
+        const entry: DmEntry = {
+          emberId: r.ember_id,
+          textChannelId: channels.textChannelId,
+          voiceChannelId: channels.voiceChannelId,
+          partnerId: r.requester_id,
+          partnerUsername: r.requester_username,
+          partnerAvatar: r.requester_avatar,
+          requestStatus: 'pending',
+          requestId: r.id,
+          isRecipient: true,
+        };
+        dmByTextChannel.set(channels.textChannelId, entry);
+        dmByEmberId.set(r.ember_id, entry);
+        window.addDmConversationToList({
+          id: channels.textChannelId,
+          participantId: r.requester_id,
+          participantUsername: r.requester_username,
+          participantAvatar: r.requester_avatar,
+          unreadCount: 0,
+          isOnline: false,
+          keyExchanged: false,
+          createdAt: new Date(r.created_at).getTime(),
+        });
+        window.wsSubscribeToChannel(channels.textChannelId);
+        if (typeof window.showDmPendingBanner === 'function') {
+          window.showDmPendingBanner({
+            channelId: channels.textChannelId,
+            partnerUsername: r.requester_username,
+            requestId: r.id,
+            isRecipient: true,
+            requesterId: r.requester_id,
+          });
+        }
+      }
+    } catch (err) {
+      log.warn("DM request poll failed", { error: (err as Error).message });
+    }
+  }
+
+  function startDMRequestPolling(): void {
+    setInterval(() => {
+      loadAndShowDmRequests().catch((err: Error) =>
+        log.warn("DM request polling error", { error: err.message }),
+      );
+    }, 30_000);
+  }
+
   // ─── Initialization ────────────────────────────────────────────────────────
 
   async function initializeDirectMessaging(): Promise<void> {
     log.info("Initializing DM system");
     await loadDmEmbers();
+    await loadAndShowDmRequests();
+    startDMRequestPolling();
     log.info("DM system ready", { dmCount: dmByTextChannel.size });
   }
 
@@ -645,6 +725,7 @@
   window.fetchDMRequests = fetchDMRequests;
   window.acceptDMRequest = acceptDMRequest;
   window.declineDMRequest = declineDMRequest;
+  window.loadAndShowDmRequests = loadAndShowDmRequests;
 
   window.getPendingStatusForChannel = (channelId: string) => {
     const entry = dmByTextChannel.get(channelId);
