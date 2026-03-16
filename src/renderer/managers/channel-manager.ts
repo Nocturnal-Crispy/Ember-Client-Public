@@ -936,14 +936,14 @@
     const el = document.querySelector<HTMLElement>(
       `.channel[data-channel-id="${channelId}"]`
     );
-    if (!el) return;
     const wasAlreadyUnread = unreadChannelIds.has(channelId);
-    el.classList.add("has-unread");
     unreadChannelIds.add(channelId);
     updateEmberBadge(App.activeEmberId, unreadChannelIds.size);
     if (!wasAlreadyUnread && typeof window.playNotificationSound === "function") {
       window.playNotificationSound("channelMessage");
     }
+    if (!el) return;
+    el.classList.add("has-unread");
   }
 
   function clearAllChannelUnread(): void {

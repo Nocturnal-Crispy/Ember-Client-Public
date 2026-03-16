@@ -291,6 +291,46 @@ describe('markChannelUnread', () => {
     expect(() => (window as any).markChannelUnread('ch-nonexistent')).not.toThrow();
   });
 
+  it('plays notification sound even when channel element is not in DOM', () => {
+    const mockPlay = jest.fn();
+    (window as any).playNotificationSound = mockPlay;
+
+    (window as any).markChannelUnread('ch-no-dom');
+
+    expect(mockPlay).toHaveBeenCalledWith('channelMessage');
+    delete (window as any).playNotificationSound;
+  });
+
+  it('plays notification sound when channel element exists and is newly unread', () => {
+    const mockPlay = jest.fn();
+    (window as any).playNotificationSound = mockPlay;
+    (window as any).renderChannels(
+      [{ id: 'ch-sound', ember_id: 'e-1', name: 'soundtest', type: 'text' as const }],
+      []
+    );
+
+    (window as any).markChannelUnread('ch-sound');
+
+    expect(mockPlay).toHaveBeenCalledWith('channelMessage');
+    delete (window as any).playNotificationSound;
+  });
+
+  it('does not play notification sound if channel was already marked unread', () => {
+    const mockPlay = jest.fn();
+    (window as any).playNotificationSound = mockPlay;
+    (window as any).renderChannels(
+      [{ id: 'ch-dup', ember_id: 'e-1', name: 'duptest', type: 'text' as const }],
+      []
+    );
+    (window as any).markChannelUnread('ch-dup');
+    mockPlay.mockClear();
+
+    (window as any).markChannelUnread('ch-dup');
+
+    expect(mockPlay).not.toHaveBeenCalled();
+    delete (window as any).playNotificationSound;
+  });
+
   it('removes has-unread class when the channel is clicked', () => {
     (window as any).renderChannels(
       [{ id: 'ch-click', ember_id: 'e-1', name: 'clickme', type: 'text' as const }],
