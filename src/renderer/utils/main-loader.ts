@@ -30,6 +30,7 @@
     "../../dist/renderer/managers/invite-manager.js",
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/notification-settings.js",
+    "../../dist/renderer/managers/plugin-settings.js",
     "../../dist/renderer/managers/update-notifier.js",
     "../../dist/renderer/components/update-modal.js",
     "../../dist/renderer/managers/version-display.js",

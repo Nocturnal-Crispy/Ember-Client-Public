@@ -111,6 +111,12 @@ declare global {
     messageSound: boolean;
   }
 
+  // ─── Plugin settings ──────────────────────────────────────────────────────
+
+  interface PluginSettings {
+    readAllButton: boolean;
+  }
+
   // ─── Update check ─────────────────────────────────────────────────────────
 
   interface UpdateInfo {
@@ -541,6 +547,9 @@ declare global {
     playVoiceSound(type: string): void;
     playNotificationSound(type: string): void;
     initNotifSettings(): void;
+    // Globals set by plugin-settings.ts
+    initPluginSettings(): void;
+    getPluginSettings(): PluginSettings;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;

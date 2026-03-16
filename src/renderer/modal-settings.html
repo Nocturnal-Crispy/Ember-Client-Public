@@ -203,10 +203,17 @@
       <!-- Plugins -->
       <div class="settings-page hidden" id="settings-page-plugins">
         <h2 class="settings-page-title">Plugins</h2>
-        <p class="settings-placeholder-text">Manage and install plugins to extend Ember.</p>
-        <div class="settings-card settings-placeholder-card">
-          <span class="settings-placeholder-icon">🧩</span>
-          <span>Plugin management coming soon.</span>
+        <p class="settings-placeholder-text">Toggle optional UI features.</p>
+
+        <div class="vv-toggle-row">
+          <div class="vv-toggle-info">
+            <span class="vv-toggle-label">Read All Button</span>
+            <span class="vv-toggle-desc">Show a button in the server list to mark all messages as read</span>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="plugin-read-all-btn" checked>
+            <span class="toggle-slider"></span>
+          </label>
         </div>
       </div>
 
