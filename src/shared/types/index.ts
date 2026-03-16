@@ -53,6 +53,7 @@ export interface StoreSchema {
   themeSettings?: ThemeSettings;
   gifFavorites?: GifFavorite[];
   skippedUpdateVersion?: string;
+  appLockPin?: string; // safeStorage-encrypted PIN, stored as base64
 }
 
 export interface AuthData {

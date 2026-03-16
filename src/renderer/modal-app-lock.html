@@ -1,0 +1,30 @@
+<!-- App Lock Overlay — full-screen, blocks all interaction when locked -->
+<div id="app-lock-overlay" class="app-lock-overlay hidden">
+  <div class="app-lock-container">
+    <div id="app-lock-icon" class="app-lock-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48" aria-hidden="true">
+        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+      </svg>
+    </div>
+    <h2 class="app-lock-title">Ember is Locked</h2>
+    <p class="app-lock-subtitle">Enter your PIN to continue</p>
+
+    <div class="app-lock-input-group">
+      <input
+        id="app-lock-pin-input"
+        type="password"
+        class="app-lock-pin-input"
+        inputmode="numeric"
+        maxlength="16"
+        autocomplete="off"
+        placeholder="Enter PIN"
+        aria-label="PIN"
+      >
+    </div>
+
+    <div id="app-lock-error" class="app-lock-error hidden">Incorrect PIN. Please try again.</div>
+    <div id="app-lock-lockout" class="app-lock-lockout hidden">Too many attempts. Please wait 30 seconds.</div>
+
+    <button id="app-lock-submit-btn" class="app-lock-submit-btn">Unlock</button>
+  </div>
+</div>

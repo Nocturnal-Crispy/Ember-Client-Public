@@ -31,6 +31,7 @@
     "../../dist/renderer/managers/voice-ui-manager.js",
     "../../dist/renderer/managers/notification-settings.js",
     "../../dist/renderer/managers/plugin-settings.js",
+    "../../dist/renderer/managers/app-lock-manager.js",
     "../../dist/renderer/managers/update-notifier.js",
     "../../dist/renderer/components/update-modal.js",
     "../../dist/renderer/managers/version-display.js",
@@ -108,6 +109,7 @@
         modalCustomStatus,
         modalUserDetails,
         modalUpdate,
+        modalAppLock,
       ] = await Promise.all([
         fetchFragment("title-bar.html"),
         fetchFragment("server-list.html"),
@@ -138,6 +140,7 @@
         fetchFragment("modal-custom-status.html"),
         fetchFragment("modal-user-details.html"),
         fetchFragment("modal-update.html"),
+        fetchFragment("modal-app-lock.html"),
       ]);
 
       // Title bar (top-level)
@@ -179,6 +182,7 @@
       document.body.appendChild(parseFragment(modalCustomStatus));
       document.body.appendChild(parseFragment(modalUserDetails));
       document.body.appendChild(parseFragment(modalUpdate));
+      document.body.appendChild(parseFragment(modalAppLock));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

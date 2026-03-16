@@ -215,6 +215,68 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+
+        <!-- App Lock -->
+        <div class="app-lock-settings-section">
+          <h3>App Lock</h3>
+          <p class="settings-placeholder-text app-lock-master-note">
+            <strong>Enable App Lock</strong> is the master switch — idle timeout and focus-loss locking both require it to be on.
+            Set a PIN before enabling, or you will be locked out.
+          </p>
+
+          <div class="vv-toggle-row">
+            <div class="vv-toggle-info">
+              <span class="vv-toggle-label">Enable App Lock</span>
+              <span class="vv-toggle-desc">Master switch — must be on for any automatic locking to work</span>
+            </div>
+            <label class="settings-toggle">
+              <input type="checkbox" id="plugin-app-lock-enable">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="vv-row">
+            <label class="vv-label">Idle Timeout</label>
+            <div class="timeout-row">
+              <input type="range" id="plugin-app-lock-timeout" min="1" max="60" value="5" step="1">
+              <span id="plugin-app-lock-timeout-display" class="timeout-display">5 min</span>
+            </div>
+          </div>
+
+          <div class="vv-toggle-row">
+            <div class="vv-toggle-info">
+              <span class="vv-toggle-label">Lock on Focus Loss</span>
+              <span class="vv-toggle-desc">Lock when Ember loses focus (alt-tab). Requires Enable App Lock to be on.</span>
+            </div>
+            <label class="settings-toggle">
+              <input type="checkbox" id="plugin-app-lock-focus-loss">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="vv-row">
+            <label class="vv-label">Focus Loss Delay (seconds)</label>
+            <input type="number" class="settings-input-small" id="plugin-app-lock-focus-delay" min="1" max="300" value="5">
+            <span class="vv-toggle-desc" style="margin-left: 0.5rem;">Ember locks this many seconds after losing focus.</span>
+          </div>
+
+          <div class="vv-row">
+            <label class="vv-label">PIN</label>
+            <div>
+              <p id="plugin-app-lock-has-pin-text" class="app-lock-pin-status">Checking...</p>
+              <div class="app-lock-pin-actions">
+                <button class="app-lock-btn-small" id="plugin-app-lock-set-pin-btn">Set / Change PIN</button>
+                <button class="app-lock-btn-small" id="plugin-app-lock-clear-pin-btn">Clear PIN</button>
+              </div>
+              <div id="plugin-app-lock-pin-setup" class="app-lock-pin-setup-form hidden">
+                <input type="password" id="plugin-app-lock-new-pin" placeholder="New PIN (min 4 digits)" autocomplete="new-password" maxlength="16">
+                <input type="password" id="plugin-app-lock-confirm-pin" placeholder="Confirm PIN" autocomplete="new-password" maxlength="16">
+                <p id="plugin-app-lock-pin-error" class="app-lock-pin-error hidden"></p>
+                <button class="app-lock-btn-small" id="plugin-app-lock-save-pin-btn">Save PIN</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Voice & Video -->

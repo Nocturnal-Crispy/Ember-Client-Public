@@ -113,8 +113,16 @@ declare global {
 
   // ─── Plugin settings ──────────────────────────────────────────────────────
 
+  interface AppLockSettings {
+    enabled: boolean;
+    idleTimeoutMinutes: number;
+    lockOnFocusLoss: boolean;
+    focusLossDelaySeconds: number;
+  }
+
   interface PluginSettings {
     readAllButton: boolean;
+    appLock: AppLockSettings;
   }
 
   // ─── Update check ─────────────────────────────────────────────────────────
@@ -550,6 +558,12 @@ declare global {
     // Globals set by plugin-settings.ts
     initPluginSettings(): void;
     getPluginSettings(): PluginSettings;
+    // Globals set by app-lock-manager.ts
+    initAppLock(): void;
+    lockApp(): void;
+    unlockApp(pin: string): Promise<boolean>;
+    isAppLocked(): boolean;
+    updateAppLockSettings(settings: Partial<AppLockSettings>): void;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;

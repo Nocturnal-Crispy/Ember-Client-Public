@@ -14,3 +14,6 @@ src/**/*.js
 .klipy-api-key
 src/main/api-key.ts
 !src/main/api-key-template.ts
+
+# Coverage reports
+coverage/
