@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer } from "electron";
 import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
+import { registerAudioCaptureHandlers, cleanOrphanedAudioModules } from "./audio-capture";
 import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
 import {
@@ -795,6 +796,27 @@ ipcMain.handle("clear-pin", () => {
   return true;
 });
 
+// ─── IPC: Screen capture sources ─────────────────────────────────────────────
+
+ipcMain.handle("get-screen-sources", async () => {
+  log.debug("IPC: get-screen-sources");
+  const raw = await desktopCapturer.getSources({
+    types: ["screen", "window"],
+    thumbnailSize: { width: 320, height: 180 },
+  });
+  return raw.map((s: Electron.DesktopCapturerSource) => ({
+    id: s.id,
+    name: s.name,
+    display_id: s.display_id,
+    thumbnail: s.thumbnail.toDataURL(),
+    // PipeWire node ID for Wayland sources (format "pipewire:<node_id>")
+    pipeWireNodeId:
+      process.platform === "linux" && s.id.startsWith("pipewire:")
+        ? parseInt(s.id.split(":")[1], 10)
+        : null,
+  }));
+});
+
 // ─── Invite protocol ──────────────────────────────────────────────────────────
 
 function parseInviteUrl(
@@ -890,8 +912,10 @@ if (!gotTheLock) {
   app.setAsDefaultProtocolClient("ember");
   log.debug("Registered ember:// protocol handler");
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     log.info("App ready");
+    await cleanOrphanedAudioModules();
+    registerAudioCaptureHandlers(process.pid);
     const isAuthenticated = checkAuthentication();
     createWindow(isAuthenticated);
 
