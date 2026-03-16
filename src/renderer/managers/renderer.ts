@@ -265,6 +265,17 @@
     const nameEl = document.createElement("span");
     nameEl.className = "attachment-preview-name";
     nameEl.textContent = App.pendingAttachment.name;
+    const spoilerToggle = document.createElement("button");
+    spoilerToggle.className = "attachment-spoiler-toggle";
+    spoilerToggle.title = "Mark as spoiler";
+    spoilerToggle.textContent = App.pendingAttachment!.spoiler ? "🔒 spoiler" : "🔓 spoiler";
+    if (App.pendingAttachment!.spoiler) spoilerToggle.classList.add("attachment-spoiler-toggle--active");
+    spoilerToggle.addEventListener("click", () => {
+      if (!App.pendingAttachment) return;
+      App.pendingAttachment.spoiler = !App.pendingAttachment.spoiler;
+      spoilerToggle.textContent = App.pendingAttachment.spoiler ? "🔒 spoiler" : "🔓 spoiler";
+      spoilerToggle.classList.toggle("attachment-spoiler-toggle--active", App.pendingAttachment.spoiler);
+    });
     const removeBtn = document.createElement("button");
     removeBtn.className = "attachment-preview-remove";
     removeBtn.title = "Remove attachment";
@@ -272,6 +283,7 @@
     removeBtn.addEventListener("click", clearPendingAttachment);
     preview.appendChild(icon);
     preview.appendChild(nameEl);
+    preview.appendChild(spoilerToggle);
     preview.appendChild(removeBtn);
     preview.classList.remove("hidden");
   }

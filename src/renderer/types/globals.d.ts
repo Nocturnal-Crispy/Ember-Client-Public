@@ -191,6 +191,7 @@ declare global {
     name: string;
     size: number;
     mime: string;
+    spoiler?: boolean;
   }
 
   interface AttachmentDownloadResult {
@@ -207,6 +208,7 @@ declare global {
     name: string;
     size: number;
     type: string;
+    spoiler?: boolean;
   }
 
   interface EmberCryptoAPI {

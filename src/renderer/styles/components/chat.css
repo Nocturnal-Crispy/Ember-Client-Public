@@ -439,6 +439,7 @@
 
 /* Wrapper holds either the status text or the loaded image */
 .image-card-wrapper {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -878,4 +879,81 @@
   font-size: 12px;
   color: rgba(var(--rgb-highlight), 0.9);
   user-select: text;
+}
+
+/* ─── Spoiler text (||...||) ──────────────────────────────────────────────── */
+
+.spoiler-text {
+  background-color: rgba(var(--rgb-surface), 0.9);
+  color: transparent;
+  border-radius: 3px;
+  padding: 0 3px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.spoiler-text:hover {
+  background-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.spoiler-text--revealed {
+  background-color: rgba(var(--accent-rgb), 0.15);
+  color: inherit;
+  cursor: default;
+}
+
+/* ─── Spoiler image overlay ───────────────────────────────────────────────── */
+
+/* The wrapper div itself becomes the spoiler overlay — guaranteed full coverage */
+.image-card-wrapper.spoiler-image-overlay {
+  display: flex;
+  width: 400px;
+  height: 300px;
+  background: #000;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.image-card-wrapper.spoiler-image-overlay:hover {
+  background: #111;
+}
+
+/* Hide the loading/image children while the spoiler is unrevealed */
+.image-card-wrapper.spoiler-image-overlay .image-card-status,
+.image-card-wrapper.spoiler-image-overlay .image-card-img {
+  display: none;
+}
+
+.spoiler-image-label {
+  font-size: 13px;
+  color: rgba(var(--rgb-highlight), 0.7);
+  font-family: 'Courier New', Courier, monospace;
+  pointer-events: none;
+}
+
+/* ─── Attachment spoiler toggle ───────────────────────────────────────────── */
+
+.attachment-spoiler-toggle {
+  background: none;
+  border: 1px solid rgba(var(--rgb-highlight), 0.2);
+  border-radius: 4px;
+  color: rgba(var(--rgb-highlight), 0.5);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.attachment-spoiler-toggle:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: rgba(var(--rgb-highlight), 0.8);
+}
+
+.attachment-spoiler-toggle--active {
+  border-color: rgba(var(--accent-rgb), 0.8);
+  color: rgb(var(--accent-rgb));
 }

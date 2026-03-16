@@ -15,6 +15,35 @@
 
   type GetEmberKey = (channelId: string) => Promise<Uint8Array | null>;
 
+  // ─── Spoiler persistence ────────────────────────────────────────────────────
+
+  const SPOILER_STORAGE_KEY = "ember:spoiler-revealed";
+  const MAX_SPOILER_RECORDS = 1000;
+
+  function isSpoilerRevealed(messageId: string): boolean {
+    try {
+      const raw = localStorage.getItem(SPOILER_STORAGE_KEY);
+      if (!raw) return false;
+      const ids: string[] = JSON.parse(raw);
+      return ids.includes(messageId);
+    } catch {
+      return false;
+    }
+  }
+
+  function markSpoilerRevealed(messageId: string): void {
+    try {
+      const raw = localStorage.getItem(SPOILER_STORAGE_KEY);
+      const ids: string[] = raw ? JSON.parse(raw) : [];
+      if (ids.includes(messageId)) return;
+      ids.push(messageId);
+      if (ids.length > MAX_SPOILER_RECORDS) ids.splice(0, ids.length - MAX_SPOILER_RECORDS);
+      localStorage.setItem(SPOILER_STORAGE_KEY, JSON.stringify(ids));
+    } catch {
+      // localStorage unavailable (e.g. private browsing)
+    }
+  }
+
   // ─── Utilities ─────────────────────────────────────────────────────────────
 
   function toChumhandle(username: string): string {
@@ -233,7 +262,8 @@
     | { type: "bold"; children: InlineToken[] }
     | { type: "italic"; children: InlineToken[] }
     | { type: "strike"; children: InlineToken[] }
-    | { type: "code"; value: string };
+    | { type: "code"; value: string }
+    | { type: "spoiler"; children: InlineToken[] };
 
   type Block =
     | { type: "paragraph"; text: string }
@@ -295,6 +325,16 @@
         }
       }
 
+      // Spoiler: ||...||
+      if (text[i] === "|" && text[i + 1] === "|") {
+        const closingSpoiler = text.indexOf("||", i + 2);
+        if (closingSpoiler !== -1) {
+          tokens.push({ type: "spoiler", children: tokenizeInline(text.slice(i + 2, closingSpoiler)) });
+          i = closingSpoiler + 2;
+          continue;
+        }
+      }
+
       // Italic: *...* (not preceded or followed by *)
       if (text[i] === "*" && text[i + 1] !== "*") {
         let closingItalic = -1;
@@ -325,6 +365,7 @@
         if (text[i] === "`") break;
         if (text[i] === "*") break;
         if (text[i] === "~" && text[i + 1] === "~") break;
+        if (text[i] === "|" && text[i + 1] === "|") break;
         if (text.startsWith("https://", i) || text.startsWith("http://", i)) break;
         i++;
       }
@@ -376,6 +417,17 @@
         const el = document.createElement("code");
         el.textContent = token.value;
         container.appendChild(el);
+      } else if (token.type === "spoiler") {
+        const span = document.createElement("span");
+        span.className = "spoiler-text";
+        span.dataset["revealed"] = "false";
+        span.setAttribute("aria-label", "Spoiler — click to reveal");
+        span.addEventListener("click", () => {
+          span.dataset["revealed"] = "true";
+          span.classList.add("spoiler-text--revealed");
+        });
+        renderInlineTokens(token.children, span);
+        container.appendChild(span);
       }
     }
   }
@@ -701,7 +753,6 @@
     card.className = "image-card";
 
     const imgWrapper = document.createElement("div");
-    imgWrapper.className = "image-card-wrapper image-card-state-loading";
 
     const statusEl = document.createElement("span");
     statusEl.className = "image-card-status";
@@ -710,9 +761,6 @@
     const img = document.createElement("img");
     img.className = "image-card-img";
     img.alt = attachment.name;
-
-    imgWrapper.appendChild(statusEl);
-    imgWrapper.appendChild(img);
 
     const footer = document.createElement("div");
     footer.className = "image-card-footer";
@@ -730,10 +778,31 @@
 
     footer.appendChild(nameEl);
     footer.appendChild(saveBtn);
+
+    if (attachment.spoiler) {
+      // Wrapper IS the spoiler overlay — defers image load until revealed.
+      imgWrapper.className = "image-card-wrapper spoiler-image-overlay";
+      const label = document.createElement("span");
+      label.className = "spoiler-image-label";
+      label.textContent = "🔒 SPOILER — click to reveal";
+      imgWrapper.appendChild(label);
+      imgWrapper.appendChild(statusEl);
+      imgWrapper.appendChild(img);
+      imgWrapper.addEventListener("click", () => {
+        imgWrapper.classList.remove("spoiler-image-overlay");
+        imgWrapper.classList.add("image-card-state-loading", "spoiler-image-overlay--revealed");
+        imgWrapper.removeChild(label);
+        loadImageForCard(attachment, img, statusEl, imgWrapper, channelId, getEmberKey);
+      }, { once: true });
+    } else {
+      imgWrapper.className = "image-card-wrapper image-card-state-loading";
+      imgWrapper.appendChild(statusEl);
+      imgWrapper.appendChild(img);
+      loadImageForCard(attachment, img, statusEl, imgWrapper, channelId, getEmberKey);
+    }
+
     card.appendChild(imgWrapper);
     card.appendChild(footer);
-
-    loadImageForCard(attachment, img, statusEl, imgWrapper, channelId, getEmberKey);
 
     return card;
   }
@@ -930,12 +999,36 @@
 
     messageDiv.appendChild(createActionToolbar(messageId, isOwn));
 
+    // ── Spoiler persistence ─────────────────────────────────────────────────
+    if (messageId) {
+      const alreadyRevealed = isSpoilerRevealed(messageId);
+
+      // Wire text spoiler spans
+      messageDiv.querySelectorAll<HTMLElement>(".spoiler-text").forEach((span) => {
+        if (alreadyRevealed) {
+          span.dataset["revealed"] = "true";
+          span.classList.add("spoiler-text--revealed");
+        }
+        span.addEventListener("click", () => markSpoilerRevealed(messageId));
+      });
+
+      // Wire image spoiler overlay
+      const imgOverlay = messageDiv.querySelector<HTMLElement>(".spoiler-image-overlay");
+      if (imgOverlay) {
+        imgOverlay.addEventListener("click", () => markSpoilerRevealed(messageId));
+        if (alreadyRevealed) {
+          // Programmatically reveal: triggers the { once } load listener
+          imgOverlay.click();
+        }
+      }
+    }
+
     // Add timestamp hover functionality if timestamp is available
     if (timestamp) {
       messageDiv.addEventListener("mouseenter", () => {
         showTimestampTooltip(messageDiv, timestamp);
       });
-      
+
       messageDiv.addEventListener("mouseleave", () => {
         hideTimestampTooltip();
       });
