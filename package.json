@@ -1,6 +1,6 @@
 {
   "name": "ember-client",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Ember Client",
   "main": "dist/main/index.js",
   "scripts": {
