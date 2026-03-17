@@ -8,6 +8,8 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 jest.mock('electron', () => ({
   shell: {
@@ -79,13 +81,13 @@ describe('launchInstaller', () => {
 
     it('does not call chmod on Windows', async () => {
       mockOpenPath.mockResolvedValue('');
-      await launchInstaller('C:\\Users\\user\\Downloads\\Ember-Setup.exe');
+      await launchInstaller(path.join(os.tmpdir(), 'Ember-Setup.exe'));
       expect(mockChmodSync).not.toHaveBeenCalled();
     });
 
     it('opens the installer without error', async () => {
       mockOpenPath.mockResolvedValue('');
-      await expect(launchInstaller('C:\\Users\\user\\Downloads\\Ember-Setup.exe')).resolves.toBeUndefined();
+      await expect(launchInstaller(path.join(os.tmpdir(), 'Ember-Setup.exe'))).resolves.toBeUndefined();
     });
   });
 
@@ -94,7 +96,7 @@ describe('launchInstaller', () => {
 
     it('does not call chmod on macOS', async () => {
       mockOpenPath.mockResolvedValue('');
-      await launchInstaller('/Users/user/Downloads/Ember-1.0.dmg');
+      await launchInstaller(path.join(os.tmpdir(), 'Ember-1.0.dmg'));
       expect(mockChmodSync).not.toHaveBeenCalled();
     });
   });
