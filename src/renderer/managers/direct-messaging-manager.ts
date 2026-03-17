@@ -83,7 +83,13 @@
       const res = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
         headers: { Authorization: `Bearer ${auth.token}` },
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        if (res.status === 404) {
+          // This device doesn't have a key yet — request enrollment from another device.
+          requestDeviceKeyEnrollment(emberId).catch(() => null);
+        }
+        return null;
+      }
       const data = (await res.json()) as { encrypted_key: string; sender_public_key?: string };
       const ownPub = naclUtil.decodeBase64(device.public_key);
       const ownPriv = naclUtil.decodeBase64(device.private_key);
@@ -758,6 +764,104 @@
     }, 30_000);
   }
 
+  // ─── Device key enrollment ─────────────────────────────────────────────────
+
+  /**
+   * Signals to other devices of the same user that this device needs the ember
+   * key for the given DM. One of the other devices will see this via
+   * `fulfillPendingKeyRequests` and deliver a peer-box.
+   */
+  async function requestDeviceKeyEnrollment(emberId: string): Promise<void> {
+    const auth = await getAuth();
+    const device = await getDevice();
+    if (!auth || !device) return;
+    try {
+      const res = await fetch(
+        `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.token}`,
+          },
+          body: JSON.stringify({ device_pub_key: device.public_key }),
+        },
+      );
+      if (!res.ok) {
+        log.warn("Failed to request device key enrollment", { emberId });
+      } else {
+        log.info("Device key enrollment requested", { emberId });
+      }
+    } catch (err) {
+      log.warn("Error requesting device key enrollment", { emberId, error: (err as Error).message });
+    }
+  }
+
+  /**
+   * Checks for pending key requests from other devices of the same user and
+   * delivers the ember key encrypted as a peer-box for each requesting device.
+   */
+  async function fulfillPendingKeyRequests(emberId: string): Promise<void> {
+    const auth = await getAuth();
+    const device = await getDevice();
+    if (!auth || !device) return;
+    try {
+      const res = await fetch(
+        `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests`,
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        requests: Array<{
+          id: string;
+          requesting_device_id: string;
+          requesting_device_pub_key: string;
+          created_at: number;
+        }>;
+      };
+      if (!data.requests || data.requests.length === 0) return;
+
+      const emberKey = await fetchAndCacheEmberKey(emberId);
+      if (!emberKey) return;
+
+      const ownPriv = naclUtil.decodeBase64(device.private_key);
+
+      for (const req of data.requests) {
+        try {
+          const recipientPub = naclUtil.decodeBase64(req.requesting_device_pub_key);
+          const encryptedKey = emberCrypto.encryptEmberKeyForUser(emberKey, recipientPub, ownPriv);
+          const fulfillRes = await fetch(
+            `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests/${req.requesting_device_id}/fulfill`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${auth.token}`,
+              },
+              body: JSON.stringify({
+                encrypted_key: encryptedKey,
+                sender_public_key: device.public_key,
+              }),
+            },
+          );
+          if (!fulfillRes.ok) {
+            log.warn("Failed to fulfill device key request", { emberId, deviceId: req.requesting_device_id });
+          } else {
+            log.info("Device key request fulfilled", { emberId, deviceId: req.requesting_device_id });
+          }
+        } catch (err) {
+          log.warn("Error fulfilling device key request", {
+            emberId,
+            deviceId: req.requesting_device_id,
+            error: (err as Error).message,
+          });
+        }
+      }
+    } catch (err) {
+      log.warn("Failed to fetch pending key requests", { emberId, error: (err as Error).message });
+    }
+  }
+
   // ─── Initialization ────────────────────────────────────────────────────────
 
   async function initializeDirectMessaging(): Promise<void> {
@@ -800,6 +904,31 @@
     }
   }) as EventListener);
 
+  // Handles the server push when another device fulfills this device's key request.
+  // Clears the stale cache entry and re-fetches the newly delivered key.
+  window.addEventListener("device-key-fulfilled", ((e: CustomEvent) => {
+    const payload = e.detail as { ember_id?: string; requesting_device_id?: string };
+    const emberId = payload?.ember_id ?? "";
+    if (!emberId) return;
+
+    App.emberKeyCache.delete(emberId);
+    fetchAndCacheEmberKey(emberId).catch((err: Error) =>
+      log.warn("Failed to re-fetch key after device key fulfillment", { emberId, error: err.message }),
+    );
+  }) as EventListener);
+
+  // Handles the server push when another device of the same user requests a key.
+  // Fulfills the request immediately so the new device can decrypt messages.
+  window.addEventListener("device-key-requested", ((e: CustomEvent) => {
+    const payload = e.detail as { ember_id?: string };
+    const emberId = payload?.ember_id ?? "";
+    if (!emberId) return;
+
+    fulfillPendingKeyRequests(emberId).catch((err: Error) =>
+      log.warn("Failed to fulfill pending key requests on WS push", { emberId, error: err.message }),
+    );
+  }) as EventListener);
+
   // ─── Expose globals ────────────────────────────────────────────────────────
 
   window.initializeDirectMessaging = initializeDirectMessaging;
@@ -816,6 +945,9 @@
   window.acceptDMRequest = acceptDMRequest;
   window.declineDMRequest = declineDMRequest;
   window.loadAndShowDmRequests = loadAndShowDmRequests;
+
+  window.requestDeviceKeyEnrollment = requestDeviceKeyEnrollment;
+  window.fulfillPendingKeyRequests = fulfillPendingKeyRequests;
 
   window.getPendingStatusForChannel = (channelId: string) => {
     const entry = dmByTextChannel.get(channelId);
