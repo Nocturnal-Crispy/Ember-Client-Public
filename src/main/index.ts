@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer, dialog } from "electron";
 import * as path from "path";
+import * as nodeCrypto from "crypto";
 import Store from "electron-store";
 import { createLogger } from "./logger";
 import { registerAudioCaptureHandlers, cleanOrphanedAudioModules, registerBeforeQuitCleanup } from "./audio-capture";
@@ -12,6 +13,9 @@ import {
   launchInstaller,
   scheduleInstallOnExit,
   getInstallOnExitPath,
+  findChecksumAsset,
+  downloadChecksumText,
+  verifyAssetChecksum,
 } from "./update-downloader";
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
@@ -113,7 +117,7 @@ let pendingInviteLink: string | null = null;
 // One-time context delivered to the pop-out window via get-popout-voice-context
 let pendingPopoutContext: { channelName: string; token: string } | null = null;
 
-//To turn on dev tools, change devTools: false to devTools: true in the webPreferences object
+// DevTools are enabled only in development builds (controlled by isDev)
 
 function createWindow(isAuthenticated: boolean) {
   log.info("Creating browser window", { authenticated: isAuthenticated });
@@ -165,7 +169,7 @@ function createWindow(isAuthenticated: boolean) {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "../preload/index.js"),
-      devTools: true,
+      devTools: isDev,
       webSecurity: true, // Always enable web security for safety
       allowRunningInsecureContent: false, // Disable insecure content
     },
@@ -350,19 +354,80 @@ ipcMain.on("auth-logout", () => {
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
+/**
+ * Check whether the OS keyring is available and block the user with a
+ * prominent dialog if it is not.  Called once at startup before any window
+ * is created so the user can make an informed decision before Ember loads.
+ *
+ * If the user already has a stored device key AND safeStorage is now
+ * unavailable, the key has been or will be stored without OS-level
+ * encryption — a critical exposure.  In that case the dialog copy is
+ * more urgent and the default action is Quit.
+ */
+function checkSafeStorageAtStartup(): void {
+  if (safeStorage.isEncryptionAvailable()) return;
+
+  const hasStoredKey = !!(store.get("devicePrivateKey") || store.get("device"));
+  log.error("safeStorage unavailable at startup", { hasStoredKey });
+
+  const message = hasStoredKey
+    ? "Your device keyring is unavailable — private key at risk"
+    : "Your device keyring is unavailable";
+
+  const detail = hasStoredKey
+    ? "Ember detected a stored device identity but cannot access the OS keyring.\n\n" +
+      "Your private key may be stored unencrypted on disk. Anyone with access " +
+      "to your filesystem can read it and decrypt your messages.\n\n" +
+      "Recommended action: quit now, start a keyring service (e.g. GNOME Keyring, " +
+      "KWallet, or macOS Keychain), then restart Ember."
+    : "Ember cannot encrypt your private key with OS-level protection.\n\n" +
+      "If you continue, your private key will be stored unencrypted on this device. " +
+      "Anyone with access to your filesystem may be able to read it.\n\n" +
+      "To resolve this, start a keyring service (e.g. GNOME Keyring, KWallet, " +
+      "or macOS Keychain) and restart Ember.";
+
+  const choice = dialog.showMessageBoxSync({
+    type: "error",
+    title: "Security Warning — Keyring Unavailable",
+    message,
+    detail,
+    buttons: ["Quit (Recommended)", "Continue at My Own Risk"],
+    defaultId: 0,
+    cancelId: 0,
+  });
+
+  if (choice === 0) {
+    log.info("User chose to quit due to unavailable safeStorage");
+    app.exit(1);
+  }
+
+  log.warn("User chose to continue despite unavailable safeStorage");
+}
+
 function encryptPrivateKey(plaintext: string): string {
   if (safeStorage.isEncryptionAvailable()) {
     log.debug("Encrypting private key with OS safeStorage");
     return safeStorage.encryptString(plaintext).toString("base64");
   }
-  // Fallback: no OS keyring available; store as-is (same security as previous plaintext store)
-  log.warn(
-    "safeStorage unavailable; private key stored without OS-level encryption"
-  );
-  console.warn(
-    "[ember] safeStorage unavailable; private key stored without OS-level encryption"
-  );
+  log.warn("safeStorage unavailable; private key stored without OS-level encryption");
   return plaintext;
+}
+
+// ─── PIN helpers ──────────────────────────────────────────────────────────────
+
+function hashPin(pin: string): string {
+  const salt = nodeCrypto.randomBytes(16);
+  const hash = nodeCrypto.scryptSync(pin, salt, 32);
+  return `scrypt:${salt.toString("base64")}:${hash.toString("base64")}`;
+}
+
+function verifyPinHash(pin: string, stored: string): boolean {
+  const parts = stored.split(":");
+  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  const salt = Buffer.from(parts[1], "base64");
+  const expected = Buffer.from(parts[2], "base64");
+  const actual = nodeCrypto.scryptSync(pin, salt, 32);
+  return nodeCrypto.timingSafeEqual(actual, expected);
 }
 
 function decryptPrivateKey(stored: string): string {
@@ -576,6 +641,7 @@ interface UpdateDetails {
   downloadUrl: string | null;
   downloadSize: number | null;
   assetName: string | null;
+  checksumUrl: string | null;
   error?: string;
 }
 
@@ -596,6 +662,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
         downloadUrl: null,
         downloadSize: null,
         assetName: null,
+        checksumUrl: null,
         error: `HTTP ${response.status}`,
       };
     }
@@ -616,6 +683,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
         downloadUrl: null,
         downloadSize: null,
         assetName: null,
+        checksumUrl: null,
         error: "Invalid tag format",
       };
     }
@@ -623,11 +691,13 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
     const updateAvailable = isNewerVersion(currentVersion, latestVersion);
     const assets = Array.isArray(data.assets) ? data.assets : [];
     const selected = selectAssetForPlatform(assets);
+    const checksumAsset = selected ? findChecksumAsset(assets, selected) : null;
     log.debug("Update details fetched", {
       currentVersion,
       latestVersion,
       updateAvailable,
       assetName: selected?.name ?? null,
+      hasChecksum: checksumAsset !== null,
     });
     return {
       updateAvailable,
@@ -638,6 +708,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
       downloadUrl: selected?.browser_download_url ?? null,
       downloadSize: selected?.size ?? null,
       assetName: selected?.name ?? null,
+      checksumUrl: checksumAsset?.browser_download_url ?? null,
     };
   } catch (err) {
     log.debug("check-for-update-details failed");
@@ -650,6 +721,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
       downloadUrl: null,
       downloadSize: null,
       assetName: null,
+      checksumUrl: null,
       error: String(err),
     };
   }
@@ -661,7 +733,8 @@ ipcMain.handle(
     _event,
     downloadUrl: unknown,
     assetName: unknown,
-    assetSize: unknown
+    assetSize: unknown,
+    checksumUrl: unknown
   ): Promise<{ filePath: string } | { error: string }> => {
     if (
       typeof downloadUrl !== "string" ||
@@ -670,6 +743,8 @@ ipcMain.handle(
     ) {
       return { error: "Invalid parameters" };
     }
+    const resolvedChecksumUrl =
+      typeof checksumUrl === "string" && checksumUrl.length > 0 ? checksumUrl : null;
     try {
       const result = await downloadAsset(
         { name: assetName, browser_download_url: downloadUrl, size: assetSize },
@@ -679,6 +754,26 @@ ipcMain.handle(
           }
         }
       );
+
+      // Verify SHA-256 checksum when a companion checksum asset is available.
+      if (resolvedChecksumUrl) {
+        try {
+          const checksumText = await downloadChecksumText(resolvedChecksumUrl);
+          await verifyAssetChecksum(result.filePath, assetName, checksumText);
+        } catch (checksumErr) {
+          // Delete the untrusted file and abort the update.
+          try { require("fs").unlinkSync(result.filePath); } catch { /* best-effort */ }
+          const error = `Checksum verification failed: ${String(checksumErr)}`;
+          log.error("Update aborted — checksum mismatch", { assetName, error });
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("update-download-error", { error });
+          }
+          return { error };
+        }
+      } else {
+        log.warn("No checksum asset found for update; integrity unverified", { assetName });
+      }
+
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("update-download-complete", {
           filePath: result.filePath,
@@ -779,7 +874,7 @@ ipcMain.handle("set-pin", (_event, pin: unknown) => {
     log.warn("IPC: set-pin rejected — invalid PIN");
     return false;
   }
-  const encrypted = encryptPrivateKey(pin);
+  const encrypted = encryptPrivateKey(hashPin(pin));
   store.set("appLockPin", encrypted);
   log.info("IPC: app lock PIN saved");
   return true;
@@ -790,7 +885,25 @@ ipcMain.handle("verify-pin", (_event, pin: unknown) => {
   const stored = store.get("appLockPin") as string | undefined;
   if (!stored) return false;
   const decrypted = decryptPrivateKey(stored);
-  return decrypted === pin;
+
+  if (decrypted.startsWith("scrypt:")) {
+    return verifyPinHash(pin, decrypted);
+  }
+
+  // Legacy path: PIN was stored as plaintext (pre-hash upgrade).
+  // Use constant-time comparison to prevent timing attacks, then upgrade on match.
+  const storedBuf = Buffer.from(decrypted, "utf8");
+  const inputBuf = Buffer.from(pin, "utf8");
+  const lengthsMatch = storedBuf.length === inputBuf.length;
+  // Always run timingSafeEqual with equal-length buffers to avoid early exit.
+  const paddedInput = Buffer.alloc(storedBuf.length);
+  inputBuf.copy(paddedInput);
+  const match = lengthsMatch && nodeCrypto.timingSafeEqual(storedBuf, paddedInput);
+  if (match) {
+    store.set("appLockPin", encryptPrivateKey(hashPin(pin)));
+    log.info("IPC: app lock PIN upgraded to hashed format");
+  }
+  return match;
 });
 
 ipcMain.handle("clear-pin", () => {
@@ -960,6 +1073,7 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     log.info("App ready");
+    checkSafeStorageAtStartup();
     await cleanOrphanedAudioModules();
     registerAudioCaptureHandlers(process.pid);
     const isAuthenticated = checkAuthentication();

@@ -132,12 +132,28 @@ if [ -f "$DEB_SRC" ]; then
     echo "  Created Ember.deb"
 fi
 
+echo "Generating SHA-256 checksums..."
+if ! command -v sha256sum &> /dev/null; then
+    echo "Error: sha256sum is not available. Cannot generate checksums." >&2
+    exit 1
+fi
+rm -f checksums.txt
+for artifact in Ember-Portable.exe EmberSetup.exe Ember.AppImage Ember.deb; do
+    if [ -f "$artifact" ]; then
+        sha256sum "$artifact" >> checksums.txt
+        echo "  Checksummed $artifact"
+    fi
+done
+echo "checksums.txt created:"
+cat checksums.txt
+
 echo "Creating GitHub release v$NEW_VERSION..."
 ASSETS=""
 [ -f "Ember-Portable.exe" ] && ASSETS="$ASSETS Ember-Portable.exe"
 [ -f "EmberSetup.exe" ] && ASSETS="$ASSETS EmberSetup.exe"
 [ -f "Ember.AppImage" ] && ASSETS="$ASSETS Ember.AppImage"
 [ -f "Ember.deb" ] && ASSETS="$ASSETS Ember.deb"
+[ -f "checksums.txt" ] && ASSETS="$ASSETS checksums.txt"
 
 # Use the generated release notes directly for GitHub release
 gh release create "v$NEW_VERSION" \

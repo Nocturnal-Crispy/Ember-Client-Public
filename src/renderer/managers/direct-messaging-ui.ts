@@ -1192,7 +1192,13 @@
     if (!typingIndicator) return;
     
     if (isTyping && username) {
-      typingIndicator.innerHTML = `${username} is typing<span>.</span><span>.</span><span>.</span>`;
+      const nameNode = document.createTextNode(`${username} is typing`);
+      const dots = ['.', '.', '.'].map(() => {
+        const s = document.createElement('span');
+        s.textContent = '.';
+        return s;
+      });
+      typingIndicator.replaceChildren(nameNode, ...dots);
       typingIndicator.style.display = 'block';
     } else {
       typingIndicator.style.display = 'none';
@@ -1213,12 +1219,16 @@
       messageElement.appendChild(reactionsContainer);
     }
     
-    reactionsContainer.innerHTML = reactions.map(reaction => `
-      <div class="dm-reaction ${reaction.reacted ? 'reacted' : ''}" data-reaction="${reaction.emoji}">
-        ${reaction.emoji} ${reaction.count}
-      </div>
-    `).join('');
-    
+    reactionsContainer.replaceChildren(
+      ...reactions.map(reaction => {
+        const div = document.createElement('div');
+        div.className = `dm-reaction${reaction.reacted ? ' reacted' : ''}`;
+        div.dataset.reaction = reaction.emoji;
+        div.textContent = `${reaction.emoji} ${reaction.count}`;
+        return div;
+      })
+    );
+
     // Add click handlers for reactions
     reactionsContainer.querySelectorAll('.dm-reaction').forEach(element => {
       element.addEventListener('click', () => {
@@ -1297,13 +1307,24 @@
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     
-    menu.innerHTML = items.map(item => `
-      <div class="dm-context-menu-item ${item.danger ? 'danger' : ''}" data-action="${item.action}">
-        <span>${item.icon}</span>
-        <span>${item.label}</span>
-      </div>
-      ${item.separator ? '<div class="dm-context-menu-separator"></div>' : ''}
-    `).join('');
+    menu.replaceChildren(
+      ...items.flatMap(item => {
+        const div = document.createElement('div');
+        div.className = `dm-context-menu-item${item.danger ? ' danger' : ''}`;
+        div.dataset.action = item.action;
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = item.icon;
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = item.label;
+        div.replaceChildren(iconSpan, labelSpan);
+        if (item.separator) {
+          const sep = document.createElement('div');
+          sep.className = 'dm-context-menu-separator';
+          return [div, sep];
+        }
+        return [div];
+      })
+    );
     
     document.body.appendChild(menu);
     

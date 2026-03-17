@@ -168,7 +168,8 @@
         'download-update',
         currentDetails.downloadUrl,
         currentDetails.assetName,
-        currentDetails.downloadSize
+        currentDetails.downloadSize,
+        currentDetails.checksumUrl ?? null
       ) as { filePath?: string; error?: string };
 
       if (result.error) {
