@@ -363,25 +363,27 @@
   }
 
   function updateSpeakingIndicator(userId: string, isSpeaking: boolean): void {
-    const elements = document.querySelectorAll<HTMLElement>(
+    // Sidebar voice avatars
+    document.querySelectorAll<HTMLElement>(
       `.voice-avatar[data-user-id="${userId}"]`
-    );
-    // log.debug("updateSpeakingIndicator", {
-    //   user_id: userId,
-    //   is_speaking: isSpeaking,
-    //   elements_found: elements.length,
-    // });
-    elements.forEach((el) => {
-      el.classList.toggle("speaking", isSpeaking);
+    ).forEach((el) => el.classList.toggle("speaking", isSpeaking));
+    // Video grid tiles
+    (["camera", "screen", "audio-only"] as const).forEach((type) => {
+      document
+        .querySelector<HTMLElement>(`[data-tile-id="${userId}:${type}"]`)
+        ?.classList.toggle("speaking", isSpeaking);
     });
   }
 
   function showVoiceControls(channelName: string): void {
     const panel = document.getElementById("voice-controls");
-    if (!panel) return;
-    panel.classList.remove("hidden");
-    const nameEl = panel.querySelector(".voice-channel-name");
-    if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
+    if (panel) {
+      panel.classList.remove("hidden");
+      const nameEl = panel.querySelector(".voice-channel-name");
+      if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
+    }
+    const barChannel = document.getElementById("voice-bar-channel");
+    if (barChannel) barChannel.textContent = "\uD83D\uDD0A " + channelName;
   }
 
   function hideVoiceControls(): void {
@@ -429,6 +431,65 @@
   document
     .getElementById("voice-screen-share-btn")
     ?.addEventListener("click", () => toggleScreenShare());
+
+  // ─── Voice Bottom Bar (#vbar-*) button wiring ──────────────────────────────
+
+  document.getElementById("vbar-mute")?.addEventListener("click", () => {
+    if (!App.voiceManager) return;
+    const muted = (App.voiceManager as { toggleMute(): boolean }).toggleMute();
+    const btn = document.getElementById("vbar-mute");
+    if (!btn) return;
+    btn.classList.toggle("active", muted);
+    btn.title = muted ? "Unmute" : "Mute";
+    btn.textContent = muted ? "\uD83D\uDD07" : "\uD83C\uDFA4";
+    // Sync sidebar button
+    const sideBtn = document.getElementById("voice-mute-btn");
+    if (sideBtn) {
+      sideBtn.classList.toggle("active", muted);
+      sideBtn.title = btn.title;
+      sideBtn.textContent = btn.textContent;
+    }
+    playVoiceSound(muted ? "mute" : "unmute");
+  });
+
+  document.getElementById("vbar-deafen")?.addEventListener("click", () => {
+    if (!App.voiceManager) return;
+    const deafened = (
+      App.voiceManager as { toggleDeafen(): boolean }
+    ).toggleDeafen();
+    const btn = document.getElementById("vbar-deafen");
+    if (!btn) return;
+    btn.classList.toggle("active", deafened);
+    btn.title = deafened ? "Undeafen" : "Deafen";
+    btn.textContent = deafened ? "\uD83D\uDD15" : "\uD83C\uDFA7";
+    const sideBtn = document.getElementById("voice-deafen-btn");
+    if (sideBtn) {
+      sideBtn.classList.toggle("active", deafened);
+      sideBtn.title = btn.title;
+      sideBtn.textContent = btn.textContent;
+    }
+    playVoiceSound(deafened ? "deafen" : "undeafen");
+  });
+
+  document
+    .getElementById("vbar-camera")
+    ?.addEventListener("click", () => toggleCamera());
+
+  document
+    .getElementById("vbar-screen")
+    ?.addEventListener("click", () => toggleScreenShare());
+
+  document.getElementById("vbar-popout")?.addEventListener("click", () => {
+    window.toggleVideoPopout();
+  });
+
+  document.getElementById("vbar-disconnect")?.addEventListener("click", () => {
+    playVoiceSound("disconnect");
+    leaveVoiceChannel();
+    document
+      .querySelectorAll(".channel")
+      .forEach((el) => el.classList.remove("active"));
+  });
 
   // ─── View Switching Functions ──────────────────────────────────────────────
 
@@ -633,11 +694,14 @@
   function handleVoiceScreenShareStarted(userId: string): void {
     log.info("Remote screen share started", { user_id: userId });
     App.screenShareParticipants.add(userId);
+    App.lastScreenShareUserId = userId;
   }
 
   function handleVoiceScreenShareStopped(userId: string): void {
     log.info("Remote screen share stopped", { user_id: userId });
     App.screenShareParticipants.delete(userId);
+    if (App.focusedTileId === `${userId}:screen`) App.focusedTileId = null;
+    if (App.lastScreenShareUserId === userId) App.lastScreenShareUserId = null;
   }
 
   function updateVideoGridVisibility(): void {
@@ -666,64 +730,180 @@
     }
   }
 
+  function resolveSpotlight(desiredTiles: Set<string>): string | null {
+    if (App.focusedTileId && desiredTiles.has(App.focusedTileId))
+      return App.focusedTileId;
+    if (App.lastScreenShareUserId) {
+      const t = App.lastScreenShareUserId + ":screen";
+      if (desiredTiles.has(t)) return t;
+    }
+    for (const t of desiredTiles) if (t.endsWith(":screen")) return t;
+    for (const t of desiredTiles) if (t.endsWith(":camera")) return t;
+    return null;
+  }
+
   async function renderVideoGrid(): Promise<void> {
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
-    grid.replaceChildren();
+    const focusArea = document.getElementById("video-focus-area");
+    const strip = document.getElementById("video-strip");
+    const audioBar = document.getElementById("video-audio-only-bar");
+    if (!focusArea || !strip || !audioBar) return;
 
     const vm = App.voiceManager as {
       auth?: AuthForVoice;
       localVideoStream?: MediaStream | null;
+      localScreenStream?: MediaStream | null;
       remoteVideoStreams?: Map<string, MediaStream>;
+      remoteScreenStreams?: Map<string, MediaStream>;
+      _userToVideoStreamId?: Map<string, string>;
+      _userToScreenStreamId?: Map<string, string>;
     } | null;
     const selfId = vm?.auth?.user_id;
     let selfUsername = vm?.auth?.username;
-
     let selfAvatar = "";
     if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice & { avatar?: string } | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as
+        | (AuthForVoice & { avatar?: string })
+        | null;
       selfUsername = auth?.username;
       selfAvatar = auth?.avatar ?? "";
     } else {
-      const auth = (await ipcRenderer.invoke("get-auth")) as { avatar?: string } | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        avatar?: string;
+      } | null;
       selfAvatar = auth?.avatar ?? "";
     }
 
-    grid.appendChild(
-      createVideoTile(
-        "__self__",
-        selfUsername ?? selfId ?? "?",
-        App.localCameraOn ? (vm?.localVideoStream ?? null) : null,
-        true,
-        selfAvatar
-      )
-    );
+    // ── Build desired tile set ────────────────────────────────────────────────
+    const desiredTiles = new Set<string>();
+    if (App.localCameraOn) desiredTiles.add("__self__:camera");
+    if (App.localScreenShareOn) desiredTiles.add("__self__:screen");
+    if (!App.localCameraOn && !App.localScreenShareOn)
+      desiredTiles.add("__self__:audio-only");
 
-    App.voiceParticipants.forEach((username, userId) => {
+    App.voiceParticipants.forEach((_username, userId) => {
       if (userId === selfId) return;
       const hasCamera = App.videoParticipants.has(userId);
-      let stream: MediaStream | null = null;
-      if (hasCamera && vm?.remoteVideoStreams) {
-        vm.remoteVideoStreams.forEach((s) => {
-          if (!stream) stream = s;
+      const hasScreen = App.screenShareParticipants.has(userId);
+      if (hasCamera) desiredTiles.add(`${userId}:camera`);
+      if (hasScreen) desiredTiles.add(`${userId}:screen`);
+      if (!hasCamera && !hasScreen) desiredTiles.add(`${userId}:audio-only`);
+    });
+
+    // ── Collect existing tile IDs from all sub-containers ────────────────────
+    const existingTileIds = new Set<string>();
+    [focusArea, strip, audioBar].forEach((container) => {
+      container
+        .querySelectorAll<HTMLElement>("[data-tile-id]")
+        .forEach((el) => {
+          if (el.dataset["tileId"]) existingTileIds.add(el.dataset["tileId"]);
         });
+    });
+
+    // ── Remove stale tiles ───────────────────────────────────────────────────
+    existingTileIds.forEach((tileId) => {
+      if (!desiredTiles.has(tileId)) {
+        document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)?.remove();
       }
-      grid.appendChild(
-        createVideoTile(userId, username, hasCamera ? stream : null, false, getMemberAvatar(userId))
-      );
+    });
+
+    // ── Determine spotlight ──────────────────────────────────────────────────
+    const spotlight = resolveSpotlight(desiredTiles);
+
+    // ── Add or move tiles ────────────────────────────────────────────────────
+    desiredTiles.forEach((tileId) => {
+      const colonIdx = tileId.lastIndexOf(":");
+      const userId = tileId.substring(0, colonIdx);
+      const type = tileId.substring(colonIdx + 1) as
+        | "camera"
+        | "screen"
+        | "audio-only";
+
+      const targetContainer =
+        tileId === spotlight ? focusArea : type === "audio-only" ? audioBar : strip;
+
+      if (!existingTileIds.has(tileId)) {
+        // ── Create new tile ────────────────────────────────────────────────
+        let stream: MediaStream | null = null;
+        if (type === "camera") {
+          if (userId === "__self__") {
+            stream = vm?.localVideoStream ?? null;
+          } else if (vm?.remoteVideoStreams) {
+            const streamId = vm._userToVideoStreamId?.get(userId);
+            if (streamId) {
+              stream = vm.remoteVideoStreams.get(streamId) ?? null;
+            } else {
+              vm.remoteVideoStreams.forEach((s) => {
+                if (!stream) stream = s;
+              });
+            }
+          }
+        } else if (type === "screen") {
+          if (userId === "__self__") {
+            stream = vm?.localScreenStream ?? null;
+          } else if (vm?.remoteScreenStreams) {
+            const streamId = vm._userToScreenStreamId?.get(userId);
+            if (streamId) {
+              stream = vm.remoteScreenStreams.get(streamId) ?? null;
+            }
+          }
+        }
+
+        const username =
+          userId === "__self__"
+            ? (selfUsername ?? selfId ?? "?")
+            : (App.voiceParticipants.get(userId) ?? userId);
+        const avatar = userId === "__self__" ? selfAvatar : getMemberAvatar(userId);
+        const tile = createVideoTile(userId, type, username, stream, userId === "__self__", avatar);
+        targetContainer.appendChild(tile);
+      } else {
+        // ── Move existing tile if spotlight changed ─────────────────────────
+        const existingTile = document.querySelector<HTMLElement>(
+          `[data-tile-id="${tileId}"]`
+        );
+        if (existingTile && existingTile.parentElement !== targetContainer) {
+          targetContainer.appendChild(existingTile);
+        }
+      }
     });
   }
 
   function createVideoTile(
     userId: string,
+    tileType: "camera" | "screen" | "audio-only",
     username: string,
     stream: MediaStream | null,
     isSelf: boolean,
     avatar?: string
   ): HTMLElement {
     const tile = document.createElement("div");
+    tile.dataset["tileId"] = `${userId}:${tileType}`;
+
+    if (tileType === "audio-only") {
+      // Compact row: avatar + username
+      tile.className = "video-tile audio-only-tile";
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "video-tile-avatar";
+      if (avatar) {
+        const img = document.createElement("img");
+        img.src = avatar;
+        img.alt = username;
+        img.style.cssText =
+          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+      }
+      const label = document.createElement("span");
+      label.className = "video-tile-label";
+      label.textContent = username ?? userId;
+      tile.appendChild(avatarEl);
+      tile.appendChild(label);
+      return tile;
+    }
+
+    // camera or screen tile
     tile.className = "video-tile";
-    tile.dataset["userId"] = userId;
+    if (tileType === "screen") tile.classList.add("screen-tile");
 
     if (stream) {
       const video = document.createElement("video") as HTMLVideoElement;
@@ -738,8 +918,9 @@
       if (avatar) {
         const img = document.createElement("img");
         img.src = avatar;
-        img.alt = username ?? userId;
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        img.alt = username;
+        img.style.cssText =
+          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
         avatarEl.appendChild(img);
       } else {
         avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
@@ -747,19 +928,27 @@
       tile.appendChild(avatarEl);
     }
 
+    if (tileType === "screen") {
+      const badge = document.createElement("span");
+      badge.className = "screen-badge";
+      badge.textContent = "🖥️";
+      tile.appendChild(badge);
+    }
+
     const label = document.createElement("div");
     label.className = "video-tile-label";
     label.textContent = username ?? userId;
     tile.appendChild(label);
+
+    tile.addEventListener("click", () => window.setSpotlight(`${userId}:${tileType}`));
+
     return tile;
   }
 
   function removeVideoTile(userId: string): void {
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
-    grid
-      .querySelector<HTMLElement>(`.video-tile[data-user-id="${userId}"]`)
-      ?.remove();
+    document
+      .querySelectorAll<HTMLElement>(`[data-tile-id^="${userId}:"]`)
+      .forEach((el) => el.remove());
   }
 
   function handleRemoteCameraStateChanged(userId: string, isOn: boolean): void {
@@ -782,12 +971,10 @@
     stream: MediaStream
   ): void {
     log.debug("Remote video stream added", { stream_id: streamId });
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
     for (const userId of App.videoParticipants) {
       if (userId === "__self__") continue;
-      const tile = grid.querySelector<HTMLElement>(
-        `.video-tile[data-user-id="${userId}"]`
+      const tile = document.querySelector<HTMLElement>(
+        `[data-tile-id="${userId}:camera"]`
       );
       if (tile && !tile.querySelector("video")) {
         tile.querySelector(".video-tile-avatar")?.remove();
@@ -1684,4 +1871,12 @@
   window.toggleScreenShare = toggleScreenShare;
   window.handleVoiceScreenShareStarted = handleVoiceScreenShareStarted;
   window.handleVoiceScreenShareStopped = handleVoiceScreenShareStopped;
+  window.resolveSpotlight = resolveSpotlight;
+  window.setSpotlight = (tileId: string | null): void => {
+    App.focusedTileId = tileId;
+    renderVideoGrid();
+  };
+  window.toggleVideoPopout = (): void => {
+    App.videoPopoutOpen = !App.videoPopoutOpen;
+  };
 })();

@@ -404,6 +404,126 @@ describe('toggleScreenShare — start path', () => {
   });
 });
 
+// ─── Phase 7: resolveSpotlight ───────────────────────────────────────────────
+
+describe('resolveSpotlight', () => {
+  beforeEach(() => {
+    const App = (window as any).App;
+    App.focusedTileId = null;
+    App.lastScreenShareUserId = null;
+  });
+
+  it('returns null for an empty tile set', () => {
+    const result = (window as any).resolveSpotlight(new Set<string>());
+    expect(result).toBeNull();
+  });
+
+  it('returns the user-selected focusedTileId when still present in desired tiles', () => {
+    (window as any).App.focusedTileId = `${USER_A}:camera`;
+    const tiles = new Set([`${USER_A}:camera`, `${USER_B}:audio-only`]);
+    expect((window as any).resolveSpotlight(tiles)).toBe(`${USER_A}:camera`);
+  });
+
+  it('falls through to next rule when focusedTileId is not in desired tiles', () => {
+    (window as any).App.focusedTileId = 'user-gone:screen';
+    const tiles = new Set([`${USER_A}:camera`]);
+    expect((window as any).resolveSpotlight(tiles)).toBe(`${USER_A}:camera`);
+  });
+
+  it('returns lastScreenShareUserId:screen when present in desired tiles', () => {
+    (window as any).App.lastScreenShareUserId = USER_A;
+    const tiles = new Set([`${USER_A}:screen`, `${USER_B}:audio-only`]);
+    expect((window as any).resolveSpotlight(tiles)).toBe(`${USER_A}:screen`);
+  });
+
+  it('returns the first screen tile when no focus or lastScreenShareUserId', () => {
+    const tiles = new Set([`${USER_A}:audio-only`, `${USER_B}:screen`]);
+    expect((window as any).resolveSpotlight(tiles)).toBe(`${USER_B}:screen`);
+  });
+
+  it('returns the first camera tile when no screen tiles are present', () => {
+    const tiles = new Set([`${USER_A}:audio-only`, `${USER_B}:camera`]);
+    expect((window as any).resolveSpotlight(tiles)).toBe(`${USER_B}:camera`);
+  });
+
+  it('returns null when only audio-only tiles are present', () => {
+    const tiles = new Set([`${USER_A}:audio-only`, `${USER_B}:audio-only`]);
+    expect((window as any).resolveSpotlight(tiles)).toBeNull();
+  });
+});
+
+// ─── Phase 7: updateSpeakingIndicator — video tiles ──────────────────────────
+
+describe('updateSpeakingIndicator — video tiles', () => {
+  function createTileEl(userId: string, type: string): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'video-tile';
+    el.dataset['tileId'] = `${userId}:${type}`;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('adds speaking class to a camera tile', () => {
+    createTileEl(USER_A, 'camera');
+    (window as any).updateSpeakingIndicator(USER_A, true);
+    const el = document.querySelector<HTMLElement>(`[data-tile-id="${USER_A}:camera"]`);
+    expect(el!.classList.contains('speaking')).toBe(true);
+  });
+
+  it('adds speaking class to a screen tile', () => {
+    createTileEl(USER_A, 'screen');
+    (window as any).updateSpeakingIndicator(USER_A, true);
+    const el = document.querySelector<HTMLElement>(`[data-tile-id="${USER_A}:screen"]`);
+    expect(el!.classList.contains('speaking')).toBe(true);
+  });
+
+  it('adds speaking class to an audio-only tile', () => {
+    createTileEl(USER_A, 'audio-only');
+    (window as any).updateSpeakingIndicator(USER_A, true);
+    const el = document.querySelector<HTMLElement>(`[data-tile-id="${USER_A}:audio-only"]`);
+    expect(el!.classList.contains('speaking')).toBe(true);
+  });
+
+  it('removes speaking class from a tile when isSpeaking is false', () => {
+    const el = createTileEl(USER_A, 'camera');
+    el.classList.add('speaking');
+    (window as any).updateSpeakingIndicator(USER_A, false);
+    expect(el.classList.contains('speaking')).toBe(false);
+  });
+});
+
+// ─── Phase 7: setSpotlight global ────────────────────────────────────────────
+
+describe('setSpotlight', () => {
+  it('sets App.focusedTileId to the given tileId', () => {
+    (window as any).setSpotlight(`${USER_A}:screen`);
+    expect((window as any).App.focusedTileId).toBe(`${USER_A}:screen`);
+  });
+
+  it('sets App.focusedTileId to null when called with null', () => {
+    (window as any).App.focusedTileId = `${USER_A}:camera`;
+    (window as any).setSpotlight(null);
+    expect((window as any).App.focusedTileId).toBeNull();
+  });
+});
+
+// ─── Phase 7: showVoiceControls — bottom bar channel name ────────────────────
+
+describe('showVoiceControls — bottom bar', () => {
+  it('sets #voice-bar-channel textContent to the channel name', () => {
+    const panel = document.createElement('div');
+    panel.id = 'voice-controls';
+    document.body.appendChild(panel);
+    const channelNameEl = document.createElement('span');
+    channelNameEl.id = 'voice-bar-channel';
+    document.body.appendChild(channelNameEl);
+
+    (window as any).showVoiceControls('general');
+
+    expect(channelNameEl.textContent).toBe('🔊 general');
+  });
+});
+
 // ─── Speaking indicator persists through re-render (integration) ──────────────
 
 describe('speaking indicator persists through re-render', () => {

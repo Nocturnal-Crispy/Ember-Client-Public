@@ -109,16 +109,167 @@
   text-overflow: ellipsis;
 }
 
-/* ─── Video Grid ────────────────────────────────────────────────────────────── */
+/* ─── Video Grid — Discord-style layout ─────────────────────────────────────── */
 .video-grid {
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 8px;
-  padding: 12px;
-  overflow-y: auto;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #111;
 }
+
+/* Focus area: large spotlight tile */
+.video-focus-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-height: 0;
+}
+
+.video-focus-area .video-tile {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+/* Strip: horizontal scroll for non-spotlight tiles */
+.video-strip {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 120px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.video-strip .video-tile {
+  width: 160px;
+  height: 90px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.video-strip .video-tile:hover {
+  border-color: rgba(var(--rgb-highlight), 0.5);
+}
+
+/* Audio-only bar: compact row of non-video participants */
+.video-audio-only-bar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.audio-only-tile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 8px;
+  background: rgba(var(--rgb-highlight), 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(var(--rgb-highlight), 0.12);
+}
+
+.audio-only-tile .video-tile-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--highlight);
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.audio-only-tile .video-tile-label {
+  position: static;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(var(--rgb-text), 0.9);
+  text-shadow: none;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-only-tile.speaking {
+  border-color: #f97316;
+  box-shadow: 0 0 0 1px #f97316;
+}
+
+/* Voice bottom bar */
+.voice-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #1a1a1a;
+  border-top: 1px solid rgba(var(--rgb-highlight), 0.15);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.voice-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.voice-bar-channel-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--online-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-bar-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.voice-btn.danger:hover {
+  background-color: rgba(var(--rgb-close-button), 0.2);
+}
+
+/* Screen tile badge */
+.screen-tile {
+  border-color: rgba(var(--rgb-highlight), 0.4);
+}
+
+.screen-badge {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 14px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+/* Speaking glow on video tiles */
+.video-tile.speaking {
+  box-shadow: 0 0 0 3px #f97316;
+  animation: speaking-pulse 1s ease-in-out infinite;
+}
+
+/* Old flat grid (kept for backwards compatibility during transition) */
 
 .video-tile {
   position: relative;

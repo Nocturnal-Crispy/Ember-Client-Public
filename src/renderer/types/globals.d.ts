@@ -626,8 +626,9 @@ declare global {
     ): void;
     hideScreenShareModal(): void;
     // Globals set by voice-ui-manager.ts (video grid)
-    setSpotlight(userId: string | null): void;
+    setSpotlight(tileId: string | null): void;
     toggleVideoPopout(): void;
+    resolveSpotlight(desiredTiles: Set<string>): string | null;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;
     // Globals set by update-notifier.ts
