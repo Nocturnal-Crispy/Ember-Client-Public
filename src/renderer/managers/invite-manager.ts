@@ -321,7 +321,11 @@
       const inviteMaxUsesSelect = getInviteMaxUsesSelect();
       const expiresIn = parseInt(inviteExpirationSelect?.value ?? "0") || 0;
       const maxUses = parseInt(inviteMaxUsesSelect?.value ?? "0") || 0;
-      const inviteCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+      // 16 bytes = 128-bit entropy, matching the server's generateInviteCode().
+      // Note: the code must be generated client-side because it serves as the
+      // PBKDF2 password for encryptEmberKeyForInvite; moving generation fully
+      // server-side would require a two-step protocol change.
+      const inviteCode = Array.from(crypto.getRandomValues(new Uint8Array(16)))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
