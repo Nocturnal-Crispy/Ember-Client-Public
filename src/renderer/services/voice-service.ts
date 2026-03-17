@@ -57,6 +57,27 @@ class VoiceManager {
   _pttKeydownHandler: ((e: KeyboardEvent) => void) | null;
   _pttKeyupHandler: ((e: KeyboardEvent) => void) | null;
 
+  // ─── Screen share ───────────────────────────────────────────────────────────
+  localScreenStream: MediaStream | null;
+  isScreenSharing: boolean;
+  onScreenShareStarted: ((userId: string) => void) | null;
+  onScreenShareStopped: ((userId: string) => void) | null;
+  // Phase 10: stream ID routing for multiple simultaneous screen shares
+  _screenStreamIdToUser: Map<string, string>;
+  _userToScreenStreamId: Map<string, string>;
+  remoteScreenStreams: Map<string, MediaStream>;
+
+  // ─── Audio capture ────────────────────────────────────────────────────────
+  _audioCaptureSetup: boolean;
+  _audioCaptureInterval: ReturnType<typeof setInterval> | null;
+  _audioCapturePCMBuffer: Int16Array[];
+  _audioCtxCapture: AudioContext | null;
+  _audioCaptureScriptNode: ScriptProcessorNode | null;
+  _audioCaptureDestination: MediaStreamAudioDestinationNode | null;
+  // Phase 9: native capture via AudioWorklet or PulseAudio
+  _nativeAudioCaptureActive: boolean;
+  _screenAudioCtx: AudioContext | null;
+
   constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
     _voiceLog.info("VoiceManager created");
     this.ws = wsConnection;
@@ -93,6 +114,25 @@ class VoiceManager {
     this._pttKey = "Backquote";
     this._pttKeydownHandler = null;
     this._pttKeyupHandler = null;
+
+    // Screen share
+    this.localScreenStream = null;
+    this.isScreenSharing = false;
+    this.onScreenShareStarted = null;
+    this.onScreenShareStopped = null;
+    this._screenStreamIdToUser = new Map();
+    this._userToScreenStreamId = new Map();
+    this.remoteScreenStreams = new Map();
+
+    // Audio capture
+    this._audioCaptureSetup = false;
+    this._audioCaptureInterval = null;
+    this._audioCapturePCMBuffer = [];
+    this._audioCtxCapture = null;
+    this._audioCaptureScriptNode = null;
+    this._audioCaptureDestination = null;
+    this._nativeAudioCaptureActive = false;
+    this._screenAudioCtx = null;
   }
 
   async fetchICEServers(): Promise<void> {
@@ -323,6 +363,13 @@ class VoiceManager {
     this.remoteVideoStreams.clear();
     this.isCameraOn = false;
 
+    if (this.localScreenStream) {
+      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+    }
+    this.isScreenSharing = false;
+    this._stopAudioCapture().catch(() => { /* ignore */ });
+
     if (this._audioCtx) {
       this._audioCtx.close().catch(() => {
         /* ignore */
@@ -370,29 +417,7 @@ class VoiceManager {
       });
 
       this.subscriberPC.ontrack = (event: RTCTrackEvent) => {
-        const stream = event.streams[0];
-        _voiceLog.debug("ontrack fired (subscriber)", {
-          kind: event.track.kind,
-          trackId: event.track.id,
-          streamId: stream?.id ?? "none",
-        });
-        if (!stream) return;
-        if (event.track.kind === "audio") {
-          if (!this.remoteStreams.has(stream.id)) {
-            this.remoteStreams.set(stream.id, stream);
-            _voiceLog.info("Remote audio stream added", { streamId: stream.id });
-            if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
-          } else {
-            _voiceLog.debug("Remote audio stream already tracked, skipping", {
-              streamId: stream.id,
-            });
-          }
-        } else if (event.track.kind === "video") {
-          this.remoteVideoStreams.set(stream.id, stream);
-          _voiceLog.info("Remote video stream added", { streamId: stream.id });
-          if (this.onVideoStreamAdded)
-            this.onVideoStreamAdded(stream.id, stream);
-        }
+        this._handleSubscriberTrack(event);
       };
 
       this.subscriberPC.onicecandidate = (
@@ -527,8 +552,28 @@ class VoiceManager {
   }
 
   handleParticipants(
-    participants: { user_id: string; username: string }[]
+    participants: { user_id: string; username: string; screen_sharing?: boolean; screen_stream_id?: string }[]
   ): void {
+    // Phase 10: reconcile stream ID maps for late joiners.
+    const activeScreenSids = new Set<string>();
+    for (const p of participants) {
+      if (p.screen_sharing && p.screen_stream_id) {
+        activeScreenSids.add(p.user_id);
+        if (!this._userToScreenStreamId.has(p.user_id)) {
+          this._screenStreamIdToUser.set(p.screen_stream_id, p.user_id);
+          this._userToScreenStreamId.set(p.user_id, p.screen_stream_id);
+        }
+      }
+    }
+    // Remove mappings for users who are no longer sharing.
+    for (const [userId] of this._userToScreenStreamId) {
+      if (!activeScreenSids.has(userId)) {
+        const streamId = this._userToScreenStreamId.get(userId)!;
+        this._screenStreamIdToUser.delete(streamId);
+        this._userToScreenStreamId.delete(userId);
+        this.remoteScreenStreams.delete(streamId);
+      }
+    }
     if (this.onParticipantsChanged) this.onParticipantsChanged(participants);
   }
 
@@ -549,6 +594,38 @@ class VoiceManager {
       el.muted = this.isDeafened;
     });
     return this.isDeafened;
+  }
+
+  // Phase 10: extracted from subscriberPC.ontrack for testability.
+  _handleSubscriberTrack(event: RTCTrackEvent): void {
+    const stream = event.streams[0];
+    _voiceLog.debug("ontrack fired (subscriber)", {
+      kind: event.track.kind,
+      trackId: event.track.id,
+      streamId: stream?.id ?? "none",
+    });
+    if (!stream) return;
+    if (event.track.kind === "audio") {
+      if (!this.remoteStreams.has(stream.id)) {
+        this.remoteStreams.set(stream.id, stream);
+        _voiceLog.info("Remote audio stream added", { streamId: stream.id });
+        if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
+      } else {
+        _voiceLog.debug("Remote audio stream already tracked, skipping", {
+          streamId: stream.id,
+        });
+      }
+    } else if (event.track.kind === "video") {
+      // Route screen streams to remoteScreenStreams, camera streams to remoteVideoStreams.
+      if (this._screenStreamIdToUser.has(stream.id)) {
+        this.remoteScreenStreams.set(stream.id, stream);
+        _voiceLog.info("Remote screen stream added", { streamId: stream.id });
+      } else {
+        this.remoteVideoStreams.set(stream.id, stream);
+        _voiceLog.info("Remote video stream added", { streamId: stream.id });
+      }
+      if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
+    }
   }
 
   _playRemoteStream(id: string, stream: MediaStream): void {
@@ -686,6 +763,12 @@ class VoiceManager {
     this._subscriberRemoteDescSet = false;
     this._subscriberIceQueue = [];
     this.isCameraOn = false;
+    if (this.localScreenStream) {
+      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+    }
+    this.isScreenSharing = false;
+    this._stopAudioCapture().catch(() => { /* ignore */ });
     const channelId = this.channelId;
     this.channelId = null;
     return channelId;
@@ -777,6 +860,369 @@ class VoiceManager {
             false
           );
         break;
+      case "screen_share_start": {
+        const ssUserId = String(msg.payload["user_id"] ?? "");
+        const ssStreamId = String(msg.payload["screen_stream_id"] ?? "");
+        if (ssStreamId) {
+          this._screenStreamIdToUser.set(ssStreamId, ssUserId);
+          this._userToScreenStreamId.set(ssUserId, ssStreamId);
+          _voiceLog.info("screen_share_start received, stream ID registered", {
+            userId: ssUserId,
+            screen_stream_id: ssStreamId,
+          });
+          // Fix race condition: if ontrack fired before this message arrived,
+          // the stream was placed in remoteVideoStreams — move it now.
+          const earlyStream = this.remoteVideoStreams.get(ssStreamId);
+          if (earlyStream) {
+            this.remoteVideoStreams.delete(ssStreamId);
+            this.remoteScreenStreams.set(ssStreamId, earlyStream);
+            _voiceLog.info("Reclassified early video track as screen share", {
+              screen_stream_id: ssStreamId,
+            });
+          }
+        }
+        if (this.onScreenShareStarted) this.onScreenShareStarted(ssUserId);
+        break;
+      }
+      case "screen_share_stop": {
+        const stopUserId = String(msg.payload["user_id"] ?? "");
+        const stopStreamId = this._userToScreenStreamId.get(stopUserId);
+        if (stopStreamId) {
+          this._screenStreamIdToUser.delete(stopStreamId);
+          this._userToScreenStreamId.delete(stopUserId);
+          this.remoteScreenStreams.delete(stopStreamId);
+        }
+        if (this.onScreenShareStopped) this.onScreenShareStopped(stopUserId);
+        break;
+      }
+      case "voice_renegotiate_answer": {
+        const raw = msg.payload["sdp"] as Record<string, unknown>;
+        if (
+          this.peerConnection &&
+          raw &&
+          typeof raw["type"] === "string" &&
+          typeof raw["sdp"] === "string"
+        ) {
+          this.peerConnection
+            .setRemoteDescription(
+              new RTCSessionDescription({
+                type: raw["type"] as RTCSdpType,
+                sdp: raw["sdp"],
+              })
+            )
+            .catch((err: unknown) =>
+              _voiceLog.error("voice_renegotiate_answer setRemoteDescription failed", {
+                error: String(err),
+              })
+            );
+        }
+        break;
+      }
+    }
+  }
+
+  // ─── Audio capture ────────────────────────────────────────────────────────
+
+  /**
+   * buildPulseAudioTrack — obtains audio from the PulseAudio combined-sink
+   * monitor device that the main process created. The monitor appears as a
+   * regular audioinput device in the renderer.
+   */
+  async buildPulseAudioTrack(): Promise<MediaStreamTrack | null> {
+    let devices: MediaDeviceInfo[];
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch {
+      return null;
+    }
+    const monitor = devices.find(
+      (d) =>
+        d.kind === 'audioinput' &&
+        d.label.toLowerCase().includes('ember_screen_capture')
+    );
+    if (!monitor) {
+      _voiceLog.warn('PulseAudio capture sink monitor device not found');
+      return null;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: monitor.deviceId } },
+        video: false,
+      });
+      return stream.getAudioTracks()[0] ?? null;
+    } catch (err) {
+      _voiceLog.warn('getUserMedia for PulseAudio monitor failed', { error: String(err) });
+      return null;
+    }
+  }
+
+  /**
+   * buildPcmInjectionTrack — AudioWorklet-based PCM injection track.
+   * Used for Windows WASAPI and Linux PipeWire capture paths.
+   * Loads pcm-injector.js, polls frames via requestAnimationFrame, and
+   * feeds raw Float32 PCM into a MediaStreamDestinationNode.
+   */
+  async buildPcmInjectionTrack(): Promise<MediaStreamTrack | null> {
+    const audioCtx = new AudioContext({ sampleRate: 48000 });
+    this._screenAudioCtx = audioCtx;
+    try {
+      await audioCtx.audioWorklet.addModule('audio/pcm-injector.js');
+    } catch (err) {
+      _voiceLog.error('Failed to load pcm-injector AudioWorklet', { error: String(err) });
+      audioCtx.close().catch(() => {});
+      this._screenAudioCtx = null;
+      return null;
+    }
+    const worklet = new AudioWorkletNode(audioCtx, 'pcm-injector');
+    const dest = audioCtx.createMediaStreamDestination();
+    worklet.connect(dest);
+
+    this._nativeAudioCaptureActive = true;
+    const poll = async () => {
+      if (!this.isScreenSharing || !this._nativeAudioCaptureActive) return;
+      try {
+        const frames = await (window.electronAPI as unknown as {
+          audioCapture: { frames(): Promise<{ pcm: Float32Array } | null> };
+        }).audioCapture.frames();
+        if (frames && frames.pcm && frames.pcm.length > 0) {
+          worklet.port.postMessage({ pcm: frames.pcm });
+        }
+      } catch { /* ignore transient frame errors */ }
+      requestAnimationFrame(poll);
+    };
+    poll();
+
+    _voiceLog.info('PCM injection audio track created');
+    return dest.stream.getAudioTracks()[0] ?? null;
+  }
+
+  /**
+   * buildAudioTrackFromNativeCapture — dispatches to the correct audio
+   * pipeline based on the platform reported by audio-capture-setup.
+   */
+  async buildAudioTrackFromNativeCapture(
+    result: { platform?: string }
+  ): Promise<MediaStreamTrack | null> {
+    if (result.platform === 'linux-pulseaudio') {
+      const track = await this.buildPulseAudioTrack();
+      if (track) this._nativeAudioCaptureActive = true;
+      return track;
+    }
+    // Windows WASAPI and Linux PipeWire: AudioWorklet PCM injection
+    return this.buildPcmInjectionTrack();
+  }
+
+  /**
+   * _startAudioCapture — attempt to start system audio capture via the
+   * main-process IPC bridge. Returns the audio MediaStream on success,
+   * or null if the platform does not support capture or setup fails.
+   */
+  async _startAudioCapture(): Promise<MediaStream | null> {
+    let setupResult: { success: boolean; platform?: string; reason?: string };
+    try {
+      setupResult = await (window.electronAPI as unknown as {
+        audioCapture: { setup(): Promise<{ success: boolean; platform?: string; reason?: string }> };
+      }).audioCapture.setup();
+    } catch (e) {
+      _voiceLog.warn("Audio capture setup threw", { error: String(e) });
+      return null;
+    }
+
+    if (!setupResult.success) {
+      _voiceLog.warn("Audio capture setup failed", {
+        reason: setupResult.reason ?? "unknown",
+      });
+      return null;
+    }
+
+    this._audioCaptureSetup = true;
+
+    const track = await this.buildAudioTrackFromNativeCapture(setupResult);
+    if (!track) {
+      this._audioCaptureSetup = false;
+      return null;
+    }
+
+    _voiceLog.info("Audio capture pipeline started", { platform: setupResult.platform });
+    return new MediaStream([track]);
+  }
+
+  /** _stopAudioCapture — tear down the audio capture pipeline. */
+  async _stopAudioCapture(): Promise<void> {
+    // Phase 9: stop rAF-based native capture loop
+    this._nativeAudioCaptureActive = false;
+
+    // Phase 9: close the AudioWorklet AudioContext
+    if (this._screenAudioCtx) {
+      await this._screenAudioCtx.close().catch(() => {});
+      this._screenAudioCtx = null;
+    }
+
+    // Legacy Phase 4 cleanup (kept for backward compat; no-ops in Phase 9)
+    if (this._audioCaptureInterval !== null) {
+      clearInterval(this._audioCaptureInterval);
+      this._audioCaptureInterval = null;
+    }
+    this._audioCapturePCMBuffer = [];
+
+    if (this._audioCaptureScriptNode) {
+      this._audioCaptureScriptNode.disconnect();
+      this._audioCaptureScriptNode = null;
+    }
+    if (this._audioCaptureDestination) {
+      this._audioCaptureDestination.disconnect();
+      this._audioCaptureDestination = null;
+    }
+    if (this._audioCtxCapture) {
+      await this._audioCtxCapture.close().catch(() => {});
+      this._audioCtxCapture = null;
+    }
+
+    if (this._audioCaptureSetup) {
+      try {
+        await (window.electronAPI as unknown as {
+          audioCapture: { teardown(): Promise<void> };
+        }).audioCapture.teardown();
+      } catch (e) {
+        _voiceLog.warn("Audio capture teardown failed", { error: String(e) });
+      }
+      this._audioCaptureSetup = false;
+    }
+    _voiceLog.info("Audio capture pipeline stopped");
+  }
+
+  // ─── Screen share methods ──────────────────────────────────────────────────
+
+  async startScreenShare(
+    sourceId: string,
+    settings: ScreenShareSettings
+  ): Promise<boolean> {
+    if (!this.channelId || !this.peerConnection) {
+      _voiceLog.warn("startScreenShare: not in a voice channel or no peerConnection");
+      return false;
+    }
+
+    const resolutionMap: Record<string, { maxWidth: number; maxHeight: number }> = {
+      "720p":  { maxWidth: 1280, maxHeight: 720  },
+      "1080p": { maxWidth: 1920, maxHeight: 1080 },
+      "1440p": { maxWidth: 2560, maxHeight: 1440 },
+    };
+    const res = resolutionMap[settings.resolution] ?? resolutionMap["720p"];
+
+    const constraints = {
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: sourceId,
+          maxWidth: res.maxWidth,
+          maxHeight: res.maxHeight,
+          maxFrameRate: settings.frameRate,
+        },
+      },
+    } as unknown as MediaStreamConstraints;
+
+    let stream: MediaStream;
+    try {
+      _voiceLog.info("Requesting screen capture stream", { sourceId });
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+      _voiceLog.error("Screen capture getUserMedia failed", { error: String(e) });
+      return false;
+    }
+
+    this.localScreenStream = stream;
+
+    // Attempt system audio capture when requested (Phase 4).
+    // Gracefully degrades to video-only when setup() returns {success: false}
+    // (as it always does before Phase 9 native addon integration).
+    if (settings.includeAudio) {
+      const audioStream = await this._startAudioCapture();
+      if (audioStream) {
+        const audioTrack = audioStream.getAudioTracks()[0];
+        if (audioTrack) {
+          this.peerConnection.addTransceiver(audioTrack, {
+            direction: "sendonly",
+            streams: [audioStream],
+          });
+          _voiceLog.info("Audio track added for screen share");
+        }
+      }
+    }
+
+    const videoTrack = stream.getVideoTracks()[0];
+    this.peerConnection.addTransceiver(videoTrack, {
+      direction: "sendonly",
+      streams: [stream],
+    });
+
+    let offer: RTCSessionDescriptionInit;
+    try {
+      offer = await this.peerConnection.createOffer();
+      await this.peerConnection.setLocalDescription(offer);
+    } catch (e) {
+      _voiceLog.error("startScreenShare: createOffer failed", { error: String(e) });
+      stream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream = null;
+      return false;
+    }
+
+    this.ws.send(
+      JSON.stringify({
+        type: "voice_renegotiate",
+        channel_id: this.channelId,
+        offer: { type: offer.type, sdp: offer.sdp },
+      })
+    );
+
+    this.ws.send(
+      JSON.stringify({
+        type: "screen_share_start",
+        channel_id: this.channelId,
+        screen_stream_id: stream.id,
+      })
+    );
+    _voiceLog.info("screen_share_start sent to server", { screen_stream_id: stream.id });
+
+    this.isScreenSharing = true;
+    _voiceLog.info("Screen share started, renegotiation offer sent");
+    return true;
+  }
+
+  async stopScreenShare(): Promise<void> {
+    if (!this.isScreenSharing || !this.localScreenStream) return;
+
+    _voiceLog.info("Stopping screen share");
+    this.localScreenStream.getTracks().forEach((t) => t.stop());
+    this.localScreenStream = null;
+    this.isScreenSharing = false;
+
+    await this._stopAudioCapture();
+
+    if (this.peerConnection && this.channelId) {
+      try {
+        const offer = await this.peerConnection.createOffer();
+        await this.peerConnection.setLocalDescription(offer);
+        this.ws.send(
+          JSON.stringify({
+            type: "voice_renegotiate",
+            channel_id: this.channelId,
+            offer: { type: offer.type, sdp: offer.sdp },
+          })
+        );
+      } catch (e) {
+        _voiceLog.warn("stopScreenShare: renegotiation offer failed", { error: String(e) });
+      }
+    }
+
+    if (this.channelId) {
+      this.ws.send(
+        JSON.stringify({
+          type: "screen_share_stop",
+          channel_id: this.channelId,
+        })
+      );
+      _voiceLog.info("screen_share_stop sent to server");
     }
   }
 

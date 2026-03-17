@@ -28,6 +28,7 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^ember-shared$": "<rootDir>/../ember-shared/src/index",
     "^ember-shared/(.*)$": "<rootDir>/../ember-shared/src/$1",
+    "^electron$": "<rootDir>/tests/__mocks__/electron.ts",
   },
 
   clearMocks: true,

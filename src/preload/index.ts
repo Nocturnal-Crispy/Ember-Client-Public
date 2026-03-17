@@ -114,6 +114,12 @@ const ALLOWED_INVOKE: readonly string[] = [
   "set-pin",
   "has-pin",
   "clear-pin",
+  "get-screen-sources",
+  "audio-capture-check-support",
+  "audio-capture-setup",
+  "audio-capture-frames",
+  "audio-capture-teardown",
+  "open-video-popout",
 ];
 
 const ALLOWED_ON: readonly string[] = [
@@ -463,6 +469,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   getKlipyApiKey: () => ipcRenderer.invoke("get-klipy-api-key"),
+
+  desktopCapturer: {
+    getSources: () => ipcRenderer.invoke("get-screen-sources"),
+  },
+
+  audioCapture: {
+    checkSupport: () => ipcRenderer.invoke("audio-capture-check-support"),
+    setup: () => ipcRenderer.invoke("audio-capture-setup"),
+    frames: () => ipcRenderer.invoke("audio-capture-frames"),
+    teardown: () => ipcRenderer.invoke("audio-capture-teardown"),
+  },
 
 });
 

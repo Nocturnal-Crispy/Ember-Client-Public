@@ -1,0 +1,250 @@
+/* ─── Screen Share Modal ───────────────────────────────────────────────────── */
+
+.screen-share-overlay {
+  align-items: center;
+}
+
+.screen-share-container {
+  position: relative;
+  background: rgb(var(--rgb-background));
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  width: 680px;
+  max-width: 92vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideIn 0.15s ease-out;
+}
+
+/* ─── Header ────────────────────────────────────────────────────────────────── */
+
+.screen-share-title {
+  margin: 0;
+  padding: 20px 24px 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.15);
+  flex-shrink: 0;
+}
+
+.screen-share-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: rgba(var(--rgb-text), 0.5);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  z-index: 1;
+}
+
+.screen-share-close:hover {
+  color: var(--text);
+  background: rgba(var(--rgb-highlight), 0.12);
+}
+
+/* ─── Source Grid ────────────────────────────────────────────────────────────── */
+
+.screen-share-source-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.screen-share-source-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.screen-share-source-grid::-webkit-scrollbar-thumb {
+  background: rgba(var(--rgb-highlight), 0.3);
+  border-radius: 3px;
+}
+
+.screen-share-source-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 2px solid rgba(var(--rgb-highlight), 0.1);
+  background: rgba(var(--rgb-surface), 0.6);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.screen-share-source-card:hover {
+  border-color: rgba(var(--rgb-highlight), 0.45);
+  background: rgba(var(--rgb-highlight), 0.06);
+  transform: translateY(-1px);
+}
+
+.screen-share-source-card.selected {
+  border-color: var(--highlight);
+  background: rgba(var(--rgb-highlight), 0.12);
+  box-shadow: 0 0 0 1px rgba(var(--rgb-highlight), 0.4);
+}
+
+.screen-share-source-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #111;
+  display: block;
+}
+
+.screen-share-source-name {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.75);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  max-width: 180px;
+}
+
+.screen-share-source-card.selected .screen-share-source-name {
+  color: var(--highlight);
+}
+
+/* ─── Settings ───────────────────────────────────────────────────────────────── */
+
+.screen-share-settings {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(var(--rgb-highlight), 0.12);
+  border-bottom: 1px solid rgba(var(--rgb-highlight), 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  background: rgba(var(--rgb-surface), 0.4);
+}
+
+.screen-share-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.screen-share-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(var(--rgb-text), 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 90px;
+}
+
+.screen-share-select {
+  background: rgb(var(--rgb-background));
+  border: 1px solid rgba(var(--rgb-highlight), 0.25);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  min-width: 100px;
+}
+
+.screen-share-select:hover,
+.screen-share-select:focus {
+  border-color: rgba(var(--rgb-highlight), 0.55);
+  outline: none;
+}
+
+/* ─── Audio row ──────────────────────────────────────────────────────────────── */
+
+.screen-share-audio-row {
+  gap: 10px;
+}
+
+.screen-share-audio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.screen-share-audio-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--highlight);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.screen-share-audio-label input:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.screen-share-audio-label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.screen-share-audio-status {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.45);
+  margin-left: auto;
+}
+
+/* ─── Actions ────────────────────────────────────────────────────────────────── */
+
+.screen-share-actions {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.screen-share-confirm-btn {
+  padding: 9px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  background: var(--highlight);
+  color: rgb(var(--rgb-background));
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.screen-share-confirm-btn:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.screen-share-confirm-btn:active:not(:disabled) {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.screen-share-confirm-btn:disabled {
+  background: rgba(var(--rgb-highlight), 0.25);
+  color: rgba(var(--rgb-text), 0.35);
+  cursor: not-allowed;
+  transform: none;
+}

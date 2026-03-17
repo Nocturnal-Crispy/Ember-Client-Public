@@ -85,25 +85,32 @@
       vm.onSpeakingChanged = (userId: string, isSpeaking: boolean) =>
         updateSpeakingIndicator(userId, isSpeaking);
       vm.onParticipantsChanged = (
-        participants: { user_id: string; username: string }[]
+        participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
         // Update own-session participant list (used for video grid)
         App.voiceParticipants.clear();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          App.voiceParticipants.set(p.user_id, p.username)
+        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        // Phase 10: reconcile screenShareParticipants from voice_participants.
+        const screenSids = new Set<string>(
+          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
         );
+        App.screenShareParticipants = screenSids;
+        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
         // Update cross-channel presence for this channel's sidebar using captured channelId
         const presenceMap = new Map<string, string>();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          presenceMap.set(p.user_id, p.username)
-        );
+        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
+        renderVideoGrid();
       };
       vm.onCameraStateChanged = (userId: string, isOn: boolean) =>
         handleRemoteCameraStateChanged(userId, isOn);
       vm.onVideoStreamAdded = (streamId: string, stream: MediaStream) =>
         handleRemoteVideoStream(streamId, stream);
+      vm.onScreenShareStarted = (userId: string) =>
+        handleVoiceScreenShareStarted(userId);
+      vm.onScreenShareStopped = (userId: string) =>
+        handleVoiceScreenShareStopped(userId);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
@@ -111,18 +118,21 @@
       vm.auth = auth;
       // Re-capture channelId in the participants callback for the new channel
       vm.onParticipantsChanged = (
-        participants: { user_id: string; username: string }[]
+        participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
         App.voiceParticipants.clear();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          App.voiceParticipants.set(p.user_id, p.username)
+        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        // Phase 10: reconcile screenShareParticipants from voice_participants.
+        const screenSids = new Set<string>(
+          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
         );
+        App.screenShareParticipants = screenSids;
+        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
         const presenceMap = new Map<string, string>();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          presenceMap.set(p.user_id, p.username)
-        );
+        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
+        renderVideoGrid();
       };
     }
 
@@ -165,8 +175,13 @@
     if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
       App.wsConnection.send(JSON.stringify({ type: "voice_camera_off" }));
     }
+    if (App.localScreenShareOn && App.wsConnection?.readyState === WebSocket.OPEN) {
+      App.wsConnection.send(JSON.stringify({ type: "screen_share_stop" }));
+    }
     App.localCameraOn = false;
+    App.localScreenShareOn = false;
     App.videoParticipants.clear();
+    App.screenShareParticipants.clear();
     if (App.activeView === "voice") showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById(
@@ -177,6 +192,14 @@
       cameraBtn.title = "Start Camera";
       cameraBtn.textContent = "📷";
       cameraBtn.disabled = false;
+    }
+    const screenShareBtn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (screenShareBtn) {
+      screenShareBtn.classList.remove("active");
+      screenShareBtn.title = "Share Screen";
+      screenShareBtn.disabled = false;
     }
     await (
       App.voiceManager as { leaveChannel(): Promise<void> }
@@ -346,29 +369,35 @@
   }
 
   function updateSpeakingIndicator(userId: string, isSpeaking: boolean): void {
-    const elements = document.querySelectorAll<HTMLElement>(
+    // Sidebar voice avatars
+    document.querySelectorAll<HTMLElement>(
       `.voice-avatar[data-user-id="${userId}"]`
-    );
-    // log.debug("updateSpeakingIndicator", {
-    //   user_id: userId,
-    //   is_speaking: isSpeaking,
-    //   elements_found: elements.length,
-    // });
-    elements.forEach((el) => {
-      el.classList.toggle("speaking", isSpeaking);
+    ).forEach((el) => el.classList.toggle("speaking", isSpeaking));
+    // Video grid tiles
+    (["camera", "screen", "audio-only"] as const).forEach((type) => {
+      document
+        .querySelector<HTMLElement>(`[data-tile-id="${userId}:${type}"]`)
+        ?.classList.toggle("speaking", isSpeaking);
     });
   }
 
   function showVoiceControls(channelName: string): void {
     const panel = document.getElementById("voice-controls");
-    if (!panel) return;
-    panel.classList.remove("hidden");
-    const nameEl = panel.querySelector(".voice-channel-name");
-    if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
+    if (panel) {
+      panel.classList.remove("hidden");
+      const nameEl = panel.querySelector(".voice-channel-name");
+      if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
+    }
   }
 
   function hideVoiceControls(): void {
     document.getElementById("voice-controls")?.classList.add("hidden");
+  }
+
+  function openVideoPopout(): void {
+    window.electronAPI.ipc.invoke("open-video-popout", {
+      channelName: App.activeVoiceChannelName ?? "",
+    });
   }
 
   document.getElementById("voice-mute-btn")?.addEventListener("click", () => {
@@ -408,6 +437,14 @@
   document
     .getElementById("voice-camera-btn")
     ?.addEventListener("click", () => toggleCamera());
+
+  document
+    .getElementById("voice-screen-share-btn")
+    ?.addEventListener("click", () => toggleScreenShare());
+
+  document
+    .getElementById("voice-popout-btn")
+    ?.addEventListener("click", () => openVideoPopout());
 
   // ─── View Switching Functions ──────────────────────────────────────────────
 
@@ -516,6 +553,123 @@
     }
   }
 
+  // ─── Screen Share Functions ────────────────────────────────────────────────
+
+  async function toggleScreenShare(): Promise<void> {
+    if (!App.voiceManager || !App.activeVoiceChannelId) return;
+    const btn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    try {
+      if (!App.localScreenShareOn) {
+        await openScreenSharePicker();
+      } else {
+        await (App.voiceManager as { stopScreenShare(): Promise<void> }).stopScreenShare();
+        App.localScreenShareOn = false;
+        App.screenShareParticipants.delete("__self__");
+        if (App.focusedTileId === "__self__:screen") App.focusedTileId = null;
+        if (btn) {
+          btn.classList.remove("active");
+          btn.title = "Share Screen";
+        }
+        updateVideoGridVisibility();
+        renderVideoGrid();
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function openScreenSharePicker(): Promise<void> {
+    let rawSources: Array<{
+      id: string;
+      name: string;
+      display_id: string;
+      thumbnail: string;
+      pipeWireNodeId: number | null;
+    }>;
+    try {
+      rawSources = await window.electronAPI.desktopCapturer.getSources();
+    } catch (e) {
+      log.error("Failed to get screen sources", { error: String(e) });
+      return;
+    }
+
+    const sources: ScreenSource[] = rawSources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      thumbnailDataUrl: s.thumbnail,
+      type: s.display_id ? "screen" : "window",
+    }));
+
+    let audioAvailable = false;
+    try {
+      const support = await window.electronAPI.audioCapture.checkSupport();
+      audioAvailable = support.supported;
+    } catch (e) {
+      log.warn("Audio capture check failed", { error: String(e) });
+    }
+
+    if (typeof window.openScreenShareModal === "function") {
+      window.openScreenShareModal(sources, audioAvailable, handleScreenShareConfirmed);
+    } else {
+      log.error("openScreenShareModal not available — modal script not loaded");
+    }
+  }
+
+  async function handleScreenShareConfirmed(
+    source: ScreenSource,
+    settings: ScreenShareSettings
+  ): Promise<void> {
+    if (!App.voiceManager || !App.activeVoiceChannelId) return;
+    log.info("Screen share source confirmed", { sourceId: source.id });
+
+    const started = await (
+      App.voiceManager as {
+        startScreenShare(sourceId: string, settings: ScreenShareSettings): Promise<boolean>;
+      }
+    ).startScreenShare(source.id, settings);
+
+    if (!started) {
+      log.error("startScreenShare returned false — aborting");
+      return;
+    }
+
+    App.localScreenShareOn = true;
+    App.screenShareParticipants.add("__self__");
+    if (App.focusedTileId === null) App.focusedTileId = "__self__:screen";
+
+    const btn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (btn) {
+      btn.classList.add("active");
+      btn.title = "Stop Sharing";
+      btn.disabled = false;
+    }
+
+    updateVideoGridVisibility();
+    renderVideoGrid();
+  }
+
+  function handleVoiceScreenShareStarted(userId: string): void {
+    log.info("Remote screen share started", { user_id: userId });
+    App.screenShareParticipants.add(userId);
+    App.lastScreenShareUserId = userId;
+    // Phase 10: auto-spotlight the first screen share when none is focused.
+    if (App.focusedTileId === null) App.focusedTileId = `${userId}:screen`;
+    renderVideoGrid();
+  }
+
+  function handleVoiceScreenShareStopped(userId: string): void {
+    log.info("Remote screen share stopped", { user_id: userId });
+    App.screenShareParticipants.delete(userId);
+    if (App.focusedTileId === `${userId}:screen`) App.focusedTileId = null;
+    if (App.lastScreenShareUserId === userId) App.lastScreenShareUserId = null;
+    renderVideoGrid();
+  }
+
   function updateVideoGridVisibility(): void {
     // When viewing the voice channel, keep the grid visible regardless of camera state.
     // When viewing a text channel, keep the grid hidden regardless of camera state.
@@ -542,64 +696,180 @@
     }
   }
 
+  function resolveSpotlight(desiredTiles: Set<string>): string | null {
+    if (App.focusedTileId && desiredTiles.has(App.focusedTileId))
+      return App.focusedTileId;
+    if (App.lastScreenShareUserId) {
+      const t = App.lastScreenShareUserId + ":screen";
+      if (desiredTiles.has(t)) return t;
+    }
+    for (const t of desiredTiles) if (t.endsWith(":screen")) return t;
+    for (const t of desiredTiles) if (t.endsWith(":camera")) return t;
+    return null;
+  }
+
   async function renderVideoGrid(): Promise<void> {
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
-    grid.replaceChildren();
+    const focusArea = document.getElementById("video-focus-area");
+    const strip = document.getElementById("video-strip");
+    const audioBar = document.getElementById("video-audio-only-bar");
+    if (!focusArea || !strip || !audioBar) return;
 
     const vm = App.voiceManager as {
       auth?: AuthForVoice;
       localVideoStream?: MediaStream | null;
+      localScreenStream?: MediaStream | null;
       remoteVideoStreams?: Map<string, MediaStream>;
+      remoteScreenStreams?: Map<string, MediaStream>;
+      _userToVideoStreamId?: Map<string, string>;
+      _userToScreenStreamId?: Map<string, string>;
     } | null;
     const selfId = vm?.auth?.user_id;
     let selfUsername = vm?.auth?.username;
-
     let selfAvatar = "";
     if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice & { avatar?: string } | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as
+        | (AuthForVoice & { avatar?: string })
+        | null;
       selfUsername = auth?.username;
       selfAvatar = auth?.avatar ?? "";
     } else {
-      const auth = (await ipcRenderer.invoke("get-auth")) as { avatar?: string } | null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        avatar?: string;
+      } | null;
       selfAvatar = auth?.avatar ?? "";
     }
 
-    grid.appendChild(
-      createVideoTile(
-        "__self__",
-        selfUsername ?? selfId ?? "?",
-        App.localCameraOn ? (vm?.localVideoStream ?? null) : null,
-        true,
-        selfAvatar
-      )
-    );
+    // ── Build desired tile set ────────────────────────────────────────────────
+    const desiredTiles = new Set<string>();
+    if (App.localCameraOn) desiredTiles.add("__self__:camera");
+    if (App.localScreenShareOn) desiredTiles.add("__self__:screen");
+    if (!App.localCameraOn && !App.localScreenShareOn)
+      desiredTiles.add("__self__:audio-only");
 
-    App.voiceParticipants.forEach((username, userId) => {
+    App.voiceParticipants.forEach((_username, userId) => {
       if (userId === selfId) return;
       const hasCamera = App.videoParticipants.has(userId);
-      let stream: MediaStream | null = null;
-      if (hasCamera && vm?.remoteVideoStreams) {
-        vm.remoteVideoStreams.forEach((s) => {
-          if (!stream) stream = s;
+      const hasScreen = App.screenShareParticipants.has(userId);
+      if (hasCamera) desiredTiles.add(`${userId}:camera`);
+      if (hasScreen) desiredTiles.add(`${userId}:screen`);
+      if (!hasCamera && !hasScreen) desiredTiles.add(`${userId}:audio-only`);
+    });
+
+    // ── Collect existing tile IDs from all sub-containers ────────────────────
+    const existingTileIds = new Set<string>();
+    [focusArea, strip, audioBar].forEach((container) => {
+      container
+        .querySelectorAll<HTMLElement>("[data-tile-id]")
+        .forEach((el) => {
+          if (el.dataset["tileId"]) existingTileIds.add(el.dataset["tileId"]);
         });
+    });
+
+    // ── Remove stale tiles ───────────────────────────────────────────────────
+    existingTileIds.forEach((tileId) => {
+      if (!desiredTiles.has(tileId)) {
+        document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)?.remove();
       }
-      grid.appendChild(
-        createVideoTile(userId, username, hasCamera ? stream : null, false, getMemberAvatar(userId))
-      );
+    });
+
+    // ── Determine spotlight ──────────────────────────────────────────────────
+    const spotlight = resolveSpotlight(desiredTiles);
+
+    // ── Add or move tiles ────────────────────────────────────────────────────
+    desiredTiles.forEach((tileId) => {
+      const colonIdx = tileId.lastIndexOf(":");
+      const userId = tileId.substring(0, colonIdx);
+      const type = tileId.substring(colonIdx + 1) as
+        | "camera"
+        | "screen"
+        | "audio-only";
+
+      const targetContainer =
+        tileId === spotlight ? focusArea : type === "audio-only" ? audioBar : strip;
+
+      if (!existingTileIds.has(tileId)) {
+        // ── Create new tile ────────────────────────────────────────────────
+        let stream: MediaStream | null = null;
+        if (type === "camera") {
+          if (userId === "__self__") {
+            stream = vm?.localVideoStream ?? null;
+          } else if (vm?.remoteVideoStreams) {
+            const streamId = vm._userToVideoStreamId?.get(userId);
+            if (streamId) {
+              stream = vm.remoteVideoStreams.get(streamId) ?? null;
+            } else {
+              vm.remoteVideoStreams.forEach((s) => {
+                if (!stream) stream = s;
+              });
+            }
+          }
+        } else if (type === "screen") {
+          if (userId === "__self__") {
+            stream = vm?.localScreenStream ?? null;
+          } else if (vm?.remoteScreenStreams) {
+            const streamId = vm._userToScreenStreamId?.get(userId);
+            if (streamId) {
+              stream = vm.remoteScreenStreams.get(streamId) ?? null;
+            }
+          }
+        }
+
+        const username =
+          userId === "__self__"
+            ? (selfUsername ?? selfId ?? "?")
+            : (App.voiceParticipants.get(userId) ?? userId);
+        const avatar = userId === "__self__" ? selfAvatar : getMemberAvatar(userId);
+        const tile = createVideoTile(userId, type, username, stream, userId === "__self__", avatar);
+        targetContainer.appendChild(tile);
+      } else {
+        // ── Move existing tile if spotlight changed ─────────────────────────
+        const existingTile = document.querySelector<HTMLElement>(
+          `[data-tile-id="${tileId}"]`
+        );
+        if (existingTile && existingTile.parentElement !== targetContainer) {
+          targetContainer.appendChild(existingTile);
+        }
+      }
     });
   }
 
   function createVideoTile(
     userId: string,
+    tileType: "camera" | "screen" | "audio-only",
     username: string,
     stream: MediaStream | null,
     isSelf: boolean,
     avatar?: string
   ): HTMLElement {
     const tile = document.createElement("div");
+    tile.dataset["tileId"] = `${userId}:${tileType}`;
+
+    if (tileType === "audio-only") {
+      // Compact row: avatar + username
+      tile.className = "video-tile audio-only-tile";
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "video-tile-avatar";
+      if (avatar) {
+        const img = document.createElement("img");
+        img.src = avatar;
+        img.alt = username;
+        img.style.cssText =
+          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+      }
+      const label = document.createElement("span");
+      label.className = "video-tile-label";
+      label.textContent = username ?? userId;
+      tile.appendChild(avatarEl);
+      tile.appendChild(label);
+      return tile;
+    }
+
+    // camera or screen tile
     tile.className = "video-tile";
-    tile.dataset["userId"] = userId;
+    if (tileType === "screen") tile.classList.add("screen-tile");
 
     if (stream) {
       const video = document.createElement("video") as HTMLVideoElement;
@@ -614,8 +884,9 @@
       if (avatar) {
         const img = document.createElement("img");
         img.src = avatar;
-        img.alt = username ?? userId;
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        img.alt = username;
+        img.style.cssText =
+          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
         avatarEl.appendChild(img);
       } else {
         avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
@@ -623,19 +894,27 @@
       tile.appendChild(avatarEl);
     }
 
+    if (tileType === "screen") {
+      const badge = document.createElement("span");
+      badge.className = "screen-badge";
+      badge.textContent = "🖥️";
+      tile.appendChild(badge);
+    }
+
     const label = document.createElement("div");
     label.className = "video-tile-label";
     label.textContent = username ?? userId;
     tile.appendChild(label);
+
+    tile.addEventListener("click", () => window.setSpotlight(`${userId}:${tileType}`));
+
     return tile;
   }
 
   function removeVideoTile(userId: string): void {
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
-    grid
-      .querySelector<HTMLElement>(`.video-tile[data-user-id="${userId}"]`)
-      ?.remove();
+    document
+      .querySelectorAll<HTMLElement>(`[data-tile-id^="${userId}:"]`)
+      .forEach((el) => el.remove());
   }
 
   function handleRemoteCameraStateChanged(userId: string, isOn: boolean): void {
@@ -658,12 +937,10 @@
     stream: MediaStream
   ): void {
     log.debug("Remote video stream added", { stream_id: streamId });
-    const grid = document.getElementById("video-grid");
-    if (!grid) return;
     for (const userId of App.videoParticipants) {
       if (userId === "__self__") continue;
-      const tile = grid.querySelector<HTMLElement>(
-        `.video-tile[data-user-id="${userId}"]`
+      const tile = document.querySelector<HTMLElement>(
+        `[data-tile-id="${userId}:camera"]`
       );
       if (tile && !tile.querySelector("video")) {
         tile.querySelector(".video-tile-avatar")?.remove();
@@ -1494,7 +1771,9 @@
       channel_id: App.activeVoiceChannelId,
     });
     App.localCameraOn = false;
+    App.localScreenShareOn = false;
     App.videoParticipants.clear();
+    App.screenShareParticipants.clear();
     if (App.activeView === "voice") showTextChannelView();
     updateVideoGridVisibility();
     const cameraBtn = document.getElementById(
@@ -1505,6 +1784,14 @@
       cameraBtn.title = "Start Camera";
       cameraBtn.textContent = "\u{1F4F7}";
       cameraBtn.disabled = false;
+    }
+    const screenShareBtn = document.getElementById(
+      "voice-screen-share-btn"
+    ) as HTMLButtonElement | null;
+    if (screenShareBtn) {
+      screenShareBtn.classList.remove("active");
+      screenShareBtn.title = "Share Screen";
+      screenShareBtn.disabled = false;
     }
     (App.voiceManager as { _cleanup(): void })._cleanup();
     App.activeVoiceChannelId = null;
@@ -1547,4 +1834,16 @@
   window.switchSettingsPage = switchSettingsPage;
   window.playVoiceSound = playVoiceSound;
   window.cleanupVoiceOnDisconnect = cleanupVoiceOnDisconnect;
+  window.toggleScreenShare = toggleScreenShare;
+  window.handleVoiceScreenShareStarted = handleVoiceScreenShareStarted;
+  window.handleVoiceScreenShareStopped = handleVoiceScreenShareStopped;
+  window.resolveSpotlight = resolveSpotlight;
+  window.setSpotlight = (tileId: string | null): void => {
+    App.focusedTileId = tileId;
+    renderVideoGrid();
+  };
+  window.openVideoPopout = openVideoPopout;
+  window.toggleVideoPopout = (): void => {
+    App.videoPopoutOpen = !App.videoPopoutOpen;
+  };
 })();

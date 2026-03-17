@@ -31,6 +31,13 @@ window.App = {
   videoGridVisible: false,
   activeView: "text" as "text" | "voice",
 
+  // ── Screen share ─────────────────────────────────────────────────────────
+  localScreenShareOn: false,
+  screenShareParticipants: new Set<string>(),
+  videoPopoutOpen: false,
+  focusedTileId: null,
+  lastScreenShareUserId: null,
+
   // ── Health check / reconnection ──────────────────────────────────────────
   healthcheckInterval: null,
   reconnectionTimeout: null,

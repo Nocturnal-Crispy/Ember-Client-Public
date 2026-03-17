@@ -30,6 +30,7 @@
 @import './components/emoji-picker.css';
 @import './components/gif-picker.css';
 @import './components/user-details-modal.css';
+@import './components/screen-share-modal.css';
 @import './components/app-lock.css';
 
 /* Utility Layer - Helper Classes */

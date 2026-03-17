@@ -117,7 +117,10 @@
             data.type === "voice_speaking" ||
             data.type === "voice_participants" ||
             data.type === "voice_camera_on" ||
-            data.type === "voice_camera_off"
+            data.type === "voice_camera_off" ||
+            data.type === "screen_share_start" ||
+            data.type === "screen_share_stop" ||
+            data.type === "voice_renegotiate_answer"
           ) {
             if (App.voiceManager)
               (

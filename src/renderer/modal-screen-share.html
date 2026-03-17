@@ -1,0 +1,42 @@
+<!-- Screen Share Source Picker Modal -->
+<div id="screen-share-modal" class="modal-overlay hidden screen-share-overlay" aria-modal="true" role="dialog" aria-labelledby="screen-share-title">
+  <div class="screen-share-container" id="screen-share-container">
+    <button class="screen-share-close" id="screen-share-close" aria-label="Close screen share picker">✕</button>
+
+    <h2 class="screen-share-title" id="screen-share-title">Share your screen</h2>
+
+    <div class="screen-share-source-grid" id="screen-share-source-grid" role="listbox" aria-label="Screen sources"></div>
+
+    <div class="screen-share-settings">
+      <div class="screen-share-settings-row">
+        <label class="screen-share-label" for="screen-share-resolution">Resolution</label>
+        <select id="screen-share-resolution" class="screen-share-select">
+          <option value="720p">720p</option>
+          <option value="1080p">1080p</option>
+          <option value="1440p">1440p</option>
+        </select>
+      </div>
+
+      <div class="screen-share-settings-row">
+        <label class="screen-share-label" for="screen-share-framerate">Frame rate</label>
+        <select id="screen-share-framerate" class="screen-share-select">
+          <option value="15">15 fps</option>
+          <option value="30">30 fps</option>
+          <option value="60">60 fps</option>
+        </select>
+      </div>
+
+      <div class="screen-share-settings-row screen-share-audio-row">
+        <label id="screen-share-audio-label" class="screen-share-audio-label" for="screen-share-audio-checkbox">
+          <input type="checkbox" id="screen-share-audio-checkbox" class="screen-share-audio-checkbox">
+          Include system audio
+        </label>
+        <span id="screen-share-audio-status" class="screen-share-audio-status"></span>
+      </div>
+    </div>
+
+    <div class="screen-share-actions">
+      <button id="screen-share-confirm" class="screen-share-confirm-btn" disabled>Share</button>
+    </div>
+  </div>
+</div>

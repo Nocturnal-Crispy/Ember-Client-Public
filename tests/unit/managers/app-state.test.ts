@@ -75,4 +75,23 @@ describe('App initial state', () => {
   it('has false _pttListening', () => {
     expect((window as any).App._pttListening).toBe(false);
   });
+
+  it('has screen share flags set to correct defaults', () => {
+    expect((window as any).App.localScreenShareOn).toBe(false);
+    const participants = (window as any).App.screenShareParticipants;
+    expect(participants).toBeInstanceOf(Set);
+    expect(participants.size).toBe(0);
+  });
+
+  it('initialises videoPopoutOpen to false', () => {
+    expect((window as any).App.videoPopoutOpen).toBe(false);
+  });
+
+  it('initialises focusedTileId to null', () => {
+    expect((window as any).App.focusedTileId).toBeNull();
+  });
+
+  it('initialises lastScreenShareUserId to null', () => {
+    expect((window as any).App.lastScreenShareUserId).toBeNull();
+  });
 });

@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer } from "electron";
 import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
+import { registerAudioCaptureHandlers, cleanOrphanedAudioModules, registerBeforeQuitCleanup } from "./audio-capture";
 import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
 import {
@@ -108,6 +109,9 @@ const defaultVoiceVideoSettings: VoiceVideoSettings = {
 
 let mainWindow: BrowserWindow | null = null;
 let pendingInviteLink: string | null = null;
+
+// One-time context delivered to the pop-out window via get-popout-voice-context
+let pendingPopoutContext: { channelName: string; token: string } | null = null;
 
 //To turn on dev tools, change devTools: false to devTools: true in the webPreferences object
 
@@ -795,6 +799,70 @@ ipcMain.handle("clear-pin", () => {
   return true;
 });
 
+// ─── IPC: Screen capture sources ─────────────────────────────────────────────
+
+ipcMain.handle("get-screen-sources", async () => {
+  log.debug("IPC: get-screen-sources");
+  const raw = await desktopCapturer.getSources({
+    types: ["screen", "window"],
+    thumbnailSize: { width: 320, height: 180 },
+  });
+  return raw.map((s: Electron.DesktopCapturerSource) => ({
+    id: s.id,
+    name: s.name,
+    display_id: s.display_id,
+    thumbnail: s.thumbnail.toDataURL(),
+    // PipeWire node ID for Wayland sources (format "pipewire:<node_id>")
+    pipeWireNodeId:
+      process.platform === "linux" && s.id.startsWith("pipewire:")
+        ? parseInt(s.id.split(":")[1], 10)
+        : null,
+  }));
+});
+
+// ─── Video Pop-Out Window ─────────────────────────────────────────────────────
+
+ipcMain.handle("open-video-popout", async (_event, args: unknown) => {
+  const { channelName } = (args as { channelName?: string }) ?? {};
+
+  // Read the auth token from the store for one-time delivery to the pop-out
+  const auth = store.get("auth") as { token?: string } | undefined;
+  const token = auth?.token ?? "";
+
+  pendingPopoutContext = { channelName: channelName ?? "", token };
+  log.info("Opening video pop-out window", { channelName });
+
+  const popout = new BrowserWindow({
+    width: 960,
+    height: 600,
+    minWidth: 480,
+    minHeight: 300,
+    backgroundColor: "#111111",
+    title: channelName ? `Voice — ${channelName}` : "Voice",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      preload: path.join(__dirname, "../preload/video-popout-preload.js"),
+      devTools: isDev,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    },
+  });
+
+  popout.loadFile(path.join(__dirname, "../renderer/video-popout.html"));
+  popout.on("closed", () => {
+    log.debug("Video pop-out window closed");
+  });
+});
+
+ipcMain.handle("get-popout-voice-context", () => {
+  log.debug("IPC: get-popout-voice-context");
+  const ctx = pendingPopoutContext;
+  pendingPopoutContext = null; // one-time read
+  return ctx;
+});
+
 // ─── Invite protocol ──────────────────────────────────────────────────────────
 
 function parseInviteUrl(
@@ -890,8 +958,10 @@ if (!gotTheLock) {
   app.setAsDefaultProtocolClient("ember");
   log.debug("Registered ember:// protocol handler");
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     log.info("App ready");
+    await cleanOrphanedAudioModules();
+    registerAudioCaptureHandlers(process.pid);
     const isAuthenticated = checkAuthentication();
     createWindow(isAuthenticated);
 
@@ -922,6 +992,9 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+
+// Register before-quit audio capture cleanup (stops WASAPI/PipeWire/PulseAudio)
+registerBeforeQuitCleanup(app);
 
 app.on("before-quit", async () => {
   const installPath = getInstallOnExitPath();
