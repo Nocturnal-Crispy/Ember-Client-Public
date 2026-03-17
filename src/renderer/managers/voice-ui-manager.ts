@@ -625,10 +625,13 @@
         await (App.voiceManager as { stopScreenShare(): Promise<void> }).stopScreenShare();
         App.localScreenShareOn = false;
         App.screenShareParticipants.delete("__self__");
+        if (App.focusedTileId === "__self__:screen") App.focusedTileId = null;
         if (btn) {
           btn.classList.remove("active");
           btn.title = "Share Screen";
         }
+        updateVideoGridVisibility();
+        renderVideoGrid();
       }
     } finally {
       if (btn) btn.disabled = false;
@@ -692,6 +695,7 @@
 
     App.localScreenShareOn = true;
     App.screenShareParticipants.add("__self__");
+    if (App.focusedTileId === null) App.focusedTileId = "__self__:screen";
 
     const btn = document.getElementById(
       "voice-screen-share-btn"
@@ -701,6 +705,9 @@
       btn.title = "Stop Sharing";
       btn.disabled = false;
     }
+
+    updateVideoGridVisibility();
+    renderVideoGrid();
   }
 
   function handleVoiceScreenShareStarted(userId: string): void {
