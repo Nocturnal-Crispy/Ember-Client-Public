@@ -470,6 +470,9 @@ declare global {
     activeView: "text" | "voice";
     localScreenShareOn: boolean;
     screenShareParticipants: Set<string>;
+    videoPopoutOpen: boolean;
+    focusedTileId: string | null;
+    lastScreenShareUserId: string | null;
     healthcheckInterval: ReturnType<typeof setInterval> | null;
     reconnectionTimeout: ReturnType<typeof setTimeout> | null;
     reconnectionStartTime: number | null;
@@ -622,6 +625,9 @@ declare global {
       onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
     ): void;
     hideScreenShareModal(): void;
+    // Globals set by voice-ui-manager.ts (video grid)
+    setSpotlight(userId: string | null): void;
+    toggleVideoPopout(): void;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;
     // Globals set by update-notifier.ts
@@ -763,13 +769,6 @@ declare global {
     openDmWithUser(userId: string, username: string): Promise<void>;
     // Globals set by renderer.ts (external link modal)
     openExternalLinkModal(url: string): void;
-    // Globals set by screen-share-modal.ts
-    openScreenShareModal(
-      sources: ScreenSource[],
-      audioAvailable: boolean,
-      onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
-    ): void;
-    hideScreenShareModal(): void;
     // Globals set by user-details-modal.ts
     openUserDetailsModal(userId: string, username: string): void;
     closeUserDetailsModal(): void;
