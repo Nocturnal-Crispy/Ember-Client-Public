@@ -869,6 +869,14 @@
     await loadDmEmbers();
     await loadAndShowDmRequests();
     startDMRequestPolling();
+    // On startup, fulfill any pending key requests from other devices of the
+    // same user that haven't been served yet (e.g. another device came online
+    // while this device was offline).
+    for (const emberId of dmByEmberId.keys()) {
+      fulfillPendingKeyRequests(emberId).catch((err: Error) =>
+        log.warn("Failed to fulfill pending key requests on startup", { emberId, error: err.message }),
+      );
+    }
     log.info("DM system ready", { dmCount: dmByTextChannel.size });
   }
 
