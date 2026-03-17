@@ -40,6 +40,10 @@
   const dmByEmberId = new Map<string, DmEntry>();
   let activeTextChannelId: string | null = null;
 
+  // BP-5: tracks message IDs that were optimistically rendered by sendDirectMessage
+  // so the WS echo for the same message is ignored and not double-displayed.
+  const pendingMessageIds = new Set<string>();
+
   // ─── Auth helpers ──────────────────────────────────────────────────────────
 
   async function getAuth(): Promise<{ token: string; hostname: string; user_id: string } | null> {
@@ -575,6 +579,19 @@
     });
     if (!res.ok) throw new Error("Failed to send message");
     const msg = (await res.json()) as { id: string };
+
+    // BP-4: Optimistic render — display immediately so the sender doesn't wait
+    // for the WS echo. BP-5: register the id so the echo is deduplicated.
+    pendingMessageIds.add(msg.id);
+    window.displayDmMessage({
+      id: msg.id,
+      conversationId: channelId,
+      senderId: auth.user_id,
+      content: plaintext,
+      timestamp: Date.now() / 1000,
+      isOwn: true,
+    });
+
     return msg.id;
   }
 
@@ -603,6 +620,15 @@
     const channelId = String(payload["channel_id"] ?? "");
     const entry = dmByTextChannel.get(channelId);
     if (!entry) return;
+
+    // BP-5: skip WS echo for messages already optimistically rendered.
+    // This check is intentionally before any await so it runs synchronously.
+    const msgId = String(payload["id"] ?? "");
+    if (pendingMessageIds.has(msgId)) {
+      pendingMessageIds.delete(msgId);
+      return;
+    }
+
     const auth = await getAuth();
     if (!auth) return;
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
