@@ -1,13 +1,15 @@
 /**
- * Unit tests for the pending-DM key guard (bugfix/dm-pending-key-guard).
+ * Unit tests for the pending-DM enrollment guard.
  *
- * PK-1  fetchConversationMessages — pending requester DM → returns [] and does
- *        NOT call the ember key API (no key exists yet, recipient hasn't accepted)
  * PK-2  fetchAndCacheEmberKey — 404 on a PENDING requester DM does NOT trigger
- *        requestDeviceKeyEnrollment (POST to device-key-requests)
- * PK-3  fetchAndCacheEmberKey — 404 on an ACCEPTED DM DOES trigger enrollment
- * PK-4  sendDirectMessage — pending requester DM → rejects with a user-friendly
- *        error message containing the partner's username
+ *        requestDeviceKeyEnrollment (POST to device-key-requests). Enrollment is
+ *        only meaningful once the key has been created somewhere.
+ * PK-3  fetchAndCacheEmberKey — 404 on an ACCEPTED DM DOES trigger enrollment,
+ *        because the key exists but hasn't been delivered to this device yet.
+ *
+ * Note: PK-1 (fetchConversationMessages early return) and PK-4 (friendly send error)
+ * were removed — those guards are no longer needed now that the requester generates
+ * the key at request time and can send messages immediately.
  */
 
 const HOSTNAME      = 'http://localhost';
@@ -88,8 +90,11 @@ beforeAll(async () => {
   // 6. Load IIFE module
   require('../../../src/renderer/managers/direct-messaging-manager');
 
-  // 7. Seed a PENDING (requester) DM entry via startDmConversation
+  // 7. Seed a PENDING (requester) DM entry via startDmConversation.
+  //    startDmConversation now fetches recipient devices to create a peer-box.
   fetchMock.mockImplementation((url: string, opts?: RequestInit) => {
+    if (String(url).includes(`/users/${PARTNER_ID}/devices`) && !opts?.method)
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ devices: [{ id: 'dev-r', public_key: 'recippub64' }] }) });
     if (String(url).includes('/dm-requests') && opts?.method === 'POST')
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'req-1', ember_id: EMBER_ID, status: 'created' }) });
     if (String(url).includes(`/embers/${EMBER_ID}/channels`))
@@ -98,9 +103,11 @@ beforeAll(async () => {
   });
   await (window as any).startDmConversation(PARTNER_ID, PARTNER_NAME);
 
-  // 8. Seed an ACCEPTED DM entry by dispatching dm-request-accepted (simulates acceptance)
+  // 8. Seed an ACCEPTED DM entry by dispatching dm-request-accepted (simulates acceptance).
   //    First register the channels so the manager knows about it.
   fetchMock.mockImplementation((url: string, opts?: RequestInit) => {
+    if (String(url).includes(`/users/partner-b/devices`) && !opts?.method)
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ devices: [{ id: 'dev-r2', public_key: 'recippub64b' }] }) });
     if (String(url).includes('/dm-requests') && opts?.method === 'POST')
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'req-2', ember_id: ACCEPTED_EMBER, status: 'created' }) });
     if (String(url).includes(`/embers/${ACCEPTED_EMBER}/channels`))
@@ -145,22 +152,6 @@ function wasDeviceKeyEnrollmentRequested(emberId: string): boolean {
   );
 }
 
-// ─── PK-1: fetchConversationMessages — pending DM skips key API ───────────────
-
-describe('PK-1: fetchConversationMessages — pending requester DM', () => {
-  it('returns an empty array without calling the ember key API', async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({ messages: [] }) });
-
-    const messages = await (window as any).fetchConversationMessages(TEXT_CH);
-
-    expect(messages).toEqual([]);
-    const keyApiCalled = fetchMock.mock.calls.some(
-      ([url]: [string]) => String(url).includes(`/embers/${EMBER_ID}/key`),
-    );
-    expect(keyApiCalled).toBe(false);
-  });
-});
-
 // ─── PK-2: fetchAndCacheEmberKey — pending DM, 404 → NO enrollment ────────────
 
 describe('PK-2: fetchAndCacheEmberKey — pending requester DM', () => {
@@ -190,22 +181,3 @@ describe('PK-3: fetchAndCacheEmberKey — accepted DM', () => {
   });
 });
 
-// ─── PK-4: sendDirectMessage — pending DM → user-friendly error ───────────────
-
-describe('PK-4: sendDirectMessage — pending requester DM', () => {
-  it('rejects with a message containing the partner username', async () => {
-    mockKeyEndpoint404(EMBER_ID);
-
-    await expect(
-      (window as any).sendDirectMessage(TEXT_CH, 'Hello?'),
-    ).rejects.toThrow(PARTNER_NAME);
-  });
-
-  it('does not reject with the generic "Ember key unavailable" message', async () => {
-    mockKeyEndpoint404(EMBER_ID);
-
-    await expect(
-      (window as any).sendDirectMessage(TEXT_CH, 'Hello?'),
-    ).rejects.not.toThrow('Ember key unavailable');
-  });
-});
