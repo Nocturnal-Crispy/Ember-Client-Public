@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCapturer, dialog } from "electron";
 import * as path from "path";
+import * as nodeCrypto from "crypto";
 import Store from "electron-store";
 import { createLogger } from "./logger";
 import { registerAudioCaptureHandlers, cleanOrphanedAudioModules, registerBeforeQuitCleanup } from "./audio-capture";
@@ -350,19 +351,48 @@ ipcMain.on("auth-logout", () => {
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
+let safeStorageWarningShown = false;
+
 function encryptPrivateKey(plaintext: string): string {
   if (safeStorage.isEncryptionAvailable()) {
     log.debug("Encrypting private key with OS safeStorage");
     return safeStorage.encryptString(plaintext).toString("base64");
   }
-  // Fallback: no OS keyring available; store as-is (same security as previous plaintext store)
-  log.warn(
-    "safeStorage unavailable; private key stored without OS-level encryption"
-  );
-  console.warn(
-    "[ember] safeStorage unavailable; private key stored without OS-level encryption"
-  );
+  log.warn("safeStorage unavailable; private key stored without OS-level encryption");
+  if (!safeStorageWarningShown) {
+    safeStorageWarningShown = true;
+    dialog.showMessageBoxSync({
+      type: "warning",
+      title: "Security Warning — Keyring Unavailable",
+      message: "Your device keyring is not available.",
+      detail:
+        "Ember cannot encrypt your private key with OS-level protection.\n\n" +
+        "Your private key will be stored unencrypted on this device. " +
+        "Anyone with access to your filesystem may be able to read it.\n\n" +
+        "To resolve this, ensure a keyring service is running " +
+        "(e.g. GNOME Keyring, KWallet, or macOS Keychain) and restart Ember.",
+      buttons: ["I Understand"],
+      defaultId: 0,
+    });
+  }
   return plaintext;
+}
+
+// ─── PIN helpers ──────────────────────────────────────────────────────────────
+
+function hashPin(pin: string): string {
+  const salt = nodeCrypto.randomBytes(16);
+  const hash = nodeCrypto.scryptSync(pin, salt, 32);
+  return `scrypt:${salt.toString("base64")}:${hash.toString("base64")}`;
+}
+
+function verifyPinHash(pin: string, stored: string): boolean {
+  const parts = stored.split(":");
+  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  const salt = Buffer.from(parts[1], "base64");
+  const expected = Buffer.from(parts[2], "base64");
+  const actual = nodeCrypto.scryptSync(pin, salt, 32);
+  return nodeCrypto.timingSafeEqual(actual, expected);
 }
 
 function decryptPrivateKey(stored: string): string {
@@ -779,7 +809,7 @@ ipcMain.handle("set-pin", (_event, pin: unknown) => {
     log.warn("IPC: set-pin rejected — invalid PIN");
     return false;
   }
-  const encrypted = encryptPrivateKey(pin);
+  const encrypted = encryptPrivateKey(hashPin(pin));
   store.set("appLockPin", encrypted);
   log.info("IPC: app lock PIN saved");
   return true;
@@ -790,7 +820,25 @@ ipcMain.handle("verify-pin", (_event, pin: unknown) => {
   const stored = store.get("appLockPin") as string | undefined;
   if (!stored) return false;
   const decrypted = decryptPrivateKey(stored);
-  return decrypted === pin;
+
+  if (decrypted.startsWith("scrypt:")) {
+    return verifyPinHash(pin, decrypted);
+  }
+
+  // Legacy path: PIN was stored as plaintext (pre-hash upgrade).
+  // Use constant-time comparison to prevent timing attacks, then upgrade on match.
+  const storedBuf = Buffer.from(decrypted, "utf8");
+  const inputBuf = Buffer.from(pin, "utf8");
+  const lengthsMatch = storedBuf.length === inputBuf.length;
+  // Always run timingSafeEqual with equal-length buffers to avoid early exit.
+  const paddedInput = Buffer.alloc(storedBuf.length);
+  inputBuf.copy(paddedInput);
+  const match = lengthsMatch && nodeCrypto.timingSafeEqual(storedBuf, paddedInput);
+  if (match) {
+    store.set("appLockPin", encryptPrivateKey(hashPin(pin)));
+    log.info("IPC: app lock PIN upgraded to hashed format");
+  }
+  return match;
 });
 
 ipcMain.handle("clear-pin", () => {

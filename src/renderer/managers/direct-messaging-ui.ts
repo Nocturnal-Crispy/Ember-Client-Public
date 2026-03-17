@@ -1192,7 +1192,13 @@
     if (!typingIndicator) return;
     
     if (isTyping && username) {
-      typingIndicator.innerHTML = `${username} is typing<span>.</span><span>.</span><span>.</span>`;
+      const nameNode = document.createTextNode(`${username} is typing`);
+      const dots = ['.', '.', '.'].map(() => {
+        const s = document.createElement('span');
+        s.textContent = '.';
+        return s;
+      });
+      typingIndicator.replaceChildren(nameNode, ...dots);
       typingIndicator.style.display = 'block';
     } else {
       typingIndicator.style.display = 'none';
