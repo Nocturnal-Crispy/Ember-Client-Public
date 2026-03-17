@@ -169,30 +169,30 @@ describe('initial state', () => {
 // ─── lockApp ──────────────────────────────────────────────────────────────────
 
 describe('lockApp', () => {
-  it('sets locked state to true', () => {
-    (window as any).lockApp();
+  it('sets locked state to true', async () => {
+    await (window as any).lockApp();
     expect((window as any).isAppLocked()).toBe(true);
   });
 
-  it('shows the overlay by removing hidden class', () => {
-    (window as any).lockApp();
+  it('shows the overlay by removing hidden class', async () => {
+    await (window as any).lockApp();
     const overlay = document.getElementById('app-lock-overlay')!;
     expect(overlay.classList.contains('hidden')).toBe(false);
   });
 
-  it('clears the PIN input field when locking', () => {
+  it('clears the PIN input field when locking', async () => {
     const pinInput = document.getElementById('app-lock-pin-input') as HTMLInputElement;
     pinInput.value = 'something';
-    (window as any).lockApp();
+    await (window as any).lockApp();
     expect(pinInput.value).toBe('');
   });
 
-  it('does not lock when feature is disabled', () => {
+  it('does not lock when feature is disabled', async () => {
     mockGetPluginSettings.mockReturnValue(buildDefaultSettings({ enabled: false }));
     jest.resetModules();
     require('../../../src/renderer/managers/app-lock-manager');
 
-    (window as any).lockApp();
+    await (window as any).lockApp();
     expect((window as any).isAppLocked()).toBe(false);
   });
 });
@@ -200,8 +200,8 @@ describe('lockApp', () => {
 // ─── unlockApp ────────────────────────────────────────────────────────────────
 
 describe('unlockApp', () => {
-  beforeEach(() => {
-    (window as any).lockApp();
+  beforeEach(async () => {
+    await (window as any).lockApp();
   });
 
   it('returns true and unlocks when correct PIN is provided', async () => {
@@ -247,8 +247,8 @@ describe('unlockApp', () => {
 describe('PIN lockout after max failed attempts', () => {
   const MAX_ATTEMPTS = 5;
 
-  beforeEach(() => {
-    (window as any).lockApp();
+  beforeEach(async () => {
+    await (window as any).lockApp();
   });
 
   it('shows lockout message after max failed attempts', async () => {
@@ -284,9 +284,11 @@ describe('PIN lockout after max failed attempts', () => {
 // ─── Idle timeout ─────────────────────────────────────────────────────────────
 
 describe('idle timeout', () => {
-  it('triggers lock after idle timeout when enabled', () => {
+  it('triggers lock after idle timeout when enabled', async () => {
     // idleTimeoutMinutes = 1 → 60 seconds
     jest.advanceTimersByTime(61000);
+    // Flush async operations
+    await Promise.resolve();
     expect((window as any).isAppLocked()).toBe(true);
   });
 
@@ -318,7 +320,7 @@ function fireIpc(channel: string): void {
 }
 
 describe('focus loss locking', () => {
-  it('locks after focus loss delay when lockOnFocusLoss is true', () => {
+  it('locks after focus loss delay when lockOnFocusLoss is true', async () => {
     jest.resetModules();
     mockGetPluginSettings.mockReturnValue(
       buildDefaultSettings({ lockOnFocusLoss: true, focusLossDelaySeconds: 5 })
@@ -327,6 +329,8 @@ describe('focus loss locking', () => {
 
     fireIpc('window-blur');
     jest.advanceTimersByTime(5001);
+    // Flush async operations
+    await Promise.resolve();
     expect((window as any).isAppLocked()).toBe(true);
   });
 
@@ -336,7 +340,7 @@ describe('focus loss locking', () => {
     expect((window as any).isAppLocked()).toBe(false);
   });
 
-  it('cancels focus loss timer when window regains focus', () => {
+  it('cancels focus loss timer when window regains focus', async () => {
     jest.resetModules();
     mockGetPluginSettings.mockReturnValue(
       buildDefaultSettings({ lockOnFocusLoss: true, focusLossDelaySeconds: 5 })
@@ -347,6 +351,8 @@ describe('focus loss locking', () => {
     jest.advanceTimersByTime(3000); // not yet locked
     fireIpc('window-focus');
     jest.advanceTimersByTime(5000); // would have locked if not cancelled
+    // Flush async operations
+    await Promise.resolve();
     expect((window as any).isAppLocked()).toBe(false);
   });
 });
@@ -360,14 +366,18 @@ describe('updateAppLockSettings', () => {
     expect((window as any).isAppLocked()).toBe(false);
   });
 
-  it('changing timeout takes effect immediately', () => {
+  it('changing timeout takes effect immediately', async () => {
     // Update to 2 minute timeout
     (window as any).updateAppLockSettings({ enabled: true, idleTimeoutMinutes: 2 });
     // 1 minute shouldn't lock
     jest.advanceTimersByTime(61000);
+    // Flush async operations
+    await Promise.resolve();
     expect((window as any).isAppLocked()).toBe(false);
     // 2 minutes should lock
     jest.advanceTimersByTime(60000);
+    // Flush async operations
+    await Promise.resolve();
     expect((window as any).isAppLocked()).toBe(true);
   });
 });
