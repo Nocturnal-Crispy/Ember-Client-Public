@@ -379,9 +379,9 @@
     const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
     const senderPublicKey = device.public_key; // base64 acceptor pub key stored with peer-box
 
-    // Fetch the requester's registered devices to create one peer-box per device.
-    // Falls back to an empty array on error; the server will reject if peer key is missing.
-    let encryptedKeyPeer = "";
+    // Fetch the requester's registered devices and create one peer-box per device
+    // so any of their devices can decrypt the ember key.
+    const peerBoxes: Array<{ device_id: string; encrypted_key: string; sender_public_key: string }> = [];
     try {
       const devRes = await fetch(`${auth.hostname}/api/v1/users/${requesterId}/devices`, {
         headers: { Authorization: `Bearer ${auth.token}` },
@@ -390,23 +390,26 @@
         const devData = (await devRes.json()) as {
           devices: Array<{ id: string; public_key: string }>;
         };
-        // Use the most-recently-registered device (last in list from server).
-        // Phase 4 will extend this to store one row per device.
-        const primaryDevice = devData.devices[devData.devices.length - 1];
-        if (primaryDevice?.public_key) {
-          const requesterPub = naclUtil.decodeBase64(primaryDevice.public_key);
-          encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, requesterPub, ownPriv);
+        for (const d of devData.devices) {
+          if (!d.public_key || !d.id) continue;
+          const requesterPub = naclUtil.decodeBase64(d.public_key);
+          const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, requesterPub, ownPriv);
+          peerBoxes.push({
+            device_id: d.id,
+            encrypted_key: encryptedKeyPeer,
+            sender_public_key: senderPublicKey,
+          });
         }
       }
     } catch (err) {
-      log.warn("Failed to fetch requester devices for peer-box", {
+      log.warn("Failed to fetch requester devices for peer-boxes", {
         requesterId,
         error: (err as Error).message,
       });
     }
 
-    if (!encryptedKeyPeer) {
-      throw new Error("Could not create peer-box: requester device not found");
+    if (peerBoxes.length === 0) {
+      throw new Error("Could not create peer-boxes: requester has no registered devices");
     }
 
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests/${requestId}/accept`, {
@@ -417,8 +420,7 @@
       },
       body: JSON.stringify({
         encrypted_key_self: encryptedKeySelf,
-        encrypted_key_peer: encryptedKeyPeer,
-        sender_public_key: senderPublicKey,
+        peer_boxes: peerBoxes,
       }),
     });
     if (!res.ok) {
@@ -579,9 +581,9 @@
   // ─── Set active conversation ───────────────────────────────────────────────
 
   function setActiveDmConversation(channelId: string): void {
-    if (activeTextChannelId && activeTextChannelId !== channelId) {
-      window.wsUnsubscribeFromChannel(activeTextChannelId);
-    }
+    // Do NOT unsubscribe the previous DM channel — all DM channels must stay
+    // subscribed so incoming messages trigger unread notifications even when
+    // the user switches to a different conversation.
     activeTextChannelId = channelId;
     // BP-3 fix: set activeChannelId so websocket-service routes live messages
     // to displayMessage (the channel path) rather than dm-channel-message.
@@ -763,6 +765,8 @@
       fetchAndCacheEmberKey(emberId).catch((err: Error) =>
         log.warn("Failed to fetch key after DM acceptance", { emberId, error: err.message }),
       );
+      // Ensure the channel stays subscribed after acceptance (hardening).
+      window.wsSubscribeToChannel(entry.textChannelId);
       if (typeof window.hideDmPendingBanner === 'function') {
         window.hideDmPendingBanner(entry.textChannelId);
       }
