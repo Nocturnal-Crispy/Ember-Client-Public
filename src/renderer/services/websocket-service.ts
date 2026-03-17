@@ -175,6 +175,9 @@
                 log.error("Failed to load DM requests after WS notification", { error: err.message }),
               );
             }
+          } else if (data.type === "dm_request_accepted") {
+            log.info("WebSocket: dm_request_accepted");
+            window.dispatchEvent(new CustomEvent("dm-request-accepted", { detail: data.payload }));
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
