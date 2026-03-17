@@ -622,7 +622,8 @@ declare global {
     openScreenShareModal(
       sources: ScreenSource[],
       audioAvailable: boolean,
-      onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
+      onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void,
+      audioLabel?: string
     ): void;
     hideScreenShareModal(): void;
     // Globals set by voice-ui-manager.ts (video grid)

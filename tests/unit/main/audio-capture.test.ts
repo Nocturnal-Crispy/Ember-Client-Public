@@ -10,8 +10,11 @@
 import {
   checkAudioCaptureSupportWith,
   registerAudioCaptureHandlers,
+  cleanOrphanedAudioModulesWith,
+  startPulseCaptureWith,
+  stopPulseCaptureWith,
 } from '../../../src/main/audio-capture';
-import type { CommandRunner } from '../../../src/main/audio-capture';
+import type { CommandRunner, PulseToken } from '../../../src/main/audio-capture';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -150,5 +153,141 @@ describe('registerAudioCaptureHandlers', () => {
   it('does not throw when called with a valid PID', () => {
     // ipcMain.handle is a no-op in the Node test environment
     expect(() => registerAudioCaptureHandlers(12345)).not.toThrow();
+  });
+});
+
+// ─── Phase 9: cleanOrphanedAudioModulesWith ───────────────────────────────────
+
+describe('cleanOrphanedAudioModulesWith', () => {
+  it('calls pactl unload-module when ember capture sink is found', async () => {
+    const calls: Array<[string, string[]]> = [];
+    const runner: CommandRunner = async (cmd, args = []) => {
+      calls.push([cmd, args]);
+      if (cmd === 'pactl' && args[0] === 'list') {
+        return {
+          stdout: '42\tmodule-null-sink\tsink_name=ember_screen_capture\n',
+          stderr: '',
+        };
+      }
+      return { stdout: '', stderr: '' };
+    };
+
+    await cleanOrphanedAudioModulesWith('linux', runner);
+
+    expect(calls.some(([c, a]) => c === 'pactl' && a.includes('unload-module') && a.includes('42'))).toBe(true);
+  });
+
+  it('does nothing when no ember capture sink is found', async () => {
+    const calls: Array<[string, string[]]> = [];
+    const runner: CommandRunner = async (cmd, args = []) => {
+      calls.push([cmd, args]);
+      return { stdout: '1\tmodule-bluetooth-policy\t\n', stderr: '' };
+    };
+
+    await cleanOrphanedAudioModulesWith('linux', runner);
+
+    expect(calls.every(([c, a]) => !(c === 'pactl' && a.includes('unload-module')))).toBe(true);
+  });
+
+  it('is a no-op on non-linux platforms', async () => {
+    const calls: Array<[string, string[]]> = [];
+    const runner: CommandRunner = async (cmd, args = []) => {
+      calls.push([cmd, args]);
+      return { stdout: '', stderr: '' };
+    };
+
+    await cleanOrphanedAudioModulesWith('win32', runner);
+
+    expect(calls.length).toBe(0);
+  });
+});
+
+// ─── Phase 9: startPulseCaptureWith ──────────────────────────────────────────
+
+describe('startPulseCaptureWith', () => {
+  const EMBER_PID = 1234;
+
+  /** JSON representing two active sink inputs — one Ember, one Firefox */
+  function makeSinkInputsJson(emberPid: number): string {
+    return JSON.stringify([
+      {
+        index: 10,
+        properties: { 'application.process.id': String(emberPid) },
+        sink: 'alsa_output.default',
+      },
+      {
+        index: 20,
+        properties: { 'application.process.id': '9999' },
+        sink: 'alsa_output.default',
+      },
+    ]);
+  }
+
+  it('returns success and platform linux-pulseaudio when pactl works', async () => {
+    const runner: CommandRunner = async (cmd, args = []) => {
+      if (cmd === 'pactl' && args.includes('sink-inputs')) {
+        return { stdout: makeSinkInputsJson(EMBER_PID), stderr: '' };
+      }
+      if (cmd === 'pactl' && args.includes('load-module')) {
+        return { stdout: '55\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    };
+
+    const result = await startPulseCaptureWith(EMBER_PID, runner);
+
+    expect(result.success).toBe(true);
+    expect(result.platform).toBe('linux-pulseaudio');
+  });
+
+  it('returns failure when there are no non-Ember audio sources', async () => {
+    const emberOnlyJson = JSON.stringify([
+      {
+        index: 10,
+        properties: { 'application.process.id': String(EMBER_PID) },
+        sink: 'alsa_output.default',
+      },
+    ]);
+    const runner: CommandRunner = async () => ({ stdout: emberOnlyJson, stderr: '' });
+
+    const result = await startPulseCaptureWith(EMBER_PID, runner);
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe('no-other-audio-sources');
+  });
+
+  it('returns failure when pactl list sink-inputs fails', async () => {
+    const runner: CommandRunner = async () => { throw new Error('pactl not found'); };
+
+    const result = await startPulseCaptureWith(EMBER_PID, runner);
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── Phase 9: stopPulseCaptureWith ───────────────────────────────────────────
+
+describe('stopPulseCaptureWith', () => {
+  it('restores moved inputs and unloads module', async () => {
+    const calls: Array<[string, string[]]> = [];
+    const runner: CommandRunner = async (cmd, args = []) => {
+      calls.push([cmd, args]);
+      return { stdout: '', stderr: '' };
+    };
+
+    const token: PulseToken = {
+      combineModuleId: '55',
+      movedInputs: [{ id: '20', originalSink: 'alsa_output.default' }],
+    };
+
+    await stopPulseCaptureWith(token, runner);
+
+    const moveCalls = calls.filter(([c, a]) => c === 'pactl' && a.includes('move-sink-input'));
+    expect(moveCalls.length).toBe(1);
+    expect(moveCalls[0][1]).toContain('alsa_output.default');
+
+    const unloadCalls = calls.filter(([c, a]) => c === 'pactl' && a.includes('unload-module'));
+    expect(unloadCalls.length).toBe(1);
+    expect(unloadCalls[0][1]).toContain('55');
   });
 });

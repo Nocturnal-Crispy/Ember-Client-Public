@@ -16,7 +16,8 @@
     "dist:win": "npm run secure-build && electron-builder --win",
     "dist:mac": "npm run secure-build && electron-builder --mac",
     "test": "jest --config ./tests/jest.config.ts",
-    "release": "npm run build && ./scripts/release.sh"
+    "release": "npm run build && ./scripts/release.sh",
+    "rebuild-native": "electron-rebuild -f -w windows-audio-capture,linux-audio-capture"
   },
   "keywords": [
     "typescript",

@@ -63,13 +63,16 @@ class VoiceManager {
   onScreenShareStarted: ((userId: string) => void) | null;
   onScreenShareStopped: ((userId: string) => void) | null;
 
-  // ─── Audio capture (Phase 4) ────────────────────────────────────────────────
+  // ─── Audio capture ────────────────────────────────────────────────────────
   _audioCaptureSetup: boolean;
   _audioCaptureInterval: ReturnType<typeof setInterval> | null;
   _audioCapturePCMBuffer: Int16Array[];
   _audioCtxCapture: AudioContext | null;
   _audioCaptureScriptNode: ScriptProcessorNode | null;
   _audioCaptureDestination: MediaStreamAudioDestinationNode | null;
+  // Phase 9: native capture via AudioWorklet or PulseAudio
+  _nativeAudioCaptureActive: boolean;
+  _screenAudioCtx: AudioContext | null;
 
   constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
     _voiceLog.info("VoiceManager created");
@@ -114,13 +117,15 @@ class VoiceManager {
     this.onScreenShareStarted = null;
     this.onScreenShareStopped = null;
 
-    // Audio capture (Phase 4)
+    // Audio capture
     this._audioCaptureSetup = false;
     this._audioCaptureInterval = null;
     this._audioCapturePCMBuffer = [];
     this._audioCtxCapture = null;
     this._audioCaptureScriptNode = null;
     this._audioCaptureDestination = null;
+    this._nativeAudioCaptureActive = false;
+    this._screenAudioCtx = null;
   }
 
   async fetchICEServers(): Promise<void> {
@@ -852,21 +857,107 @@ class VoiceManager {
     }
   }
 
-  // ─── Audio capture (Phase 4) ───────────────────────────────────────────────
+  // ─── Audio capture ────────────────────────────────────────────────────────
+
+  /**
+   * buildPulseAudioTrack — obtains audio from the PulseAudio combined-sink
+   * monitor device that the main process created. The monitor appears as a
+   * regular audioinput device in the renderer.
+   */
+  async buildPulseAudioTrack(): Promise<MediaStreamTrack | null> {
+    let devices: MediaDeviceInfo[];
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch {
+      return null;
+    }
+    const monitor = devices.find(
+      (d) =>
+        d.kind === 'audioinput' &&
+        d.label.toLowerCase().includes('ember_screen_capture')
+    );
+    if (!monitor) {
+      _voiceLog.warn('PulseAudio capture sink monitor device not found');
+      return null;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: monitor.deviceId } },
+        video: false,
+      });
+      return stream.getAudioTracks()[0] ?? null;
+    } catch (err) {
+      _voiceLog.warn('getUserMedia for PulseAudio monitor failed', { error: String(err) });
+      return null;
+    }
+  }
+
+  /**
+   * buildPcmInjectionTrack — AudioWorklet-based PCM injection track.
+   * Used for Windows WASAPI and Linux PipeWire capture paths.
+   * Loads pcm-injector.js, polls frames via requestAnimationFrame, and
+   * feeds raw Float32 PCM into a MediaStreamDestinationNode.
+   */
+  async buildPcmInjectionTrack(): Promise<MediaStreamTrack | null> {
+    const audioCtx = new AudioContext({ sampleRate: 48000 });
+    this._screenAudioCtx = audioCtx;
+    try {
+      await audioCtx.audioWorklet.addModule('audio/pcm-injector.js');
+    } catch (err) {
+      _voiceLog.error('Failed to load pcm-injector AudioWorklet', { error: String(err) });
+      audioCtx.close().catch(() => {});
+      this._screenAudioCtx = null;
+      return null;
+    }
+    const worklet = new AudioWorkletNode(audioCtx, 'pcm-injector');
+    const dest = audioCtx.createMediaStreamDestination();
+    worklet.connect(dest);
+
+    this._nativeAudioCaptureActive = true;
+    const poll = async () => {
+      if (!this.isScreenSharing || !this._nativeAudioCaptureActive) return;
+      try {
+        const frames = await (window.electronAPI as unknown as {
+          audioCapture: { frames(): Promise<{ pcm: Float32Array } | null> };
+        }).audioCapture.frames();
+        if (frames && frames.pcm && frames.pcm.length > 0) {
+          worklet.port.postMessage({ pcm: frames.pcm });
+        }
+      } catch { /* ignore transient frame errors */ }
+      requestAnimationFrame(poll);
+    };
+    poll();
+
+    _voiceLog.info('PCM injection audio track created');
+    return dest.stream.getAudioTracks()[0] ?? null;
+  }
+
+  /**
+   * buildAudioTrackFromNativeCapture — dispatches to the correct audio
+   * pipeline based on the platform reported by audio-capture-setup.
+   */
+  async buildAudioTrackFromNativeCapture(
+    result: { platform?: string }
+  ): Promise<MediaStreamTrack | null> {
+    if (result.platform === 'linux-pulseaudio') {
+      const track = await this.buildPulseAudioTrack();
+      if (track) this._nativeAudioCaptureActive = true;
+      return track;
+    }
+    // Windows WASAPI and Linux PipeWire: AudioWorklet PCM injection
+    return this.buildPcmInjectionTrack();
+  }
 
   /**
    * _startAudioCapture — attempt to start system audio capture via the
    * main-process IPC bridge. Returns the audio MediaStream on success,
    * or null if the platform does not support capture or setup fails.
-   * Safe to call even when audio capture stubs are not yet implemented
-   * (Phase 9); the pipeline is wired but will deliver silence until the
-   * native addon is present.
    */
   async _startAudioCapture(): Promise<MediaStream | null> {
-    let setupResult: { success: boolean; reason?: string };
+    let setupResult: { success: boolean; platform?: string; reason?: string };
     try {
       setupResult = await (window.electronAPI as unknown as {
-        audioCapture: { setup(): Promise<{ success: boolean; reason?: string }> };
+        audioCapture: { setup(): Promise<{ success: boolean; platform?: string; reason?: string }> };
       }).audioCapture.setup();
     } catch (e) {
       _voiceLog.warn("Audio capture setup threw", { error: String(e) });
@@ -882,56 +973,28 @@ class VoiceManager {
 
     this._audioCaptureSetup = true;
 
-    const ctx = new AudioContext({ sampleRate: 48000 });
-    const scriptNode = ctx.createScriptProcessor(4096, 0, 1);
-    const destination = ctx.createMediaStreamDestination();
-    scriptNode.connect(destination);
+    const track = await this.buildAudioTrackFromNativeCapture(setupResult);
+    if (!track) {
+      this._audioCaptureSetup = false;
+      return null;
+    }
 
-    // Feed queued PCM frames (Int16) into the WebRTC audio pipeline.
-    scriptNode.onaudioprocess = (e: AudioProcessingEvent) => {
-      const outData = e.outputBuffer.getChannelData(0);
-      const frame = this._audioCapturePCMBuffer.shift();
-      if (frame) {
-        const len = Math.min(outData.length, frame.length);
-        for (let i = 0; i < len; i++) {
-          outData[i] = frame[i] / 32768.0;
-        }
-      }
-      // else: output buffer is already zeroed (silence)
-    };
-
-    this._audioCtxCapture = ctx;
-    this._audioCaptureScriptNode = scriptNode;
-    this._audioCaptureDestination = destination;
-
-    // Poll frames from the main process at ~50 fps. When the native addon
-    // is not yet present (Phase 9), frames() returns null and the
-    // ScriptProcessor outputs silence.
-    this._audioCaptureInterval = setInterval(() => {
-      (window.electronAPI as unknown as {
-        audioCapture: { frames(): Promise<Int16Array | null> };
-      }).audioCapture
-        .frames()
-        .then((frames) => {
-          if (frames && frames.length > 0) {
-            this._audioCapturePCMBuffer.push(new Int16Array(frames));
-            // Limit buffer to avoid unbounded growth if rendering falls behind.
-            while (this._audioCapturePCMBuffer.length > 5) {
-              this._audioCapturePCMBuffer.shift();
-            }
-          }
-        })
-        .catch(() => {
-          /* ignore transient frame errors */
-        });
-    }, 20);
-
-    _voiceLog.info("Audio capture pipeline started");
-    return destination.stream;
+    _voiceLog.info("Audio capture pipeline started", { platform: setupResult.platform });
+    return new MediaStream([track]);
   }
 
   /** _stopAudioCapture — tear down the audio capture pipeline. */
   async _stopAudioCapture(): Promise<void> {
+    // Phase 9: stop rAF-based native capture loop
+    this._nativeAudioCaptureActive = false;
+
+    // Phase 9: close the AudioWorklet AudioContext
+    if (this._screenAudioCtx) {
+      await this._screenAudioCtx.close().catch(() => {});
+      this._screenAudioCtx = null;
+    }
+
+    // Legacy Phase 4 cleanup (kept for backward compat; no-ops in Phase 9)
     if (this._audioCaptureInterval !== null) {
       clearInterval(this._audioCaptureInterval);
       this._audioCaptureInterval = null;
@@ -947,11 +1010,10 @@ class VoiceManager {
       this._audioCaptureDestination = null;
     }
     if (this._audioCtxCapture) {
-      await this._audioCtxCapture.close().catch(() => {
-        /* ignore */
-      });
+      await this._audioCtxCapture.close().catch(() => {});
       this._audioCtxCapture = null;
     }
+
     if (this._audioCaptureSetup) {
       try {
         await (window.electronAPI as unknown as {

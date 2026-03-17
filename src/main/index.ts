@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCa
 import * as path from "path";
 import Store from "electron-store";
 import { createLogger } from "./logger";
-import { registerAudioCaptureHandlers, cleanOrphanedAudioModules } from "./audio-capture";
+import { registerAudioCaptureHandlers, cleanOrphanedAudioModules, registerBeforeQuitCleanup } from "./audio-capture";
 import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
 import {
@@ -992,6 +992,9 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+
+// Register before-quit audio capture cleanup (stops WASAPI/PipeWire/PulseAudio)
+registerBeforeQuitCleanup(app);
 
 app.on("before-quit", async () => {
   const installPath = getInstallOnExitPath();

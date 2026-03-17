@@ -319,6 +319,33 @@ describe('openScreenShareModal — audioAvailable: true', () => {
   });
 });
 
+// ─── Phase 9: audioLabel parameter ───────────────────────────────────────────
+
+describe('openScreenShareModal — audioLabel parameter', () => {
+  it('displays the specific audioLabel text in the status element when provided', () => {
+    const platformLabel = 'WASAPI process loopback (Windows 10 2004+)';
+    (window.openScreenShareModal as Function)([SCREEN_SOURCE], true, mockOnSelect, platformLabel);
+
+    const status = document.getElementById('screen-share-audio-status')!;
+    expect(status.textContent).toContain(platformLabel);
+  });
+
+  it('shows generic text when audioLabel is not provided (backward compat)', () => {
+    window.openScreenShareModal([SCREEN_SOURCE], true, mockOnSelect);
+
+    const status = document.getElementById('screen-share-audio-status')!;
+    expect((status.textContent ?? '').length).toBeGreaterThan(0);
+  });
+
+  it('shows PipeWire label when provided', () => {
+    const platformLabel = 'PipeWire node-based capture';
+    (window.openScreenShareModal as Function)([SCREEN_SOURCE], true, mockOnSelect, platformLabel);
+
+    const status = document.getElementById('screen-share-audio-status')!;
+    expect(status.textContent).toContain('PipeWire');
+  });
+});
+
 // ─── Settings — resolution and frame rate ─────────────────────────────────────
 
 describe('openScreenShareModal — settings', () => {

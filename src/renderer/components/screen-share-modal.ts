@@ -77,7 +77,7 @@
 
   // ─── Audio availability ───────────────────────────────────────────────────
 
-  function applyAudioAvailability(audioAvailable: boolean): void {
+  function applyAudioAvailability(audioAvailable: boolean, audioLabel?: string): void {
     _audioAvailable = audioAvailable;
 
     const cb = getEl<HTMLInputElement>('screen-share-audio-checkbox');
@@ -87,7 +87,7 @@
 
     if (audioAvailable) {
       cb.disabled = false;
-      status.textContent = 'System audio capture available';
+      status.textContent = audioLabel ?? 'System audio capture available';
     } else {
       cb.checked = false;
       cb.disabled = true;
@@ -124,7 +124,8 @@
   function openScreenShareModal(
     sources: ScreenSource[],
     audioAvailable: boolean,
-    onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void
+    onSelect: (source: ScreenSource, settings: ScreenShareSettings) => void,
+    audioLabel?: string
   ): void {
     log.debug('Opening screen share modal', { sourceCount: sources.length, audioAvailable });
 
@@ -146,7 +147,7 @@
     if (cb) cb.checked = false;
 
     renderSources(sources);
-    applyAudioAvailability(audioAvailable);
+    applyAudioAvailability(audioAvailable, audioLabel);
 
     const modal = getEl('screen-share-modal');
     if (modal) {

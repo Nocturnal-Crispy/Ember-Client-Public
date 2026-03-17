@@ -89,12 +89,16 @@ let mockDestination: {
   stream: MediaStream;
   disconnect: jest.Mock;
 };
+let mockWorkletPort: { postMessage: jest.Mock };
+let mockWorkletNode: { connect: jest.Mock; port: { postMessage: jest.Mock } };
 let mockAudioCtxCapture: {
   createScriptProcessor: jest.Mock;
   createMediaStreamDestination: jest.Mock;
+  audioWorklet: { addModule: jest.Mock };
   close: jest.Mock;
   state: string;
 };
+let mockEnumerateDevices: jest.Mock;
 
 // getUserMedia mock (needed for startScreenShare tests)
 let mockGetUserMedia: jest.Mock;
@@ -114,6 +118,13 @@ beforeAll(() => {
   (global as any).RTCSessionDescription = jest.fn((s: RTCSessionDescriptionInit) => s);
   (global as any).RTCIceCandidate = jest.fn((c: RTCIceCandidateInit) => c);
   (global as any).requestAnimationFrame = jest.fn();
+  // MediaStream constructor used by _startAudioCapture (Phase 9)
+  (global as any).MediaStream = jest.fn().mockImplementation((tracks: MediaStreamTrack[]) => ({
+    getTracks: () => tracks ?? [],
+    getAudioTracks: () => (tracks ?? []).filter((t: MediaStreamTrack) => t.kind === 'audio'),
+    getVideoTracks: () => (tracks ?? []).filter((t: MediaStreamTrack) => t.kind === 'video'),
+    active: true,
+  }));
 
   require('../../../src/renderer/services/voice-service');
   VoiceManagerClass = (global as any).window.VoiceManager;
@@ -127,10 +138,11 @@ let mockPC: ReturnType<typeof makeMockPC>;
 beforeEach(() => {
   // Reset navigator.mediaDevices
   mockGetUserMedia = jest.fn();
+  mockEnumerateDevices = jest.fn().mockResolvedValue([]);
   Object.defineProperty(global, 'navigator', {
     configurable: true,
     writable: true,
-    value: { mediaDevices: { getUserMedia: mockGetUserMedia } },
+    value: { mediaDevices: { getUserMedia: mockGetUserMedia, enumerateDevices: mockEnumerateDevices } },
   });
 
   // Set up audio capture IPC mocks
@@ -146,7 +158,12 @@ beforeEach(() => {
     },
   };
 
-  // AudioContext mock with Phase 4 methods
+  // AudioWorklet mock
+  mockWorkletPort = { postMessage: jest.fn() };
+  mockWorkletNode = { connect: jest.fn(), port: mockWorkletPort };
+  (global as any).AudioWorkletNode = jest.fn().mockReturnValue(mockWorkletNode);
+
+  // AudioContext mock with Phase 4 + Phase 9 methods
   mockScriptNode = {
     connect: jest.fn(),
     disconnect: jest.fn(),
@@ -159,6 +176,7 @@ beforeEach(() => {
   mockAudioCtxCapture = {
     createScriptProcessor: jest.fn().mockReturnValue(mockScriptNode),
     createMediaStreamDestination: jest.fn().mockReturnValue(mockDestination),
+    audioWorklet: { addModule: jest.fn().mockResolvedValue(undefined) },
     close: jest.fn().mockResolvedValue(undefined),
     state: 'running',
   };
@@ -186,7 +204,7 @@ describe('_startAudioCapture', () => {
 
     expect(result).toBeNull();
     expect((vm as any)._audioCaptureSetup).toBe(false);
-    expect((vm as any)._audioCaptureInterval).toBeNull();
+    expect((vm as any)._nativeAudioCaptureActive).toBe(false);
   });
 
   it('returns null when audioCapture.setup() throws', async () => {
@@ -198,76 +216,52 @@ describe('_startAudioCapture', () => {
     expect((vm as any)._audioCaptureSetup).toBe(false);
   });
 
-  it('sets _audioCaptureSetup=true and starts interval on success', async () => {
+  it('sets _audioCaptureSetup=true and _nativeAudioCaptureActive=true on success', async () => {
     mockAudioCaptureSetup.mockResolvedValue({ success: true, platform: 'linux-pipewire' });
 
     await (vm as any)._startAudioCapture();
 
     expect((vm as any)._audioCaptureSetup).toBe(true);
-    expect((vm as any)._audioCaptureInterval).not.toBeNull();
+    expect((vm as any)._nativeAudioCaptureActive).toBe(true);
   });
 
-  it('creates AudioContext pipeline and returns the destination stream', async () => {
+  it('creates AudioWorklet pipeline and returns an audio track stream', async () => {
     mockAudioCaptureSetup.mockResolvedValue({ success: true, platform: 'linux-pipewire' });
 
     const result = await (vm as any)._startAudioCapture();
 
-    expect(mockAudioCtxCapture.createScriptProcessor).toHaveBeenCalled();
+    expect(mockAudioCtxCapture.audioWorklet.addModule).toHaveBeenCalled();
     expect(mockAudioCtxCapture.createMediaStreamDestination).toHaveBeenCalled();
-    expect(mockScriptNode.connect).toHaveBeenCalledWith(mockDestination);
-    expect(result).toBe(mockDestination.stream);
-  });
-
-  it('onaudioprocess fills output buffer from queued PCM frame', async () => {
-    mockAudioCaptureSetup.mockResolvedValue({ success: true });
-
-    await (vm as any)._startAudioCapture();
-
-    // Enqueue a PCM frame (Int16: value 16384 → float32: 0.5)
-    const pcmFrame = new Int16Array([16384, -16384, 0]);
-    (vm as any)._audioCapturePCMBuffer.push(pcmFrame);
-
-    const outData = new Float32Array(3);
-    const mockEvent = {
-      outputBuffer: { getChannelData: jest.fn().mockReturnValue(outData) },
-    } as unknown as AudioProcessingEvent;
-
-    mockScriptNode.onaudioprocess!(mockEvent);
-
-    expect(outData[0]).toBeCloseTo(0.5, 3);
-    expect(outData[1]).toBeCloseTo(-0.5, 3);
-    expect(outData[2]).toBeCloseTo(0, 5);
-    // Frame was consumed
-    expect((vm as any)._audioCapturePCMBuffer.length).toBe(0);
-  });
-
-  it('onaudioprocess outputs silence when PCM buffer is empty', async () => {
-    mockAudioCaptureSetup.mockResolvedValue({ success: true });
-
-    await (vm as any)._startAudioCapture();
-
-    const outData = new Float32Array(4); // all zeros by default
-    const mockEvent = {
-      outputBuffer: { getChannelData: jest.fn().mockReturnValue(outData) },
-    } as unknown as AudioProcessingEvent;
-
-    // No frames queued
-    mockScriptNode.onaudioprocess!(mockEvent);
-
-    // Output should remain all zeros
-    expect(Array.from(outData)).toEqual([0, 0, 0, 0]);
+    expect(mockWorkletNode.connect).toHaveBeenCalledWith(mockDestination);
+    // Result is a MediaStream wrapping the audio track
+    expect(result).not.toBeNull();
   });
 });
 
 // ─── _stopAudioCapture ────────────────────────────────────────────────────────
 
 describe('_stopAudioCapture', () => {
-  it('clears interval, disconnects nodes, and calls teardown when active', async () => {
-    // Start capture first
-    mockAudioCaptureSetup.mockResolvedValue({ success: true });
+  it('clears native capture state and calls teardown when active', async () => {
+    // Start capture first (AudioWorklet path)
+    mockAudioCaptureSetup.mockResolvedValue({ success: true, platform: 'win32-wasapi' });
     await (vm as any)._startAudioCapture();
 
-    expect((vm as any)._audioCaptureInterval).not.toBeNull();
+    expect((vm as any)._nativeAudioCaptureActive).toBe(true);
+
+    await (vm as any)._stopAudioCapture();
+
+    expect((vm as any)._nativeAudioCaptureActive).toBe(false);
+    expect(mockAudioCaptureTeardown).toHaveBeenCalled();
+    expect((vm as any)._audioCaptureSetup).toBe(false);
+  });
+
+  it('legacy: disconnects ScriptProcessor nodes if they were manually injected', async () => {
+    // Simulate old Phase 4 state manually injected
+    (vm as any)._audioCaptureSetup = true;
+    (vm as any)._audioCaptureInterval = setInterval(() => {}, 1000);
+    (vm as any)._audioCtxCapture = mockAudioCtxCapture;
+    (vm as any)._audioCaptureScriptNode = mockScriptNode;
+    (vm as any)._audioCaptureDestination = mockDestination;
 
     await (vm as any)._stopAudioCapture();
 
@@ -456,5 +450,103 @@ describe('_partialCleanup audio capture teardown', () => {
     await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
 
     expect(mockAudioCaptureTeardown).toHaveBeenCalled();
+  });
+});
+
+// ─── Phase 9: buildPulseAudioTrack ────────────────────────────────────────────
+
+describe('buildPulseAudioTrack', () => {
+  it('returns null when no ember_screen_capture device is found', async () => {
+    mockEnumerateDevices.mockResolvedValue([
+      { kind: 'audioinput', deviceId: 'default', label: 'Default Microphone' },
+      { kind: 'audioinput', deviceId: 'hw-1', label: 'USB Microphone' },
+    ]);
+
+    const result = await (vm as any).buildPulseAudioTrack();
+
+    expect(result).toBeNull();
+    expect(mockGetUserMedia).not.toHaveBeenCalled();
+  });
+
+  it('calls getUserMedia with the correct deviceId when monitor is found', async () => {
+    const monitorDeviceId = 'monitor-device-42';
+    mockEnumerateDevices.mockResolvedValue([
+      { kind: 'audioinput', deviceId: 'default', label: 'Default Microphone' },
+      { kind: 'audioinput', deviceId: monitorDeviceId, label: 'Monitor of Ember_Screen_Capture' },
+    ]);
+    const audioTrack = makeMockTrack('audio');
+    mockGetUserMedia.mockResolvedValue(makeMockStream([audioTrack]));
+
+    const result = await (vm as any).buildPulseAudioTrack();
+
+    expect(mockGetUserMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ audio: expect.objectContaining({ deviceId: expect.objectContaining({ exact: monitorDeviceId }) }) })
+    );
+    expect(result).toBe(audioTrack);
+  });
+
+  it('returns null when getUserMedia throws', async () => {
+    const monitorDeviceId = 'monitor-42';
+    mockEnumerateDevices.mockResolvedValue([
+      { kind: 'audioinput', deviceId: monitorDeviceId, label: 'Monitor of Ember_Screen_Capture' },
+    ]);
+    mockGetUserMedia.mockRejectedValue(new Error('Permission denied'));
+
+    const result = await (vm as any).buildPulseAudioTrack();
+
+    expect(result).toBeNull();
+  });
+});
+
+// ─── Phase 9: buildAudioTrackFromNativeCapture ────────────────────────────────
+
+describe('buildAudioTrackFromNativeCapture', () => {
+  it('uses PulseAudio path when platform is linux-pulseaudio', async () => {
+    const monitorDeviceId = 'monitor-99';
+    mockEnumerateDevices.mockResolvedValue([
+      { kind: 'audioinput', deviceId: monitorDeviceId, label: 'Monitor of Ember_Screen_Capture' },
+    ]);
+    const audioTrack = makeMockTrack('audio');
+    mockGetUserMedia.mockResolvedValue(makeMockStream([audioTrack]));
+
+    const result = await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'linux-pulseaudio' });
+
+    expect(mockGetUserMedia).toHaveBeenCalled();
+    expect(result).toBe(audioTrack);
+  });
+
+  it('sets _nativeAudioCaptureActive=true when PulseAudio track is obtained', async () => {
+    const monitorDeviceId = 'monitor-99';
+    mockEnumerateDevices.mockResolvedValue([
+      { kind: 'audioinput', deviceId: monitorDeviceId, label: 'Monitor of Ember_Screen_Capture' },
+    ]);
+    const audioTrack = makeMockTrack('audio');
+    mockGetUserMedia.mockResolvedValue(makeMockStream([audioTrack]));
+
+    await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'linux-pulseaudio' });
+
+    expect((vm as any)._nativeAudioCaptureActive).toBe(true);
+  });
+
+  it('uses AudioWorklet path for win32-wasapi platform', async () => {
+    const result = await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'win32-wasapi' });
+
+    expect(mockAudioCtxCapture.audioWorklet.addModule).toHaveBeenCalled();
+    // Result is the first audio track from createMediaStreamDestination's stream
+    expect(result).not.toBeUndefined();
+  });
+
+  it('uses AudioWorklet path for linux-pipewire platform', async () => {
+    await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'linux-pipewire' });
+
+    expect(mockAudioCtxCapture.audioWorklet.addModule).toHaveBeenCalled();
+  });
+
+  it('returns null when AudioWorklet addModule fails', async () => {
+    mockAudioCtxCapture.audioWorklet.addModule.mockRejectedValue(new Error('module load failed'));
+
+    const result = await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'win32-wasapi' });
+
+    expect(result).toBeNull();
   });
 });
