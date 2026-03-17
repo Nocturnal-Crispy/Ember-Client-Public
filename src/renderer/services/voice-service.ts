@@ -1161,6 +1161,14 @@ class VoiceManager {
       })
     );
 
+    this.ws.send(
+      JSON.stringify({
+        type: "screen_share_start",
+        channel_id: this.channelId,
+        screen_stream_id: stream.id,
+      })
+    );
+
     this.isScreenSharing = true;
     _voiceLog.info("Screen share started, renegotiation offer sent");
     return true;
@@ -1190,6 +1198,15 @@ class VoiceManager {
       } catch (e) {
         _voiceLog.warn("stopScreenShare: renegotiation offer failed", { error: String(e) });
       }
+    }
+
+    if (this.channelId) {
+      this.ws.send(
+        JSON.stringify({
+          type: "screen_share_stop",
+          channel_id: this.channelId,
+        })
+      );
     }
   }
 

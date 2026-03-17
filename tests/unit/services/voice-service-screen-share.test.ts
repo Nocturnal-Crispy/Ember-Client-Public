@@ -21,8 +21,9 @@ function makeMockTrack(kind = 'video'): MediaStreamTrack {
   return { kind, stop: jest.fn(), id: 'track-' + kind } as unknown as MediaStreamTrack;
 }
 
-function makeMockStream(tracks: MediaStreamTrack[] = []): MediaStream {
+function makeMockStream(tracks: MediaStreamTrack[] = [], id = `stream-${Math.random().toString(36).slice(2)}`): MediaStream {
   return {
+    id,
     getTracks: () => tracks,
     getVideoTracks: () => tracks.filter((t) => t.kind === 'video'),
     getAudioTracks: () => tracks.filter((t) => t.kind === 'audio'),
@@ -173,11 +174,15 @@ describe('startScreenShare', () => {
     expect(mockPC.createOffer).toHaveBeenCalled();
     expect(mockPC.setLocalDescription).toHaveBeenCalled();
 
-    expect(mockWsMessages.length).toBe(1);
+    expect(mockWsMessages.length).toBe(2);
     const msg = JSON.parse(mockWsMessages[0]);
     expect(msg.type).toBe('voice_renegotiate');
     expect(msg.channel_id).toBe(MOCK_CHANNEL_ID);
     expect(msg.offer).toMatchObject({ type: 'offer' });
+    const ssMsg = JSON.parse(mockWsMessages[1]);
+    expect(ssMsg.type).toBe('screen_share_start');
+    expect(ssMsg.channel_id).toBe(MOCK_CHANNEL_ID);
+    expect(typeof ssMsg.screen_stream_id).toBe('string');
   });
 
   it('sets isScreenSharing=true and stores stream', async () => {
@@ -259,13 +264,16 @@ describe('stopScreenShare', () => {
     tracks.forEach((t) => expect(t.stop).toHaveBeenCalled());
   });
 
-  it('sends voice_renegotiate after stopping', async () => {
+  it('sends voice_renegotiate and screen_share_stop after stopping', async () => {
     await (vm as any).stopScreenShare();
 
     expect(mockPC.createOffer).toHaveBeenCalled();
-    expect(mockWsMessages.length).toBe(1);
-    const msg = JSON.parse(mockWsMessages[0]);
-    expect(msg.type).toBe('voice_renegotiate');
+    expect(mockWsMessages.length).toBe(2);
+    const renegMsg = JSON.parse(mockWsMessages[0]);
+    expect(renegMsg.type).toBe('voice_renegotiate');
+    const stopMsg = JSON.parse(mockWsMessages[1]);
+    expect(stopMsg.type).toBe('screen_share_stop');
+    expect(stopMsg.channel_id).toBe(MOCK_CHANNEL_ID);
   });
 
   it('resets isScreenSharing and localScreenStream', async () => {
