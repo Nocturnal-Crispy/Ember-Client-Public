@@ -354,7 +354,55 @@ ipcMain.on("auth-logout", () => {
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
-let safeStorageWarningShown = false;
+/**
+ * Check whether the OS keyring is available and block the user with a
+ * prominent dialog if it is not.  Called once at startup before any window
+ * is created so the user can make an informed decision before Ember loads.
+ *
+ * If the user already has a stored device key AND safeStorage is now
+ * unavailable, the key has been or will be stored without OS-level
+ * encryption — a critical exposure.  In that case the dialog copy is
+ * more urgent and the default action is Quit.
+ */
+function checkSafeStorageAtStartup(): void {
+  if (safeStorage.isEncryptionAvailable()) return;
+
+  const hasStoredKey = !!(store.get("devicePrivateKey") || store.get("device"));
+  log.error("safeStorage unavailable at startup", { hasStoredKey });
+
+  const message = hasStoredKey
+    ? "Your device keyring is unavailable — private key at risk"
+    : "Your device keyring is unavailable";
+
+  const detail = hasStoredKey
+    ? "Ember detected a stored device identity but cannot access the OS keyring.\n\n" +
+      "Your private key may be stored unencrypted on disk. Anyone with access " +
+      "to your filesystem can read it and decrypt your messages.\n\n" +
+      "Recommended action: quit now, start a keyring service (e.g. GNOME Keyring, " +
+      "KWallet, or macOS Keychain), then restart Ember."
+    : "Ember cannot encrypt your private key with OS-level protection.\n\n" +
+      "If you continue, your private key will be stored unencrypted on this device. " +
+      "Anyone with access to your filesystem may be able to read it.\n\n" +
+      "To resolve this, start a keyring service (e.g. GNOME Keyring, KWallet, " +
+      "or macOS Keychain) and restart Ember.";
+
+  const choice = dialog.showMessageBoxSync({
+    type: "error",
+    title: "Security Warning — Keyring Unavailable",
+    message,
+    detail,
+    buttons: ["Quit (Recommended)", "Continue at My Own Risk"],
+    defaultId: 0,
+    cancelId: 0,
+  });
+
+  if (choice === 0) {
+    log.info("User chose to quit due to unavailable safeStorage");
+    app.exit(1);
+  }
+
+  log.warn("User chose to continue despite unavailable safeStorage");
+}
 
 function encryptPrivateKey(plaintext: string): string {
   if (safeStorage.isEncryptionAvailable()) {
@@ -362,22 +410,6 @@ function encryptPrivateKey(plaintext: string): string {
     return safeStorage.encryptString(plaintext).toString("base64");
   }
   log.warn("safeStorage unavailable; private key stored without OS-level encryption");
-  if (!safeStorageWarningShown) {
-    safeStorageWarningShown = true;
-    dialog.showMessageBoxSync({
-      type: "warning",
-      title: "Security Warning — Keyring Unavailable",
-      message: "Your device keyring is not available.",
-      detail:
-        "Ember cannot encrypt your private key with OS-level protection.\n\n" +
-        "Your private key will be stored unencrypted on this device. " +
-        "Anyone with access to your filesystem may be able to read it.\n\n" +
-        "To resolve this, ensure a keyring service is running " +
-        "(e.g. GNOME Keyring, KWallet, or macOS Keychain) and restart Ember.",
-      buttons: ["I Understand"],
-      defaultId: 0,
-    });
-  }
   return plaintext;
 }
 
@@ -1041,6 +1073,7 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     log.info("App ready");
+    checkSafeStorageAtStartup();
     await cleanOrphanedAudioModules();
     registerAudioCaptureHandlers(process.pid);
     const isAuthenticated = checkAuthentication();
