@@ -85,8 +85,15 @@
       });
       if (!res.ok) {
         if (res.status === 404) {
-          // This device doesn't have a key yet — request enrollment from another device.
-          requestDeviceKeyEnrollment(emberId).catch(() => null);
+          // Only request enrollment when the DM has already been accepted — meaning
+          // the key exists on at least one other device but hasn't been delivered to
+          // this one yet. For pending DMs (requester perspective) no key has been
+          // created anywhere yet, so enrollment is pointless and misleading.
+          const dmEntry = dmByEmberId.get(emberId);
+          const isPendingRequester = dmEntry?.requestStatus === 'pending' && !dmEntry.isRecipient;
+          if (!isPendingRequester) {
+            requestDeviceKeyEnrollment(emberId).catch(() => null);
+          }
         }
         return null;
       }
@@ -235,8 +242,10 @@
 
   /**
    * Sends a DM request to another user and immediately provisions the DM channel.
-   * The requester can send messages right away; a "pending" banner is shown until
-   * the recipient accepts. Returns the text channel ID so the UI can open the DM.
+   * The requester generates the ember key at request time so they can send messages
+   * before the recipient accepts. A peer-box is included in the request body so
+   * the recipient can decrypt all messages (including pre-acceptance ones) after
+   * they accept, without any additional round-trips.
    *
    * Returns the existing channel ID if a DM already exists with this user.
    */
@@ -254,16 +263,44 @@
     );
     if (existing) return existing.textChannelId;
 
-    // Do NOT generate an ember key here — the acceptor creates the single shared
-    // key and distributes it via peer-box on acceptance. The requester fetches
-    // their peer-box after the DM is accepted (see fetchAndCacheEmberKey).
+    // Generate the ember key immediately so the requester can send messages before
+    // the recipient accepts. A peer-box for the recipient is stored on the server
+    // with pending=true; flipped to active when the recipient accepts.
+    const emberKey = emberCrypto.generateEmberKey();
+    const ownPub  = naclUtil.decodeBase64(device.public_key);
+    const ownPriv = naclUtil.decodeBase64(device.private_key);
+    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
+
+    // Fetch the recipient's device public key to create one peer-box for them.
+    let peerBox: { recipient_id: string; encrypted_key: string; sender_public_key: string } | undefined;
+    try {
+      const devRes = await fetch(`${auth.hostname}/api/v1/users/${participantId}/devices`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (devRes.ok) {
+        const devData = (await devRes.json()) as { devices: Array<{ id: string; public_key: string }> };
+        const firstDevice = devData.devices?.[0];
+        if (firstDevice?.public_key) {
+          const recipientPub = naclUtil.decodeBase64(firstDevice.public_key);
+          const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, recipientPub, ownPriv);
+          peerBox = {
+            recipient_id:      participantId,
+            encrypted_key:     encryptedKeyPeer,
+            sender_public_key: device.public_key,
+          };
+        }
+      }
+    } catch (err) {
+      log.warn("Failed to fetch recipient devices for peer-box", { participantId, error: (err as Error).message });
+    }
+
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      body: JSON.stringify({ user_id: participantId }),
+      body: JSON.stringify({ user_id: participantId, encrypted_key_self: encryptedKeySelf, peer_box: peerBox }),
     });
     if (!res.ok) {
       const errData = (await res.json().catch(() => ({}))) as { error?: string };
@@ -296,6 +333,9 @@
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
+
+    // Cache the key immediately so the requester can send messages right away.
+    App.emberKeyCache.set(emberId, emberKey);
 
     window.addDmConversationToList({
       id: channels.textChannelId,
@@ -362,14 +402,11 @@
   }
 
   /**
-   * Accepts a pending DM request. The recipient:
-   *   1. Generates their own ember key for the DM channel.
-   *   2. Seals it as a self-box (encrypted with their own device key pair).
-   *   3. Sends the self-box to the server — no peer-box, no cross-user asymmetric
-   *      encryption required. Each party only ever encrypts for themselves.
-   *
-   * The DM ember and channels already exist (created when the request was sent).
-   * This call just adds the recipient as a member and stores their key.
+   * Accepts a pending DM request. The requester pre-computed a peer-box for the
+   * recipient at request time (stored with pending=true on the server). This call
+   * activates it (pending → false) and adds the recipient as a member. No key
+   * generation is needed here — the recipient fetches their pre-computed peer-box
+   * via fetchAndCacheEmberKey, which decrypts it and migrates to a self-box.
    */
   async function acceptDMRequest(
     requestId: string,
@@ -377,50 +414,7 @@
     requesterUsername: string,
   ): Promise<string> {
     const auth = await getAuth();
-    const device = await getDevice();
-    if (!auth || !device) throw new Error("Not authenticated");
-
-    // Acceptor generates the ONE shared ember key and distributes it:
-    //   self-box:  encrypted for own device (standard self-box path)
-    //   peer-box:  encrypted for each of the requester's registered devices
-    const emberKey = emberCrypto.generateEmberKey();
-    const ownPub = naclUtil.decodeBase64(device.public_key);
-    const ownPriv = naclUtil.decodeBase64(device.private_key);
-    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
-    const senderPublicKey = device.public_key; // base64 acceptor pub key stored with peer-box
-
-    // Fetch the requester's registered devices and create one peer-box per device
-    // so any of their devices can decrypt the ember key.
-    const peerBoxes: Array<{ device_id: string; encrypted_key: string; sender_public_key: string }> = [];
-    try {
-      const devRes = await fetch(`${auth.hostname}/api/v1/users/${requesterId}/devices`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      });
-      if (devRes.ok) {
-        const devData = (await devRes.json()) as {
-          devices: Array<{ id: string; public_key: string }>;
-        };
-        for (const d of devData.devices) {
-          if (!d.public_key || !d.id) continue;
-          const requesterPub = naclUtil.decodeBase64(d.public_key);
-          const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, requesterPub, ownPriv);
-          peerBoxes.push({
-            device_id: d.id,
-            encrypted_key: encryptedKeyPeer,
-            sender_public_key: senderPublicKey,
-          });
-        }
-      }
-    } catch (err) {
-      log.warn("Failed to fetch requester devices for peer-boxes", {
-        requesterId,
-        error: (err as Error).message,
-      });
-    }
-
-    if (peerBoxes.length === 0) {
-      throw new Error("Could not create peer-boxes: requester has no registered devices");
-    }
+    if (!auth) throw new Error("Not authenticated");
 
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests/${requestId}/accept`, {
       method: "POST",
@@ -428,18 +422,13 @@
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      body: JSON.stringify({
-        encrypted_key_self: encryptedKeySelf,
-        peer_boxes: peerBoxes,
-      }),
+      body: JSON.stringify({}),
     });
     if (!res.ok) {
       const errData = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(errData.error ?? "Failed to accept DM request");
     }
     const { ember_id: emberId } = (await res.json()) as { ember_id: string };
-
-    App.emberKeyCache.set(emberId, emberKey);
 
     // Update local state: the DM may already be in the map (recipient sees it as pending)
     const existingEntry = dmByEmberId.get(emberId);
@@ -475,6 +464,12 @@
     }
     // Always subscribe — fixes BP-2 where subscription was skipped for existing entries
     window.wsSubscribeToChannel(channels.textChannelId);
+
+    // Fetch the pre-computed peer-box key the requester stored at request time.
+    // fetchAndCacheEmberKey handles the peer-box decrypt + self-box migration automatically.
+    fetchAndCacheEmberKey(emberId).catch((err: Error) =>
+      log.warn("Failed to fetch peer-box key after DM acceptance", { emberId, error: err.message }),
+    );
 
     // Hide the pending banner now that the DM is accepted
     if (typeof window.hideDmPendingBanner === 'function') {
@@ -568,7 +563,9 @@
     if (!auth || !entry) throw new Error("DM channel not found");
 
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) throw new Error("Ember key unavailable");
+    if (!emberKey) {
+      throw new Error("Ember key unavailable");
+    }
 
     const ciphertext = emberCrypto.encryptMessage(plaintext, emberKey);
 
@@ -897,12 +894,9 @@
 
     const entry = dmByEmberId.get(emberId);
     if (entry) {
-      // Mark the entry as accepted and refresh the key from the server (peer-box).
-      App.emberKeyCache.delete(emberId); // force re-fetch to get the peer-box
+      // Mark the entry as accepted. The requester generated the key at request time
+      // and it is already in cache — no re-fetch needed.
       entry.requestStatus = 'accepted';
-      fetchAndCacheEmberKey(emberId).catch((err: Error) =>
-        log.warn("Failed to fetch key after DM acceptance", { emberId, error: err.message }),
-      );
       // Ensure the channel stays subscribed after acceptance (hardening).
       window.wsSubscribeToChannel(entry.textChannelId);
       if (typeof window.hideDmPendingBanner === 'function') {
