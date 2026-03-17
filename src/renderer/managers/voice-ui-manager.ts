@@ -390,6 +390,12 @@
     document.getElementById("voice-controls")?.classList.add("hidden");
   }
 
+  function openVideoPopout(): void {
+    window.electronAPI.ipc.invoke("open-video-popout", {
+      channelName: App.activeVoiceChannelName ?? "",
+    });
+  }
+
   document.getElementById("voice-mute-btn")?.addEventListener("click", () => {
     if (!App.voiceManager) return;
     const muted = (App.voiceManager as { toggleMute(): boolean }).toggleMute();
@@ -480,7 +486,7 @@
     ?.addEventListener("click", () => toggleScreenShare());
 
   document.getElementById("vbar-popout")?.addEventListener("click", () => {
-    window.toggleVideoPopout();
+    openVideoPopout();
   });
 
   document.getElementById("vbar-disconnect")?.addEventListener("click", () => {
@@ -1876,6 +1882,7 @@
     App.focusedTileId = tileId;
     renderVideoGrid();
   };
+  window.openVideoPopout = openVideoPopout;
   window.toggleVideoPopout = (): void => {
     App.videoPopoutOpen = !App.videoPopoutOpen;
   };

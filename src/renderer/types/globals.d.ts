@@ -628,6 +628,7 @@ declare global {
     // Globals set by voice-ui-manager.ts (video grid)
     setSpotlight(tileId: string | null): void;
     toggleVideoPopout(): void;
+    openVideoPopout(): void;
     resolveSpotlight(desiredTiles: Set<string>): string | null;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;

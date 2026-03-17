@@ -110,6 +110,9 @@ const defaultVoiceVideoSettings: VoiceVideoSettings = {
 let mainWindow: BrowserWindow | null = null;
 let pendingInviteLink: string | null = null;
 
+// One-time context delivered to the pop-out window via get-popout-voice-context
+let pendingPopoutContext: { channelName: string; token: string } | null = null;
+
 //To turn on dev tools, change devTools: false to devTools: true in the webPreferences object
 
 function createWindow(isAuthenticated: boolean) {
@@ -815,6 +818,49 @@ ipcMain.handle("get-screen-sources", async () => {
         ? parseInt(s.id.split(":")[1], 10)
         : null,
   }));
+});
+
+// ─── Video Pop-Out Window ─────────────────────────────────────────────────────
+
+ipcMain.handle("open-video-popout", async (_event, args: unknown) => {
+  const { channelName } = (args as { channelName?: string }) ?? {};
+
+  // Read the auth token from the store for one-time delivery to the pop-out
+  const auth = store.get("auth") as { token?: string } | undefined;
+  const token = auth?.token ?? "";
+
+  pendingPopoutContext = { channelName: channelName ?? "", token };
+  log.info("Opening video pop-out window", { channelName });
+
+  const popout = new BrowserWindow({
+    width: 960,
+    height: 600,
+    minWidth: 480,
+    minHeight: 300,
+    backgroundColor: "#111111",
+    title: channelName ? `Voice — ${channelName}` : "Voice",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      preload: path.join(__dirname, "../preload/video-popout-preload.js"),
+      devTools: isDev,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    },
+  });
+
+  popout.loadFile(path.join(__dirname, "../renderer/video-popout.html"));
+  popout.on("closed", () => {
+    log.debug("Video pop-out window closed");
+  });
+});
+
+ipcMain.handle("get-popout-voice-context", () => {
+  log.debug("IPC: get-popout-voice-context");
+  const ctx = pendingPopoutContext;
+  pendingPopoutContext = null; // one-time read
+  return ctx;
 });
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────

@@ -119,6 +119,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "audio-capture-setup",
   "audio-capture-frames",
   "audio-capture-teardown",
+  "open-video-popout",
 ];
 
 const ALLOWED_ON: readonly string[] = [

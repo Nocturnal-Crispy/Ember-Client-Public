@@ -524,6 +524,32 @@ describe('showVoiceControls — bottom bar', () => {
   });
 });
 
+// ─── Phase 8: openVideoPopout ─────────────────────────────────────────────────
+
+describe('openVideoPopout', () => {
+  beforeEach(() => {
+    mockIpcInvoke.mockClear();
+    (window as any).App.activeVoiceChannelName = null;
+  });
+
+  it('invokes open-video-popout IPC channel', () => {
+    (window as any).openVideoPopout();
+    expect(mockIpcInvoke).toHaveBeenCalledWith('open-video-popout', expect.anything());
+  });
+
+  it('passes activeVoiceChannelName as channelName when set', () => {
+    (window as any).App.activeVoiceChannelName = 'general';
+    (window as any).openVideoPopout();
+    expect(mockIpcInvoke).toHaveBeenCalledWith('open-video-popout', { channelName: 'general' });
+  });
+
+  it('passes empty string as channelName when activeVoiceChannelName is null', () => {
+    (window as any).App.activeVoiceChannelName = null;
+    (window as any).openVideoPopout();
+    expect(mockIpcInvoke).toHaveBeenCalledWith('open-video-popout', { channelName: '' });
+  });
+});
+
 // ─── Speaking indicator persists through re-render (integration) ──────────────
 
 describe('speaking indicator persists through re-render', () => {
