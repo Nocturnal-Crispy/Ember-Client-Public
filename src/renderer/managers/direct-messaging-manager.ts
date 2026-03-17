@@ -85,8 +85,15 @@
       });
       if (!res.ok) {
         if (res.status === 404) {
-          // This device doesn't have a key yet — request enrollment from another device.
-          requestDeviceKeyEnrollment(emberId).catch(() => null);
+          // Only request enrollment when the DM has already been accepted — meaning
+          // the key exists on at least one other device but hasn't been delivered to
+          // this one yet. For pending DMs (requester perspective) no key has been
+          // created anywhere yet, so enrollment is pointless and misleading.
+          const dmEntry = dmByEmberId.get(emberId);
+          const isPendingRequester = dmEntry?.requestStatus === 'pending' && !dmEntry.isRecipient;
+          if (!isPendingRequester) {
+            requestDeviceKeyEnrollment(emberId).catch(() => null);
+          }
         }
         return null;
       }
@@ -517,6 +524,12 @@
     const entry = dmByTextChannel.get(channelId);
     if (!auth || !entry) return [];
 
+    // No key exists yet for pending DMs from the requester's perspective — the
+    // recipient hasn't accepted yet so there is nothing to decrypt.
+    if (entry.requestStatus === 'pending' && !entry.isRecipient) {
+      return [];
+    }
+
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
     if (!emberKey) {
       log.error("Cannot fetch DM messages: ember key unavailable", {
@@ -568,7 +581,12 @@
     if (!auth || !entry) throw new Error("DM channel not found");
 
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) throw new Error("Ember key unavailable");
+    if (!emberKey) {
+      if (entry.requestStatus === 'pending' && !entry.isRecipient) {
+        throw new Error(`${entry.partnerUsername} hasn't accepted your message request yet`);
+      }
+      throw new Error("Ember key unavailable");
+    }
 
     const ciphertext = emberCrypto.encryptMessage(plaintext, emberKey);
 
