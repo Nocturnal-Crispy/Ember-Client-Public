@@ -109,16 +109,44 @@ export function downloadChecksumText(url: string): Promise<string> {
       reject(new Error(`Checksum URL must use HTTPS: ${url}`));
       return;
     }
-    https.get(url, { headers: { 'User-Agent': 'ember-client' } }, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`Checksum fetch failed: HTTP ${res.statusCode}`));
-        return;
-      }
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => resolve(data));
-      res.on('error', reject);
-    }).on('error', reject);
+
+    function makeRequest(requestUrl: string): void {
+      https.get(requestUrl, { headers: { 'User-Agent': 'ember-client' } }, (res) => {
+        const { statusCode, headers } = res;
+
+        if (
+          (statusCode === 301 || statusCode === 302 || statusCode === 307 || statusCode === 308) &&
+          headers.location
+        ) {
+          // Enforce HTTPS-only redirects to prevent TLS-stripping attacks.
+          let redirectUrl: URL;
+          try {
+            redirectUrl = new URL(headers.location);
+          } catch {
+            reject(new Error(`Invalid redirect URL: ${headers.location}`));
+            return;
+          }
+          if (redirectUrl.protocol !== 'https:') {
+            reject(new Error(`Redirect to non-HTTPS URL rejected: ${headers.location}`));
+            return;
+          }
+          res.resume();
+          makeRequest(headers.location);
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`Checksum fetch failed: HTTP ${res.statusCode}`));
+          return;
+        }
+        let data = '';
+        res.on('data', (chunk: string) => { data += chunk; });
+        res.on('end', () => resolve(data));
+        res.on('error', reject);
+      }).on('error', reject);
+    }
+
+    makeRequest(url);
   });
 }
 
