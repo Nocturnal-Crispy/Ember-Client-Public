@@ -388,8 +388,6 @@
       const nameEl = panel.querySelector(".voice-channel-name");
       if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
     }
-    const barChannel = document.getElementById("voice-bar-channel");
-    if (barChannel) barChannel.textContent = "\uD83D\uDD0A " + channelName;
   }
 
   function hideVoiceControls(): void {
@@ -444,64 +442,9 @@
     .getElementById("voice-screen-share-btn")
     ?.addEventListener("click", () => toggleScreenShare());
 
-  // ─── Voice Bottom Bar (#vbar-*) button wiring ──────────────────────────────
-
-  document.getElementById("vbar-mute")?.addEventListener("click", () => {
-    if (!App.voiceManager) return;
-    const muted = (App.voiceManager as { toggleMute(): boolean }).toggleMute();
-    const btn = document.getElementById("vbar-mute");
-    if (!btn) return;
-    btn.classList.toggle("active", muted);
-    btn.title = muted ? "Unmute" : "Mute";
-    btn.textContent = muted ? "\uD83D\uDD07" : "\uD83C\uDFA4";
-    // Sync sidebar button
-    const sideBtn = document.getElementById("voice-mute-btn");
-    if (sideBtn) {
-      sideBtn.classList.toggle("active", muted);
-      sideBtn.title = btn.title;
-      sideBtn.textContent = btn.textContent;
-    }
-    playVoiceSound(muted ? "mute" : "unmute");
-  });
-
-  document.getElementById("vbar-deafen")?.addEventListener("click", () => {
-    if (!App.voiceManager) return;
-    const deafened = (
-      App.voiceManager as { toggleDeafen(): boolean }
-    ).toggleDeafen();
-    const btn = document.getElementById("vbar-deafen");
-    if (!btn) return;
-    btn.classList.toggle("active", deafened);
-    btn.title = deafened ? "Undeafen" : "Deafen";
-    btn.textContent = deafened ? "\uD83D\uDD15" : "\uD83C\uDFA7";
-    const sideBtn = document.getElementById("voice-deafen-btn");
-    if (sideBtn) {
-      sideBtn.classList.toggle("active", deafened);
-      sideBtn.title = btn.title;
-      sideBtn.textContent = btn.textContent;
-    }
-    playVoiceSound(deafened ? "deafen" : "undeafen");
-  });
-
   document
-    .getElementById("vbar-camera")
-    ?.addEventListener("click", () => toggleCamera());
-
-  document
-    .getElementById("vbar-screen")
-    ?.addEventListener("click", () => toggleScreenShare());
-
-  document.getElementById("vbar-popout")?.addEventListener("click", () => {
-    openVideoPopout();
-  });
-
-  document.getElementById("vbar-disconnect")?.addEventListener("click", () => {
-    playVoiceSound("disconnect");
-    leaveVoiceChannel();
-    document
-      .querySelectorAll(".channel")
-      .forEach((el) => el.classList.remove("active"));
-  });
+    .getElementById("voice-popout-btn")
+    ?.addEventListener("click", () => openVideoPopout());
 
   // ─── View Switching Functions ──────────────────────────────────────────────
 

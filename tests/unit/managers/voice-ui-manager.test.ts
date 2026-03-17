@@ -507,20 +507,20 @@ describe('setSpotlight', () => {
   });
 });
 
-// ─── Phase 7: showVoiceControls — bottom bar channel name ────────────────────
+// ─── Phase 7: showVoiceControls — sidebar channel name ───────────────────────
 
-describe('showVoiceControls — bottom bar', () => {
-  it('sets #voice-bar-channel textContent to the channel name', () => {
+describe('showVoiceControls — sidebar', () => {
+  it('sets .voice-channel-name textContent to the channel name', () => {
     const panel = document.createElement('div');
     panel.id = 'voice-controls';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'voice-channel-name';
+    panel.appendChild(nameEl);
     document.body.appendChild(panel);
-    const channelNameEl = document.createElement('span');
-    channelNameEl.id = 'voice-bar-channel';
-    document.body.appendChild(channelNameEl);
 
     (window as any).showVoiceControls('general');
 
-    expect(channelNameEl.textContent).toBe('🔊 general');
+    expect(nameEl.textContent).toBe('🔊 general');
   });
 });
 

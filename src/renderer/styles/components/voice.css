@@ -5,8 +5,7 @@
   border-top: 1px solid rgba(var(--rgb-highlight), 0.2);
   border-bottom: 1px solid rgba(var(--rgb-highlight), 0.2);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 6px;
 }
 
@@ -15,10 +14,9 @@
 }
 
 .voice-channel-name {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--online-color);
-  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -27,7 +25,6 @@
 .voice-buttons {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
 }
 
 .voice-btn {
@@ -209,40 +206,6 @@
 .audio-only-tile.speaking {
   border-color: #f97316;
   box-shadow: 0 0 0 1px #f97316;
-}
-
-/* Voice bottom bar */
-.voice-bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: #1a1a1a;
-  border-top: 1px solid rgba(var(--rgb-highlight), 0.15);
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-.voice-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.voice-bar-channel-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--online-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.voice-bar-controls {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 .voice-btn.danger:hover {
