@@ -159,6 +159,7 @@ declare global {
     downloadUrl: string | null;
     downloadSize: number | null;
     assetName: string | null;
+    checksumUrl: string | null;
     error?: string;
   }
 

@@ -13,6 +13,9 @@ import {
   launchInstaller,
   scheduleInstallOnExit,
   getInstallOnExitPath,
+  findChecksumAsset,
+  downloadChecksumText,
+  verifyAssetChecksum,
 } from "./update-downloader";
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
@@ -606,6 +609,7 @@ interface UpdateDetails {
   downloadUrl: string | null;
   downloadSize: number | null;
   assetName: string | null;
+  checksumUrl: string | null;
   error?: string;
 }
 
@@ -626,6 +630,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
         downloadUrl: null,
         downloadSize: null,
         assetName: null,
+        checksumUrl: null,
         error: `HTTP ${response.status}`,
       };
     }
@@ -646,6 +651,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
         downloadUrl: null,
         downloadSize: null,
         assetName: null,
+        checksumUrl: null,
         error: "Invalid tag format",
       };
     }
@@ -653,11 +659,13 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
     const updateAvailable = isNewerVersion(currentVersion, latestVersion);
     const assets = Array.isArray(data.assets) ? data.assets : [];
     const selected = selectAssetForPlatform(assets);
+    const checksumAsset = selected ? findChecksumAsset(assets, selected) : null;
     log.debug("Update details fetched", {
       currentVersion,
       latestVersion,
       updateAvailable,
       assetName: selected?.name ?? null,
+      hasChecksum: checksumAsset !== null,
     });
     return {
       updateAvailable,
@@ -668,6 +676,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
       downloadUrl: selected?.browser_download_url ?? null,
       downloadSize: selected?.size ?? null,
       assetName: selected?.name ?? null,
+      checksumUrl: checksumAsset?.browser_download_url ?? null,
     };
   } catch (err) {
     log.debug("check-for-update-details failed");
@@ -680,6 +689,7 @@ ipcMain.handle("check-for-update-details", async (): Promise<UpdateDetails> => {
       downloadUrl: null,
       downloadSize: null,
       assetName: null,
+      checksumUrl: null,
       error: String(err),
     };
   }
@@ -691,7 +701,8 @@ ipcMain.handle(
     _event,
     downloadUrl: unknown,
     assetName: unknown,
-    assetSize: unknown
+    assetSize: unknown,
+    checksumUrl: unknown
   ): Promise<{ filePath: string } | { error: string }> => {
     if (
       typeof downloadUrl !== "string" ||
@@ -700,6 +711,8 @@ ipcMain.handle(
     ) {
       return { error: "Invalid parameters" };
     }
+    const resolvedChecksumUrl =
+      typeof checksumUrl === "string" && checksumUrl.length > 0 ? checksumUrl : null;
     try {
       const result = await downloadAsset(
         { name: assetName, browser_download_url: downloadUrl, size: assetSize },
@@ -709,6 +722,26 @@ ipcMain.handle(
           }
         }
       );
+
+      // Verify SHA-256 checksum when a companion checksum asset is available.
+      if (resolvedChecksumUrl) {
+        try {
+          const checksumText = await downloadChecksumText(resolvedChecksumUrl);
+          await verifyAssetChecksum(result.filePath, assetName, checksumText);
+        } catch (checksumErr) {
+          // Delete the untrusted file and abort the update.
+          try { require("fs").unlinkSync(result.filePath); } catch { /* best-effort */ }
+          const error = `Checksum verification failed: ${String(checksumErr)}`;
+          log.error("Update aborted — checksum mismatch", { assetName, error });
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("update-download-error", { error });
+          }
+          return { error };
+        }
+      } else {
+        log.warn("No checksum asset found for update; integrity unverified", { assetName });
+      }
+
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("update-download-complete", {
           filePath: result.filePath,
