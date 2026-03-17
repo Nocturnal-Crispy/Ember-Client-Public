@@ -315,8 +315,22 @@
       sender_user_id: string;
     } & Record<string, unknown>
   ): Promise<void> {
-    if (payload.channel_id !== App.activeChannelId) {
+    // Check if this is a DM channel by checking if there's a DM entry for this channel
+    const isDmChannel = typeof window.getEmberIdForDmChannel === "function" && 
+                       window.getEmberIdForDmChannel(payload.channel_id) !== null;
+    
+    if (isDmChannel) {
+      // Always dispatch DM messages as dm-channel-message events
       window.dispatchEvent(new CustomEvent('dm-channel-message', { detail: payload }));
+      // Mark as unread if not the active channel
+      if (payload.channel_id !== App.activeChannelId) {
+        window.markChannelUnread(payload.channel_id);
+      }
+      return;
+    }
+    
+    // Handle regular channel messages
+    if (payload.channel_id !== App.activeChannelId) {
       window.markChannelUnread(payload.channel_id);
       return;
     }
