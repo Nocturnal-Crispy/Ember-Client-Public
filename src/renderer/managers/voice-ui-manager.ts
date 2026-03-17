@@ -85,20 +85,23 @@
       vm.onSpeakingChanged = (userId: string, isSpeaking: boolean) =>
         updateSpeakingIndicator(userId, isSpeaking);
       vm.onParticipantsChanged = (
-        participants: { user_id: string; username: string }[]
+        participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
         // Update own-session participant list (used for video grid)
         App.voiceParticipants.clear();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          App.voiceParticipants.set(p.user_id, p.username)
+        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        // Phase 10: reconcile screenShareParticipants from voice_participants.
+        const screenSids = new Set<string>(
+          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
         );
+        App.screenShareParticipants = screenSids;
+        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
         // Update cross-channel presence for this channel's sidebar using captured channelId
         const presenceMap = new Map<string, string>();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          presenceMap.set(p.user_id, p.username)
-        );
+        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
+        renderVideoGrid();
       };
       vm.onCameraStateChanged = (userId: string, isOn: boolean) =>
         handleRemoteCameraStateChanged(userId, isOn);
@@ -115,18 +118,21 @@
       vm.auth = auth;
       // Re-capture channelId in the participants callback for the new channel
       vm.onParticipantsChanged = (
-        participants: { user_id: string; username: string }[]
+        participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
         App.voiceParticipants.clear();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          App.voiceParticipants.set(p.user_id, p.username)
+        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        // Phase 10: reconcile screenShareParticipants from voice_participants.
+        const screenSids = new Set<string>(
+          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
         );
+        App.screenShareParticipants = screenSids;
+        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
         const presenceMap = new Map<string, string>();
-        participants.forEach((p: { user_id: string; username: string }) =>
-          presenceMap.set(p.user_id, p.username)
-        );
+        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
+        renderVideoGrid();
       };
     }
 
@@ -701,6 +707,9 @@
     log.info("Remote screen share started", { user_id: userId });
     App.screenShareParticipants.add(userId);
     App.lastScreenShareUserId = userId;
+    // Phase 10: auto-spotlight the first screen share when none is focused.
+    if (App.focusedTileId === null) App.focusedTileId = `${userId}:screen`;
+    renderVideoGrid();
   }
 
   function handleVoiceScreenShareStopped(userId: string): void {
@@ -708,6 +717,7 @@
     App.screenShareParticipants.delete(userId);
     if (App.focusedTileId === `${userId}:screen`) App.focusedTileId = null;
     if (App.lastScreenShareUserId === userId) App.lastScreenShareUserId = null;
+    renderVideoGrid();
   }
 
   function updateVideoGridVisibility(): void {

@@ -62,6 +62,10 @@ class VoiceManager {
   isScreenSharing: boolean;
   onScreenShareStarted: ((userId: string) => void) | null;
   onScreenShareStopped: ((userId: string) => void) | null;
+  // Phase 10: stream ID routing for multiple simultaneous screen shares
+  _screenStreamIdToUser: Map<string, string>;
+  _userToScreenStreamId: Map<string, string>;
+  remoteScreenStreams: Map<string, MediaStream>;
 
   // ─── Audio capture ────────────────────────────────────────────────────────
   _audioCaptureSetup: boolean;
@@ -116,6 +120,9 @@ class VoiceManager {
     this.isScreenSharing = false;
     this.onScreenShareStarted = null;
     this.onScreenShareStopped = null;
+    this._screenStreamIdToUser = new Map();
+    this._userToScreenStreamId = new Map();
+    this.remoteScreenStreams = new Map();
 
     // Audio capture
     this._audioCaptureSetup = false;
@@ -410,29 +417,7 @@ class VoiceManager {
       });
 
       this.subscriberPC.ontrack = (event: RTCTrackEvent) => {
-        const stream = event.streams[0];
-        _voiceLog.debug("ontrack fired (subscriber)", {
-          kind: event.track.kind,
-          trackId: event.track.id,
-          streamId: stream?.id ?? "none",
-        });
-        if (!stream) return;
-        if (event.track.kind === "audio") {
-          if (!this.remoteStreams.has(stream.id)) {
-            this.remoteStreams.set(stream.id, stream);
-            _voiceLog.info("Remote audio stream added", { streamId: stream.id });
-            if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
-          } else {
-            _voiceLog.debug("Remote audio stream already tracked, skipping", {
-              streamId: stream.id,
-            });
-          }
-        } else if (event.track.kind === "video") {
-          this.remoteVideoStreams.set(stream.id, stream);
-          _voiceLog.info("Remote video stream added", { streamId: stream.id });
-          if (this.onVideoStreamAdded)
-            this.onVideoStreamAdded(stream.id, stream);
-        }
+        this._handleSubscriberTrack(event);
       };
 
       this.subscriberPC.onicecandidate = (
@@ -567,8 +552,28 @@ class VoiceManager {
   }
 
   handleParticipants(
-    participants: { user_id: string; username: string }[]
+    participants: { user_id: string; username: string; screen_sharing?: boolean; screen_stream_id?: string }[]
   ): void {
+    // Phase 10: reconcile stream ID maps for late joiners.
+    const activeScreenSids = new Set<string>();
+    for (const p of participants) {
+      if (p.screen_sharing && p.screen_stream_id) {
+        activeScreenSids.add(p.user_id);
+        if (!this._userToScreenStreamId.has(p.user_id)) {
+          this._screenStreamIdToUser.set(p.screen_stream_id, p.user_id);
+          this._userToScreenStreamId.set(p.user_id, p.screen_stream_id);
+        }
+      }
+    }
+    // Remove mappings for users who are no longer sharing.
+    for (const [userId] of this._userToScreenStreamId) {
+      if (!activeScreenSids.has(userId)) {
+        const streamId = this._userToScreenStreamId.get(userId)!;
+        this._screenStreamIdToUser.delete(streamId);
+        this._userToScreenStreamId.delete(userId);
+        this.remoteScreenStreams.delete(streamId);
+      }
+    }
     if (this.onParticipantsChanged) this.onParticipantsChanged(participants);
   }
 
@@ -589,6 +594,38 @@ class VoiceManager {
       el.muted = this.isDeafened;
     });
     return this.isDeafened;
+  }
+
+  // Phase 10: extracted from subscriberPC.ontrack for testability.
+  _handleSubscriberTrack(event: RTCTrackEvent): void {
+    const stream = event.streams[0];
+    _voiceLog.debug("ontrack fired (subscriber)", {
+      kind: event.track.kind,
+      trackId: event.track.id,
+      streamId: stream?.id ?? "none",
+    });
+    if (!stream) return;
+    if (event.track.kind === "audio") {
+      if (!this.remoteStreams.has(stream.id)) {
+        this.remoteStreams.set(stream.id, stream);
+        _voiceLog.info("Remote audio stream added", { streamId: stream.id });
+        if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
+      } else {
+        _voiceLog.debug("Remote audio stream already tracked, skipping", {
+          streamId: stream.id,
+        });
+      }
+    } else if (event.track.kind === "video") {
+      // Route screen streams to remoteScreenStreams, camera streams to remoteVideoStreams.
+      if (this._screenStreamIdToUser.has(stream.id)) {
+        this.remoteScreenStreams.set(stream.id, stream);
+        _voiceLog.info("Remote screen stream added", { streamId: stream.id });
+      } else {
+        this.remoteVideoStreams.set(stream.id, stream);
+        _voiceLog.info("Remote video stream added", { streamId: stream.id });
+      }
+      if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
+    }
   }
 
   _playRemoteStream(id: string, stream: MediaStream): void {
@@ -823,14 +860,27 @@ class VoiceManager {
             false
           );
         break;
-      case "screen_share_start":
-        if (this.onScreenShareStarted)
-          this.onScreenShareStarted(String(msg.payload["user_id"] ?? ""));
+      case "screen_share_start": {
+        const ssUserId = String(msg.payload["user_id"] ?? "");
+        const ssStreamId = String(msg.payload["screen_stream_id"] ?? "");
+        if (ssStreamId) {
+          this._screenStreamIdToUser.set(ssStreamId, ssUserId);
+          this._userToScreenStreamId.set(ssUserId, ssStreamId);
+        }
+        if (this.onScreenShareStarted) this.onScreenShareStarted(ssUserId);
         break;
-      case "screen_share_stop":
-        if (this.onScreenShareStopped)
-          this.onScreenShareStopped(String(msg.payload["user_id"] ?? ""));
+      }
+      case "screen_share_stop": {
+        const stopUserId = String(msg.payload["user_id"] ?? "");
+        const stopStreamId = this._userToScreenStreamId.get(stopUserId);
+        if (stopStreamId) {
+          this._screenStreamIdToUser.delete(stopStreamId);
+          this._userToScreenStreamId.delete(stopUserId);
+          this.remoteScreenStreams.delete(stopStreamId);
+        }
+        if (this.onScreenShareStopped) this.onScreenShareStopped(stopUserId);
         break;
+      }
       case "voice_renegotiate_answer": {
         const raw = msg.payload["sdp"] as Record<string, unknown>;
         if (

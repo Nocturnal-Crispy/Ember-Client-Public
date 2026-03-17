@@ -370,3 +370,178 @@ describe('_cleanup screen share state', () => {
     expect(() => (vm as any)._cleanup()).not.toThrow();
   });
 });
+
+// ─── Phase 10: screen_share_start registers stream ID ─────────────────────────
+
+describe('Phase 10: screen_share_start registers stream ID in maps', () => {
+  it('stores screen_stream_id → user_id in _screenStreamIdToUser', () => {
+    (vm as any).handleMessage({
+      type: 'screen_share_start',
+      payload: { user_id: 'user-A', screen_stream_id: 'stream-A' },
+    });
+
+    expect((vm as any)._screenStreamIdToUser.get('stream-A')).toBe('user-A');
+  });
+
+  it('stores user_id → screen_stream_id in _userToScreenStreamId', () => {
+    (vm as any).handleMessage({
+      type: 'screen_share_start',
+      payload: { user_id: 'user-A', screen_stream_id: 'stream-A' },
+    });
+
+    expect((vm as any)._userToScreenStreamId.get('user-A')).toBe('stream-A');
+  });
+
+  it('still fires onScreenShareStarted callback', () => {
+    const cb = jest.fn();
+    (vm as any).onScreenShareStarted = cb;
+
+    (vm as any).handleMessage({
+      type: 'screen_share_start',
+      payload: { user_id: 'user-A', screen_stream_id: 'stream-A' },
+    });
+
+    expect(cb).toHaveBeenCalledWith('user-A');
+  });
+
+  it('does not crash when screen_stream_id is absent', () => {
+    expect(() =>
+      (vm as any).handleMessage({ type: 'screen_share_start', payload: { user_id: 'user-A' } })
+    ).not.toThrow();
+  });
+});
+
+// ─── Phase 10: screen_share_stop clears stream ID from maps ───────────────────
+
+describe('Phase 10: screen_share_stop clears stream ID from maps', () => {
+  beforeEach(() => {
+    // Pre-populate maps as if a screen_share_start was received
+    (vm as any)._screenStreamIdToUser.set('stream-A', 'user-A');
+    (vm as any)._userToScreenStreamId.set('user-A', 'stream-A');
+    (vm as any).remoteScreenStreams.set('stream-A', makeMockStream());
+  });
+
+  it('removes entry from _screenStreamIdToUser', () => {
+    (vm as any).handleMessage({
+      type: 'screen_share_stop',
+      payload: { user_id: 'user-A' },
+    });
+
+    expect((vm as any)._screenStreamIdToUser.has('stream-A')).toBe(false);
+  });
+
+  it('removes entry from _userToScreenStreamId', () => {
+    (vm as any).handleMessage({
+      type: 'screen_share_stop',
+      payload: { user_id: 'user-A' },
+    });
+
+    expect((vm as any)._userToScreenStreamId.has('user-A')).toBe(false);
+  });
+
+  it('removes stream from remoteScreenStreams', () => {
+    (vm as any).handleMessage({
+      type: 'screen_share_stop',
+      payload: { user_id: 'user-A' },
+    });
+
+    expect((vm as any).remoteScreenStreams.has('stream-A')).toBe(false);
+  });
+
+  it('still fires onScreenShareStopped callback', () => {
+    const cb = jest.fn();
+    (vm as any).onScreenShareStopped = cb;
+
+    (vm as any).handleMessage({
+      type: 'screen_share_stop',
+      payload: { user_id: 'user-A' },
+    });
+
+    expect(cb).toHaveBeenCalledWith('user-A');
+  });
+});
+
+// ─── Phase 10: handleParticipants reconciles screen share state ────────────────
+
+describe('Phase 10: handleParticipants reconciles screen share state', () => {
+  it('registers stream ID maps for a sharing participant', () => {
+    (vm as any).handleParticipants([
+      { user_id: 'user-A', username: 'Alice', screen_sharing: true, screen_stream_id: 'stream-A' },
+    ]);
+
+    expect((vm as any)._screenStreamIdToUser.get('stream-A')).toBe('user-A');
+    expect((vm as any)._userToScreenStreamId.get('user-A')).toBe('stream-A');
+  });
+
+  it('does not re-register when user already has a stream ID mapped', () => {
+    (vm as any)._screenStreamIdToUser.set('stream-OLD', 'user-A');
+    (vm as any)._userToScreenStreamId.set('user-A', 'stream-OLD');
+
+    (vm as any).handleParticipants([
+      { user_id: 'user-A', username: 'Alice', screen_sharing: true, screen_stream_id: 'stream-NEW' },
+    ]);
+
+    // Existing mapping is preserved (not overwritten)
+    expect((vm as any)._userToScreenStreamId.get('user-A')).toBe('stream-OLD');
+  });
+
+  it('removes departed screen shares from maps', () => {
+    (vm as any)._screenStreamIdToUser.set('stream-A', 'user-A');
+    (vm as any)._userToScreenStreamId.set('user-A', 'stream-A');
+    (vm as any).remoteScreenStreams.set('stream-A', makeMockStream());
+
+    // voice_participants arrives with user-A no longer sharing
+    (vm as any).handleParticipants([
+      { user_id: 'user-A', username: 'Alice', screen_sharing: false },
+    ]);
+
+    expect((vm as any)._userToScreenStreamId.has('user-A')).toBe(false);
+    expect((vm as any)._screenStreamIdToUser.has('stream-A')).toBe(false);
+    expect((vm as any).remoteScreenStreams.has('stream-A')).toBe(false);
+  });
+
+  it('still calls onParticipantsChanged callback', () => {
+    const cb = jest.fn();
+    (vm as any).onParticipantsChanged = cb;
+
+    const participants = [{ user_id: 'user-A', username: 'Alice' }];
+    (vm as any).handleParticipants(participants);
+
+    expect(cb).toHaveBeenCalledWith(participants);
+  });
+});
+
+// ─── Phase 10: ontrack routes screen streams to remoteScreenStreams ────────────
+
+describe('Phase 10: ontrack routes screen streams to remoteScreenStreams', () => {
+  it('routes a video stream whose ID is in _screenStreamIdToUser to remoteScreenStreams', () => {
+    // Pre-register screen stream mapping (as if screen_share_start was received)
+    (vm as any)._screenStreamIdToUser.set('stream-scr', 'user-A');
+    (vm as any)._userToScreenStreamId.set('user-A', 'stream-scr');
+
+    // Simulate subscriberPC.ontrack firing for a screen stream
+    const mockStream = { id: 'stream-scr', getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+    const mockTrack = { kind: 'video' } as MediaStreamTrack;
+
+    // Trigger ontrack by calling the internal handler directly
+    (vm as any)._handleSubscriberTrack?.({ track: mockTrack, streams: [mockStream] });
+
+    expect((vm as any).remoteScreenStreams.has('stream-scr')).toBe(true);
+    expect((vm as any).remoteVideoStreams.has('stream-scr')).toBe(false);
+  });
+
+  it('routes a video stream with unknown ID to remoteVideoStreams', () => {
+    // No pre-registered mapping → should go to camera streams
+    const mockStream = { id: 'stream-cam', getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+    const mockTrack = { kind: 'video' } as MediaStreamTrack;
+
+    (vm as any)._handleSubscriberTrack?.({ track: mockTrack, streams: [mockStream] });
+
+    // Stream goes to remoteVideoStreams (camera) if _handleSubscriberTrack is available
+    // This test validates the routing split when the method is exposed
+    if ((vm as any)._handleSubscriberTrack) {
+      expect((vm as any).remoteVideoStreams.has('stream-cam')).toBe(true);
+      expect((vm as any).remoteScreenStreams.has('stream-cam')).toBe(false);
+    }
+  });
+});
