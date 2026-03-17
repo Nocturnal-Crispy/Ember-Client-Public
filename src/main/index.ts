@@ -114,7 +114,7 @@ let pendingInviteLink: string | null = null;
 // One-time context delivered to the pop-out window via get-popout-voice-context
 let pendingPopoutContext: { channelName: string; token: string } | null = null;
 
-//To turn on dev tools, change devTools: false to devTools: true in the webPreferences object
+// DevTools are enabled only in development builds (controlled by isDev)
 
 function createWindow(isAuthenticated: boolean) {
   log.info("Creating browser window", { authenticated: isAuthenticated });
@@ -166,7 +166,7 @@ function createWindow(isAuthenticated: boolean) {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "../preload/index.js"),
-      devTools: true,
+      devTools: isDev,
       webSecurity: true, // Always enable web security for safety
       allowRunningInsecureContent: false, // Disable insecure content
     },
