@@ -866,6 +866,20 @@ class VoiceManager {
         if (ssStreamId) {
           this._screenStreamIdToUser.set(ssStreamId, ssUserId);
           this._userToScreenStreamId.set(ssUserId, ssStreamId);
+          _voiceLog.info("screen_share_start received, stream ID registered", {
+            userId: ssUserId,
+            screen_stream_id: ssStreamId,
+          });
+          // Fix race condition: if ontrack fired before this message arrived,
+          // the stream was placed in remoteVideoStreams — move it now.
+          const earlyStream = this.remoteVideoStreams.get(ssStreamId);
+          if (earlyStream) {
+            this.remoteVideoStreams.delete(ssStreamId);
+            this.remoteScreenStreams.set(ssStreamId, earlyStream);
+            _voiceLog.info("Reclassified early video track as screen share", {
+              screen_stream_id: ssStreamId,
+            });
+          }
         }
         if (this.onScreenShareStarted) this.onScreenShareStarted(ssUserId);
         break;
@@ -1168,6 +1182,7 @@ class VoiceManager {
         screen_stream_id: stream.id,
       })
     );
+    _voiceLog.info("screen_share_start sent to server", { screen_stream_id: stream.id });
 
     this.isScreenSharing = true;
     _voiceLog.info("Screen share started, renegotiation offer sent");
@@ -1207,6 +1222,7 @@ class VoiceManager {
           channel_id: this.channelId,
         })
       );
+      _voiceLog.info("screen_share_stop sent to server");
     }
   }
 
