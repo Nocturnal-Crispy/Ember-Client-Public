@@ -42,6 +42,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@signalapp/libsignal-client": "^0.89.0",
     "electron-store": "^8.1.0",
     "ember-shared": "file:../ember-shared",
     "tweetnacl": "^1.0.3",
