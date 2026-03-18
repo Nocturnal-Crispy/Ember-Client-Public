@@ -23,12 +23,18 @@ const config: Config = {
     "^.+\\.tsx?$": ["ts-jest", { diagnostics: false }],
   },
 
+  // Handle ES modules in node_modules (specifically Signal client)
+  transformIgnorePatterns: [
+    "node_modules/(?!(.*\\.mjs$|@signalapp/libsignal-client))"
+  ],
+
   // TS path alias @/* → src/*; resolve ember-shared to source for fast test compilation
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^ember-shared$": "<rootDir>/../ember-shared/src/index",
     "^ember-shared/(.*)$": "<rootDir>/../ember-shared/src/$1",
     "^electron$": "<rootDir>/tests/__mocks__/electron.ts",
+    "^@signalapp/libsignal-client$": "<rootDir>/tests/__mocks__/signal-client.ts",
   },
 
   clearMocks: true,
