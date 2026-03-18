@@ -37,6 +37,8 @@ const config: Config = {
     "^@signalapp/libsignal-client$": "<rootDir>/tests/__mocks__/signal-client.ts",
   },
 
+  setupFilesAfterEnv: ["<rootDir>/tests/jest.setup.ts"],
+
   clearMocks: true,
   restoreMocks: true,
 
