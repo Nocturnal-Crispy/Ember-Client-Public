@@ -499,6 +499,8 @@ declare global {
     _micTestAnimFrame: number | null;
     _cameraPreviewStream: MediaStream | null;
     _pttListening: boolean;
+    signalSessionReady: Map<string, boolean>;
+    signalSessionManager: import('../services/signal-service').SignalService | null;
   }
 
   interface Window {

@@ -227,6 +227,12 @@ export class SignalService {
     };
   }
 
+  async hasSession(userId: string, deviceId: string): Promise<boolean> {
+    const address = `${userId}.${deviceId}`;
+    const sessionData = await this.invoke<LoadSessionData>('LoadSession', { address });
+    return sessionData.record !== null;
+  }
+
   async ensureSession(userId: string, deviceId: string): Promise<void> {
     const address = `${userId}.${deviceId}`;
     const sessionData = await this.invoke<LoadSessionData>('LoadSession', { address });

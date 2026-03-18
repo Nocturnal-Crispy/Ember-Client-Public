@@ -34,6 +34,10 @@
     requestId: string;
     /** True when the current user is the recipient of a pending request. */
     isRecipient: boolean;
+    /** Device ID of the partner when they are Signal-capable; null for legacy devices. */
+    partnerDeviceId: string | null;
+    /** Protocol version: 1 = Signal, 0 = legacy NaCl. */
+    partnerProtocolVersion: number;
   }
 
   const dmByTextChannel = new Map<string, DmEntry>();
@@ -167,6 +171,8 @@
           requestStatus,
           requestId,
           isRecipient,
+          partnerDeviceId: null,
+          partnerProtocolVersion: 0,
         };
         if (entry.textChannelId) {
           dmByTextChannel.set(entry.textChannelId, entry);
@@ -273,13 +279,14 @@
 
     // Fetch the recipient's device public key to create one peer-box for them.
     let peerBox: { recipient_id: string; encrypted_key: string; sender_public_key: string } | undefined;
+    let firstDevice: { id: string; public_key: string; protocol_version?: number } | undefined;
     try {
       const devRes = await fetch(`${auth.hostname}/api/v1/users/${participantId}/devices`, {
         headers: { Authorization: `Bearer ${auth.token}` },
       });
       if (devRes.ok) {
-        const devData = (await devRes.json()) as { devices: Array<{ id: string; public_key: string }> };
-        const firstDevice = devData.devices?.[0];
+        const devData = (await devRes.json()) as { devices: Array<{ id: string; public_key: string; protocol_version?: number }> };
+        firstDevice = devData.devices?.[0];
         if (firstDevice?.public_key) {
           const recipientPub = naclUtil.decodeBase64(firstDevice.public_key);
           const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, recipientPub, ownPriv);
@@ -320,6 +327,9 @@
 
     // Open the DM channel — key will be fetched after the recipient accepts.
     const channels = await fetchDmChannels(auth, emberId);
+    const partnerDeviceId = firstDevice?.protocol_version === 1 ? (firstDevice.id ?? null) : null;
+    const partnerProtocolVersion = firstDevice?.protocol_version === 1 ? 1 : 0;
+
     const entry: DmEntry = {
       emberId,
       textChannelId: channels.textChannelId,
@@ -330,9 +340,20 @@
       requestStatus: 'pending',
       requestId,
       isRecipient: false,
+      partnerDeviceId,
+      partnerProtocolVersion,
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
+
+    // Initiate Signal session eagerly if the peer is Signal-capable.
+    if (partnerDeviceId && partnerProtocolVersion === 1 && App.signalSessionManager) {
+      App.signalSessionManager.ensureSession(participantId, partnerDeviceId).catch(
+        (err: Error) => log.warn("Signal ensureSession failed, falling back to legacy", {
+          participantId, partnerDeviceId, error: err.message,
+        }),
+      );
+    }
 
     // Cache the key immediately so the requester can send messages right away.
     App.emberKeyCache.set(emberId, emberKey);
@@ -446,6 +467,8 @@
       requestStatus: 'accepted',
       requestId,
       isRecipient: true,
+      partnerDeviceId: existingEntry?.partnerDeviceId ?? null,
+      partnerProtocolVersion: existingEntry?.partnerProtocolVersion ?? 0,
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
@@ -562,23 +585,42 @@
     const entry = dmByTextChannel.get(channelId);
     if (!auth || !entry) throw new Error("DM channel not found");
 
+    const device = await ipcRenderer.invoke("get-device-identity") as {
+      device_id?: string;
+    } | null;
+    const deviceId = device?.device_id ?? "";
+
+    const signalManager = App.signalSessionManager;
+    if (signalManager && entry.partnerDeviceId && entry.partnerProtocolVersion === 1) {
+      const signalAddress = `${entry.partnerId}.${entry.partnerDeviceId}`;
+      const hasSession = await signalManager.hasSession(entry.partnerId, entry.partnerDeviceId);
+      if (hasSession) {
+        const plaintextBytes = new TextEncoder().encode(plaintext);
+        const { ciphertext, messageType } = await signalManager.encrypt(signalAddress, plaintextBytes);
+        const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
+        const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+          body: JSON.stringify({ ciphertext: ciphertextBase64, envelope_type: "signal_dm", message_type: messageType, device_id: deviceId }),
+        });
+        if (!res.ok) throw new Error("Failed to send message");
+        const msg = (await res.json()) as { id: string };
+        pendingMessageIds.add(msg.id);
+        window.displayDmMessage({ id: msg.id, conversationId: channelId, senderId: auth.user_id, content: plaintext, timestamp: Date.now() / 1000, isOwn: true });
+        return msg.id;
+      }
+    }
+
+    // Legacy NaCl path
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
     if (!emberKey) {
       throw new Error("Ember key unavailable");
     }
-
-    const ciphertext = emberCrypto.encryptMessage(plaintext, emberKey);
-
-    const device = await ipcRenderer.invoke("get-device-identity") as {
-      device_id?: string;
-    } | null;
+    const naclCiphertext = emberCrypto.encryptMessage(plaintext, emberKey);
     const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${auth.token}`,
-      },
-      body: JSON.stringify({ ciphertext, device_id: device?.device_id ?? "" }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+      body: JSON.stringify({ ciphertext: naclCiphertext, device_id: deviceId }),
     });
     if (!res.ok) throw new Error("Failed to send message");
     const msg = (await res.json()) as { id: string };
@@ -634,6 +676,36 @@
 
     const auth = await getAuth();
     if (!auth) return;
+
+    const senderId = String(payload["sender_user_id"] ?? "");
+    const createdAt = Number(payload["created_at"] ?? 0);
+    const envelopeType = payload["envelope_type"];
+    const signalManager = App.signalSessionManager;
+
+    if (envelopeType === "signal_dm" && signalManager) {
+      const ciphertextBase64 = String(payload["ciphertext"] ?? "");
+      const messageType = Number(payload["message_type"] ?? 3);
+      const senderDeviceId = String(payload["sender_device_id"] ?? "1");
+      const senderAddress = `${senderId}.${senderDeviceId}`;
+      try {
+        const ciphertextBytes = new Uint8Array(
+          atob(ciphertextBase64).split("").map((c) => c.charCodeAt(0)),
+        );
+        const plaintextBytes = await signalManager.decrypt(senderAddress, ciphertextBytes, messageType);
+        const messageContent = new TextDecoder().decode(plaintextBytes);
+        const isOwn = senderId === auth.user_id;
+        window.displayDmMessage({ id: String(payload["id"] ?? ""), conversationId: channelId, senderId, content: messageContent, timestamp: createdAt, isOwn });
+        if (!isOwn && typeof window.playNotificationSound === "function") {
+          window.playNotificationSound("dmMessage");
+        }
+      } catch (err) {
+        log.error("Signal decrypt failed for incoming DM", { message_id: String(payload["id"] ?? ""), channel_id: channelId, error: (err as Error).message });
+        window.displayDmMessage({ id: String(payload["id"] ?? ""), conversationId: channelId, senderId, content: "[Failed to decrypt message]", timestamp: createdAt, isOwn: false });
+      }
+      return;
+    }
+
+    // Legacy NaCl path
     const emberKey = await fetchAndCacheEmberKey(entry.emberId);
     if (!emberKey) {
       log.error("Cannot handle incoming DM message: ember key unavailable", {
@@ -644,8 +716,6 @@
     }
     const ciphertext = String(payload["ciphertext"] ?? "");
     const plaintext = emberCrypto.decryptMessage(ciphertext, emberKey);
-    const senderId = String(payload["sender_user_id"] ?? "");
-    const createdAt = Number(payload["created_at"] ?? 0);
 
     const messageContent = plaintext === null ? "[Failed to decrypt message]" : plaintext;
     if (plaintext === null) {
@@ -724,6 +794,8 @@
           requestStatus: 'pending',
           requestId: r.id,
           isRecipient: true,
+          partnerDeviceId: null,
+          partnerProtocolVersion: 0,
         };
         dmByTextChannel.set(channels.textChannelId, entry);
         dmByEmberId.set(r.ember_id, entry);

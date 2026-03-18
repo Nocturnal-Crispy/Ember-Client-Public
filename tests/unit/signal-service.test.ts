@@ -545,6 +545,33 @@ describe('signal-service', () => {
       });
     });
 
+    describe('hasSession', () => {
+      it('returns true when a session record exists', async () => {
+        mockInvoke.mockResolvedValueOnce({
+          success: true,
+          data: { record: toBase64(new Uint8Array([1, 2, 3])) },
+        });
+
+        const result = await service.hasSession('user-456', 'device-2');
+
+        expect(mockInvoke).toHaveBeenCalledWith('LoadSession', {
+          address: 'user-456.device-2',
+        });
+        expect(result).toBe(true);
+      });
+
+      it('returns false when no session record exists', async () => {
+        mockInvoke.mockResolvedValueOnce({
+          success: true,
+          data: { record: null },
+        });
+
+        const result = await service.hasSession('user-456', 'device-2');
+
+        expect(result).toBe(false);
+      });
+    });
+
     describe('invoke helper — error handling', () => {
       it('throws EmberIpcError when response.success is false', async () => {
         mockInvoke.mockResolvedValueOnce({ success: false, error: 'Encryption failed' });
