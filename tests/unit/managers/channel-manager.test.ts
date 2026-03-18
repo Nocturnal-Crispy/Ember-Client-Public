@@ -15,16 +15,17 @@
  */
 
 let mockIpcInvoke: jest.Mock;
+let mockEmberApiInvoke: jest.Mock;
 let mockChannelServiceFetchChannels: jest.Mock;
 
 beforeAll(() => {
   // 1. Populate window.App
   require('../../../src/renderer/managers/app-state');
-  
+
   // 2. Load auth-loader to make getValidAuth available globally
   require('../../../src/renderer/utils/auth-loader');
 
-  // 3. Mock window.electronAPI
+  // 3. Mock window.electronAPI (used directly by channel-manager's own IPC calls)
   mockIpcInvoke = jest.fn().mockImplementation((channel: string) => {
     if (channel === 'get-auth') {
       return Promise.resolve(null);
@@ -46,7 +47,18 @@ beforeAll(() => {
     },
   };
 
-  // 3. Mock window.emberLog
+  // 3b. Mock window.emberAPI (used by auth-loader's getValidAuth)
+  mockEmberApiInvoke = jest.fn().mockImplementation((cmd: string) => {
+    if (cmd === 'GetAuth') {
+      return Promise.resolve({ success: true, data: null });
+    }
+    return Promise.resolve({ success: true, data: null });
+  });
+  (window as any).emberAPI = {
+    invoke: mockEmberApiInvoke,
+  };
+
+  // 4. Mock window.emberLog
   (window as any).emberLog = {
     createLogger: () => ({
       debug: jest.fn(),
@@ -56,13 +68,13 @@ beforeAll(() => {
     }),
   };
 
-  // 4. Stubs called by renderChannels auto-select logic
+  // 5. Stubs called by renderChannels auto-select logic
   (window as any).updateChatHeader = jest.fn();
   (window as any).loadChannelMessages = jest.fn();
   (window as any).joinVoiceChannel = jest.fn();
   (window as any).showTextChannelView = jest.fn();
 
-  // 5. Load the IIFE
+  // 6. Load the IIFE
   require('../../../src/renderer/managers/channel-manager');
 });
 
@@ -71,12 +83,19 @@ beforeEach(() => {
   (window as any).App.activeChannelId = null;
   mockChannelServiceFetchChannels.mockClear();
   mockIpcInvoke.mockReset();
-  // Reset the default implementation
+  mockEmberApiInvoke.mockReset();
+  // Reset the default implementations
   mockIpcInvoke.mockImplementation((channel: string) => {
     if (channel === 'get-auth') {
       return Promise.resolve(null);
     }
     return Promise.resolve(null);
+  });
+  mockEmberApiInvoke.mockImplementation((cmd: string) => {
+    if (cmd === 'GetAuth') {
+      return Promise.resolve({ success: true, data: null });
+    }
+    return Promise.resolve({ success: true, data: null });
   });
 });
 
@@ -91,14 +110,18 @@ describe('fetchChannels', () => {
   });
 
   it('returns an empty array when the auth token is missing', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ hostname: 'http://localhost:8085' });
+    // emberAPI returns no data → getValidAuth returns null → fetchChannels returns []
+    mockEmberApiInvoke.mockResolvedValueOnce({ success: true, data: null });
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
     expect(mockChannelServiceFetchChannels).not.toHaveBeenCalled();
   });
 
   it('returns an empty array when the service throws', async () => {
-    mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
+    mockEmberApiInvoke.mockResolvedValueOnce({
+      success: true,
+      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+    });
     mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('forbidden'));
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual([]);
@@ -109,28 +132,24 @@ describe('fetchChannels', () => {
       { id: 'ch-1', ember_id: 'e-1', name: 'general', type: 'text' },
       { id: 'ch-2', ember_id: 'e-1', name: 'voice', type: 'voice' },
     ];
-    
-    mockIpcInvoke.mockImplementationOnce((channel: string) => {
-      if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
-      }
-      return Promise.resolve(null);
+
+    mockEmberApiInvoke.mockResolvedValueOnce({
+      success: true,
+      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
     });
-    
-    mockChannelServiceFetchChannels.mockImplementationOnce((auth: any, emberId: any) => {
+
+    mockChannelServiceFetchChannels.mockImplementationOnce((_auth: any, _emberId: any) => {
       return Promise.resolve({ channels: mockChannels, categories: [] });
     });
-    
+
     const result = await (window as any).fetchChannels('e-1');
     expect(result).toEqual(mockChannels);
   });
 
   it('returns an empty array when the service rejects', async () => {
-    mockIpcInvoke.mockImplementationOnce((channel: string) => {
-      if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
-      }
-      return Promise.resolve(null);
+    mockEmberApiInvoke.mockResolvedValueOnce({
+      success: true,
+      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
     });
     mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchChannels('e-1');
@@ -138,16 +157,16 @@ describe('fetchChannels', () => {
   });
 
   it('calls channelService.fetchChannels with auth and emberId', async () => {
-    const auth = { token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' };
-    mockIpcInvoke.mockImplementationOnce((channel: string) => {
-      if (channel === 'get-auth') {
-        return Promise.resolve(auth);
-      }
-      return Promise.resolve(null);
+    const authData = { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' };
+    // The auth passed to channelService will be in AuthData format (user_id/device_id)
+    const expectedAuth = { token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice' };
+    mockEmberApiInvoke.mockResolvedValueOnce({
+      success: true,
+      data: authData,
     });
     mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: [] });
     await (window as any).fetchChannels('e-42');
-    expect(mockChannelServiceFetchChannels).toHaveBeenCalledWith(auth, 'e-42');
+    expect(mockChannelServiceFetchChannels).toHaveBeenCalledWith(expectedAuth, 'e-42');
   });
 });
 
@@ -155,18 +174,16 @@ describe('fetchChannels', () => {
 
 describe('fetchCategories', () => {
   it('returns an empty array when get-auth returns null', async () => {
-    mockIpcInvoke.mockResolvedValueOnce(null);
+    mockEmberApiInvoke.mockResolvedValueOnce({ success: true, data: null });
     const result = await (window as any).fetchCategories('e-1');
     expect(result).toEqual([]);
   });
 
   it('returns categories from a successful response', async () => {
     const mockCats = [{ id: 'cat-1', ember_id: 'e-1', name: 'Text Channels' }];
-    mockIpcInvoke.mockImplementationOnce((channel: string) => {
-      if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
-      }
-      return Promise.resolve(null);
+    mockEmberApiInvoke.mockResolvedValueOnce({
+      success: true,
+      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
     });
     mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: mockCats });
     const result = await (window as any).fetchCategories('e-1');

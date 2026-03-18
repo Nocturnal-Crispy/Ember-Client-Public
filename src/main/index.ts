@@ -20,6 +20,9 @@ import {
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../shared/types";
+import { openSignalDatabase } from "./signal-db";
+import type { SignalDatabase } from "./signal-db";
+import { registerEmberIpcHandlers } from "./ipc/ember-ipc";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
@@ -113,6 +116,7 @@ const defaultVoiceVideoSettings: VoiceVideoSettings = {
 
 let mainWindow: BrowserWindow | null = null;
 let pendingInviteLink: string | null = null;
+let signalDb: SignalDatabase | null = null;
 
 // One-time context delivered to the pop-out window via get-popout-voice-context
 let pendingPopoutContext: { channelName: string; token: string } | null = null;
@@ -1076,6 +1080,25 @@ if (!gotTheLock) {
     checkSafeStorageAtStartup();
     await cleanOrphanedAudioModules();
     registerAudioCaptureHandlers(process.pid);
+
+    // Open signal database using the device private key for HKDF
+    const storedKey = store.get("devicePrivateKey");
+    if (storedKey) {
+      try {
+        const privateKeyStr = decryptPrivateKey(storedKey as string);
+        const privateKeyBytes = Buffer.from(privateKeyStr, "base64");
+        signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes);
+        registerEmberIpcHandlers(signalDb);
+        log.info("Signal database opened and IPC handlers registered");
+      } catch (err) {
+        log.warn("Failed to open signal database; Signal IPC unavailable", { error: String(err) });
+        registerEmberIpcHandlers(null);
+      }
+    } else {
+      log.info("No device key yet — Signal IPC handlers registered without database");
+      registerEmberIpcHandlers(null);
+    }
+
     const isAuthenticated = checkAuthentication();
     createWindow(isAuthenticated);
 
@@ -1111,6 +1134,11 @@ app.on("window-all-closed", () => {
 registerBeforeQuitCleanup(app);
 
 app.on("before-quit", async () => {
+  if (signalDb) {
+    signalDb.closeDatabase();
+    signalDb = null;
+    log.info("Signal database closed");
+  }
   const installPath = getInstallOnExitPath();
   if (installPath) {
     log.info("Running scheduled update install before quit");

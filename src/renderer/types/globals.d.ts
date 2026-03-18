@@ -34,6 +34,8 @@ import type {
   AuthForVoice,
   OscillatorType,
   SoundDef,
+  EmberCmd,
+  EmberIpcResponse,
 } from "ember-shared";
 
 declare global {
@@ -449,6 +451,10 @@ declare global {
     audioCapture: AudioCaptureAPI;
   }
 
+  interface EmberAPI {
+    invoke<D = unknown>(cmd: EmberCmd, args: object): Promise<EmberIpcResponse<D>>;
+  }
+
   // ─── App state ────────────────────────────────────────────────────────────
 
   interface AppState {
@@ -499,6 +505,7 @@ declare global {
     App: AppState;
     emberLog: EmberLogAPI;
     electronAPI: ElectronAPI;
+    emberAPI: EmberAPI;
     // Auth utilities
     getValidAuth(): Promise<AuthData | null>;
     isValidAuth(auth: unknown): auth is AuthData;

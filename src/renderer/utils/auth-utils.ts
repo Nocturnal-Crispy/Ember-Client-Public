@@ -8,7 +8,14 @@
  * Returns null if authentication is missing or invalid.
  */
 export async function getValidAuth(): Promise<AuthData | null> {
-  const auth = (await window.electronAPI.ipc.invoke("get-auth")) as AuthData | null;
+  const resp = await window.emberAPI.invoke<{ token: string; userId: string; deviceId: string; hostname: string; username: string }>('GetAuth', {});
+  const auth: AuthData | null = (resp.success && resp.data) ? {
+    token: resp.data.token,
+    user_id: (resp.data as any).userId ?? (resp.data as any).user_id,
+    device_id: (resp.data as any).deviceId ?? (resp.data as any).device_id,
+    hostname: resp.data.hostname,
+    username: resp.data.username,
+  } : null;
   if (!auth || !auth.token || !auth.hostname) {
     return null;
   }

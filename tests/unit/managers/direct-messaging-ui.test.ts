@@ -78,6 +78,19 @@ beforeAll(() => {
     wsService: { buildWsUrl: jest.fn().mockReturnValue('ws://localhost:8086/ws?token=tok') },
   };
 
+  // 2b. Mock window.emberAPI (used by direct-messaging-ui.ts for GetAuth calls)
+  (window as any).emberAPI = {
+    invoke: jest.fn().mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({
+          success: true,
+          data: { token: 'tok', userId: 'me', deviceId: 'dev-1', hostname: 'http://localhost', username: 'Me' },
+        });
+      }
+      return Promise.resolve({ success: true, data: null });
+    }),
+  };
+
   // 3. Mock window.emberLog
   (window as any).emberLog = {
     createLogger: () => ({
