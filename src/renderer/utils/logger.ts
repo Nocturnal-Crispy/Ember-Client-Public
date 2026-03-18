@@ -53,7 +53,15 @@
 
     // Forward to main process for terminal output
     try {
-      if (window.electronAPI && window.electronAPI.ipc) {
+      if (window.emberAPI) {
+        window.emberAPI.invoke('Log', {
+          level: payload.level,
+          context: payload.context,
+          message: payload.message,
+          data: payload.data ? JSON.stringify(payload.data) : undefined,
+        }).catch(() => { /* fire-and-forget */ });
+      } else if (window.electronAPI && window.electronAPI.ipc) {
+        // Fallback for environments where emberAPI is not yet available
         window.electronAPI.ipc.send("log-to-console", payload);
       }
     } catch (_) {

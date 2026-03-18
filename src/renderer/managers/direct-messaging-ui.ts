@@ -36,9 +36,8 @@
       log.info("Initializing Direct Messaging UI");
 
       // Fetch own username for chumhandle display
-      window.electronAPI.ipc.invoke('get-auth').then((auth) => {
-        const a = auth as { username?: string } | null;
-        if (a?.username) ownUsername = a.username;
+      window.emberAPI.invoke<{ token: string; userId: string; deviceId: string; hostname: string; username: string }>('GetAuth', {}).then((resp) => {
+        if (resp.success && resp.data?.username) ownUsername = resp.data.username;
       }).catch(() => { /* keep default */ });
 
       // Get existing DM elements from the DOM
@@ -879,8 +878,15 @@
     try {
       // Handle DM attachment upload if present
       if (dmPendingAttachment) {
-        const auth = (await window.electronAPI.ipc.invoke("get-auth")) as AuthData | null;
-        
+        const _authResp = await window.emberAPI.invoke<{ token: string; userId: string; deviceId: string; hostname: string; username: string }>('GetAuth', {});
+        const auth: AuthData | null = (_authResp.success && _authResp.data) ? {
+          token: _authResp.data.token,
+          user_id: (_authResp.data as any).userId ?? (_authResp.data as any).user_id,
+          device_id: (_authResp.data as any).deviceId ?? (_authResp.data as any).device_id,
+          hostname: _authResp.data.hostname,
+          username: _authResp.data.username,
+        } : null;
+
         if (!auth || !auth.token || !auth.hostname) {
           throw new Error("Authentication required");
         }

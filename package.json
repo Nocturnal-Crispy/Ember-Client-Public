@@ -43,6 +43,8 @@
   },
   "dependencies": {
     "@signalapp/libsignal-client": "^0.89.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.8.0",
     "electron-store": "^8.1.0",
     "ember-shared": "file:../ember-shared",
     "tweetnacl": "^1.0.3",

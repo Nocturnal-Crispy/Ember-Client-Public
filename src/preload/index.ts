@@ -1,4 +1,4 @@
-import type { AuthData, DeviceIdentity } from "ember-shared";
+import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "ember-shared";
 import { contextBridge, ipcRenderer } from "electron";
 import * as nacl from "tweetnacl";
 import * as naclUtil from "tweetnacl-util";
@@ -120,6 +120,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "audio-capture-frames",
   "audio-capture-teardown",
   "open-video-popout",
+  "ember",  // Signal Protocol unified IPC channel
 ];
 
 const ALLOWED_ON: readonly string[] = [
@@ -481,6 +482,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     teardown: () => ipcRenderer.invoke("audio-capture-teardown"),
   },
 
+});
+
+contextBridge.exposeInMainWorld("emberAPI", {
+  invoke<D = unknown>(cmd: EmberCmd, args: object): Promise<EmberIpcResponse<D>> {
+    return ipcRenderer.invoke("ember", { cmd, args }) as Promise<EmberIpcResponse<D>>;
+  },
 });
 
 preloadLog("info", "Preload script ready, contextBridge API exposed");
