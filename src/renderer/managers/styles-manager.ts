@@ -1,3 +1,8 @@
+/**
+ * styles-manager.ts
+ *
+ * Manages application styles selections and persistence.
+ */
 (function (): void {
   // --- Persistent State ------------------------------------------------------
   const savedShadow = localStorage.getItem("ember_styles_shadow_enabled");
@@ -31,7 +36,7 @@
     if (!container) return;
     container.replaceChildren();
 
-    // ─── 1. Corner Rounding Slider ───
+    // ─── Corner Rounding Slider ───
     const radiusRow = document.createElement("div");
     radiusRow.className = "theme-color-row";
     radiusRow.style.display = "flex";
@@ -59,7 +64,7 @@
 
 
 
-    // ─── 2. Inset Shadow Checkbox ───
+    // ─── Inset Shadow Checkbox ───
     const shadowRow = document.createElement("div");
     shadowRow.className = "theme-color-row";
     shadowRow.style.display = "flex";
@@ -79,16 +84,16 @@
       shadowCheck.addEventListener("change", (e) => {
         isShadowEnabled = (e.target as HTMLInputElement).checked;
         saveStylesToDisk();
-        applyShadows(); // <--- APPLY ON CHANGE
+        applyShadows(); 
       });
     }
   }
   
-  // 1. Load initial state
+  //  Load initial state
 const savedMemberList = localStorage.getItem("ember_styles_memberlist_hidden");
 let isMemberListHidden = savedMemberList === "true";
 
-// 2. Helper to apply the visual change
+// Helper to apply the visual change
 function applyMemberListState(): void {
   const memberList = document.querySelector(".member-list") as HTMLElement;
   const btn = document.getElementById("toggle-members-btn");
@@ -104,10 +109,10 @@ function applyMemberListState(): void {
   }
 }
 
-// 3. Delegation Listener (This handles the "Dynamic" button)
+// Delegation Listener (This handles the "Dynamic" button)
 document.addEventListener("mousedown", (e) => {
   const target = e.target as HTMLElement;
-  console.log("Mouse down on:", target.className, target.id); // This tells us what you hit
+  console.log("Mouse down on:", target.className, target.id);
 
   const toggleBtn = target.closest("#toggle-members-btn");
 
@@ -118,17 +123,15 @@ document.addEventListener("mousedown", (e) => {
     isMemberListHidden = !isMemberListHidden;
     localStorage.setItem("ember_styles_memberlist_hidden", isMemberListHidden.toString());
     
-    // Find the list and toggle the class directly
     const memberList = document.querySelector(".member-list");
     if (memberList) {
         memberList.classList.toggle("hidden-sidebar");
         console.log("Member list hidden state:", memberList.classList.contains("hidden-sidebar"));
     }
   }
-}, true); // The 'true' here makes this a "Capture" listener (it hits first)
+}, true); 
 
 
-// 4. Run once on startup
 
 
 

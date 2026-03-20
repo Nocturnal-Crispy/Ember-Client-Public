@@ -878,24 +878,24 @@
     border-color: var(--accent-color);
 }
 
-/* The larger back box showing the Background RGB */
+
 .theme-preset-swatch-container {
-    width: 60px;          /* Slightly bigger than original */
+    width: 60px;         
     height: 40px;
-    border-radius: 6px;   /* Round those corners! */
-    display: flex;        /* Centering logic */
+    border-radius: 6px;  
+    display: flex;       
     align-items: center;
     justify-content: center;
     margin-bottom: 8px;
-    border: 1px solid rgba(255,255,255,0.1); /* Subtle edge */
+    border: 1px solid rgba(255,255,255,0.1); 
 }
 
-/* The smaller front box showing the Accent RGB */
+
 .theme-preset-swatch {
-    width: 30px;          /* Half the size of the back box */
+    width: 30px;         
     height: 20px;
-    border-radius: 4px;   /* Slightly smaller radius */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Adds depth */
+    border-radius: 4px;  
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3); 
 }
 
 
