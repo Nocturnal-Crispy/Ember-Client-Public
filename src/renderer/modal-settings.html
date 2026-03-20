@@ -202,6 +202,34 @@
         </div>
 
         <div class="settings-section-divider"></div>
+        
+<!-- THE MAIN WRAPPER MUST HAVE THIS ID -->
+<div id="custom-theme-editor" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid #444; border-radius: 8px; background: rgba(0,0,0,0.2);">
+  <h4 style="margin-top: 0;">New Custom Theme</h4>
+  
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    
+    <!-- Theme Name -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <label style="width: 120px;">Theme Name:</label>
+      <input type="text" id="custom-name-input" placeholder="My Cool Theme" style="background: #222; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; flex-grow: 1;">
+    </div>
+
+    <!-- Background Color Picker -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <label style="width: 120px;">Background Color:</label>
+      <input type="color" id="custom-bg-picker" value="#141419" style="width: 50px; height: 30px; border: none; cursor: pointer; background: none;">
+      <span id="custom-bg-value" style="font-family: monospace; opacity: 0.7;">rgb(20, 20, 25)</span>
+    </div>
+
+    <button id="save-custom-btn" style="align-self: flex-end; padding: 8px 20px; cursor: pointer; background: var(--accent-color, #ff7850); border: none; border-radius: 4px; color: white;">Save Theme</button>
+  </div>
+</div>
+
+
+
+        <div class="settings-section-divider"></div>
+
 
         <h3 class="settings-subsection-title">Color Preview</h3>
         <div class="theme-preview-bar">
@@ -222,6 +250,13 @@
             <span class="theme-preview-accent-text">Accent Text</span>
           </div>
         </div>
+        
+        <div class="settings-section-divider"></div>
+
+<h3 class="settings-subsection-title">Interface Styles</h3>
+<div id="styles-settings-container" class="theme-color-row" style="flex-direction: column; gap: 15px;">
+  <!-- populated by styles-manager.ts -->
+</div>
 
         <div class="vv-save-row">
           <button class="modal-btn modal-btn-primary" id="theme-save-btn">Save Theme</button>

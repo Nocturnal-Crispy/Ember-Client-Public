@@ -836,6 +836,70 @@
 }
 
 .theme-preset-card {
+    position: relative; /* Essential for positioning the X */
+}
+
+.theme-preset-delete {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 0, 0, 0.6);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 10;
+}
+
+.theme-preset-card:hover .theme-preset-delete {
+    opacity: 1; /* Shows up on hover */
+}
+
+.theme-preset-delete:hover {
+    background: rgba(255, 0, 0, 1);
+}
+
+.add-new-btn {
+    border: 1px dashed #666;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.add-new-btn:hover {
+    opacity: 1;
+    border-color: var(--accent-color);
+}
+
+/* The larger back box showing the Background RGB */
+.theme-preset-swatch-container {
+    width: 60px;          /* Slightly bigger than original */
+    height: 40px;
+    border-radius: 6px;   /* Round those corners! */
+    display: flex;        /* Centering logic */
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,0.1); /* Subtle edge */
+}
+
+/* The smaller front box showing the Accent RGB */
+.theme-preset-swatch {
+    width: 30px;          /* Half the size of the back box */
+    height: 20px;
+    border-radius: 4px;   /* Slightly smaller radius */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Adds depth */
+}
+
+
+.theme-preset-card {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -861,12 +925,7 @@
   background-color: rgba(var(--rgb-highlight), 0.15);
 }
 
-.theme-preset-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: 0;
-  flex-shrink: 0;
-}
+
 
 .theme-preset-name {
   font-size: 12px;
