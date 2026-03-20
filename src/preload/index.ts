@@ -210,9 +210,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   crypto: {
-    generateRecoveryCode: () => {
-      preloadLog("debug", "Crypto: generateRecoveryCode");
-      return emberCrypto.generateRecoveryCode();
+    generateRecoveryCode: (length?: number) => {
+      preloadLog("debug", "Crypto: generateRecoveryCode", { length });
+      return emberCrypto.generateRecoveryCode(length);
     },
     encryptPrivateKeyWithRecoveryCode: (
       privateKey: Uint8Array,

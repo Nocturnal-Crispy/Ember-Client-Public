@@ -24,6 +24,9 @@ import { openSignalDatabase } from "./signal-db";
 import type { SignalDatabase } from "./signal-db";
 import { registerEmberIpcHandlers } from "./ipc/ember-ipc";
 import { initializeAuthWithElectronSafeStorage, migrateDevicePrivateKeyToSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
+import { migrateDeviceIdentity, generateRecoveryCode, encryptPrivateKeyWithRecoveryCode } from "ember-shared";
+import { uploadSignedPreKey, uploadOneTimePreKeys } from "ember-shared";
+import { PrivateKey } from "@signalapp/libsignal-client";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
@@ -534,6 +537,108 @@ ipcMain.handle("save-device-identity", async (_event, deviceIdentity) => {
     log.debug("Device identity saved (no private key provided)");
   }
   return true;
+});
+
+// ─── IPC: Signal migration ────────────────────────────────────────────────────
+
+ipcMain.handle("migrate-to-signal", async (_event, params: {
+  hostname: string;
+  token: string;
+  device_id: string;
+  user_id: string;
+  legacy_private_key_b64: string;
+}) => {
+  log.info("IPC: migrate-to-signal", { device_id: params.device_id });
+  try {
+    const legacyPrivateKey = Buffer.from(params.legacy_private_key_b64, "base64");
+    const migrationResult = await migrateDeviceIdentity(new Uint8Array(legacyPrivateKey));
+    const identityKeyBase64 = Buffer.from(migrationResult.identityKeyPair.publicKey).toString("base64");
+    const authData = { hostname: params.hostname, token: params.token, user_id: params.user_id, device_id: params.device_id, username: "" };
+
+    // Store identity key pair in Signal DB
+    if (signalDb) {
+      const localAddress = `${params.user_id}.${params.device_id}`;
+      await signalDb.saveIdentity(localAddress, Buffer.from(migrationResult.identityKeyPair.publicKey));
+      log.debug("Identity key stored in Signal DB", { address: localAddress });
+    }
+
+    // Upload signed prekey to server
+    await uploadSignedPreKey(authData, migrationResult.signedPreKey);
+    log.debug("Signed prekey uploaded");
+
+    // Upload one-time prekeys to server
+    await uploadOneTimePreKeys(authData, migrationResult.oneTimePreKeys);
+    log.debug("One-time prekeys uploaded");
+
+    // Generate proof of possession: sign(deviceId + identityKeyBase64)
+    const message = Buffer.from(`${params.device_id}${identityKeyBase64}`);
+    const identityPrivKey = PrivateKey.deserialize(Buffer.from(migrationResult.identityKeyPair.privateKey));
+    const signature = identityPrivKey.sign(message);
+    const proofOfPossession = Buffer.from(signature).toString("base64");
+
+    // PATCH device on server
+    const patchUrl = `${params.hostname}/api/v1/devices/${params.device_id}`;
+    const patchResponse = await net.fetch(patchUrl, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.token}`,
+      },
+      body: JSON.stringify({
+        identity_key: identityKeyBase64,
+        protocol_version: 1,
+        proof_of_possession: proofOfPossession,
+      }),
+    });
+    if (!patchResponse.ok) {
+      const errText = await patchResponse.text().catch(() => "");
+      throw new Error(`Device PATCH failed: ${patchResponse.status} ${errText}`);
+    }
+
+    // Store new identity key in safeStorage
+    await electronSafeStorageFunctions.setSafeStorage(
+      `identity_key_${params.user_id}_${params.device_id}`,
+      Buffer.from(migrationResult.identityKeyPair.privateKey).toString("base64"),
+    );
+
+    // Re-encrypt recovery code with new identity key (24-digit code)
+    let recoveryCode: string | undefined;
+    try {
+      const newRecoveryCode = generateRecoveryCode(24);
+      const { encrypted, salt } = await encryptPrivateKeyWithRecoveryCode(
+        new Uint8Array(migrationResult.identityKeyPair.privateKey),
+        newRecoveryCode,
+      );
+      const recoveryPatchUrl = `${params.hostname}/api/v1/recovery-codes`;
+      const recoveryResponse = await net.fetch(recoveryPatchUrl, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.token}`,
+        },
+        body: JSON.stringify({ encrypted_device_key: encrypted, salt }),
+      });
+      if (recoveryResponse.ok) {
+        recoveryCode = newRecoveryCode;
+        log.info("Recovery code re-encrypted with new identity key");
+      } else {
+        log.warn("Recovery code re-encryption upload failed, user can re-encrypt later", {
+          status: recoveryResponse.status,
+        });
+      }
+    } catch (recoveryErr) {
+      log.warn("Recovery code re-encryption failed, non-fatal", {
+        error: (recoveryErr as Error).message,
+      });
+    }
+
+    log.info("Signal migration complete", { device_id: params.device_id });
+    return { status: "complete", identityKeyBase64, recoveryCode };
+  } catch (err) {
+    const error = err as Error;
+    log.error("Signal migration failed", { error: error.message });
+    return { status: "failed", error: error.message };
+  }
 });
 
 // ─── IPC: Auth storage ────────────────────────────────────────────────────────

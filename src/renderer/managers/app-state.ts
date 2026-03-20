@@ -58,9 +58,14 @@ window.App = {
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,
 
+  // ── Ember metadata ──────────────────────────────────────────────────────
+  emberMetadata: new Map<string, { protocol_version: number }>(),
+
   // ── Signal Protocol ───────────────────────────────────────────────────────
   signalSessionReady: new Map<string, boolean>(),
   signalSessionManager: null,
+  protocolVersion: 0 as number,
+  migrationStatus: 'idle' as 'idle' | 'in-progress' | 'complete' | 'failed',
 
   // ── Attachment composer ───────────────────────────────────────────────────
   pendingAttachment: null,

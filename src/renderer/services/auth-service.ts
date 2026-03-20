@@ -456,6 +456,59 @@
         user_id: authData.user_id,
       });
 
+      // ── Signal migration check (non-blocking) ──────────────────────────
+      if (isLoginMode && deviceIdentity.private_key) {
+        try {
+          showLoading("Checking protocol version...", "Verifying device");
+          const devicesRes = await fetch(`${hostname}/api/v1/devices`, {
+            headers: { Authorization: `Bearer ${authData.token}` },
+          });
+          if (devicesRes.ok) {
+            const devicesBody = (await devicesRes.json()) as {
+              devices: Array<{
+                id: string;
+                protocol_version: number;
+              }>;
+            };
+            const currentDevice = devicesBody.devices.find(
+              (d) => d.id === deviceIdentity.device_id
+            );
+            if (currentDevice && currentDevice.protocol_version === 0) {
+              log.info("Device needs Signal migration", {
+                device_id: deviceIdentity.device_id,
+              });
+              showLoading("Upgrading encryption...", "Migrating to Signal Protocol");
+              const migrationResult = (await ipcRenderer.invoke(
+                "migrate-to-signal",
+                {
+                  hostname,
+                  token: authData.token,
+                  device_id: deviceIdentity.device_id,
+                  user_id: authData.user_id,
+                  legacy_private_key_b64: deviceIdentity.private_key,
+                }
+              )) as { status: string; error?: string; recoveryCode?: string };
+              if (migrationResult.status === "complete") {
+                log.info("Signal migration completed successfully");
+                if (migrationResult.recoveryCode) {
+                  authData._recoveryCode = migrationResult.recoveryCode;
+                }
+              } else {
+                log.warn("Signal migration failed, will retry next login", {
+                  error: migrationResult.error,
+                });
+              }
+            } else {
+              log.debug("Device already on Signal protocol or not found");
+            }
+          }
+        } catch (migrationErr) {
+          log.warn("Migration check failed, continuing to app", {
+            error: (migrationErr as Error).message,
+          });
+        }
+      }
+
       hideLoading();
 
       if (authData._recoveryCode) {

@@ -162,6 +162,10 @@
   // ─── Message send ──────────────────────────────────────────────────────────
 
   async function sendEncryptedMessage(channelId: string, plaintext: string): Promise<string> {
+    if (App.migrationStatus === "in-progress") {
+      log.warn("Message send blocked: migration in progress");
+      throw new Error("Please wait — encryption upgrade in progress");
+    }
     const targetChannelId = channelId || App.activeChannelId;
     if (!targetChannelId || !App.activeEmberId) {
       throw new Error("No active channel or ember");
@@ -196,7 +200,11 @@
               "Content-Type": "application/json",
               Authorization: `Bearer ${auth.token}`,
             },
-            body: JSON.stringify({ ciphertext: groupCiphertext }),
+            body: JSON.stringify({
+              ciphertext: groupCiphertext,
+              protocol_version: 1,
+              envelope_type: "signal_group",
+            }),
           }
         );
         if (!response.ok) {
@@ -260,7 +268,11 @@
             "Content-Type": "application/json",
             Authorization: `Bearer ${auth.token}`,
           },
-          body: JSON.stringify({ ciphertext: groupCiphertext }),
+          body: JSON.stringify({
+            ciphertext: groupCiphertext,
+            protocol_version: 1,
+            envelope_type: "signal_group",
+          }),
         }
       );
       if (!response.ok) {
@@ -363,6 +375,8 @@
     id: string;
     channel_id: string;
     ciphertext: string;
+    protocol_version?: number;
+    envelope_type?: string;
   }): Promise<void> {
     if (payload.channel_id !== App.activeChannelId) return;
     const messageDiv = messagesContainer?.querySelector(
@@ -374,11 +388,36 @@
     ) as HTMLElement | null;
     if (!textEl) return;
     if (!App.activeEmberId) return;
-    let plaintext = await tryGroupDecrypt(payload.ciphertext);
-    if (plaintext === null) {
-      const emberKey = App.emberKeyCache.get(App.activeEmberId);
-      if (!emberKey) return;
-      plaintext = emberCrypto.decryptMessage(payload.ciphertext, emberKey);
+    let plaintext: string | null = null;
+    const envelopeType = payload.envelope_type ?? "legacy";
+    if (envelopeType === "signal_group") {
+      plaintext = await tryGroupDecrypt(payload.ciphertext);
+    } else if (envelopeType === "signal_dm") {
+      textEl.textContent = "[Requires app update to view this message]";
+      markMessageAsEdited(messageDiv);
+      return;
+    } else {
+      plaintext = await tryGroupDecrypt(payload.ciphertext);
+      if (plaintext === null) {
+        let emberKey = App.emberKeyCache.get(App.activeEmberId) ?? null;
+        if (!emberKey) {
+          try {
+            const archiveResult = await window.emberAPI.invoke<{ key: string | null }>(
+              "LoadLegacyEmberKey",
+              { emberId: App.activeEmberId },
+            );
+            if (archiveResult.data?.key) {
+              const loadedKey = window.electronAPI.naclUtil.decodeBase64(archiveResult.data.key);
+              emberKey = loadedKey;
+              App.emberKeyCache.set(App.activeEmberId, loadedKey);
+            }
+          } catch {
+            // SQLite fallback failed silently
+          }
+        }
+        if (!emberKey) return;
+        plaintext = emberCrypto.decryptMessage(payload.ciphertext, emberKey);
+      }
     }
     if (plaintext === null) return;
     textEl.textContent = plaintext;
@@ -457,17 +496,15 @@
   async function displayDecryptedMessage(msg: Message, prepend = false): Promise<void> {
     if (!App.activeEmberId) return;
     let plaintext: string | null = null;
-    plaintext = await tryGroupDecrypt(msg.ciphertext);
-    if (plaintext === null) {
-      const emberKey = App.emberKeyCache.get(App.activeEmberId);
-      if (!emberKey) {
-        log.warn("Cannot decrypt message: ember key not in cache", {
-          ember_id: App.activeEmberId,
-          message_id: msg.id,
-        });
+    const envelopeType = msg.envelope_type ?? "legacy";
+    if (envelopeType === "signal_group") {
+      plaintext = await tryGroupDecrypt(msg.ciphertext);
+      if (plaintext === null) {
+        log.warn("Sender key decrypt failed, triggering distribution fetch", { message_id: msg.id });
+        window.processIncomingDistributions?.().catch(() => {});
         addMessage(
           msg.username ?? "Unknown",
-          "[Encrypted message - key unavailable]",
+          "[Waiting for sender key — message will be readable once keys arrive]",
           msg.created_at,
           prepend,
           msg.id,
@@ -475,7 +512,54 @@
         );
         return;
       }
-      plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
+    } else if (envelopeType === "signal_dm") {
+      addMessage(
+        msg.username ?? "Unknown",
+        "[Requires app update to view this message]",
+        msg.created_at,
+        prepend,
+        msg.id,
+        msg.chat_color
+      );
+      return;
+    } else {
+      plaintext = await tryGroupDecrypt(msg.ciphertext);
+      if (plaintext === null) {
+        let emberKey = App.emberKeyCache.get(App.activeEmberId) ?? null;
+        if (!emberKey) {
+          // Fallback: try loading from SQLite archive
+          try {
+            const archiveResult = await window.emberAPI.invoke<{ key: string | null }>(
+              "LoadLegacyEmberKey",
+              { emberId: App.activeEmberId },
+            );
+            if (archiveResult.data?.key) {
+              const loadedKey = window.electronAPI.naclUtil.decodeBase64(archiveResult.data.key);
+              emberKey = loadedKey;
+              App.emberKeyCache.set(App.activeEmberId, loadedKey);
+              log.debug("Ember key loaded from SQLite archive for decryption", { ember_id: App.activeEmberId });
+            }
+          } catch {
+            log.debug("SQLite archive lookup failed during decryption", { ember_id: App.activeEmberId });
+          }
+        }
+        if (!emberKey) {
+          log.warn("Cannot decrypt message: ember key not available", {
+            ember_id: App.activeEmberId,
+            message_id: msg.id,
+          });
+          addMessage(
+            msg.username ?? "Unknown",
+            "[This message cannot be decrypted — ember key not found]",
+            msg.created_at,
+            prepend,
+            msg.id,
+            msg.chat_color
+          );
+          return;
+        }
+        plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
+      }
     }
     if (plaintext === null) {
       log.warn("Message decryption failed", { message_id: msg.id });
