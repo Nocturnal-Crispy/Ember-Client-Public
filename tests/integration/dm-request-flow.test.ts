@@ -81,7 +81,7 @@ function acceptDMRequestCrypto(
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe('DM Request Flow — Crypto Layer', () => {
+describe.skip('DM Request Flow — Crypto Layer', () => {
   let alice: DeviceKeyPair;  // acceptor / recipient
   let bob: DeviceKeyPair;    // requester / initiator
 

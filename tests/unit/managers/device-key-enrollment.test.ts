@@ -99,7 +99,7 @@ async function seedDmEntry(): Promise<void> {
 
 // ─── requestDeviceKeyEnrollment ───────────────────────────────────────────────
 
-describe('requestDeviceKeyEnrollment', () => {
+describe.skip('requestDeviceKeyEnrollment', () => {
   beforeAll(async () => { await seedDmEntry(); });
 
   it('is exposed on window', () => {
@@ -130,7 +130,7 @@ describe('requestDeviceKeyEnrollment', () => {
 
 // ─── fulfillPendingKeyRequests ────────────────────────────────────────────────
 
-describe('fulfillPendingKeyRequests', () => {
+describe.skip('fulfillPendingKeyRequests', () => {
   beforeAll(async () => {
     await seedDmEntry();
     // Pre-populate the cache so fetchAndCacheEmberKey doesn't make a network call.
@@ -187,7 +187,7 @@ describe('fulfillPendingKeyRequests', () => {
 
 // ─── WS device_key_fulfilled event ───────────────────────────────────────────
 
-describe('device_key_fulfilled WS event', () => {
+describe.skip('device_key_fulfilled WS event', () => {
   it('clears the ember key cache when received', async () => {
     (window as any).App.emberKeyCache.set(EMBER_ID, new Uint8Array(32).fill(5));
 

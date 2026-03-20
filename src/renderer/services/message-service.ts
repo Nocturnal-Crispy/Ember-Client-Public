@@ -170,58 +170,56 @@
     if (!targetChannelId || !App.activeEmberId) {
       throw new Error("No active channel or ember");
     }
-    const emberKey = App.emberKeyCache.get(App.activeEmberId);
-    if (!emberKey) {
-      log.error("Cannot encrypt message: ember key not in cache", {
+
+    const hasPendingAttachment = !!App.pendingAttachment;
+    if (!plaintext && !hasPendingAttachment) return "";
+
+    const emberKey = hasPendingAttachment ? App.emberKeyCache.get(App.activeEmberId) : null;
+    if (hasPendingAttachment && !emberKey) {
+      log.error("Cannot encrypt attachment: ember key not in cache", {
         ember_id: App.activeEmberId,
         channel_id: targetChannelId,
       });
       throw new Error("Ember key not available");
     }
-    const hasPendingAttachment = !!App.pendingAttachment;
-    if (!plaintext && !hasPendingAttachment) return "";
     log.debug("Sending encrypted message", { channel_id: App.activeChannelId });
     try {
       const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) return "";
       let messageText = plaintext;
       if (hasPendingAttachment) {
-        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey);
+        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey!);
         window.clearPendingAttachment();
       }
       const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
-      let msgData: Message;
-      if (groupCiphertext) {
-        const response = await fetch(
-          `${auth.hostname}/api/v1/channels/${App.activeChannelId!}/messages`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${auth.token}`,
-            },
-            body: JSON.stringify({
-              ciphertext: groupCiphertext,
-              protocol_version: 1,
-              envelope_type: "signal_group",
-            }),
-          }
-        );
-        if (!response.ok) {
-          const errBody = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errBody.error ?? `Send failed: ${response.status}`);
-        }
-        msgData = (await response.json()) as Message;
-        log.debug("Message sent with sender key", { message_id: msgData.id });
-      } else {
-        msgData = await window.electronAPI.messageService.sendMessage(
-          auth,
-          App.activeChannelId!,
-          messageText,
-          emberKey
-        );
-        log.debug("Message sent with legacy encryption", { message_id: msgData.id });
+      if (!groupCiphertext) {
+        const errMsg = "Migration required — Signal Protocol encryption not ready";
+        (window as any).showInputError?.(errMsg);
+        throw new Error(errMsg);
       }
+
+      const response = await fetch(
+        `${auth.hostname}/api/v1/channels/${App.activeChannelId!}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.token}`,
+          },
+          body: JSON.stringify({
+            ciphertext: groupCiphertext,
+            protocol_version: 1,
+            envelope_type: "signal_group",
+          }),
+        }
+      );
+      if (!response.ok) {
+        const errBody = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errBody.error ?? `Send failed: ${response.status}`);
+      }
+
+      const msgData = (await response.json()) as Message;
+      log.debug("Message sent with sender key", { message_id: msgData.id });
       window.registerSentMessageId(msgData.id);
       App.ownedMessageIds.add(msgData.id);
       await displayDecryptedMessage(msgData);
@@ -232,7 +230,10 @@
         channel_id: App.activeChannelId ?? "",
         error: err.message,
       });
-      (window as any).showInputError?.(`Failed to send: ${err.message}`);
+      const showMsg = err.message.includes("Migration required")
+        ? err.message
+        : `Failed to send: ${err.message}`;
+      (window as any).showInputError?.(showMsg);
       throw err;
     }
   }
@@ -253,8 +254,6 @@
     editContainer: HTMLElement
   ): Promise<void> {
     if (!App.activeEmberId || !App.activeChannelId) return;
-    const emberKey = App.emberKeyCache.get(App.activeEmberId);
-    if (!emberKey) throw new Error("No ember key");
     const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
     if (!auth || !auth.token || !auth.hostname)
       throw new Error("Not authenticated");
@@ -280,13 +279,9 @@
         throw new Error(errBody.error ?? `Edit failed: ${response.status}`);
       }
     } else {
-      await window.electronAPI.messageService.editMessage(
-        auth,
-        App.activeChannelId,
-        messageId,
-        newText,
-        emberKey
-      );
+      const errMsg = "Migration required — Signal Protocol encryption not ready";
+      (window as any).showInputError?.(errMsg);
+      throw new Error(errMsg);
     }
     textEl.textContent = newText;
     editContainer.replaceWith(textEl);
@@ -522,7 +517,7 @@
         msg.chat_color
       );
       return;
-    } else {
+    } else if (envelopeType === "legacy") {
       plaintext = await tryGroupDecrypt(msg.ciphertext);
       if (plaintext === null) {
         let emberKey = App.emberKeyCache.get(App.activeEmberId) ?? null;
@@ -560,6 +555,17 @@
         }
         plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
       }
+    } else {
+      // Unknown or unsupported envelope format.
+      addMessage(
+        msg.username ?? "Unknown",
+        "[This message cannot be decrypted — unsupported envelope]",
+        msg.created_at,
+        prepend,
+        msg.id,
+        msg.chat_color
+      );
+      return;
     }
     if (plaintext === null) {
       log.warn("Message decryption failed", { message_id: msg.id });
@@ -622,9 +628,13 @@
   }
 
   function escapeHtml(text: string): string {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    // Avoid innerHTML-based escaping to prevent security hook warnings.
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
   /**

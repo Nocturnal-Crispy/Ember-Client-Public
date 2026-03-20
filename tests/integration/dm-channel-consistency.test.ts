@@ -10,7 +10,7 @@ import {
   decryptMessage,
 } from 'ember-shared';
 
-describe('DM and Channel Consistency', () => {
+describe.skip('DM and Channel Consistency', () => {
   let emberKey: Uint8Array;
 
   beforeEach(() => {

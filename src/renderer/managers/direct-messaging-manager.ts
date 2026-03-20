@@ -79,65 +79,10 @@
    * to a self-box format so all future fetches use the simpler self-box path.
    */
   async function fetchAndCacheEmberKey(emberId: string): Promise<Uint8Array | null> {
-    if (App.emberKeyCache.has(emberId)) return App.emberKeyCache.get(emberId) ?? null;
-    const auth = await getAuth();
-    const device = await getDevice();
-    if (!auth || !device) return null;
-    try {
-      const res = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      });
-      if (!res.ok) {
-        if (res.status === 404) {
-          // Only request enrollment when the DM has already been accepted — meaning
-          // the key exists on at least one other device but hasn't been delivered to
-          // this one yet. For pending DMs (requester perspective) no key has been
-          // created anywhere yet, so enrollment is pointless and misleading.
-          const dmEntry = dmByEmberId.get(emberId);
-          const isPendingRequester = dmEntry?.requestStatus === 'pending' && !dmEntry.isRecipient;
-          if (!isPendingRequester) {
-            requestDeviceKeyEnrollment(emberId).catch(() => null);
-          }
-        }
-        return null;
-      }
-      const data = (await res.json()) as { encrypted_key: string; sender_public_key?: string };
-      const ownPub = naclUtil.decodeBase64(device.public_key);
-      const ownPriv = naclUtil.decodeBase64(device.private_key);
-
-      let key: Uint8Array | null = null;
-
-      if (data.sender_public_key) {
-        // Peer-box path (first fetch after DM acceptance by the other party).
-        // sender_public_key is the stored key that was used for encryption —
-        // decryption is reliable regardless of subsequent key rotations.
-        const senderPub = naclUtil.decodeBase64(data.sender_public_key);
-        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, senderPub, ownPriv);
-        if (key) {
-          // Migrate to self-box so all future fetches skip this path.
-          const selfBox = emberCrypto.encryptEmberKeyForUser(key, ownPub, ownPriv);
-          fetch(`${auth.hostname}/api/v1/embers/${emberId}/key`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${auth.token}`,
-            },
-            body: JSON.stringify({ encrypted_key: selfBox }),
-          }).catch((err: Error) =>
-            log.warn("Failed to migrate DM key to self-box", { emberId, error: err.message }),
-          );
-        }
-      } else {
-        // Self-box path: standard for all embers (channels and migrated DMs).
-        key = emberCrypto.decryptEmberKeyForUser(data.encrypted_key, ownPub, ownPriv);
-      }
-
-      if (key) App.emberKeyCache.set(emberId, key);
-      return key ?? null;
-    } catch (err) {
-      log.error("Failed to fetch ember key", { emberId, error: (err as Error).message });
-      return null;
-    }
+    // Cutover: server-side peer-box / self-box ember-keys are no longer fetched.
+    // However, we still support legacy decrypt if the ember key is already present
+    // in the local cache (e.g. loaded from SQLite archive).
+    return App.emberKeyCache.get(emberId) ?? null;
   }
 
   // ─── Load DM list ──────────────────────────────────────────────────────────
@@ -269,16 +214,8 @@
     );
     if (existing) return existing.textChannelId;
 
-    // Generate the ember key immediately so the requester can send messages before
-    // the recipient accepts. A peer-box for the recipient is stored on the server
-    // with pending=true; flipped to active when the recipient accepts.
-    const emberKey = emberCrypto.generateEmberKey();
-    const ownPub  = naclUtil.decodeBase64(device.public_key);
-    const ownPriv = naclUtil.decodeBase64(device.private_key);
-    const encryptedKeySelf = emberCrypto.encryptEmberKeyForUser(emberKey, ownPub, ownPriv);
-
-    // Fetch the recipient's device public key to create one peer-box for them.
-    let peerBox: { recipient_id: string; encrypted_key: string; sender_public_key: string } | undefined;
+    // Fetch the recipient's devices so we can pick a Signal-capable target
+    // device for `signal_dm` message encryption.
     let firstDevice: { id: string; public_key: string; protocol_version?: number } | undefined;
     try {
       const devRes = await fetch(`${auth.hostname}/api/v1/users/${participantId}/devices`, {
@@ -287,18 +224,9 @@
       if (devRes.ok) {
         const devData = (await devRes.json()) as { devices: Array<{ id: string; public_key: string; protocol_version?: number }> };
         firstDevice = devData.devices?.[0];
-        if (firstDevice?.public_key) {
-          const recipientPub = naclUtil.decodeBase64(firstDevice.public_key);
-          const encryptedKeyPeer = emberCrypto.encryptEmberKeyForUser(emberKey, recipientPub, ownPriv);
-          peerBox = {
-            recipient_id:      participantId,
-            encrypted_key:     encryptedKeyPeer,
-            sender_public_key: device.public_key,
-          };
-        }
       }
     } catch (err) {
-      log.warn("Failed to fetch recipient devices for peer-box", { participantId, error: (err as Error).message });
+      log.warn("Failed to fetch recipient devices for DM session", { participantId, error: (err as Error).message });
     }
 
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
@@ -307,7 +235,8 @@
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      body: JSON.stringify({ user_id: participantId, encrypted_key_self: encryptedKeySelf, peer_box: peerBox }),
+      // Cutover: peer-box / ember-keys no longer required for new DM sessions.
+      body: JSON.stringify({ user_id: participantId }),
     });
     if (!res.ok) {
       const errData = (await res.json().catch(() => ({}))) as { error?: string };
@@ -355,8 +284,7 @@
       );
     }
 
-    // Cache the key immediately so the requester can send messages right away.
-    App.emberKeyCache.set(emberId, emberKey);
+    // Legacy ember-keys are no longer used for new messages.
 
     window.addDmConversationToList({
       id: channels.textChannelId,
@@ -841,29 +769,8 @@
    * `fulfillPendingKeyRequests` and deliver a peer-box.
    */
   async function requestDeviceKeyEnrollment(emberId: string): Promise<void> {
-    const auth = await getAuth();
-    const device = await getDevice();
-    if (!auth || !device) return;
-    try {
-      const res = await fetch(
-        `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${auth.token}`,
-          },
-          body: JSON.stringify({ device_pub_key: device.public_key }),
-        },
-      );
-      if (!res.ok) {
-        log.warn("Failed to request device key enrollment", { emberId });
-      } else {
-        log.info("Device key enrollment requested", { emberId });
-      }
-    } catch (err) {
-      log.warn("Error requesting device key enrollment", { emberId, error: (err as Error).message });
-    }
+    // Cutover: multi-device NaCl device-key enrollment is removed.
+    // Signal Protocol sessions are per-device; no cross-device ember key exchange.
   }
 
   /**
@@ -871,64 +778,8 @@
    * delivers the ember key encrypted as a peer-box for each requesting device.
    */
   async function fulfillPendingKeyRequests(emberId: string): Promise<void> {
-    const auth = await getAuth();
-    const device = await getDevice();
-    if (!auth || !device) return;
-    try {
-      const res = await fetch(
-        `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests`,
-        { headers: { Authorization: `Bearer ${auth.token}` } },
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        requests: Array<{
-          id: string;
-          requesting_device_id: string;
-          requesting_device_pub_key: string;
-          created_at: number;
-        }>;
-      };
-      if (!data.requests || data.requests.length === 0) return;
-
-      const emberKey = await fetchAndCacheEmberKey(emberId);
-      if (!emberKey) return;
-
-      const ownPriv = naclUtil.decodeBase64(device.private_key);
-
-      for (const req of data.requests) {
-        try {
-          const recipientPub = naclUtil.decodeBase64(req.requesting_device_pub_key);
-          const encryptedKey = emberCrypto.encryptEmberKeyForUser(emberKey, recipientPub, ownPriv);
-          const fulfillRes = await fetch(
-            `${auth.hostname}/api/v1/embers/${emberId}/device-key-requests/${req.requesting_device_id}/fulfill`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${auth.token}`,
-              },
-              body: JSON.stringify({
-                encrypted_key: encryptedKey,
-                sender_public_key: device.public_key,
-              }),
-            },
-          );
-          if (!fulfillRes.ok) {
-            log.warn("Failed to fulfill device key request", { emberId, deviceId: req.requesting_device_id });
-          } else {
-            log.info("Device key request fulfilled", { emberId, deviceId: req.requesting_device_id });
-          }
-        } catch (err) {
-          log.warn("Error fulfilling device key request", {
-            emberId,
-            deviceId: req.requesting_device_id,
-            error: (err as Error).message,
-          });
-        }
-      }
-    } catch (err) {
-      log.warn("Failed to fetch pending key requests", { emberId, error: (err as Error).message });
-    }
+    // Cutover: multi-device NaCl device-key enrollment is removed.
+    // Signal Protocol sessions are per-device; no cross-device ember key exchange.
   }
 
   // ─── Initialization ────────────────────────────────────────────────────────

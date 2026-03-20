@@ -294,12 +294,8 @@
     }
     const emberMeta = App.emberMetadata.get(App.activeEmberId);
     const isSignalEmber = (emberMeta?.protocol_version ?? 0) === 1;
-    const emberKey = App.emberKeyCache.get(App.activeEmberId);
-    if (!isSignalEmber && !emberKey) {
-      log.error("Cannot create invite: ember key not in cache", {
-        ember_id: App.activeEmberId,
-      });
-      showCreateInviteError("Ember key not available");
+    if (!isSignalEmber) {
+      showCreateInviteError("Invites for legacy embers are not supported after cutover");
       return;
     }
 
@@ -330,15 +326,6 @@
       const requestBody: Record<string, unknown> = {
         code: inviteCode,
       };
-      // For legacy embers, encrypt and include the ember key in the invite
-      if (!isSignalEmber && emberKey) {
-        const inviteKeyData = await emberCrypto.encryptEmberKeyForInvite(
-          emberKey,
-          inviteCode
-        );
-        requestBody["encrypted_ember_key"] = inviteKeyData.encrypted;
-        requestBody["key_salt"] = inviteKeyData.salt;
-      }
       if (expiresIn > 0) requestBody["expires_in"] = expiresIn;
       if (maxUses > 0) requestBody["max_uses"] = maxUses;
 
@@ -415,9 +402,9 @@
     ember_name?: string;
     ember_icon?: string;
     member_count?: number;
-    encrypted_ember_key: string;
+    encrypted_ember_key?: string;
     code: string;
-    key_salt: string;
+    key_salt?: string;
     hostname?: string;
     protocol_version?: number;
   }
@@ -528,33 +515,13 @@
       const info = App.pendingInvite as unknown as InviteInfo;
       const hostname = info.hostname ?? auth.hostname;
       const isSignalEmber = (info.protocol_version ?? 0) === 1;
-      let acceptBody: Record<string, unknown> = {};
-      let emberKey: Uint8Array | null = null;
-
       if (!isSignalEmber) {
-        // Legacy path: decrypt ember key from invite and re-encrypt for this user
-        emberKey = await emberCrypto.decryptEmberKeyFromInvite(
-          info.encrypted_ember_key,
-          info.code,
-          info.key_salt
-        );
-        if (!emberKey) {
-          log.error("Failed to decrypt ember key from invite");
-          showAcceptInviteError("Failed to decrypt ember key from invite");
-          return;
-        }
-        log.debug("Ember key decrypted from invite successfully");
-        const publicKeyBytes = naclUtil.decodeBase64(device.public_key!);
-        const privateKeyBytes = naclUtil.decodeBase64(device.private_key!);
-        const encryptedEmberKey = emberCrypto.encryptEmberKeyForUser(
-          emberKey,
-          publicKeyBytes,
-          privateKeyBytes
-        );
-        acceptBody = { encrypted_ember_key: encryptedEmberKey };
-      } else {
-        log.info("Signal ember invite: no ember key exchange needed");
+        showAcceptInviteError("This invite type is not supported after cutover");
+        return;
       }
+
+      // Signal ember invites are membership-only; no ember key exchange needed.
+      const acceptBody: Record<string, unknown> = {};
 
       const response = await fetch(
         `${hostname}/api/v1/invites/${info.code}/accept`,
@@ -578,9 +545,6 @@
         ember_name?: string;
       };
       if (data.ember_id) {
-        if (emberKey) {
-          App.emberKeyCache.set(data.ember_id, emberKey);
-        }
         log.info("Joined server via invite", {
           ember_id: data.ember_id,
           name: data.ember_name ?? "",

@@ -8,6 +8,19 @@
   const naclUtil = window.electronAPI.naclUtil;
   const emberCrypto = window.electronAPI.crypto;
 
+  function compareVersions(a: string, b: string): number {
+    const partsA = a.split(".").map(Number);
+    const partsB = b.split(".").map(Number);
+    const len = Math.max(partsA.length, partsB.length);
+    for (let i = 0; i < len; i++) {
+      const numA = partsA[i] ?? 0;
+      const numB = partsB[i] ?? 0;
+      if (numA < numB) return -1;
+      if (numA > numB) return 1;
+    }
+    return 0;
+  }
+
   interface AuthElements {
     form: HTMLFormElement | null;
     formTitle: HTMLElement | null;
@@ -456,51 +469,54 @@
         user_id: authData.user_id,
       });
 
-      // ── Signal migration check (non-blocking) ──────────────────────────
-      if (isLoginMode && deviceIdentity.private_key) {
+      // ── Minimum client version gate ────────────────────────────────────
+      if (authData.minimum_client_version) {
         try {
-          showLoading("Checking protocol version...", "Verifying device");
-          const devicesRes = await fetch(`${hostname}/api/v1/devices`, {
-            headers: { Authorization: `Bearer ${authData.token}` },
-          });
-          if (devicesRes.ok) {
-            const devicesBody = (await devicesRes.json()) as {
-              devices: Array<{
-                id: string;
-                protocol_version: number;
-              }>;
-            };
-            const currentDevice = devicesBody.devices.find(
-              (d) => d.id === deviceIdentity.device_id
+          const appVersion = (await ipcRenderer.invoke("get-app-version")) as string;
+          if (compareVersions(appVersion, authData.minimum_client_version) < 0) {
+            log.warn("Client version below minimum", {
+              app_version: appVersion,
+              minimum: authData.minimum_client_version,
+            });
+            hideLoading();
+            showError(
+              `Your Ember client (v${appVersion}) is outdated. Please update to v${authData.minimum_client_version} or later.`
             );
-            if (currentDevice && currentDevice.protocol_version === 0) {
-              log.info("Device needs Signal migration", {
-                device_id: deviceIdentity.device_id,
-              });
-              showLoading("Upgrading encryption...", "Migrating to Signal Protocol");
-              const migrationResult = (await ipcRenderer.invoke(
-                "migrate-to-signal",
-                {
-                  hostname,
-                  token: authData.token,
-                  device_id: deviceIdentity.device_id,
-                  user_id: authData.user_id,
-                  legacy_private_key_b64: deviceIdentity.private_key,
-                }
-              )) as { status: string; error?: string; recoveryCode?: string };
-              if (migrationResult.status === "complete") {
-                log.info("Signal migration completed successfully");
-                if (migrationResult.recoveryCode) {
-                  authData._recoveryCode = migrationResult.recoveryCode;
-                }
-              } else {
-                log.warn("Signal migration failed, will retry next login", {
-                  error: migrationResult.error,
-                });
-              }
-            } else {
-              log.debug("Device already on Signal protocol or not found");
+            return;
+          }
+        } catch (versionErr) {
+          log.warn("Version check failed, continuing", {
+            error: (versionErr as Error).message,
+          });
+        }
+      }
+
+      // ── Signal migration check ─────────────────────────────────────────
+      if (isLoginMode && deviceIdentity.private_key && authData.migration_required) {
+        try {
+          log.info("Server indicated migration required", {
+            device_id: deviceIdentity.device_id,
+          });
+          showLoading("Upgrading encryption...", "Migrating to Signal Protocol");
+          const migrationResult = (await ipcRenderer.invoke(
+            "migrate-to-signal",
+            {
+              hostname,
+              token: authData.token,
+              device_id: deviceIdentity.device_id,
+              user_id: authData.user_id,
+              legacy_private_key_b64: deviceIdentity.private_key,
             }
+          )) as { status: string; error?: string; recoveryCode?: string };
+          if (migrationResult.status === "complete") {
+            log.info("Signal migration completed successfully");
+            if (migrationResult.recoveryCode) {
+              authData._recoveryCode = migrationResult.recoveryCode;
+            }
+          } else {
+            log.warn("Signal migration failed, will retry next login", {
+              error: migrationResult.error,
+            });
           }
         } catch (migrationErr) {
           log.warn("Migration check failed, continuing to app", {

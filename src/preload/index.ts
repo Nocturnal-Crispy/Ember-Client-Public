@@ -114,6 +114,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   "set-pin",
   "has-pin",
   "clear-pin",
+  "get-app-version",
   "get-screen-sources",
   "audio-capture-check-support",
   "audio-capture-setup",
@@ -236,34 +237,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
         saltBase64
       );
     },
-    generateEmberKey: () => {
-      preloadLog("debug", "Crypto: generateEmberKey");
-      return emberCrypto.generateEmberKey();
-    },
-    encryptEmberKeyForUser: (
-      emberKey: Uint8Array,
-      recipientPublicKey: Uint8Array,
-      senderPrivateKey: Uint8Array
-    ) => {
-      preloadLog("debug", "Crypto: encryptEmberKeyForUser");
-      return emberCrypto.encryptEmberKeyForUser(
-        emberKey,
-        recipientPublicKey,
-        senderPrivateKey
-      );
-    },
-    decryptEmberKeyForUser: (
-      encryptedBase64: string,
-      senderPublicKey: Uint8Array,
-      recipientPrivateKey: Uint8Array
-    ) => {
-      preloadLog("debug", "Crypto: decryptEmberKeyForUser");
-      return emberCrypto.decryptEmberKeyForUser(
-        encryptedBase64,
-        senderPublicKey,
-        recipientPrivateKey
-      );
-    },
     encryptMessage: (plaintext: string, emberKey: Uint8Array) => {
       preloadLog("debug", "Crypto: encryptMessage");
       return emberCrypto.encryptMessage(plaintext, emberKey);
@@ -285,22 +258,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       const nonce = combined.slice(0, nacl.secretbox.nonceLength);
       const cipher = combined.slice(nacl.secretbox.nonceLength);
       return nacl.secretbox.open(cipher, nonce, key);
-    },
-    encryptEmberKeyForInvite: (emberKey: Uint8Array, inviteCode: string) => {
-      preloadLog("debug", "Crypto: encryptEmberKeyForInvite");
-      return emberCrypto.encryptEmberKeyForInvite(emberKey, inviteCode);
-    },
-    decryptEmberKeyFromInvite: (
-      encryptedBase64: string,
-      inviteCode: string,
-      saltBase64: string
-    ) => {
-      preloadLog("debug", "Crypto: decryptEmberKeyFromInvite");
-      return emberCrypto.decryptEmberKeyFromInvite(
-        encryptedBase64,
-        inviteCode,
-        saltBase64
-      );
     },
   },
 
@@ -372,14 +329,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     sendMessage: (
       auth: unknown,
       channelId: string,
-      plaintext: string,
-      emberKey: Uint8Array
+      ciphertext: string
     ) =>
       emberServices.sendMessage(
         auth as AuthData,
         channelId,
-        plaintext,
-        emberKey
+        ciphertext
       ),
     deleteMessage: (
       auth: unknown,
@@ -395,15 +350,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       auth: unknown,
       channelId: string,
       messageId: string,
-      plaintext: string,
-      emberKey: Uint8Array
+      ciphertext: string
     ) =>
       emberServices.editMessage(
         auth as AuthData,
         channelId,
         messageId,
-        plaintext,
-        emberKey
+        ciphertext
       ),
     uploadAttachment: (
       auth: unknown,

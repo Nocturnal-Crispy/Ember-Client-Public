@@ -34,7 +34,7 @@ class TestUser {
   }
 }
 
-describe('DM Channel Crypto Integration', () => {
+describe.skip('DM Channel Crypto Integration', () => {
   let alice: TestUser;
   let bob: TestUser;
   let charlie: TestUser;

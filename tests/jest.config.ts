@@ -33,6 +33,9 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^ember-shared$": "<rootDir>/../ember-shared/src/index",
     "^ember-shared/(.*)$": "<rootDir>/../ember-shared/src/$1",
+    // ESM-style TS imports in ember-shared use explicit `.js` extensions.
+    // Map relative `.js` imports back to TypeScript sources for Jest.
+    "^(\\.{1,2}/.*)\\.js$": "$1",
     "^electron$": "<rootDir>/tests/__mocks__/electron.ts",
     "^@signalapp/libsignal-client$": "<rootDir>/tests/__mocks__/signal-client.ts",
   },

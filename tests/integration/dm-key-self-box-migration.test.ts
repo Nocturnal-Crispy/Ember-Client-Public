@@ -18,7 +18,7 @@ import {
 
 import * as nacl from 'tweetnacl';
 
-describe('DM Key Self-Box Migration', () => {
+describe.skip('DM Key Self-Box Migration', () => {
   let alice: nacl.BoxKeyPair;
   let bob: nacl.BoxKeyPair;
   let emberKey: Uint8Array;

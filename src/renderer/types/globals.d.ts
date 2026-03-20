@@ -255,31 +255,11 @@ declare global {
       recoveryCode: string,
       saltBase64: string
     ): Promise<Uint8Array | null>;
-    generateEmberKey(): Uint8Array;
-    encryptEmberKeyForUser(
-      emberKey: Uint8Array,
-      recipientPublicKey: Uint8Array,
-      senderPrivateKey: Uint8Array
-    ): string;
-    decryptEmberKeyForUser(
-      encryptedBase64: string,
-      senderPublicKey: Uint8Array,
-      recipientPrivateKey: Uint8Array
-    ): Uint8Array | null;
     encryptMessage(plaintext: string, emberKey: Uint8Array): string;
     decryptMessage(
       ciphertextBase64: string,
       emberKey: Uint8Array
     ): string | null;
-    encryptEmberKeyForInvite(
-      emberKey: Uint8Array,
-      inviteCode: string
-    ): Promise<{ encrypted: string; salt: string }>;
-    decryptEmberKeyFromInvite(
-      encryptedBase64: string,
-      inviteCode: string,
-      saltBase64: string
-    ): Promise<Uint8Array | null>;
     encryptFileBytes(fileBytes: Uint8Array, key: Uint8Array): string;
     decryptFileBytes(encryptedBase64: string, key: Uint8Array): Uint8Array | null;
   }
@@ -351,8 +331,7 @@ declare global {
     sendMessage(
       auth: AuthData,
       channelId: string,
-      plaintext: string,
-      emberKey: Uint8Array
+      ciphertext: string
     ): Promise<Message>;
     deleteMessage(
       auth: AuthData,
@@ -363,8 +342,7 @@ declare global {
       auth: AuthData,
       channelId: string,
       messageId: string,
-      plaintext: string,
-      emberKey: Uint8Array
+      ciphertext: string
     ): Promise<void>;
     uploadAttachment(
       auth: AuthData,

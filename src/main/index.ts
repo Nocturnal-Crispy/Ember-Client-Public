@@ -973,6 +973,10 @@ ipcMain.handle("get-skipped-version", () => {
   return store.get("skippedUpdateVersion") ?? null;
 });
 
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
+});
+
 ipcMain.handle("get-klipy-api-key", () => {
   log.debug("IPC: get-klipy-api-key");
   // Return the obfuscated API key - this is available to all users

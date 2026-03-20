@@ -467,64 +467,9 @@
     } catch {
       log.debug("SQLite archive lookup failed, falling back to server", { ember_id: emberId });
     }
-    log.debug("Fetching ember key from server", { ember_id: emberId });
-    try {
-      const auth = (await ipcRenderer.invoke("get-auth")) as {
-        token?: string;
-        hostname?: string;
-      } | null;
-      const device = (await ipcRenderer.invoke("get-device-identity")) as {
-        private_key?: string;
-        public_key?: string;
-      } | null;
-      if (!auth || !auth.token || !auth.hostname || !device) {
-        log.error("Cannot fetch ember key: missing auth or device identity");
-        return null;
-      }
-      const response = await fetch(
-        `${auth.hostname}/api/v1/embers/${emberId}/key`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }
-      );
-      if (!response.ok) {
-        log.error("Failed to fetch ember key", {
-          status: response.status,
-          ember_id: emberId,
-        });
-        return null;
-      }
-      const data = (await response.json()) as { encrypted_key: string };
-      const privateKey = naclUtil.decodeBase64(device.private_key!);
-      const publicKey = naclUtil.decodeBase64(device.public_key!);
-      const emberKey = emberCrypto.decryptEmberKeyForUser(
-        data.encrypted_key,
-        publicKey,
-        privateKey
-      );
-      if (emberKey) {
-        App.emberKeyCache.set(emberId, emberKey);
-        log.info("Ember key fetched and cached", { ember_id: emberId });
-        // Archive to SQLite for offline/fallback access
-        window.emberAPI.invoke("StoreLegacyEmberKey", {
-          emberId,
-          key: naclUtil.encodeBase64(emberKey),
-        }).catch((archiveErr: Error) => {
-          log.warn("Failed to archive ember key to SQLite", { ember_id: emberId, error: archiveErr.message });
-        });
-      } else {
-        log.error("Ember key decryption failed", { ember_id: emberId });
-      }
-      return emberKey;
-    } catch (error) {
-      const err = error as Error;
-      log.error("Error fetching ember key", {
-        ember_id: emberId,
-        error: err.message,
-      });
-      return null;
-    }
+    // Legacy ember-key server endpoints are removed/unsupported post-cutover.
+    // For historical decrypt fallback we rely exclusively on the local SQLite archive.
+    return null;
   }
 
   async function loadServerContent(
@@ -845,27 +790,8 @@
         showCreateServerError("Not authenticated");
         return;
       }
-      const device = (await ipcRenderer.invoke("get-device-identity")) as {
-        public_key?: string;
-        private_key?: string;
-      } | null;
-      if (!device) {
-        showCreateServerError("Device identity not found");
-        return;
-      }
-
-      const emberKey = emberCrypto.generateEmberKey();
-      const publicKeyBytes = naclUtil.decodeBase64(device.public_key!);
-      const privateKeyBytes = naclUtil.decodeBase64(device.private_key!);
-      const encryptedEmberKey = emberCrypto.encryptEmberKeyForUser(
-        emberKey,
-        publicKeyBytes,
-        privateKeyBytes
-      );
-
       const requestBody: Record<string, unknown> = {
         name: serverName,
-        encrypted_ember_key: encryptedEmberKey,
       };
       if (App.currentIconData) requestBody["icon_data"] = App.currentIconData;
 
@@ -887,7 +813,7 @@
         id?: string;
         name?: string;
       };
-      if (newEmber.id) App.emberKeyCache.set(newEmber.id, emberKey);
+      // Signal sender-keys replace legacy ember-keys for new messages.
 
       if (newEmber.id) {
         try {
