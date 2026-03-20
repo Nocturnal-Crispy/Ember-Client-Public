@@ -323,7 +323,9 @@
       .querySelectorAll<HTMLElement>(".server-icon:not(.add-server):not(.dm-icon)")
       .forEach((el) => el.remove());
 
+    App.emberMetadata.clear();
     embers.forEach((ember, index) => {
+      App.emberMetadata.set(ember.id, { protocol_version: ember.protocol_version ?? 0 });
       const serverIcon = document.createElement("div");
       serverIcon.className = "server-icon";
       serverIcon.dataset["emberId"] = ember.id;
@@ -440,9 +442,30 @@
   }
 
   async function fetchEmberKey(emberId: string): Promise<Uint8Array | null> {
+    // Signal embers (protocol_version=1) do not use legacy ember keys
+    const emberMeta = App.emberMetadata.get(emberId);
+    if ((emberMeta?.protocol_version ?? 0) === 1) {
+      log.debug("Signal ember, no legacy key needed", { ember_id: emberId });
+      return null;
+    }
     if (App.emberKeyCache.has(emberId)) {
       log.debug("Ember key cache hit", { ember_id: emberId });
       return App.emberKeyCache.get(emberId) ?? null;
+    }
+    // Try loading from local SQLite archive first
+    try {
+      const archiveResult = await window.emberAPI.invoke<{ key: string | null }>(
+        "LoadLegacyEmberKey",
+        { emberId },
+      );
+      if (archiveResult.data?.key) {
+        const keyBytes = naclUtil.decodeBase64(archiveResult.data.key);
+        App.emberKeyCache.set(emberId, keyBytes);
+        log.debug("Ember key loaded from SQLite archive", { ember_id: emberId });
+        return keyBytes;
+      }
+    } catch {
+      log.debug("SQLite archive lookup failed, falling back to server", { ember_id: emberId });
     }
     log.debug("Fetching ember key from server", { ember_id: emberId });
     try {
@@ -483,6 +506,13 @@
       if (emberKey) {
         App.emberKeyCache.set(emberId, emberKey);
         log.info("Ember key fetched and cached", { ember_id: emberId });
+        // Archive to SQLite for offline/fallback access
+        window.emberAPI.invoke("StoreLegacyEmberKey", {
+          emberId,
+          key: naclUtil.encodeBase64(emberKey),
+        }).catch((archiveErr: Error) => {
+          log.warn("Failed to archive ember key to SQLite", { ember_id: emberId, error: archiveErr.message });
+        });
       } else {
         log.error("Ember key decryption failed", { ember_id: emberId });
       }

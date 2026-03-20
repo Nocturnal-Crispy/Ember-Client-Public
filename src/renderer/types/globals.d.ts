@@ -245,7 +245,7 @@ declare global {
   }
 
   interface EmberCryptoAPI {
-    generateRecoveryCode(): string;
+    generateRecoveryCode(length?: number): string;
     encryptPrivateKeyWithRecoveryCode(
       privateKey: Uint8Array,
       recoveryCode: string
@@ -499,8 +499,11 @@ declare global {
     _micTestAnimFrame: number | null;
     _cameraPreviewStream: MediaStream | null;
     _pttListening: boolean;
+    emberMetadata: Map<string, { protocol_version: number }>;
     signalSessionReady: Map<string, boolean>;
     signalSessionManager: import('../services/signal-service').SignalService | null;
+    protocolVersion: number;
+    migrationStatus: 'idle' | 'in-progress' | 'complete' | 'failed';
   }
 
   interface Window {
@@ -563,6 +566,7 @@ declare global {
     closeCreateServerModal(): void;
     handleSenderKeyMemberJoined(emberId: string): Promise<void>;
     handleSenderKeyMemberLeft(emberId: string): Promise<void>;
+    processIncomingDistributions?(): Promise<void>;
     // Globals set by channel-manager.ts
     fetchChannels(emberId: string): Promise<Channel[]>;
     fetchCategories(emberId: string): Promise<Category[]>;
