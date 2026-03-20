@@ -136,7 +136,7 @@ function setupWindowGlobals(): void {
       crypto: {
         generateEmberKey: mockGenerateEmberKey,
         encryptMessage: mockEncryptNaCl,
-        decryptMessage: mockDecryptNaCl,
+        decryptLegacyMessage: mockDecryptNaCl,
         encryptEmberKeyForUser: jest.fn<() => string>(() => 'peerBoxBase64'),
         decryptEmberKeyForUser: jest.fn<() => Uint8Array>(() => new Uint8Array([9, 9, 9])),
       },
@@ -212,22 +212,16 @@ describe('dm-signal-flow', () => {
       );
     });
 
-    it('falls back to legacy NaCl when signalSessionManager has no session', async () => {
+    it('throws migration required when signalSessionManager has no session', async () => {
       mockHasSession.mockResolvedValueOnce(false);
 
-      const nacalEmberKey = new Uint8Array([30, 31, 32]);
-      (
-        window as Window & { App: { emberKeyCache: Map<string, Uint8Array> } }
-      ).App.emberKeyCache.set(EMBER_ID, nacalEmberKey);
-
-      await (
-        window as Window & {
-          sendDirectMessage(channelId: string, text: string): Promise<string>;
-        }
-      ).sendDirectMessage(TEXT_CHANNEL_ID, 'hello legacy');
-
-      expect(mockEncrypt).not.toHaveBeenCalled();
-      expect(mockEncryptNaCl).toHaveBeenCalledWith('hello legacy', nacalEmberKey);
+      await expect(
+        (
+          window as Window & {
+            sendDirectMessage(channelId: string, text: string): Promise<string>;
+          }
+        ).sendDirectMessage(TEXT_CHANNEL_ID, 'hello legacy')
+      ).rejects.toThrow(/Migration required/i);
     });
   });
 

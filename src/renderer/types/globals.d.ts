@@ -184,39 +184,6 @@ declare global {
     createLogger(context: string): EmberLogger;
   }
 
-  interface NaClAPI {
-    randomBytes(n: number): Uint8Array;
-    box(
-      msg: Uint8Array,
-      nonce: Uint8Array,
-      theirPk: Uint8Array,
-      mysk: Uint8Array
-    ): Uint8Array;
-    boxOpen(
-      box: Uint8Array,
-      nonce: Uint8Array,
-      theirPk: Uint8Array,
-      mysk: Uint8Array
-    ): Uint8Array | null;
-    boxKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array };
-    secretbox(msg: Uint8Array, nonce: Uint8Array, k: Uint8Array): Uint8Array;
-    secretboxOpen(
-      box: Uint8Array,
-      nonce: Uint8Array,
-      k: Uint8Array
-    ): Uint8Array | null;
-    BOX_NONCE_LENGTH: number;
-    SECRETBOX_NONCE_LENGTH: number;
-    SECRETBOX_KEY_LENGTH: number;
-  }
-
-  interface NaClUtilAPI {
-    encodeBase64(data: Uint8Array): string;
-    decodeBase64(str: string): Uint8Array;
-    encodeUTF8(data: Uint8Array): string;
-    decodeUTF8(str: string): Uint8Array;
-  }
-
   // ─── Attachment types ─────────────────────────────────────────────────────
 
   interface AttachmentData {
@@ -255,8 +222,8 @@ declare global {
       recoveryCode: string,
       saltBase64: string
     ): Promise<Uint8Array | null>;
-    encryptMessage(plaintext: string, emberKey: Uint8Array): string;
-    decryptMessage(
+    // Historical message decrypt only (legacy NaCl secretbox).
+    decryptLegacyMessage(
       ciphertextBase64: string,
       emberKey: Uint8Array
     ): string | null;
@@ -415,8 +382,6 @@ declare global {
 
   interface ElectronAPI {
     ipc: IPCRenderer;
-    nacl: NaClAPI;
-    naclUtil: NaClUtilAPI;
     crypto: EmberCryptoAPI;
     authService: AuthServiceAPI;
     messageService: MessageServiceAPI;

@@ -1,12 +1,30 @@
 import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "ember-shared";
 import { contextBridge, ipcRenderer } from "electron";
-import * as nacl from "tweetnacl";
-import * as naclUtil from "tweetnacl-util";
 import * as emberCrypto from "ember-shared";
 import * as emberServices from "ember-shared";
+import * as nacl from "tweetnacl";
 import { refreshToken } from "./services/token-refresh-service";
 import { getTokenExpiry, isTokenExpiringSoon } from "./utils/token-utils";
 const { IPC_CHANNELS } = require("../shared/constants");
+
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  if (typeof Buffer !== "undefined") {
+    return new Uint8Array(Buffer.from(base64, "base64"));
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
 function preloadLog(
@@ -187,29 +205,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
-  nacl: {
-    randomBytes: (n: number) => nacl.randomBytes(n),
-    box: (m: Uint8Array, n: Uint8Array, pk: Uint8Array, sk: Uint8Array) =>
-      nacl.box(m, n, pk, sk),
-    boxOpen: (b: Uint8Array, n: Uint8Array, pk: Uint8Array, sk: Uint8Array) =>
-      nacl.box.open(b, n, pk, sk),
-    boxKeyPair: () => nacl.box.keyPair(),
-    secretbox: (m: Uint8Array, n: Uint8Array, k: Uint8Array) =>
-      nacl.secretbox(m, n, k),
-    secretboxOpen: (b: Uint8Array, n: Uint8Array, k: Uint8Array) =>
-      nacl.secretbox.open(b, n, k),
-    BOX_NONCE_LENGTH: nacl.box.nonceLength as number,
-    SECRETBOX_NONCE_LENGTH: nacl.secretbox.nonceLength as number,
-    SECRETBOX_KEY_LENGTH: nacl.secretbox.keyLength as number,
-  },
-
-  naclUtil: {
-    encodeBase64: (data: Uint8Array) => naclUtil.encodeBase64(data),
-    decodeBase64: (str: string) => naclUtil.decodeBase64(str),
-    encodeUTF8: (data: Uint8Array) => naclUtil.encodeUTF8(data),
-    decodeUTF8: (str: string) => naclUtil.decodeUTF8(str),
-  },
-
   crypto: {
     generateRecoveryCode: (length?: number) => {
       preloadLog("debug", "Crypto: generateRecoveryCode", { length });
@@ -237,12 +232,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
         saltBase64
       );
     },
-    encryptMessage: (plaintext: string, emberKey: Uint8Array) => {
-      preloadLog("debug", "Crypto: encryptMessage");
-      return emberCrypto.encryptMessage(plaintext, emberKey);
-    },
-    decryptMessage: (ciphertextBase64: string, emberKey: Uint8Array) => {
-      preloadLog("debug", "Crypto: decryptMessage");
+    // Historical message decrypt only (legacy NaCl secretbox).
+    decryptLegacyMessage: (ciphertextBase64: string, emberKey: Uint8Array) => {
+      preloadLog("debug", "Crypto: decryptLegacyMessage");
       return emberCrypto.decryptMessage(ciphertextBase64, emberKey);
     },
     encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
@@ -251,10 +243,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
       const combined = new Uint8Array(nonce.length + cipherBytes.length);
       combined.set(nonce, 0);
       combined.set(cipherBytes, nonce.length);
-      return naclUtil.encodeBase64(combined);
+      return bytesToBase64(combined);
     },
     decryptFileBytes: (encryptedBase64: string, key: Uint8Array): Uint8Array | null => {
-      const combined = naclUtil.decodeBase64(encryptedBase64);
+      const combined = base64ToBytes(encryptedBase64);
       const nonce = combined.slice(0, nacl.secretbox.nonceLength);
       const cipher = combined.slice(nacl.secretbox.nonceLength);
       return nacl.secretbox.open(cipher, nonce, key);

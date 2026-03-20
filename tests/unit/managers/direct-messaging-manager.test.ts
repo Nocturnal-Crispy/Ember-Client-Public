@@ -27,6 +27,14 @@ beforeAll(() => {
   App.emberKeyCache.set(EMBER_ID, new Uint8Array(32).fill(7));
   App.activeChannelId = null;
   App.currentMembers  = [];
+  App.signalSessionManager = {
+    ensureSession: jest.fn().mockResolvedValue(undefined),
+    hasSession: jest.fn().mockResolvedValue(true),
+    encrypt: jest.fn().mockResolvedValue({
+      ciphertext: new Uint8Array([10, 11, 12]),
+      messageType: 3,
+    }),
+  };
 
   // 2. electronAPI mock
   (window as any).electronAPI = {
@@ -47,6 +55,7 @@ beforeAll(() => {
       decryptEmberKeyForUser: jest.fn().mockReturnValue(new Uint8Array(32).fill(7)),
       encryptMessage:         jest.fn().mockReturnValue('ciphertext64'),
       decryptMessage:         jest.fn().mockReturnValue(PLAINTEXT),
+      decryptLegacyMessage:  jest.fn().mockReturnValue(PLAINTEXT),
     },
     nacl:     {},
     naclUtil: {
@@ -91,6 +100,12 @@ beforeAll(() => {
 
 async function seedDmEntry(): Promise<void> {
   fetchMock.mockImplementation((url: string, opts?: RequestInit) => {
+    if (String(url).includes(`/users/${PARTNER_ID}/devices`) && !opts?.method) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ devices: [{ id: 'partner-dev-1', public_key: 'partnerPub', protocol_version: 1 }] }),
+      } as Response);
+    }
     if (String(url).includes('/dm-requests') && opts?.method === 'POST')
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'req-1', ember_id: EMBER_ID, status: 'created' }) });
     if (String(url).includes(`/embers/${EMBER_ID}/channels`))

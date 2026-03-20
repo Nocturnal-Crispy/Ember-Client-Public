@@ -24,7 +24,14 @@ import {
 } from 'ember-shared';
 
 import * as nacl from 'tweetnacl';
-import * as naclUtil from 'tweetnacl-util';
+
+function encodeBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64');
+}
+
+function decodeBase64(base64: string): Uint8Array {
+  return new Uint8Array(Buffer.from(base64, 'base64'));
+}
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
@@ -40,8 +47,8 @@ function makeDeviceKeyPair(): DeviceKeyPair {
   return {
     publicKey: kp.publicKey,
     secretKey: kp.secretKey,
-    publicKeyB64: naclUtil.encodeBase64(kp.publicKey),
-    secretKeyB64: naclUtil.encodeBase64(kp.secretKey),
+    publicKeyB64: encodeBase64(kp.publicKey),
+    secretKeyB64: encodeBase64(kp.secretKey),
   };
 }
 
@@ -128,7 +135,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
 
       const decrypted = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),  // acceptor's pub key (sender)
+        decodeBase64(senderPublicKey),  // acceptor's pub key (sender)
         bob.secretKey,                            // requester's priv key
       );
 
@@ -142,7 +149,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
 
       const decrypted = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         charlie.secretKey, // wrong key
       );
 
@@ -156,7 +163,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
       const aliceKey = decryptEmberKeyForUser(encryptedKeySelf, alice.publicKey, alice.secretKey);
       const bobKey = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         bob.secretKey,
       );
 
@@ -181,7 +188,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
       // Requester decrypts the peer-box
       const decryptedKey = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         bob.secretKey,
       );
       expect(decryptedKey).toEqual(emberKey);
@@ -200,7 +207,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
 
       const decryptedKey = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         bob.secretKey,
       );
       const selfBox = encryptEmberKeyForUser(decryptedKey!, bob.publicKey, bob.secretKey);
@@ -216,7 +223,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
       // Bob migrates to self-box
       const decryptedKey = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         bob.secretKey,
       )!;
       const selfBox = encryptEmberKeyForUser(decryptedKey, bob.publicKey, bob.secretKey);
@@ -244,7 +251,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
       // Bob (requester) decrypts peer-box and migrates to self-box
       const bobKeyRaw = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey),
+        decodeBase64(senderPublicKey),
         bob.secretKey,
       )!;
       const bobSelfBox = encryptEmberKeyForUser(bobKeyRaw, bob.publicKey, bob.secretKey);
@@ -315,7 +322,7 @@ describe.skip('DM Request Flow — Crypto Layer', () => {
       // senderPublicKey is stored in DB alongside the peer-box; never looked up dynamically
       const decrypted = decryptEmberKeyForUser(
         encryptedKeyPeer,
-        naclUtil.decodeBase64(senderPublicKey), // always the key actually used
+        decodeBase64(senderPublicKey), // always the key actually used
         bob.secretKey,
       );
       expect(decrypted).not.toBeNull(); // always works

@@ -5,8 +5,14 @@
 (function (): void {
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("Auth");
-  const naclUtil = window.electronAPI.naclUtil;
   const emberCrypto = window.electronAPI.crypto;
+
+  function decodeBase64ToBytes(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
 
   function compareVersions(a: string, b: string): number {
     const partsA = a.split(".").map(Number);
@@ -431,9 +437,7 @@
         log.info("Initiating registration request", { username });
         const recoveryCode = emberCrypto.generateRecoveryCode();
         log.debug("Recovery code generated for new account");
-        const privateKeyBytes = naclUtil.decodeBase64(
-          deviceIdentity.private_key
-        );
+        const privateKeyBytes = decodeBase64ToBytes(deviceIdentity.private_key);
         const recoveryData: RecoveryData =
           await emberCrypto.encryptPrivateKeyWithRecoveryCode(
             privateKeyBytes,

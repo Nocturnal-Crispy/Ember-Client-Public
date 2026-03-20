@@ -7,6 +7,13 @@
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("MessageManager");
   const emberCrypto = window.electronAPI.crypto;
+
+  function decodeBase64ToBytes(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
   
   const messagesContainer = document.getElementById("messages");
 
@@ -402,7 +409,7 @@
               { emberId: App.activeEmberId },
             );
             if (archiveResult.data?.key) {
-              const loadedKey = window.electronAPI.naclUtil.decodeBase64(archiveResult.data.key);
+              const loadedKey = decodeBase64ToBytes(archiveResult.data.key);
               emberKey = loadedKey;
               App.emberKeyCache.set(App.activeEmberId, loadedKey);
             }
@@ -411,7 +418,7 @@
           }
         }
         if (!emberKey) return;
-        plaintext = emberCrypto.decryptMessage(payload.ciphertext, emberKey);
+        plaintext = emberCrypto.decryptLegacyMessage(payload.ciphertext, emberKey);
       }
     }
     if (plaintext === null) return;
@@ -529,7 +536,7 @@
               { emberId: App.activeEmberId },
             );
             if (archiveResult.data?.key) {
-              const loadedKey = window.electronAPI.naclUtil.decodeBase64(archiveResult.data.key);
+              const loadedKey = decodeBase64ToBytes(archiveResult.data.key);
               emberKey = loadedKey;
               App.emberKeyCache.set(App.activeEmberId, loadedKey);
               log.debug("Ember key loaded from SQLite archive for decryption", { ember_id: App.activeEmberId });
@@ -553,7 +560,7 @@
           );
           return;
         }
-        plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
+        plaintext = emberCrypto.decryptLegacyMessage(msg.ciphertext, emberKey);
       }
     } else {
       // Unknown or unsupported envelope format.

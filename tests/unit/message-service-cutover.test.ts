@@ -33,8 +33,7 @@ beforeAll(() => {
     },
     crypto: {
       // Legacy decrypt path uses decryptMessage() for envelope_type="legacy".
-      decryptMessage: jest.fn().mockReturnValue("legacy-plaintext"),
-      encryptMessage: jest.fn(),
+      decryptLegacyMessage: jest.fn().mockReturnValue("legacy-plaintext"),
     },
     nacl: {},
     naclUtil: {
@@ -163,7 +162,7 @@ describe("message-service cutover", () => {
 
     await (window as any).displayDecryptedMessage(msg, false);
 
-    expect((window as any).electronAPI.crypto.decryptMessage).toHaveBeenCalled();
+    expect((window as any).electronAPI.crypto.decryptLegacyMessage).toHaveBeenCalled();
     const messagesText = document.getElementById("messages")?.textContent ?? "";
     expect(messagesText).toContain("legacy-plaintext");
   });

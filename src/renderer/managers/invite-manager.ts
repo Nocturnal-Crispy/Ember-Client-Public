@@ -7,7 +7,6 @@
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("InviteManager");
   const emberCrypto = window.electronAPI.crypto;
-  const naclUtil = window.electronAPI.naclUtil;
 
   // Setup IPC listener immediately to avoid missing messages
   log.debug("Setting up IPC listener for handle-invite-link");

@@ -17,7 +17,6 @@
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("DirectMessagingManager");
   const emberCrypto = window.electronAPI.crypto;
-  const naclUtil = window.electronAPI.naclUtil;
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -485,7 +484,7 @@
       };
       const currentUserId = auth.user_id;
       return (data.messages ?? []).map((msg) => {
-        const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
+        const plaintext = emberCrypto.decryptLegacyMessage(msg.ciphertext, emberKey);
         if (plaintext === null) {
           log.warn("DM message decryption failed", { message_id: msg.id, channel_id: channelId });
         }
@@ -539,33 +538,10 @@
       }
     }
 
-    // Legacy NaCl path
-    const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) {
-      throw new Error("Ember key unavailable");
-    }
-    const naclCiphertext = emberCrypto.encryptMessage(plaintext, emberKey);
-    const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-      body: JSON.stringify({ ciphertext: naclCiphertext, device_id: deviceId }),
-    });
-    if (!res.ok) throw new Error("Failed to send message");
-    const msg = (await res.json()) as { id: string };
-
-    // BP-4: Optimistic render — display immediately so the sender doesn't wait
-    // for the WS echo. BP-5: register the id so the echo is deduplicated.
-    pendingMessageIds.add(msg.id);
-    window.displayDmMessage({
-      id: msg.id,
-      conversationId: channelId,
-      senderId: auth.user_id,
-      content: plaintext,
-      timestamp: Date.now() / 1000,
-      isOwn: true,
-    });
-
-    return msg.id;
+    // Cutover: clients can no longer send NaCl-encrypted messages.
+    const errMsg = "Migration required — Signal Protocol encryption not ready";
+    (window as any).showInputError?.(errMsg);
+    throw new Error(errMsg);
   }
 
   // ─── Set active conversation ───────────────────────────────────────────────
@@ -643,7 +619,7 @@
       return;
     }
     const ciphertext = String(payload["ciphertext"] ?? "");
-    const plaintext = emberCrypto.decryptMessage(ciphertext, emberKey);
+    const plaintext = emberCrypto.decryptLegacyMessage(ciphertext, emberKey);
 
     const messageContent = plaintext === null ? "[Failed to decrypt message]" : plaintext;
     if (plaintext === null) {
