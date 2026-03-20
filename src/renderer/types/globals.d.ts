@@ -499,6 +499,8 @@ declare global {
     _micTestAnimFrame: number | null;
     _cameraPreviewStream: MediaStream | null;
     _pttListening: boolean;
+    signalSessionReady: Map<string, boolean>;
+    signalSessionManager: import('../services/signal-service').SignalService | null;
   }
 
   interface Window {
@@ -535,8 +537,8 @@ declare global {
     // Globals set by message-service.ts
     sendEncryptedMessage(channelId: string, plaintext: string): Promise<string>;
     sendGifMessage(url: string, title: string): Promise<void>;
-    displayDecryptedMessage(msg: Message, prepend?: boolean): void;
-    handleEditedMessage(msg: Message): void;
+    displayDecryptedMessage(msg: Message, prepend?: boolean): Promise<void>;
+    handleEditedMessage(msg: Message): Promise<void>;
     escapeHtml(text: string): string;
     loadChannelMessages(channelId: string, forceRefresh?: boolean): Promise<void>;
     fetchMessages(channelId: string, before?: string, limit?: number): Promise<FetchResult>;
@@ -559,6 +561,8 @@ declare global {
     loadServerContent(emberId: string, emberName: string): Promise<void>;
     openCreateServerModal(): void;
     closeCreateServerModal(): void;
+    handleSenderKeyMemberJoined(emberId: string): Promise<void>;
+    handleSenderKeyMemberLeft(emberId: string): Promise<void>;
     // Globals set by channel-manager.ts
     fetchChannels(emberId: string): Promise<Channel[]>;
     fetchCategories(emberId: string): Promise<Category[]>;

@@ -23,6 +23,7 @@ import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../
 import { openSignalDatabase } from "./signal-db";
 import type { SignalDatabase } from "./signal-db";
 import { registerEmberIpcHandlers } from "./ipc/ember-ipc";
+import { initializeAuthWithElectronSafeStorage, migrateDevicePrivateKeyToSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
 const { IPC_CHANNELS } = require("../shared/constants");
 
 const log = createLogger("Main");
@@ -372,40 +373,44 @@ function checkSafeStorageAtStartup(): void {
   if (safeStorage.isEncryptionAvailable()) return;
 
   const hasStoredKey = !!(store.get("devicePrivateKey") || store.get("device"));
-  log.error("safeStorage unavailable at startup", { hasStoredKey });
-
-  const message = hasStoredKey
-    ? "Your device keyring is unavailable — private key at risk"
-    : "Your device keyring is unavailable";
-
-  const detail = hasStoredKey
-    ? "Ember detected a stored device identity but cannot access the OS keyring.\n\n" +
-      "Your private key may be stored unencrypted on disk. Anyone with access " +
-      "to your filesystem can read it and decrypt your messages.\n\n" +
-      "Recommended action: quit now, start a keyring service (e.g. GNOME Keyring, " +
-      "KWallet, or macOS Keychain), then restart Ember."
-    : "Ember cannot encrypt your private key with OS-level protection.\n\n" +
-      "If you continue, your private key will be stored unencrypted on this device. " +
-      "Anyone with access to your filesystem may be able to read it.\n\n" +
-      "To resolve this, start a keyring service (e.g. GNOME Keyring, KWallet, " +
-      "or macOS Keychain) and restart Ember.";
-
-  const choice = dialog.showMessageBoxSync({
-    type: "error",
-    title: "Security Warning — Keyring Unavailable",
-    message,
-    detail,
-    buttons: ["Quit (Recommended)", "Continue at My Own Risk"],
-    defaultId: 0,
-    cancelId: 0,
-  });
-
-  if (choice === 0) {
-    log.info("User chose to quit due to unavailable safeStorage");
-    app.exit(1);
+  
+  // Also check new safeStorage system
+  const authData = store.get("auth") as any;
+  let hasNewSafeStorageKeys = false;
+  if (authData && authData.user_id && authData.device_id) {
+    // We can't check async functions here, but we'll assume there might be keys
+    // This is a best-effort check since we can't await in this sync function
+    hasNewSafeStorageKeys = true;
   }
+  
+  if (hasStoredKey || hasNewSafeStorageKeys) {
+    log.error("safeStorage unavailable at startup", { hasStoredKey, hasNewSafeStorageKeys });
 
-  log.warn("User chose to continue despite unavailable safeStorage");
+    const message = hasStoredKey
+      ? "Your device keyring is unavailable — private key at risk"
+      : "Your device keyring is unavailable — some features may not work";
+
+    dialog.showErrorBox("SafeStorage Unavailable", message);
+
+    const choice = dialog.showMessageBoxSync({
+      type: "warning",
+      title: "SafeStorage Unavailable",
+      message: "Your device keyring is unavailable due to system security settings.",
+      detail: hasStoredKey
+        ? "Your private keys are stored without OS-level encryption, which poses a security risk. It's recommended to quit and resolve the safeStorage issue."
+        : "Some features may not work properly. Consider quitting and resolving the safeStorage issue.",
+      buttons: ["Quit", "Continue Anyway"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (choice === 0) {
+      log.info("User chose to quit due to unavailable safeStorage");
+      app.exit(1);
+    }
+
+    log.warn("User chose to continue despite unavailable safeStorage");
+  }
 }
 
 function encryptPrivateKey(plaintext: string): string {
@@ -450,12 +455,25 @@ function decryptPrivateKey(stored: string): string {
 
 // ─── IPC: Device identity ─────────────────────────────────────────────────────
 
-ipcMain.handle("get-device-identity", () => {
+ipcMain.handle("get-device-identity", async () => {
   log.debug("IPC: get-device-identity");
   const device = store.get("device") ?? null;
   if (!device) {
     log.debug("No device identity found in store");
     return null;
+  }
+
+  // Try to get private key from new safeStorage system first
+  // Check for new Signal keys first
+  const authData = store.get("auth") as any;
+  if (authData && authData.user_id && authData.device_id) {
+    const identityKey = await electronSafeStorageFunctions.getSafeStorage(`identity_key_${authData.user_id}_${authData.device_id}`);
+    const legacyKey = await electronSafeStorageFunctions.getSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`);
+    
+    if (legacyKey) {
+      log.debug("Device identity retrieved with new safeStorage system");
+      return { ...device, private_key: legacyKey };
+    }
   }
 
   // Migration: old builds stored private_key directly in the device object
@@ -466,31 +484,52 @@ ipcMain.handle("get-device-identity", () => {
     store.set("devicePrivateKey", encryptPrivateKey(plaintextKey));
     store.set("device", deviceWithoutKey);
     log.info("Device private key migration complete");
+    
+    // Also migrate to new safeStorage system if we have auth data
+    if (authData && authData.user_id && authData.device_id) {
+      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, plaintextKey);
+      store.delete("devicePrivateKey"); // Remove old storage after migration
+    }
+    
     return { ...deviceWithoutKey, private_key: plaintextKey };
   }
 
   const storedKey = store.get("devicePrivateKey");
-  if (!storedKey) {
-    log.debug("Device identity retrieved (no encrypted key stored)");
-    return device;
+  if (storedKey) {
+    log.debug("Device identity retrieved with encrypted private key");
+    const privateKey = decryptPrivateKey(storedKey as string);
+    
+    // Migrate to new safeStorage system if we have auth data
+    if (authData && authData.user_id && authData.device_id) {
+      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, privateKey);
+      store.delete("devicePrivateKey"); // Remove old storage after migration
+    }
+    
+    return { ...device, private_key: privateKey };
   }
 
-  log.debug("Device identity retrieved with encrypted private key");
-  return { ...device, private_key: decryptPrivateKey(storedKey) };
+  log.debug("Device identity retrieved (no private key stored)");
+  return device;
 });
 
-ipcMain.handle("save-device-identity", (_event, deviceIdentity) => {
+ipcMain.handle("save-device-identity", async (_event, deviceIdentity) => {
   log.debug("IPC: save-device-identity", {
     device_id: deviceIdentity?.device_id,
   });
   const { private_key, ...deviceWithoutKey } = deviceIdentity;
   store.set("device", deviceWithoutKey);
+  
   if (private_key !== undefined) {
-    store.set(
-      "devicePrivateKey",
-      encryptPrivateKey(String(private_key))
-    );
-    log.debug("Device identity saved with encrypted private key");
+    // Store in new safeStorage system if we have auth data
+    const authData = store.get("auth") as any;
+    if (authData && authData.user_id && authData.device_id) {
+      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, String(private_key));
+      log.debug("Device identity saved with new safeStorage system");
+    } else {
+      // Fallback to old method for backward compatibility
+      store.set("devicePrivateKey", encryptPrivateKey(String(private_key)));
+      log.debug("Device identity saved with encrypted private key (fallback)");
+    }
   } else {
     log.debug("Device identity saved (no private key provided)");
   }
@@ -1078,15 +1117,49 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     log.info("App ready");
     checkSafeStorageAtStartup();
+    
+    // Initialize auth service with safeStorage
+    initializeAuthWithElectronSafeStorage();
+    
     await cleanOrphanedAudioModules();
     registerAudioCaptureHandlers(process.pid);
 
     // Open signal database using the device private key for HKDF
-    const storedKey = store.get("devicePrivateKey");
-    if (storedKey) {
+    const authData = store.get("auth") as any;
+    let privateKeyBytes: Buffer | null = null;
+    
+    if (authData && authData.user_id && authData.device_id) {
+      // Try new safeStorage system first
+      const legacyKey = await electronSafeStorageFunctions.getSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`);
+      if (legacyKey) {
+        privateKeyBytes = Buffer.from(legacyKey, "base64");
+        log.debug("Signal database: Using private key from new safeStorage system");
+      }
+    }
+    
+    // Fallback to old devicePrivateKey system
+    if (!privateKeyBytes) {
+      const storedKey = store.get("devicePrivateKey");
+      if (storedKey) {
+        try {
+          const privateKeyStr = decryptPrivateKey(storedKey as string);
+          privateKeyBytes = Buffer.from(privateKeyStr, "base64");
+          log.debug("Signal database: Using private key from legacy storage");
+          
+          // Migrate to new system
+          if (authData && authData.user_id && authData.device_id) {
+            await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, privateKeyStr);
+            store.delete("devicePrivateKey");
+            log.debug("Signal database: Migrated private key to new safeStorage system");
+          }
+        } catch (err) {
+          log.warn("Failed to decrypt legacy devicePrivateKey", { error: String(err) });
+        }
+      }
+    }
+    
+    if (privateKeyBytes) {
       try {
-        const privateKeyStr = decryptPrivateKey(storedKey as string);
-        const privateKeyBytes = Buffer.from(privateKeyStr, "base64");
         signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes);
         registerEmberIpcHandlers(signalDb);
         log.info("Signal database opened and IPC handlers registered");

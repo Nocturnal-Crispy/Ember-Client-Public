@@ -10,6 +10,78 @@
   
   const messagesContainer = document.getElementById("messages");
 
+  // ─── Sender Key (Signal group) encrypt/decrypt helpers ──────────────────
+
+  const SK_VERSION = 2;
+
+  function textToBase64(text: string): string {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function base64ToText(b64: string): string {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  async function tryGroupEncrypt(
+    plaintext: string,
+    emberId: string
+  ): Promise<string | null> {
+    try {
+      const distResp = await window.emberAPI.invoke<{
+        distribution_id: string | null;
+      }>("LoadDistributionId", { address: emberId });
+      if (!distResp.success || !distResp.data?.distribution_id) return null;
+      const plaintextB64 = textToBase64(plaintext);
+      const encResp = await window.emberAPI.invoke<{ ciphertext: string }>(
+        "GroupEncrypt",
+        {
+          distributionId: distResp.data.distribution_id,
+          plaintext: plaintextB64,
+        }
+      );
+      if (!encResp.success || !encResp.data?.ciphertext) return null;
+      const auth = (await ipcRenderer.invoke("get-auth")) as {
+        user_id?: string;
+        device_id?: string;
+      } | null;
+      if (!auth?.user_id || !auth?.device_id) return null;
+      return JSON.stringify({
+        v: SK_VERSION,
+        sa: `${auth.user_id}.${auth.device_id}`,
+        ct: encResp.data.ciphertext,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function tryGroupDecrypt(ciphertext: string): Promise<string | null> {
+    try {
+      if (!ciphertext.startsWith('{"v":2')) return null;
+      const envelope = JSON.parse(ciphertext) as {
+        v?: number;
+        sa?: string;
+        ct?: string;
+      };
+      if (envelope.v !== SK_VERSION || !envelope.sa || !envelope.ct)
+        return null;
+      const decResp = await window.emberAPI.invoke<{ plaintext: string }>(
+        "GroupDecrypt",
+        { senderAddress: envelope.sa, ciphertext: envelope.ct }
+      );
+      if (!decResp.success || !decResp.data?.plaintext) return null;
+      return base64ToText(decResp.data.plaintext);
+    } catch {
+      return null;
+    }
+  }
+
   // Pagination state (per channel load)
   let hasMoreMessages = false;
   let oldestMessageId: string | null = null;
@@ -113,19 +185,38 @@
         messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey);
         window.clearPendingAttachment();
       }
-      const msgData = await window.electronAPI.messageService.sendMessage(
-        auth,
-        App.activeChannelId!,
-        messageText,
-        emberKey
-      );
-      log.debug("Message sent successfully", {
-        channel_id: App.activeChannelId,
-        message_id: msgData.id,
-      });
+      const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
+      let msgData: Message;
+      if (groupCiphertext) {
+        const response = await fetch(
+          `${auth.hostname}/api/v1/channels/${App.activeChannelId!}/messages`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({ ciphertext: groupCiphertext }),
+          }
+        );
+        if (!response.ok) {
+          const errBody = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(errBody.error ?? `Send failed: ${response.status}`);
+        }
+        msgData = (await response.json()) as Message;
+        log.debug("Message sent with sender key", { message_id: msgData.id });
+      } else {
+        msgData = await window.electronAPI.messageService.sendMessage(
+          auth,
+          App.activeChannelId!,
+          messageText,
+          emberKey
+        );
+        log.debug("Message sent with legacy encryption", { message_id: msgData.id });
+      }
       window.registerSentMessageId(msgData.id);
       App.ownedMessageIds.add(msgData.id);
-      displayDecryptedMessage(msgData);
+      await displayDecryptedMessage(msgData);
       return msgData.id;
     } catch (error) {
       const err = error as Error;
@@ -159,13 +250,32 @@
     const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
     if (!auth || !auth.token || !auth.hostname)
       throw new Error("Not authenticated");
-    await window.electronAPI.messageService.editMessage(
-      auth,
-      App.activeChannelId,
-      messageId,
-      newText,
-      emberKey
-    );
+    const groupCiphertext = await tryGroupEncrypt(newText, App.activeEmberId);
+    if (groupCiphertext) {
+      const response = await fetch(
+        `${auth.hostname}/api/v1/channels/${App.activeChannelId}/messages/${messageId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${auth.token}`,
+          },
+          body: JSON.stringify({ ciphertext: groupCiphertext }),
+        }
+      );
+      if (!response.ok) {
+        const errBody = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errBody.error ?? `Edit failed: ${response.status}`);
+      }
+    } else {
+      await window.electronAPI.messageService.editMessage(
+        auth,
+        App.activeChannelId,
+        messageId,
+        newText,
+        emberKey
+      );
+    }
     textEl.textContent = newText;
     editContainer.replaceWith(textEl);
     const messageDiv = textEl.closest(".message") as HTMLElement | null;
@@ -249,11 +359,11 @@
     });
   }
 
-  function handleEditedMessage(payload: {
+  async function handleEditedMessage(payload: {
     id: string;
     channel_id: string;
     ciphertext: string;
-  }): void {
+  }): Promise<void> {
     if (payload.channel_id !== App.activeChannelId) return;
     const messageDiv = messagesContainer?.querySelector(
       `[data-message-id="${payload.id}"]`
@@ -264,9 +374,12 @@
     ) as HTMLElement | null;
     if (!textEl) return;
     if (!App.activeEmberId) return;
-    const emberKey = App.emberKeyCache.get(App.activeEmberId);
-    if (!emberKey) return;
-    const plaintext = emberCrypto.decryptMessage(payload.ciphertext, emberKey);
+    let plaintext = await tryGroupDecrypt(payload.ciphertext);
+    if (plaintext === null) {
+      const emberKey = App.emberKeyCache.get(App.activeEmberId);
+      if (!emberKey) return;
+      plaintext = emberCrypto.decryptMessage(payload.ciphertext, emberKey);
+    }
     if (plaintext === null) return;
     textEl.textContent = plaintext;
     markMessageAsEdited(messageDiv);
@@ -341,25 +454,29 @@
     }
   }
 
-  function displayDecryptedMessage(msg: Message, prepend = false): void {
+  async function displayDecryptedMessage(msg: Message, prepend = false): Promise<void> {
     if (!App.activeEmberId) return;
-    const emberKey = App.emberKeyCache.get(App.activeEmberId);
-    if (!emberKey) {
-      log.warn("Cannot decrypt message: ember key not in cache", {
-        ember_id: App.activeEmberId,
-        message_id: msg.id,
-      });
-      addMessage(
-        msg.username ?? "Unknown",
-        "[Encrypted message - key unavailable]",
-        msg.created_at,
-        prepend,
-        msg.id,
-        msg.chat_color
-      );
-      return;
+    let plaintext: string | null = null;
+    plaintext = await tryGroupDecrypt(msg.ciphertext);
+    if (plaintext === null) {
+      const emberKey = App.emberKeyCache.get(App.activeEmberId);
+      if (!emberKey) {
+        log.warn("Cannot decrypt message: ember key not in cache", {
+          ember_id: App.activeEmberId,
+          message_id: msg.id,
+        });
+        addMessage(
+          msg.username ?? "Unknown",
+          "[Encrypted message - key unavailable]",
+          msg.created_at,
+          prepend,
+          msg.id,
+          msg.chat_color
+        );
+        return;
+      }
+      plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
     }
-    const plaintext = emberCrypto.decryptMessage(msg.ciphertext, emberKey);
     if (plaintext === null) {
       log.warn("Message decryption failed", { message_id: msg.id });
       addMessage(
@@ -822,20 +939,12 @@
       has_more: hasMore,
     });
     
-    // Batch DOM updates for better performance
-    const updates: (() => void)[] = [];
-    
-    messages.forEach((msg) => {
+    for (const msg of messages) {
       if (currentUserId && msg.sender_user_id === currentUserId) {
         App.ownedMessageIds.add(msg.id);
       }
-      updates.push(() => {
-        displayDecryptedMessage(msg);
-      });
-    });
-    
-    // Execute all DOM updates in a single batch
-    batchDOMUpdates(updates);
+      await displayDecryptedMessage(msg);
+    }
     
     // Clean up old messages if needed
     cleanupOldMessages();
@@ -893,18 +1002,12 @@
           oldestMessageId = messages[0].id;
           
           // Prepend messages in reverse order so oldest appears at top
-          const updates: (() => void)[] = [];
           for (let i = messages.length - 1; i >= 0; i--) {
             if (currentUserId && messages[i].sender_user_id === currentUserId) {
               App.ownedMessageIds.add(messages[i].id);
             }
-            updates.push(() => {
-              displayDecryptedMessage(messages[i], true);
-            });
+            await displayDecryptedMessage(messages[i], true);
           }
-          
-          // Execute all DOM updates in a single batch
-          batchDOMUpdates(updates);
           
           currentMessageCount = renderedMessageIds.size;
           
@@ -958,7 +1061,7 @@
     
     const prevScrollHeight = messagesContainer?.scrollHeight || 0;
     fetchMessages(App.activeChannelId, oldestMessageId).then(
-      ({ messages, hasMore }) => {
+      async ({ messages, hasMore }) => {
         hasMoreMessages = hasMore;
         if (messages.length > 0) {
           oldestMessageId = messages[0].id;
@@ -967,7 +1070,7 @@
             if (currentUserId && messages[i].sender_user_id === currentUserId) {
               App.ownedMessageIds.add(messages[i].id);
             }
-            displayDecryptedMessage(messages[i], true);
+            await displayDecryptedMessage(messages[i], true);
           }
           // Restore scroll position so the viewport doesn't jump
           messagesContainer!.scrollTop =

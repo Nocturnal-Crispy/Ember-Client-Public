@@ -9,6 +9,251 @@
   const emberCrypto = window.electronAPI.crypto;
   const naclUtil = window.electronAPI.naclUtil;
 
+  // ─── Sender Key Distribution Management ──────────────────────────────────
+
+  const senderKeyDistributionIds = new Map<string, string>();
+
+  async function loadOrCreateDistributionId(emberId: string): Promise<string> {
+    const cached = senderKeyDistributionIds.get(emberId);
+    if (cached) return cached;
+    const response = await window.emberAPI.invoke<{ distribution_id: string | null }>(
+      "LoadDistributionId",
+      { address: emberId }
+    );
+    if (response.success && response.data?.distribution_id) {
+      senderKeyDistributionIds.set(emberId, response.data.distribution_id);
+      return response.data.distribution_id;
+    }
+    const distributionId = crypto.randomUUID();
+    await window.emberAPI.invoke("StoreDistributionId", {
+      address: emberId,
+      distributionId,
+    });
+    senderKeyDistributionIds.set(emberId, distributionId);
+    log.info("Generated distribution ID", { ember_id: emberId });
+    return distributionId;
+  }
+
+  async function createSenderKeyForEmber(
+    emberId: string
+  ): Promise<{ distributionId: string; distributionMessage: string }> {
+    const distributionId = await loadOrCreateDistributionId(emberId);
+    const response = await window.emberAPI.invoke<{ distributionMessage: string }>(
+      "CreateSenderKeyDistribution",
+      { distributionId }
+    );
+    if (!response.success || !response.data?.distributionMessage) {
+      throw new Error("Failed to create sender key distribution");
+    }
+    return {
+      distributionId,
+      distributionMessage: response.data.distributionMessage,
+    };
+  }
+
+  async function ensureSignalSession(
+    auth: AuthData,
+    userId: string,
+    deviceId: string
+  ): Promise<void> {
+    const address = `${userId}.${deviceId}`;
+    const sessionResponse = await window.emberAPI.invoke<{ record: string | null }>(
+      "LoadSession",
+      { address }
+    );
+    if (sessionResponse.success && sessionResponse.data?.record) return;
+    const bundleResponse = await fetch(
+      `${auth.hostname}/api/v1/users/${userId}/devices/${deviceId}/prekey-bundle`,
+      { headers: { Authorization: `Bearer ${auth.token}` } }
+    );
+    if (!bundleResponse.ok) {
+      throw new Error(`Failed to fetch pre-key bundle for ${address}`);
+    }
+    const bundle = (await bundleResponse.json()) as Record<string, unknown>;
+    await window.emberAPI.invoke("ProcessPreKeyBundle", {
+      recipientAddress: address,
+      registrationId: bundle["registration_id"],
+      deviceId: Number(bundle["device_id"]),
+      preKeyId: bundle["prekey_id"] ?? undefined,
+      preKey: bundle["prekey_public"] ?? undefined,
+      signedPreKeyId: bundle["signed_prekey_id"],
+      signedPreKey: bundle["signed_prekey_public"],
+      signedPreKeySignature: bundle["signed_prekey_signature"],
+      identityKey: bundle["identity_key"],
+    });
+    log.info("Signal session established", { address });
+  }
+
+  async function distributeSenderKeyToMembers(emberId: string): Promise<void> {
+    try {
+      const auth = await window.getValidAuth();
+      if (!auth) return;
+      const { distributionMessage } = await createSenderKeyForEmber(emberId);
+      const membersResponse = await fetch(
+        `${auth.hostname}/api/v1/embers/${emberId}/device-members`,
+        { headers: { Authorization: `Bearer ${auth.token}` } }
+      );
+      if (!membersResponse.ok) {
+        log.warn("Failed to fetch device members", { ember_id: emberId });
+        return;
+      }
+      const membersData = (await membersResponse.json()) as {
+        members: Array<{ user_id: string; device_id: string }>;
+      };
+      const members = membersData.members ?? [];
+      if (members.length === 0) return;
+      const distributions: Array<{
+        recipient_user_id: string;
+        recipient_device_id: string;
+        distribution_message: string;
+      }> = [];
+      for (const member of members) {
+        try {
+          await ensureSignalSession(auth, member.user_id, member.device_id);
+          const address = `${member.user_id}.${member.device_id}`;
+          const encResponse = await window.emberAPI.invoke<{
+            ciphertext: string;
+            messageType: number;
+          }>("Encrypt", {
+            recipientAddress: address,
+            plaintext: distributionMessage,
+          });
+          if (!encResponse.success || !encResponse.data) {
+            log.warn("Failed to encrypt distribution", { recipient: address });
+            continue;
+          }
+          const envelope = JSON.stringify({
+            ct: encResponse.data.ciphertext,
+            mt: encResponse.data.messageType,
+          });
+          distributions.push({
+            recipient_user_id: member.user_id,
+            recipient_device_id: member.device_id,
+            distribution_message: btoa(envelope),
+          });
+        } catch (memberErr) {
+          const err = memberErr as Error;
+          log.warn("Skipping member for distribution", {
+            user_id: member.user_id,
+            error: err.message,
+          });
+        }
+      }
+      if (distributions.length > 0) {
+        await fetch(
+          `${auth.hostname}/api/v1/embers/${emberId}/sender-key-distributions`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({ distributions }),
+          }
+        );
+        log.info("Sender key distributed", {
+          ember_id: emberId,
+          count: distributions.length,
+        });
+      }
+    } catch (error) {
+      const err = error as Error;
+      log.error("Failed to distribute sender key", {
+        ember_id: emberId,
+        error: err.message,
+      });
+    }
+  }
+
+  async function processIncomingSenderKeyDistributions(): Promise<void> {
+    try {
+      const auth = await window.getValidAuth();
+      if (!auth) return;
+      const response = await fetch(
+        `${auth.hostname}/api/v1/sender-key-distributions/pending`,
+        { headers: { Authorization: `Bearer ${auth.token}` } }
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        distributions: Array<{
+          id: string;
+          sender_user_id: string;
+          sender_device_id: string;
+          distribution_message: string;
+        }>;
+      };
+      const pending = data.distributions ?? [];
+      if (pending.length === 0) return;
+      let processed = 0;
+      for (const dist of pending) {
+        try {
+          const senderAddress = `${dist.sender_user_id}.${dist.sender_device_id}`;
+          const envelope = JSON.parse(atob(dist.distribution_message)) as {
+            ct: string;
+            mt: number;
+          };
+          const decryptCmd = envelope.mt === 3 ? "DecryptPreKey" : "Decrypt";
+          const decResponse = await window.emberAPI.invoke<{ plaintext: string }>(
+            decryptCmd,
+            { senderAddress, ciphertext: envelope.ct }
+          );
+          if (!decResponse.success || !decResponse.data?.plaintext) {
+            log.warn("Failed to decrypt distribution", {
+              id: dist.id,
+              sender: senderAddress,
+            });
+            continue;
+          }
+          await window.emberAPI.invoke("ProcessSenderKeyDistribution", {
+            senderAddress,
+            distributionMessage: decResponse.data.plaintext,
+          });
+          await fetch(
+            `${auth.hostname}/api/v1/sender-key-distributions/${dist.id}/ack`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${auth.token}` },
+            }
+          );
+          processed++;
+        } catch (distErr) {
+          const err = distErr as Error;
+          log.warn("Failed to process distribution", {
+            id: dist.id,
+            error: err.message,
+          });
+        }
+      }
+      if (processed > 0) {
+        log.info("Processed pending distributions", { count: processed });
+      }
+    } catch (error) {
+      const err = error as Error;
+      log.error("Failed to process incoming distributions", {
+        error: err.message,
+      });
+    }
+  }
+
+  async function handleSenderKeyMemberJoined(emberId: string): Promise<void> {
+    log.info("Member joined — distributing sender key", { ember_id: emberId });
+    await distributeSenderKeyToMembers(emberId);
+  }
+
+  async function handleSenderKeyMemberLeft(emberId: string): Promise<void> {
+    log.info("Member left — rotating sender key", { ember_id: emberId });
+    const newDistId = crypto.randomUUID();
+    await window.emberAPI.invoke("StoreDistributionId", {
+      address: emberId,
+      distributionId: newDistId,
+    });
+    senderKeyDistributionIds.set(emberId, newDistId);
+    await window.emberAPI.invoke("CreateSenderKeyDistribution", {
+      distributionId: newDistId,
+    });
+    await distributeSenderKeyToMembers(emberId);
+  }
+
   // ─── Ember order (localStorage) ───────────────────────────────────────────
 
   const EMBER_ORDER_KEY = "ember_order";
@@ -279,6 +524,17 @@
     }
 
     await fetchEmberKey(emberId);
+
+    try {
+      await createSenderKeyForEmber(emberId);
+      await processIncomingSenderKeyDistributions();
+    } catch (skErr) {
+      log.warn("Sender key setup deferred", {
+        ember_id: emberId,
+        error: (skErr as Error).message,
+      });
+    }
+
     const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
     let channels: Channel[] = [];
     let categories: Category[] = [];
@@ -602,6 +858,18 @@
         name?: string;
       };
       if (newEmber.id) App.emberKeyCache.set(newEmber.id, emberKey);
+
+      if (newEmber.id) {
+        try {
+          await createSenderKeyForEmber(newEmber.id);
+          log.info("Sender key initialized for new ember", { ember_id: newEmber.id });
+        } catch (skErr) {
+          log.warn("Sender key initialization deferred", {
+            ember_id: newEmber.id,
+            error: (skErr as Error).message,
+          });
+        }
+      }
 
       closeCreateServerModal();
       log.info("Server created successfully", {
@@ -953,4 +1221,6 @@
   window.loadServerContent = loadServerContent;
   window.openCreateServerModal = openCreateServerModal;
   window.closeCreateServerModal = closeCreateServerModal;
+  window.handleSenderKeyMemberJoined = handleSenderKeyMemberJoined;
+  window.handleSenderKeyMemberLeft = handleSenderKeyMemberLeft;
 })();

@@ -58,6 +58,10 @@ window.App = {
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,
 
+  // ── Signal Protocol ───────────────────────────────────────────────────────
+  signalSessionReady: new Map<string, boolean>(),
+  signalSessionManager: null,
+
   // ── Attachment composer ───────────────────────────────────────────────────
   pendingAttachment: null,
 
