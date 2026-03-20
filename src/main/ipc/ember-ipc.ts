@@ -6,7 +6,8 @@
  * base64 strings; the dispatcher converts to/from Uint8Array before calling
  * the SignalDatabase.
  *
- * Crypto commands (ProcessPreKeyBundle, Encrypt, etc.) are stubs for Sprint 3.
+ * Crypto commands (ProcessPreKeyBundle, Encrypt, etc.) are implemented via
+ * libsignal store adapters that bridge the SignalDatabase to native types.
  */
 
 import { ipcMain, safeStorage } from 'electron';
@@ -49,7 +50,44 @@ import type {
   StoreDistributionIdArgs,
   LoadDistributionIdArgs,
   LoadDistributionIdData,
+  ProcessPreKeyBundleArgs,
+  EncryptArgs,
+  EncryptData,
+  DecryptArgs,
+  DecryptData,
+  DecryptPreKeyArgs,
+  GroupEncryptArgs,
+  GroupEncryptData,
+  GroupDecryptArgs,
+  GroupDecryptData,
+  CreateSenderKeyDistributionArgs,
+  CreateSenderKeyDistributionData,
+  ProcessSenderKeyDistributionArgs,
 } from 'ember-shared';
+import {
+  encryptSignalMessage,
+  decryptSignalMessage,
+  createSenderKeyDistribution,
+  processSenderKeyDistribution,
+  groupEncryptMessage,
+  groupDecryptMessage,
+} from 'ember-shared';
+import {
+  ProtocolAddress,
+  PublicKey,
+  PreKeyBundle as LibSignalPreKeyBundle,
+  CiphertextMessageType,
+  processPreKeyBundle,
+} from '@signalapp/libsignal-client';
+import type { Uuid } from '@signalapp/libsignal-client';
+import {
+  SignalDbSessionStore,
+  SignalDbIdentityKeyStore,
+  SignalDbPreKeyStore,
+  SignalDbSignedPreKeyStore,
+  SignalDbKyberPreKeyStore,
+  SignalDbSenderKeyStore,
+} from '../signal-store-adapters';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -78,19 +116,7 @@ const KNOWN_CMDS: Set<EmberCmd> = new Set<EmberCmd>([
   'LoadDistributionId',
   'StoreLegacyEmberKey',
   'LoadLegacyEmberKey',
-  // Signal crypto operations (stubs — Sprint 3)
-  'ProcessPreKeyBundle',
-  'Encrypt',
-  'DecryptPreKey',
-  'Decrypt',
-  'GroupEncrypt',
-  'GroupDecrypt',
-  'CreateSenderKeyDistribution',
-  'ProcessSenderKeyDistribution',
-]);
-
-// Deferred Signal crypto commands — require libsignal session establishment (Sprint 3)
-const DEFERRED_CRYPTO_CMDS: Set<EmberCmd> = new Set<EmberCmd>([
+  // Signal crypto operations
   'ProcessPreKeyBundle',
   'Encrypt',
   'DecryptPreKey',
@@ -259,6 +285,143 @@ function handleLoadLegacyEmberKey(db: SignalDatabase, args: LoadLegacyEmberKeyAr
   return { key: result ? Buffer.from(result).toString('base64') : null };
 }
 
+// ── Signal crypto handlers ────────────────────────────────────────────────────
+
+const log = createLogger('EmberIPC');
+
+function getLocalAddress(): ProtocolAddress {
+  const auth: LocalAuthData | undefined = store.get('auth');
+  if (!auth?.user_id || !auth?.device_id) {
+    throw new Error('Not authenticated — cannot determine local address');
+  }
+  return ProtocolAddress.new(`${auth.user_id}.${auth.device_id}`, 1);
+}
+
+function buildSignalStores(db: SignalDatabase) {
+  return {
+    sessionStore: new SignalDbSessionStore(db),
+    identityStore: new SignalDbIdentityKeyStore(db),
+    preKeyStore: new SignalDbPreKeyStore(db),
+    signedPreKeyStore: new SignalDbSignedPreKeyStore(db),
+    kyberPreKeyStore: new SignalDbKyberPreKeyStore(db),
+  };
+}
+
+async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKeyBundleArgs): Promise<void> {
+  const stores = buildSignalStores(db);
+  const recipientAddress = ProtocolAddress.new(args.recipientAddress, 1);
+  const identityKey = PublicKey.deserialize(Buffer.from(args.identityKey, 'base64'));
+  const signedPreKey = PublicKey.deserialize(Buffer.from(args.signedPreKey, 'base64'));
+  const signedPreKeySignature = Buffer.from(args.signedPreKeySignature, 'base64');
+  const preKey = args.preKey ? PublicKey.deserialize(Buffer.from(args.preKey, 'base64')) : null;
+  const bundle = LibSignalPreKeyBundle.new(
+    args.registrationId,
+    args.deviceId,
+    args.preKeyId ?? null,
+    preKey,
+    args.signedPreKeyId,
+    signedPreKey,
+    signedPreKeySignature,
+    identityKey,
+    // Kyber PQ prekey fields — not provided via IPC; native binding accepts null.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    null as any, null as any, null as any,
+  );
+  await processPreKeyBundle(
+    bundle,
+    recipientAddress,
+    stores.sessionStore,
+    stores.identityStore,
+  );
+  log.info('Signal session established', { recipient: args.recipientAddress });
+}
+
+async function handleEncrypt(db: SignalDatabase, args: EncryptArgs): Promise<EncryptData> {
+  const stores = buildSignalStores(db);
+  const recipientAddress = ProtocolAddress.new(args.recipientAddress, 1);
+  const plaintext = Buffer.from(args.plaintext, 'base64');
+  const result = await encryptSignalMessage(new Uint8Array(plaintext), recipientAddress, stores);
+  return {
+    ciphertext: Buffer.from(result.ciphertext).toString('base64'),
+    messageType: result.type,
+  };
+}
+
+async function handleDecryptPreKey(db: SignalDatabase, args: DecryptPreKeyArgs): Promise<DecryptData> {
+  const stores = buildSignalStores(db);
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const ciphertext = Buffer.from(args.ciphertext, 'base64');
+  const msg = {
+    ciphertext: new Uint8Array(ciphertext),
+    type: CiphertextMessageType.PreKey,
+    senderDeviceId: senderAddress.deviceId().toString(),
+    senderRegistrationId: 0,
+  };
+  const plaintext = await decryptSignalMessage(msg, senderAddress, stores);
+  return { plaintext: Buffer.from(plaintext).toString('base64') };
+}
+
+async function handleDecryptWhisper(db: SignalDatabase, args: DecryptArgs): Promise<DecryptData> {
+  const stores = buildSignalStores(db);
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const ciphertext = Buffer.from(args.ciphertext, 'base64');
+  const msg = {
+    ciphertext: new Uint8Array(ciphertext),
+    type: CiphertextMessageType.Whisper,
+    senderDeviceId: senderAddress.deviceId().toString(),
+    senderRegistrationId: 0,
+  };
+  const plaintext = await decryptSignalMessage(msg, senderAddress, stores);
+  return { plaintext: Buffer.from(plaintext).toString('base64') };
+}
+
+async function handleGroupEncrypt(db: SignalDatabase, args: GroupEncryptArgs): Promise<GroupEncryptData> {
+  const senderKeyStore = new SignalDbSenderKeyStore(db);
+  const localAddress = getLocalAddress();
+  const plaintext = Buffer.from(args.plaintext, 'base64');
+  const ciphertext = await groupEncryptMessage(
+    localAddress,
+    args.distributionId as unknown as Uuid,
+    new Uint8Array(plaintext),
+    senderKeyStore,
+  );
+  return { ciphertext: Buffer.from(ciphertext).toString('base64') };
+}
+
+async function handleGroupDecrypt(db: SignalDatabase, args: GroupDecryptArgs): Promise<GroupDecryptData> {
+  const senderKeyStore = new SignalDbSenderKeyStore(db);
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const ciphertext = Buffer.from(args.ciphertext, 'base64');
+  const plaintext = await groupDecryptMessage(senderAddress, new Uint8Array(ciphertext), senderKeyStore);
+  return { plaintext: Buffer.from(plaintext).toString('base64') };
+}
+
+async function handleCreateSenderKeyDistribution(
+  db: SignalDatabase,
+  args: CreateSenderKeyDistributionArgs,
+): Promise<CreateSenderKeyDistributionData> {
+  const senderKeyStore = new SignalDbSenderKeyStore(db);
+  const localAddress = getLocalAddress();
+  const distributionBytes = await createSenderKeyDistribution(
+    localAddress,
+    args.distributionId as unknown as Uuid,
+    senderKeyStore,
+  );
+  log.info('Sender key distribution created', { distributionId: args.distributionId });
+  return { distributionMessage: Buffer.from(distributionBytes).toString('base64') };
+}
+
+async function handleProcessSenderKeyDistribution(
+  db: SignalDatabase,
+  args: ProcessSenderKeyDistributionArgs,
+): Promise<void> {
+  const senderKeyStore = new SignalDbSenderKeyStore(db);
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const distributionMessage = Buffer.from(args.distributionMessage, 'base64');
+  await processSenderKeyDistribution(senderAddress, new Uint8Array(distributionMessage), senderKeyStore);
+  log.info('Sender key distribution processed', { sender: args.senderAddress });
+}
+
 // ── Core dispatcher ───────────────────────────────────────────────────────────
 
 /**
@@ -288,12 +451,7 @@ export async function dispatchEmberCmd(
     return { success: false, error: 'Unknown command' };
   }
 
-  // 3. Deferred crypto stubs
-  if (DEFERRED_CRYPTO_CMDS.has(cmd)) {
-    return { success: false, error: 'Not yet implemented' };
-  }
-
-  // 4. Dispatch
+  // 3. Dispatch
   try {
     const result = await dispatch(cmd, args as Record<string, unknown>, db);
     return { success: true, data: result };
@@ -373,8 +531,26 @@ async function dispatch(
       return undefined;
     case 'LoadLegacyEmberKey':
       return handleLoadLegacyEmberKey(requireDb(db), args as unknown as LoadLegacyEmberKeyArgs);
+    // Signal crypto operations
+    case 'ProcessPreKeyBundle':
+      await handleProcessPreKeyBundle(requireDb(db), args as unknown as ProcessPreKeyBundleArgs);
+      return undefined;
+    case 'Encrypt':
+      return handleEncrypt(requireDb(db), args as unknown as EncryptArgs);
+    case 'DecryptPreKey':
+      return handleDecryptPreKey(requireDb(db), args as unknown as DecryptPreKeyArgs);
+    case 'Decrypt':
+      return handleDecryptWhisper(requireDb(db), args as unknown as DecryptArgs);
+    case 'GroupEncrypt':
+      return handleGroupEncrypt(requireDb(db), args as unknown as GroupEncryptArgs);
+    case 'GroupDecrypt':
+      return handleGroupDecrypt(requireDb(db), args as unknown as GroupDecryptArgs);
+    case 'CreateSenderKeyDistribution':
+      return handleCreateSenderKeyDistribution(requireDb(db), args as unknown as CreateSenderKeyDistributionArgs);
+    case 'ProcessSenderKeyDistribution':
+      await handleProcessSenderKeyDistribution(requireDb(db), args as unknown as ProcessSenderKeyDistributionArgs);
+      return undefined;
     default:
-      // Should be unreachable — DEFERRED_CRYPTO_CMDS handled above
       return undefined;
   }
 }
