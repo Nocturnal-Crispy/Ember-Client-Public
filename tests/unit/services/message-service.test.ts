@@ -11,10 +11,15 @@
  */
 
 beforeAll(() => {
-  // 1. Populate window.App
+  // 1. Create messages container BEFORE loading modules (since they capture it at load time)
+  const container = document.createElement('div');
+  container.id = 'messages';
+  document.body.appendChild(container);
+
+  // 2. Populate window.App
   require('../../../src/renderer/managers/app-state');
 
-  // 2. Mock window.electronAPI (ipc + crypto needed at load time)
+  // 3. Mock window.electronAPI (ipc + crypto needed at load time)
   (window as any).electronAPI = {
     ipc: {
       invoke: jest.fn().mockResolvedValue(null),
@@ -33,24 +38,46 @@ beforeAll(() => {
     },
   };
 
-  // 3. Mock window.emberLog (createLogger called at load time)
-  (window as any).emberLog = {
-    createLogger: () => ({
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    }),
+  // 4. Mock window.emberLog (createLogger called at load time)
+  const mockLogger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
   };
+  (window as any).emberLog = {
+    createLogger: () => mockLogger,
+  };
+  // Store mockLogger globally for test access
+  (window as any)._mockLogger = mockLogger;
 
-  // 4. Stub window.wsSubscribeToChannel (called by loadChannelMessages)
+  // 5. Stub window.wsSubscribeToChannel (called by loadChannelMessages)
   (window as any).wsSubscribeToChannel = jest.fn();
 
-  // 5. Load messages-area first (sets window.createBasicMessageElement, window.formatTimestamp, etc.)
+  // 6. Load messages-area first (sets window.createBasicMessageElement, window.formatTimestamp, etc.)
   require('../../../src/renderer/components/messages-area');
 
-  // 6. Load message-service (sets window.escapeHtml, window.addMessage, etc.)
+  // 7. Load message-service (sets window.escapeHtml, window.addMessage, etc.)
   require('../../../src/renderer/services/message-service');
+});
+
+// Mock emberAPI for sender key tests
+let mockEmberApiInvokeForSenderKeys: jest.Mock;
+let mockProcessIncomingDistributions: jest.Mock;
+
+beforeEach(() => {
+  mockEmberApiInvokeForSenderKeys = jest.fn();
+  mockProcessIncomingDistributions = jest.fn().mockResolvedValue(undefined);
+  
+  (window as any).emberAPI = {
+    invoke: mockEmberApiInvokeForSenderKeys,
+  };
+  
+  (window as any).processIncomingDistributions = mockProcessIncomingDistributions;
+  
+  // Reset logger mock
+  const mockLogger = (window as any)._mockLogger;
+  mockLogger.warn.mockClear();
 });
 
 // ─── formatTimestamp ──────────────────────────────────────────────────────────
@@ -157,5 +184,122 @@ describe('addMessage', () => {
   it('formatTimestamp and escapeHtml are both exported', () => {
     expect(typeof (window as any).formatTimestamp).toBe('function');
     expect(typeof (window as any).escapeHtml).toBe('function');
+  });
+});
+
+// ─── Sender Key Decryption Tests ───────────────────────────────────────────────────
+
+describe('Sender Key Decryption', () => {
+  beforeEach(() => {
+    // Set up active ember for message display
+    (window as any).App.activeEmberId = 'test-ember-id';
+    
+    // Mock GroupDecrypt to fail (simulating missing sender key)
+    mockEmberApiInvokeForSenderKeys.mockImplementation((cmd: string) => {
+      if (cmd === 'GroupDecrypt') {
+        return Promise.resolve({ success: true, data: { plaintext: null } }); // Decrypt fails
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+  });
+
+  it('should have displayDecryptedMessage function available', () => {
+    expect(typeof (window as any).displayDecryptedMessage).toBe('function');
+  });
+
+  it('should log warning and trigger distribution fetch when sender key decrypt fails', async () => {
+    const mockLogger = (window as any)._mockLogger;
+    
+    // Create a message with signal_group envelope type
+    const message = {
+      id: 'test-message-id',
+      username: 'Alice',
+      ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
+      envelope_type: 'signal_group',
+      created_at: 1700000000,
+      chat_color: '#ff0000'
+    };
+
+    // Call displayDecryptedMessage which should trigger the failure path
+    await (window as any).displayDecryptedMessage?.(message);
+
+    // Verify warning was logged with the specific message
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      "Sender key decrypt failed, triggering distribution fetch",
+      { message_id: 'test-message-id' }
+    );
+
+    // Verify processIncomingDistributions was called (synchronously now)
+    expect(mockProcessIncomingDistributions).toHaveBeenCalled();
+  });
+
+  it('should display waiting message when sender key decrypt fails', async () => {
+    // Clear any existing messages from the container
+    const container = document.getElementById('messages')!;
+    container.innerHTML = '';
+
+    // Create a message with signal_group envelope type
+    const message = {
+      id: 'test-message-id',
+      username: 'Alice',
+      ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
+      envelope_type: 'signal_group',
+      created_at: 1700000000,
+      chat_color: '#ff0000'
+    };
+
+    // Call displayDecryptedMessage which should trigger the failure path
+    await (window as any).displayDecryptedMessage?.(message);
+
+    // Check that a "waiting for sender key" message was added
+    const waitingMessage = container.querySelector('.message-content');
+    expect(waitingMessage).toBeTruthy();
+    expect(waitingMessage?.textContent).toContain('Waiting for sender key');
+  });
+
+  it('should successfully decrypt after sender key distribution is processed', async () => {
+    // Clear any existing messages from the container
+    const container = document.getElementById('messages')!;
+    container.innerHTML = '';
+
+    // Mock GroupDecrypt to fail initially, then succeed after distribution
+    let decryptAttempts = 0;
+    mockEmberApiInvokeForSenderKeys.mockImplementation((cmd: string) => {
+      if (cmd === 'GroupDecrypt') {
+        decryptAttempts++;
+        if (decryptAttempts === 1) {
+          return Promise.resolve({ success: true, data: { plaintext: null } }); // First attempt fails
+        } else {
+          return Promise.resolve({ success: true, data: { plaintext: 'SGVsbG8gV29ybGQ=' } }); // Second attempt succeeds
+        }
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    // Create a message with signal_group envelope type
+    const message = {
+      id: 'test-message-id',
+      username: 'Alice',
+      ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
+      envelope_type: 'signal_group',
+      created_at: 1700000000,
+      chat_color: '#ff0000'
+    };
+
+    // Call displayDecryptedMessage - should fail initially, fetch distribution, then retry and succeed
+    await (window as any).displayDecryptedMessage?.(message);
+
+    // Verify the message was successfully decrypted (not waiting message)
+    const decryptedMessage = container.querySelector('.message-content');
+    expect(decryptedMessage?.textContent).toContain('Hello World');
+    
+    // Verify no waiting message is shown
+    expect(decryptedMessage?.textContent).not.toContain('Waiting for sender key');
+    
+    // Verify processIncomingDistributions was called
+    expect(mockProcessIncomingDistributions).toHaveBeenCalled();
+    
+    // Verify GroupDecrypt was called twice (initial fail + retry)
+    expect(decryptAttempts).toBe(2);
   });
 });

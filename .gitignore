@@ -17,3 +17,6 @@ src/main/api-key.ts
 
 # Coverage reports
 coverage/
+
+# Logs
+logs/

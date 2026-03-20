@@ -222,11 +222,6 @@ declare global {
       recoveryCode: string,
       saltBase64: string
     ): Promise<Uint8Array | null>;
-    // Historical message decrypt only (legacy NaCl secretbox).
-    decryptLegacyMessage(
-      ciphertextBase64: string,
-      emberKey: Uint8Array
-    ): string | null;
     encryptFileBytes(fileBytes: Uint8Array, key: Uint8Array): string;
     decryptFileBytes(encryptedBase64: string, key: Uint8Array): Uint8Array | null;
   }
@@ -444,9 +439,10 @@ declare global {
     _pttListening: boolean;
     emberMetadata: Map<string, { protocol_version: number }>;
     signalSessionReady: Map<string, boolean>;
-    signalSessionManager: import('../services/signal-service').SignalService | null;
+    signalSessionManager: import('../managers/signal-session-manager').SignalSessionManager | null;
     protocolVersion: number;
     migrationStatus: 'idle' | 'in-progress' | 'complete' | 'failed';
+    initializeSignalSessionManager(): void;
   }
 
   interface Window {
@@ -456,6 +452,7 @@ declare global {
     emberAPI: EmberAPI;
     // Auth utilities
     getValidAuth(): Promise<AuthData | null>;
+    getAuthSync(): AuthData | null;
     isValidAuth(auth: unknown): auth is AuthData;
     createAuthenticatedFetch(url: string, options?: RequestInit): Promise<{ auth: AuthData; fetchOptions: RequestInit } | null>;
     // Globals set by websocket-service.ts
@@ -510,6 +507,7 @@ declare global {
     handleSenderKeyMemberJoined(emberId: string): Promise<void>;
     handleSenderKeyMemberLeft(emberId: string): Promise<void>;
     processIncomingDistributions?(): Promise<void>;
+    distributeSenderKeyToMembers(emberId: string): Promise<void>;
     // Globals set by channel-manager.ts
     fetchChannels(emberId: string): Promise<Channel[]>;
     fetchCategories(emberId: string): Promise<Category[]>;
@@ -617,8 +615,6 @@ declare global {
     acceptDMRequest(requestId: string, requesterId: string, requesterUsername: string): Promise<string>;
     declineDMRequest(requestId: string): Promise<void>;
     loadAndShowDmRequests(): Promise<void>;
-    requestDeviceKeyEnrollment(emberId: string): Promise<void>;
-    fulfillPendingKeyRequests(emberId: string): Promise<void>;
     /** Called when user sends a DM request; channel is now open but pending. */
     onDmRequestSent?(payload: { requestId: string; participantId: string; participantUsername: string }): void;
     getPendingStatusForChannel(channelId: string): { requestId: string; isRecipient: boolean } | null;

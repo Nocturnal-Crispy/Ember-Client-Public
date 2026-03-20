@@ -303,6 +303,22 @@
       }
 
       const users = await response.json();
+      
+      // Validate response format to prevent null reference errors
+      if (!users) {
+        log.warn("Users API returned null response", { query });
+        return [];
+      }
+      
+      if (!Array.isArray(users)) {
+        log.warn("Users API returned invalid format", { 
+          query, 
+          type: typeof users,
+          users: users 
+        });
+        return [];
+      }
+      
       log.info("Users searched successfully", { 
         query, 
         count: users.length,

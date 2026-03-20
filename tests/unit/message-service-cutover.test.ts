@@ -32,8 +32,7 @@ beforeAll(() => {
       on: jest.fn(),
     },
     crypto: {
-      // Legacy decrypt path uses decryptMessage() for envelope_type="legacy".
-      decryptLegacyMessage: jest.fn().mockReturnValue("legacy-plaintext"),
+      // No legacy decrypt during hard cutover.
     },
     nacl: {},
     naclUtil: {
@@ -143,13 +142,7 @@ describe("message-service cutover", () => {
     expect((global as any).fetch).not.toHaveBeenCalled();
   });
 
-  it('displayDecryptedMessage decrypts legacy envelope_type via legacy decrypt', async () => {
-    // Fetch legacy ember key from SQLite archive
-    (window as any).emberAPI.invoke.mockImplementation(async (cmd: string) => {
-      if (cmd === "LoadLegacyEmberKey") return { success: true, data: { key: "aGVsbG8=" } };
-      return { success: false, data: null };
-    });
-
+  it('displayDecryptedMessage shows placeholder for legacy envelope_type', async () => {
     const msg = {
       id: "msg-legacy-1",
       username: "alice",
@@ -162,9 +155,8 @@ describe("message-service cutover", () => {
 
     await (window as any).displayDecryptedMessage(msg, false);
 
-    expect((window as any).electronAPI.crypto.decryptLegacyMessage).toHaveBeenCalled();
     const messagesText = document.getElementById("messages")?.textContent ?? "";
-    expect(messagesText).toContain("legacy-plaintext");
+    expect(messagesText).toContain("unsupported envelope");
   });
 });
 

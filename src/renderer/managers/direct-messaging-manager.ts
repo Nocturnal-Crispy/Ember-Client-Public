@@ -16,7 +16,6 @@
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("DirectMessagingManager");
-  const emberCrypto = window.electronAPI.crypto;
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -276,11 +275,15 @@
 
     // Initiate Signal session eagerly if the peer is Signal-capable.
     if (partnerDeviceId && partnerProtocolVersion === 1 && App.signalSessionManager) {
-      App.signalSessionManager.ensureSession(participantId, partnerDeviceId).catch(
-        (err: Error) => log.warn("Signal ensureSession failed, falling back to legacy", {
-          participantId, partnerDeviceId, error: err.message,
-        }),
-      );
+      try {
+        await App.signalSessionManager.ensureSession(participantId, partnerDeviceId);
+      } catch (err: unknown) {
+        const error = err as Error;
+        log.warn("Signal ensureSession failed, falling back to legacy", {
+          participantId, partnerDeviceId, error: error.message,
+        });
+        // Continue without Signal - will fall back to error message in sendDirectMessage
+      }
     }
 
     // Legacy ember-keys are no longer used for new messages.
@@ -461,15 +464,7 @@
     const auth = await getAuth();
     const entry = dmByTextChannel.get(channelId);
     if (!auth || !entry) return [];
-
-    const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) {
-      log.error("Cannot fetch DM messages: ember key unavailable", {
-        emberId: entry.emberId,
-        channelId,
-      });
-      return [];
-    }
+    const signalManager = App.signalSessionManager;
 
     try {
       const res = await fetch(
@@ -479,26 +474,85 @@
       if (!res.ok) return [];
       const data = (await res.json()) as {
         messages: Array<{
-          id: string; sender_user_id: string; ciphertext: string; created_at: number;
+          id: string;
+          sender_user_id: string;
+          sender_device_id?: string;
+          message_type?: number;
+          ciphertext: string;
+          created_at: number;
+          envelope_type?: string;
         }>;
       };
       const currentUserId = auth.user_id;
-      return (data.messages ?? []).map((msg) => {
-        const plaintext = emberCrypto.decryptLegacyMessage(msg.ciphertext, emberKey);
-        if (plaintext === null) {
-          log.warn("DM message decryption failed", { message_id: msg.id, channel_id: channelId });
-        }
-        return {
-          id: msg.id,
-          conversationId: channelId,
-          senderId: msg.sender_user_id,
-          content: plaintext ?? "[Failed to decrypt message]",
-          timestamp: typeof msg.created_at === "number"
-            ? msg.created_at
-            : new Date(msg.created_at).getTime() / 1000,
-          isOwn: msg.sender_user_id === currentUserId,
-        };
-      });
+
+      return await Promise.all(
+        (data.messages ?? []).map(async (msg) => {
+          const envelopeType = msg.envelope_type;
+          const senderId = msg.sender_user_id;
+          const isOwn = senderId === currentUserId;
+
+          if (
+            envelopeType === "signal_dm" &&
+            signalManager &&
+            msg.sender_device_id &&
+            typeof msg.message_type === "number"
+          ) {
+            try {
+              const ciphertextBytes = new Uint8Array(
+                atob(msg.ciphertext).split("").map((c) => c.charCodeAt(0)),
+              );
+              const senderAddress = `${senderId}.${msg.sender_device_id}`;
+              const plaintextBytes = await signalManager.decrypt(
+                senderAddress,
+                ciphertextBytes,
+                msg.message_type,
+              );
+              const messageContent = new TextDecoder().decode(plaintextBytes);
+              return {
+                id: msg.id,
+                conversationId: channelId,
+                senderId,
+                content: messageContent,
+                timestamp:
+                  typeof msg.created_at === "number"
+                    ? msg.created_at
+                    : new Date(msg.created_at).getTime() / 1000,
+                isOwn,
+              };
+            } catch (err) {
+              log.error("Signal decrypt failed for incoming DM", {
+                message_id: msg.id,
+                channel_id: channelId,
+                error: (err as Error).message,
+              });
+              return {
+                id: msg.id,
+                conversationId: channelId,
+                senderId,
+                content: "[Failed to decrypt message]",
+                timestamp:
+                  typeof msg.created_at === "number"
+                    ? msg.created_at
+                    : new Date(msg.created_at).getTime() / 1000,
+                isOwn,
+              };
+            }
+          }
+
+          // Hard cutover: any non-signal envelope is permanently unreadable.
+          return {
+            id: msg.id,
+            conversationId: channelId,
+            senderId,
+            content: "[This message cannot be decrypted — unsupported envelope]",
+            timestamp:
+              typeof msg.created_at === "number"
+                ? msg.created_at
+                : new Date(msg.created_at).getTime() / 1000,
+            isOwn,
+          };
+        }),
+      );
     } catch (err) {
       log.error("Failed to fetch DM messages", { channelId, error: (err as Error).message });
       return [];
@@ -538,8 +592,8 @@
       }
     }
 
-    // Cutover: clients can no longer send NaCl-encrypted messages.
-    const errMsg = "Migration required — Signal Protocol encryption not ready";
+    // Signal Protocol is required for direct messaging
+    const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
     (window as any).showInputError?.(errMsg);
     throw new Error(errMsg);
   }
@@ -609,32 +663,14 @@
       return;
     }
 
-    // Legacy NaCl path
-    const emberKey = await fetchAndCacheEmberKey(entry.emberId);
-    if (!emberKey) {
-      log.error("Cannot handle incoming DM message: ember key unavailable", {
-        emberId: entry.emberId,
-        channelId,
-      });
-      return;
-    }
-    const ciphertext = String(payload["ciphertext"] ?? "");
-    const plaintext = emberCrypto.decryptLegacyMessage(ciphertext, emberKey);
-
-    const messageContent = plaintext === null ? "[Failed to decrypt message]" : plaintext;
-    if (plaintext === null) {
-      log.warn("Incoming DM message decryption failed", {
-        message_id: String(payload["id"] ?? ""),
-        channel_id: channelId,
-      });
-    }
-
     const isOwn = senderId === auth.user_id;
+
+    // Hard cutover: any non-signal envelope is permanently unreadable.
     window.displayDmMessage({
       id: String(payload["id"] ?? ""),
       conversationId: channelId,
       senderId,
-      content: messageContent,
+      content: "[This message cannot be decrypted — unsupported envelope]",
       timestamp: createdAt,
       isOwn,
     });
@@ -739,24 +775,7 @@
 
   // ─── Device key enrollment ─────────────────────────────────────────────────
 
-  /**
-   * Signals to other devices of the same user that this device needs the ember
-   * key for the given DM. One of the other devices will see this via
-   * `fulfillPendingKeyRequests` and deliver a peer-box.
-   */
-  async function requestDeviceKeyEnrollment(emberId: string): Promise<void> {
-    // Cutover: multi-device NaCl device-key enrollment is removed.
-    // Signal Protocol sessions are per-device; no cross-device ember key exchange.
-  }
-
-  /**
-   * Checks for pending key requests from other devices of the same user and
-   * delivers the ember key encrypted as a peer-box for each requesting device.
-   */
-  async function fulfillPendingKeyRequests(emberId: string): Promise<void> {
-    // Cutover: multi-device NaCl device-key enrollment is removed.
-    // Signal Protocol sessions are per-device; no cross-device ember key exchange.
-  }
+  // (multi-device NaCl device-key enrollment removed)
 
   // ─── Initialization ────────────────────────────────────────────────────────
 
@@ -765,14 +784,6 @@
     await loadDmEmbers();
     await loadAndShowDmRequests();
     startDMRequestPolling();
-    // On startup, fulfill any pending key requests from other devices of the
-    // same user that haven't been served yet (e.g. another device came online
-    // while this device was offline).
-    for (const emberId of dmByEmberId.keys()) {
-      fulfillPendingKeyRequests(emberId).catch((err: Error) =>
-        log.warn("Failed to fulfill pending key requests on startup", { emberId, error: err.message }),
-      );
-    }
     log.info("DM system ready", { dmCount: dmByTextChannel.size });
   }
 
@@ -805,30 +816,7 @@
     }
   }) as EventListener);
 
-  // Handles the server push when another device fulfills this device's key request.
-  // Clears the stale cache entry and re-fetches the newly delivered key.
-  window.addEventListener("device-key-fulfilled", ((e: CustomEvent) => {
-    const payload = e.detail as { ember_id?: string; requesting_device_id?: string };
-    const emberId = payload?.ember_id ?? "";
-    if (!emberId) return;
-
-    App.emberKeyCache.delete(emberId);
-    fetchAndCacheEmberKey(emberId).catch((err: Error) =>
-      log.warn("Failed to re-fetch key after device key fulfillment", { emberId, error: err.message }),
-    );
-  }) as EventListener);
-
-  // Handles the server push when another device of the same user requests a key.
-  // Fulfills the request immediately so the new device can decrypt messages.
-  window.addEventListener("device-key-requested", ((e: CustomEvent) => {
-    const payload = e.detail as { ember_id?: string };
-    const emberId = payload?.ember_id ?? "";
-    if (!emberId) return;
-
-    fulfillPendingKeyRequests(emberId).catch((err: Error) =>
-      log.warn("Failed to fulfill pending key requests on WS push", { emberId, error: err.message }),
-    );
-  }) as EventListener);
+  // (device-key-fulfilled/device-key-requested handlers removed)
 
   // ─── Expose globals ────────────────────────────────────────────────────────
 
@@ -846,9 +834,6 @@
   window.acceptDMRequest = acceptDMRequest;
   window.declineDMRequest = declineDMRequest;
   window.loadAndShowDmRequests = loadAndShowDmRequests;
-
-  window.requestDeviceKeyEnrollment = requestDeviceKeyEnrollment;
-  window.fulfillPendingKeyRequests = fulfillPendingKeyRequests;
 
   window.getPendingStatusForChannel = (channelId: string) => {
     const entry = dmByTextChannel.get(channelId);

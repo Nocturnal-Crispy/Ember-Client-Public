@@ -7,13 +7,6 @@
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger("MessageManager");
   const emberCrypto = window.electronAPI.crypto;
-
-  function decodeBase64ToBytes(b64: string): Uint8Array {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
   
   const messagesContainer = document.getElementById("messages");
 
@@ -200,7 +193,7 @@
       }
       const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
       if (!groupCiphertext) {
-        const errMsg = "Migration required — Signal Protocol encryption not ready";
+        const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
         (window as any).showInputError?.(errMsg);
         throw new Error(errMsg);
       }
@@ -237,7 +230,7 @@
         channel_id: App.activeChannelId ?? "",
         error: err.message,
       });
-      const showMsg = err.message.includes("Migration required")
+      const showMsg = err.message.includes("Signal Protocol encryption not ready")
         ? err.message
         : `Failed to send: ${err.message}`;
       (window as any).showInputError?.(showMsg);
@@ -286,7 +279,7 @@
         throw new Error(errBody.error ?? `Edit failed: ${response.status}`);
       }
     } else {
-      const errMsg = "Migration required — Signal Protocol encryption not ready";
+      const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
       (window as any).showInputError?.(errMsg);
       throw new Error(errMsg);
     }
@@ -390,39 +383,22 @@
     ) as HTMLElement | null;
     if (!textEl) return;
     if (!App.activeEmberId) return;
-    let plaintext: string | null = null;
-    const envelopeType = payload.envelope_type ?? "legacy";
-    if (envelopeType === "signal_group") {
-      plaintext = await tryGroupDecrypt(payload.ciphertext);
-    } else if (envelopeType === "signal_dm") {
+    if (payload.envelope_type === "signal_group") {
+      const plaintext = await tryGroupDecrypt(payload.ciphertext);
+      if (plaintext === null) return;
+      textEl.textContent = plaintext;
+      markMessageAsEdited(messageDiv);
+      return;
+    }
+
+    if (payload.envelope_type === "signal_dm") {
       textEl.textContent = "[Requires app update to view this message]";
       markMessageAsEdited(messageDiv);
       return;
-    } else {
-      plaintext = await tryGroupDecrypt(payload.ciphertext);
-      if (plaintext === null) {
-        let emberKey = App.emberKeyCache.get(App.activeEmberId) ?? null;
-        if (!emberKey) {
-          try {
-            const archiveResult = await window.emberAPI.invoke<{ key: string | null }>(
-              "LoadLegacyEmberKey",
-              { emberId: App.activeEmberId },
-            );
-            if (archiveResult.data?.key) {
-              const loadedKey = decodeBase64ToBytes(archiveResult.data.key);
-              emberKey = loadedKey;
-              App.emberKeyCache.set(App.activeEmberId, loadedKey);
-            }
-          } catch {
-            // SQLite fallback failed silently
-          }
-        }
-        if (!emberKey) return;
-        plaintext = emberCrypto.decryptLegacyMessage(payload.ciphertext, emberKey);
-      }
     }
-    if (plaintext === null) return;
-    textEl.textContent = plaintext;
+
+    // Hard cutover: any non-signal envelope is permanently unreadable.
+    textEl.textContent = "[This message cannot be decrypted — unsupported envelope]";
     markMessageAsEdited(messageDiv);
   }
 
@@ -498,61 +474,23 @@
   async function displayDecryptedMessage(msg: Message, prepend = false): Promise<void> {
     if (!App.activeEmberId) return;
     let plaintext: string | null = null;
-    const envelopeType = msg.envelope_type ?? "legacy";
+    const envelopeType = msg.envelope_type;
     if (envelopeType === "signal_group") {
       plaintext = await tryGroupDecrypt(msg.ciphertext);
       if (plaintext === null) {
         log.warn("Sender key decrypt failed, triggering distribution fetch", { message_id: msg.id });
-        window.processIncomingDistributions?.().catch(() => {});
-        addMessage(
-          msg.username ?? "Unknown",
-          "[Waiting for sender key — message will be readable once keys arrive]",
-          msg.created_at,
-          prepend,
-          msg.id,
-          msg.chat_color
-        );
-        return;
-      }
-    } else if (envelopeType === "signal_dm") {
-      addMessage(
-        msg.username ?? "Unknown",
-        "[Requires app update to view this message]",
-        msg.created_at,
-        prepend,
-        msg.id,
-        msg.chat_color
-      );
-      return;
-    } else if (envelopeType === "legacy") {
-      plaintext = await tryGroupDecrypt(msg.ciphertext);
-      if (plaintext === null) {
-        let emberKey = App.emberKeyCache.get(App.activeEmberId) ?? null;
-        if (!emberKey) {
-          // Fallback: try loading from SQLite archive
-          try {
-            const archiveResult = await window.emberAPI.invoke<{ key: string | null }>(
-              "LoadLegacyEmberKey",
-              { emberId: App.activeEmberId },
-            );
-            if (archiveResult.data?.key) {
-              const loadedKey = decodeBase64ToBytes(archiveResult.data.key);
-              emberKey = loadedKey;
-              App.emberKeyCache.set(App.activeEmberId, loadedKey);
-              log.debug("Ember key loaded from SQLite archive for decryption", { ember_id: App.activeEmberId });
-            }
-          } catch {
-            log.debug("SQLite archive lookup failed during decryption", { ember_id: App.activeEmberId });
-          }
-        }
-        if (!emberKey) {
-          log.warn("Cannot decrypt message: ember key not available", {
-            ember_id: App.activeEmberId,
-            message_id: msg.id,
-          });
+        
+        // Trigger distribution fetch and retry decryption
+        await window.processIncomingDistributions?.();
+        
+        // Retry decryption after distribution fetch
+        plaintext = await tryGroupDecrypt(msg.ciphertext);
+        
+        if (plaintext === null) {
+          // Still failed - show waiting message
           addMessage(
             msg.username ?? "Unknown",
-            "[This message cannot be decrypted — ember key not found]",
+            "[Waiting for sender key — message will be readable once keys arrive]",
             msg.created_at,
             prepend,
             msg.id,
@@ -560,13 +498,11 @@
           );
           return;
         }
-        plaintext = emberCrypto.decryptLegacyMessage(msg.ciphertext, emberKey);
       }
-    } else {
-      // Unknown or unsupported envelope format.
+    } else if (envelopeType === "signal_dm") {
       addMessage(
         msg.username ?? "Unknown",
-        "[This message cannot be decrypted — unsupported envelope]",
+        "[Requires app update to view this message]",
         msg.created_at,
         prepend,
         msg.id,

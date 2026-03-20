@@ -11,6 +11,8 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import Database from 'better-sqlite3';
+import { PrivateKey } from '@signalapp/libsignal-client';
 import { openSignalDatabase } from '../../../src/main/signal-db';
 import type { SignalDatabase } from '../../../src/main/signal-db';
 
@@ -459,6 +461,110 @@ describe('IIdentityKeyStore', () => {
     await db.saveIdentity('omar.1', storedKey);
     const trusted = await db.isTrustedIdentity('omar.1', differentKey, 'sending');
     expect(trusted).toBe(false);
+  });
+});
+
+// ─── Local identity initialization ─────────────────────────────────────────────
+
+describe('Local identity initialization', () => {
+  it('initialises __local__ keypair and __registration_id__ on open', async () => {
+    const encryptionKey = identityKey;
+    const localIdentityPrivateKey = makeIdentityKey(); // Ed25519 private key (32 bytes)
+
+    const localPrivateKeyObj = PrivateKey.deserialize(Buffer.from(localIdentityPrivateKey));
+    const localIdentityPublicKey = new Uint8Array(localPrivateKeyObj.getPublicKey().serialize());
+
+    const localRegistrationId = 12345;
+    const localIdentityAddress = 'user-local.1';
+
+    // Intentionally pass init options even if openSignalDatabase doesn't support them yet.
+    // The test will fail until signal-db.ts is updated to honour these options.
+    db = (openSignalDatabase as unknown as (
+      userDataPath: string,
+      identityPrivateKey: Uint8Array,
+      opts: {
+        localIdentityPrivateKey: Uint8Array;
+        localIdentityPublicKey: Uint8Array;
+        localRegistrationId: number;
+        localIdentityAddress: string;
+      },
+    ) => SignalDatabase)(tmpDir, encryptionKey, {
+      localIdentityPrivateKey,
+      localIdentityPublicKey,
+      localRegistrationId,
+      localIdentityAddress,
+    });
+
+    const pair = await db.getIdentityKeyPair();
+    expect(Buffer.from(pair.privateKey)).toEqual(Buffer.from(localIdentityPrivateKey));
+    expect(Buffer.from(pair.publicKey)).toEqual(Buffer.from(localIdentityPublicKey));
+
+    expect(await db.getLocalRegistrationId()).toBe(localRegistrationId);
+
+    // Ensure saveIdentity stores non-empty key_pair_private for addresses that
+    // should have a local private key available.
+    await db.saveIdentity(localIdentityAddress, localIdentityPublicKey);
+
+    const dbPath = path.join(tmpDir, 'signal-state.db');
+    const rawDb = new Database(dbPath);
+    const row = rawDb
+      .prepare('SELECT key_pair_private FROM identity_keys WHERE name = ?')
+      .get(localIdentityAddress) as { key_pair_private: Buffer } | undefined;
+
+    expect(row).toBeDefined();
+
+    // encryptBlob envelope format: IV(12) | authTag(16) | ciphertext(plaintextLen)
+    // For a 32-byte Ed25519 private key, total envelope length is 12 + 16 + 32 = 60.
+    expect(row!.key_pair_private.length).toBe(60);
+
+    // Also verify __registration_id__ never stores an empty private key blob.
+    const regRow = rawDb
+      .prepare('SELECT key_pair_private FROM identity_keys WHERE name = ?')
+      .get('__registration_id__') as { key_pair_private: Buffer } | undefined;
+
+    expect(regRow).toBeDefined();
+    // registrationBytes plaintext is 4 bytes, so total envelope length is 12 + 16 + 4 = 32.
+    expect(regRow!.key_pair_private.length).toBe(32);
+
+    rawDb.close();
+  });
+
+  it('initializeLocalIdentity writes __local__ and __registration_id__', async () => {
+    const localIdentityPrivateKey = makeIdentityKey();
+    const localPrivateKeyObj = PrivateKey.deserialize(Buffer.from(localIdentityPrivateKey));
+    const localIdentityPublicKey = new Uint8Array(localPrivateKeyObj.getPublicKey().serialize());
+
+    const localRegistrationId = 15000;
+    const localIdentityAddress = 'user-local-init.1';
+
+    // Open without local init options; then call initializeLocalIdentity.
+    db = openSignalDatabase(tmpDir, identityKey);
+
+    db.initializeLocalIdentity(
+      {
+        publicKey: localIdentityPublicKey,
+        privateKey: localIdentityPrivateKey,
+      },
+      localRegistrationId,
+      localIdentityAddress,
+    );
+
+    const pair = await db.getIdentityKeyPair();
+    expect(Buffer.from(pair.privateKey)).toEqual(Buffer.from(localIdentityPrivateKey));
+    expect(Buffer.from(pair.publicKey)).toEqual(Buffer.from(localIdentityPublicKey));
+
+    expect(await db.getLocalRegistrationId()).toBe(localRegistrationId);
+
+    // Raw DB assertions for registration id private value.
+    const dbPath = path.join(tmpDir, 'signal-state.db');
+    const rawDb = new Database(dbPath);
+    const regRow = rawDb
+      .prepare('SELECT key_pair_private FROM identity_keys WHERE name = ?')
+      .get('__registration_id__') as { key_pair_private: Buffer } | undefined;
+    rawDb.close();
+
+    expect(regRow).toBeDefined();
+    expect(regRow!.key_pair_private.length).toBe(32);
   });
 });
 

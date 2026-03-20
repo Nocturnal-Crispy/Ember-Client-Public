@@ -2,6 +2,7 @@
  * Ember manager — TypeScript conversion of public/ember-manager.js.
  * Handles ember fetch, server list rendering, server creation, and ember key management.
  */
+
 (function (): void {
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
@@ -43,18 +44,34 @@
   async function createSenderKeyForEmber(
     emberId: string
   ): Promise<{ distributionId: string; distributionMessage: string }> {
-    const distributionId = await loadOrCreateDistributionId(emberId);
-    const response = await window.emberAPI.invoke<{ distributionMessage: string }>(
-      "CreateSenderKeyDistribution",
-      { distributionId }
-    );
-    if (!response.success || !response.data?.distributionMessage) {
-      throw new Error("Failed to create sender key distribution");
+    try {
+      const distributionId = await loadOrCreateDistributionId(emberId);
+      const response = await window.emberAPI.invoke<{ distributionMessage: string; error?: string }>(
+        "CreateSenderKeyDistribution",
+        { distributionId }
+      );
+      if (!response.success || !response.data?.distributionMessage) {
+        // Provide more detailed error information
+        const errorMessage = response.data?.error || 'Unknown error';
+        throw new Error(`Failed to create sender key distribution: ${errorMessage}`);
+      }
+      return {
+        distributionId,
+        distributionMessage: response.data.distributionMessage,
+      };
+    } catch (error) {
+      // Enhance error message with context
+      const err = error as Error;
+      if (err.message.includes('Signal database not available')) {
+        throw new Error('Signal database not available - please check database configuration and restart the application');
+      }
+      if (err.message.includes('Failed to create sender key distribution')) {
+        // Re-throw enhanced error
+        throw err;
+      }
+      // Wrap other errors
+      throw new Error(`Failed to create sender key distribution: ${err.message}`);
     }
-    return {
-      distributionId,
-      distributionMessage: response.data.distributionMessage,
-    };
   }
 
   async function ensureSignalSession(
@@ -107,13 +124,61 @@
         members: Array<{ user_id: string; device_id: string }>;
       };
       const members = membersData.members ?? [];
-      if (members.length === 0) return;
+      
       const distributions: Array<{
         recipient_user_id: string;
         recipient_device_id: string;
         distribution_message: string;
       }> = [];
+      
+      // CRITICAL FIX: Always include the current user's device in distributions
+      // This is required for Signal Protocol even when solo in a channel
+      const currentUserAuth = auth; // Use consistent auth data
+      if (currentUserAuth?.user_id && currentUserAuth?.device_id) {
+        // CRITICAL FIX: Ensure session with self first before encrypting
+        await ensureSignalSession(auth, currentUserAuth.user_id, currentUserAuth.device_id);
+        
+        // Add current user's device first (self-distribution)
+        const selfAddress = `${currentUserAuth.user_id}.${currentUserAuth.device_id}`;
+        const encResponse = await window.emberAPI.invoke<{
+          ciphertext: string;
+          messageType: number;
+        }>("Encrypt", {
+          recipientAddress: selfAddress,
+          plaintext: distributionMessage,
+        });
+        if (encResponse.success && encResponse.data) {
+          const envelope = JSON.stringify({
+            ct: encResponse.data.ciphertext,
+            mt: encResponse.data.messageType,
+          });
+          distributions.push({
+            recipient_user_id: currentUserAuth.user_id,
+            recipient_device_id: currentUserAuth.device_id,
+            distribution_message: btoa(envelope),
+          });
+          log.debug("Added self-distribution", { 
+            user_id: currentUserAuth.user_id, 
+            device_id: currentUserAuth.device_id 
+          });
+        } else {
+          // CRITICAL FIX: Log encryption failures with context
+          log.error("Self-encryption failed", {
+            ember_id: emberId,
+            user_id: currentUserAuth.user_id,
+            device_id: currentUserAuth.device_id,
+            error: encResponse.error || 'Unknown encryption error'
+          });
+        }
+      }
+      
+      // Then distribute to other members (if any)
       for (const member of members) {
+        // Skip if this is the current user's device (already added above)
+        if (member.user_id === currentUserAuth?.user_id && member.device_id === currentUserAuth?.device_id) {
+          continue;
+        }
+        
         try {
           await ensureSignalSession(auth, member.user_id, member.device_id);
           const address = `${member.user_id}.${member.device_id}`;
@@ -145,6 +210,7 @@
           });
         }
       }
+      
       if (distributions.length > 0) {
         await fetch(
           `${auth.hostname}/api/v1/embers/${emberId}/sender-key-distributions`,
@@ -160,7 +226,10 @@
         log.info("Sender key distributed", {
           ember_id: emberId,
           count: distributions.length,
+          self_included: currentUserAuth?.user_id ? true : false,
         });
+      } else {
+        log.warn("No distributions created", { ember_id: emberId });
       }
     } catch (error) {
       const err = error as Error;
@@ -506,9 +575,12 @@
 
     await fetchEmberKey(emberId);
 
+    // CRITICAL FIX: Complete ALL sender key setup BEFORE loading any messages
+    // This prevents the race condition where messages arrive before keys are available
     try {
       await createSenderKeyForEmber(emberId);
       await processIncomingSenderKeyDistributions();
+      await distributeSenderKeyToMembers(emberId);
     } catch (skErr) {
       log.warn("Sender key setup deferred", {
         ember_id: emberId,
@@ -1185,4 +1257,6 @@
   window.closeCreateServerModal = closeCreateServerModal;
   window.handleSenderKeyMemberJoined = handleSenderKeyMemberJoined;
   window.handleSenderKeyMemberLeft = handleSenderKeyMemberLeft;
+  window.processIncomingDistributions = processIncomingSenderKeyDistributions;
+  window.distributeSenderKeyToMembers = distributeSenderKeyToMembers;
 })();

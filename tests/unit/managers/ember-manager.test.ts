@@ -23,6 +23,28 @@ beforeAll(() => {
   // 1. Populate window.App
   require('../../../src/renderer/managers/app-state');
 
+  // Mock window.emberLog (createLogger called at load time)
+  const mockLogger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
+  (window as any).emberLog = {
+    createLogger: () => mockLogger,
+  };
+  // Store mockLogger globally for test access
+  (window as any)._mockLogger = mockLogger;
+
+  // Mock window.getValidAuth
+  (window as any).getValidAuth = jest.fn().mockResolvedValue({
+    token: 'tok',
+    hostname: 'http://localhost:8085',
+    user_id: 'u1',
+    device_id: 'd1',
+    username: 'alice'
+  });
+
   // 2. Load auth-loader to make getValidAuth available globally
   require('../../../src/renderer/utils/auth-loader');
 
@@ -223,5 +245,467 @@ describe('fetchEmberKey', () => {
       .mockResolvedValueOnce(null); // get-device-identity
     const result = await (window as any).fetchEmberKey('e-no-device');
     expect(result).toBeNull();
+  });
+});
+
+// ─── processIncomingDistributions ─────────────────────────────────────────────
+
+describe('processIncomingDistributions', () => {
+  it('should be assigned to window.processIncomingDistributions', () => {
+    // This test reproduces the bug: window.processIncomingDistributions is undefined
+    // because the assignment is missing in ember-manager.ts
+    expect((window as any).processIncomingDistributions).toBeDefined();
+  });
+
+  it('should be a callable function', () => {
+    expect(typeof (window as any).processIncomingDistributions).toBe('function');
+  });
+
+  it('should call processIncomingSenderKeyDistributions when invoked', async () => {
+    // Mock the dependencies for processIncomingSenderKeyDistributions
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    // Mock fetch to return empty distributions
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ distributions: [] })
+    });
+
+    // This should call the function but will fail because window.processIncomingDistributions is undefined
+    await expect((window as any).processIncomingDistributions?.()).resolves.not.toThrow();
+  });
+});
+
+// ─── Self-Distribution Fix Tests ───────────────────────────────────────────
+
+describe('Self-Distribution Fix for Solo Users', () => {
+  beforeEach(() => {
+    // Mock get-auth to return current user
+    mockIpcInvoke.mockImplementation((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ 
+          token: 'tok', 
+          hostname: 'http://localhost:8085', 
+          user_id: 'u1', 
+          device_id: 'd1', 
+          username: 'alice' 
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    // Mock emberAPI for encryption
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
+      }
+      if (cmd === 'Encrypt') {
+        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    // Mock window.getValidAuth to return consistent auth data
+    (window as any).getValidAuth = jest.fn().mockResolvedValue({
+      token: 'tok',
+      hostname: 'http://localhost:8085',
+      user_id: 'u1',
+      device_id: 'd1',
+      username: 'alice'
+    });
+  });
+
+  it('should create self-distribution even when no other members exist', async () => {
+    // Mock empty members response (solo user scenario)
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ members: [] }) // Empty - solo user
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    // This should not throw and should create a self-distribution
+    const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
+    expect(result).toBeUndefined(); // Function returns void
+
+    // Verify that the distribution API was called with exactly 1 distribution (self)
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:8085/api/v1/embers/test-ember/sender-key-distributions',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('recipient_user_id'),
+      })
+    );
+
+    // Parse the request body to verify self-distribution
+    const distributionCall = mockFetch.mock.calls.find(call => 
+      call[0].includes('/sender-key-distributions')
+    );
+    expect(distributionCall).toBeDefined();
+    
+    const requestBody = JSON.parse(distributionCall![1].body);
+    expect(requestBody.distributions).toHaveLength(1);
+    expect(requestBody.distributions[0]).toMatchObject({
+      recipient_user_id: 'u1',
+      recipient_device_id: 'd1',
+    });
+  });
+
+  it('should not duplicate self-distribution when user is in members list', async () => {
+    // Mock members response that includes the current user
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ 
+            members: [{ user_id: 'u1', device_id: 'd1' }] // Current user included
+          })
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    // This should create exactly 1 distribution (not 2)
+    const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
+    expect(result).toBeUndefined();
+
+    const distributionCall = mockFetch.mock.calls.find(call => 
+      call[0].includes('/sender-key-distributions')
+    );
+    const requestBody = JSON.parse(distributionCall![1].body);
+    expect(requestBody.distributions).toHaveLength(1); // Should not duplicate
+    expect(requestBody.distributions[0]).toMatchObject({
+      recipient_user_id: 'u1',
+      recipient_device_id: 'd1',
+    });
+  });
+
+  it('should handle multiple members including self correctly', async () => {
+    // Mock members response with current user + others
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ 
+            members: [
+              { user_id: 'u1', device_id: 'd1' }, // Current user
+              { user_id: 'u2', device_id: 'd2' }, // Other user
+            ]
+          })
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
+    expect(result).toBeUndefined();
+
+    const distributionCall = mockFetch.mock.calls.find(call => 
+      call[0].includes('/sender-key-distributions')
+    );
+    const requestBody = JSON.parse(distributionCall![1].body);
+    expect(requestBody.distributions).toHaveLength(2); // Self + 1 other
+    expect(requestBody.distributions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ recipient_user_id: 'u1', recipient_device_id: 'd1' }),
+        expect.objectContaining({ recipient_user_id: 'u2', recipient_device_id: 'd2' }),
+      ])
+    );
+  });
+
+  it('should establish Signal session with self before encrypting self-distribution', async () => {
+    // Mock empty members response (solo user scenario)
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ members: [] }) // Empty - solo user
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' })
+        });
+      }
+      if (url.includes('/prekey-bundle')) {
+        // This should be called for self-session establishment
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ registrationId: 1, deviceId: 'd1', identityKey: 'test-key' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    // Track emberAPI calls to verify session establishment
+    const emberApiCalls: string[] = [];
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      emberApiCalls.push(cmd);
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
+      }
+      if (cmd === 'LoadSession') {
+        // First call for self-session should return null (no session exists)
+        return Promise.resolve({ success: true, data: { record: null } });
+      }
+      if (cmd === 'ProcessPreKeyBundle') {
+        return Promise.resolve({ success: true, data: null });
+      }
+      if (cmd === 'Encrypt') {
+        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    await (window as any).distributeSenderKeyToMembers?.('test-ember');
+
+    // Verify session establishment sequence was called for self
+    expect(emberApiCalls).toContain('LoadSession');
+    expect(emberApiCalls).toContain('ProcessPreKeyBundle');
+    
+    // Verify the calls happened in the right order (LoadSession before Encrypt)
+    const loadSessionIndex = emberApiCalls.indexOf('LoadSession');
+    const encryptIndex = emberApiCalls.indexOf('Encrypt');
+    expect(loadSessionIndex).toBeLessThan(encryptIndex);
+  });
+});
+
+// ─── Race Condition: Messages Before Keys ───────────────────────────────────────
+
+describe('Race Condition: Messages Before Keys', () => {
+  beforeEach(() => {
+    // Mock basic auth
+    mockIpcInvoke.mockImplementation((channel: string) => {
+      if (channel === 'get-auth') {
+        return Promise.resolve({ 
+          token: 'tok', 
+          hostname: 'http://localhost:8085', 
+          user_id: 'u1', 
+          device_id: 'd1', 
+          username: 'alice' 
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    // Mock emberAPI for basic operations
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    // Mock missing window functions for loadServerContent
+    (window as any).fetchAndRenderVoicePresence = jest.fn().mockResolvedValue(undefined);
+    (window as any).fetchMembers = jest.fn().mockResolvedValue([]);
+    (window as any).renderMemberList = jest.fn();
+    (window as any).wsSubscribeToEmber = jest.fn();
+    (window as any).renderChannels = jest.fn();
+    (window as any).electronAPI = {
+      channelService: {
+        fetchChannels: jest.fn().mockResolvedValue({ channels: [], categories: [] })
+      }
+    };
+  });
+
+  it('should distribute sender keys BEFORE loading channel messages', async () => {
+    // Track the order of operations
+    const operationOrder: string[] = [];
+    
+    // Mock fetch to track API calls
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        operationOrder.push('fetch-device-members');
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ members: [] })
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        operationOrder.push('sender-key-distributions');
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' })
+        });
+      }
+      if (url.includes('/channels')) {
+        operationOrder.push('fetch-channels');
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ channels: [], categories: [] })
+        });
+      }
+      if (url.includes('/messages')) {
+        operationOrder.push('fetch-messages');
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ messages: [], has_more: false })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    // Mock emberAPI to track encryption calls
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        operationOrder.push('load-distribution-id');
+        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        operationOrder.push('create-sender-key-distribution');
+        return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
+      }
+      if (cmd === 'Encrypt') {
+        operationOrder.push('encrypt-self-distribution');
+        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    // Call loadServerContent which should fix the race condition
+    await (window as any).loadServerContent?.('test-ember');
+
+    // Verify sender key operations happen BEFORE message loading
+    const senderKeyOps = operationOrder.filter(op => 
+      op.includes('distribution') || op.includes('encrypt')
+    );
+    const messageOps = operationOrder.filter(op => 
+      op.includes('messages') || op.includes('channels')
+    );
+
+    // All sender key operations should come before message operations
+    const lastSenderKeyOp = Math.max(...senderKeyOps.map(op => operationOrder.lastIndexOf(op)));
+    const firstMessageOp = Math.min(...messageOps.map(op => operationOrder.indexOf(op)));
+
+    expect(lastSenderKeyOp).toBeLessThan(firstMessageOp);
+  });
+
+  it('should complete sender key distribution before processing messages', async () => {
+    // Mock slow sender key distribution
+    let distributionCompleted = false;
+    
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/device-members')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ members: [] })
+        });
+      }
+      if (url.includes('/sender-key-distributions')) {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            distributionCompleted = true;
+            resolve({
+              ok: true,
+              json: () => Promise.resolve({ status: 'ok' })
+            });
+          }, 100); // Simulate slow network
+        });
+      }
+      if (url.includes('/channels')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ channels: [], categories: [] })
+        });
+      }
+      if (url.includes('/messages')) {
+        // This should only be called AFTER distribution completes
+        expect(distributionCompleted).toBe(true);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ messages: [], has_more: false })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    // Mock emberAPI for encryption
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({ 
+          success: true, 
+          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
+      }
+      if (cmd === 'Encrypt') {
+        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    await (window as any).loadServerContent?.('test-ember');
+
+    // If we get here, the test passed (messages were fetched after distribution)
+    expect(distributionCompleted).toBe(true);
   });
 });

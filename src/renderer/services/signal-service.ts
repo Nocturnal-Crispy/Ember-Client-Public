@@ -310,3 +310,6 @@ export class SignalService {
     await this.invoke<undefined>('ProcessSenderKeyDistribution', args);
   }
 }
+
+// Export globally for script loading compatibility
+(window as any).SignalService = SignalService;

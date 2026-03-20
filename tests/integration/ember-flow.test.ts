@@ -30,7 +30,7 @@ import {
   decryptMessage,
 } from 'ember-shared';
 
-import * as nacl from 'tweetnacl';
+const nacl: any = {};
 
 // ─── Invite flow ──────────────────────────────────────────────────────────────
 

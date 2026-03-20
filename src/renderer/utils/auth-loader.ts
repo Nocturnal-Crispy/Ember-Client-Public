@@ -3,6 +3,9 @@
  * This file should be loaded before other modules that depend on auth utilities.
  */
 
+// Cache for synchronous auth access
+let cachedAuth: AuthData | null = null;
+
 // Directly define the auth utilities here to avoid CommonJS require issues in browser
 /**
  * Fetches and validates authentication data from the main process.
@@ -20,7 +23,19 @@ async function getValidAuth(): Promise<AuthData | null> {
   if (!auth || !auth.token || !auth.hostname) {
     return null;
   }
+  
+  // Update cache
+  cachedAuth = auth;
   return auth;
+}
+
+/**
+ * Synchronously gets cached auth data.
+ * Returns null if no auth data is cached.
+ * This should only be used after getValidAuth() has been called at least once.
+ */
+function getAuthSync(): AuthData | null {
+  return cachedAuth;
 }
 
 /**
@@ -67,5 +82,6 @@ async function createAuthenticatedFetch(
 
 // Expose auth utilities globally
 window.getValidAuth = getValidAuth;
+window.getAuthSync = getAuthSync;
 window.isValidAuth = isValidAuth;
 window.createAuthenticatedFetch = createAuthenticatedFetch;

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dynamic Import</title>
+</head>
+<body>
+    <h1>Testing Dynamic Import</h1>
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            console.log(message);
+            output.innerHTML += message + '<br>';
+        }
+        
+        // Mock the required globals
+        window.electronAPI = {
+            ipc: {
+                invoke: () => Promise.resolve(),
+                on: () => {},
+                removeAllListeners: () => {}
+            }
+        };
+        
+        window.getAuthSync = () => ({
+            token: 'test-token',
+            hostname: 'https://test.example.com',
+            user_id: 'test-user-id',
+            device_id: 'test-device-id',
+            username: 'testuser'
+        });
+        
+        async function testDynamicImport() {
+            try {
+                log('Testing dynamic import of signal-session-manager...');
+                
+                const { SignalSessionManager } = await import('./dist/renderer/managers/signal-session-manager.js');
+                log('✅ Dynamic import successful!');
+                
+                const manager = new SignalSessionManager(window.getAuthSync());
+                log('✅ SignalSessionManager instantiated!');
+                
+                log('✅ All tests passed!');
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        // Run the test
+        testDynamicImport();
+    </script>
+</body>
+</html>

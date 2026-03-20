@@ -7,7 +7,7 @@
  *   - startDmConversation  → SignalService.ensureSession for Signal-capable peers
  *   - sendDirectMessage    → SignalService.encrypt + signal_dm envelope when a session exists
  *   - handleIncomingMessage → SignalService.decrypt for signal_dm envelope messages
- *   - handleIncomingMessage → legacy NaCl path for messages without envelope_type
+ *   - handleIncomingMessage → hard cutover placeholder for messages without envelope_type
  */
 
 import { jest, describe, it, expect, beforeAll, beforeEach } from '@jest/globals';
@@ -136,7 +136,6 @@ function setupWindowGlobals(): void {
       crypto: {
         generateEmberKey: mockGenerateEmberKey,
         encryptMessage: mockEncryptNaCl,
-        decryptLegacyMessage: mockDecryptNaCl,
         encryptEmberKeyForUser: jest.fn<() => string>(() => 'peerBoxBase64'),
         decryptEmberKeyForUser: jest.fn<() => Uint8Array>(() => new Uint8Array([9, 9, 9])),
       },
@@ -265,12 +264,6 @@ describe('dm-signal-flow', () => {
     });
 
     it('uses legacy NaCl decrypt for messages without envelope_type', async () => {
-      const nacalEmberKey = new Uint8Array([30, 31, 32]);
-      (
-        window as Window & { App: { emberKeyCache: Map<string, Uint8Array> } }
-      ).App.emberKeyCache.set(EMBER_ID, nacalEmberKey);
-      mockDecryptNaCl.mockReturnValueOnce('legacy plaintext');
-
       window.dispatchEvent(
         new CustomEvent('dm-channel-message', {
           detail: {
@@ -285,12 +278,13 @@ describe('dm-signal-flow', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(mockDecryptNaCl).toHaveBeenCalledWith('legacy-ciphertext-b64', nacalEmberKey);
       expect(mockDecrypt).not.toHaveBeenCalled();
       expect(
         (window as unknown as { displayDmMessage: jest.Mock }).displayDmMessage,
       ).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'legacy plaintext' }),
+        expect.objectContaining({
+          content: '[This message cannot be decrypted — unsupported envelope]',
+        }),
       );
     });
   });

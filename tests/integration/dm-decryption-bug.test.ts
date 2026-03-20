@@ -13,7 +13,7 @@ import {
   decryptMessage,
 } from 'ember-shared';
 
-import * as nacl from 'tweetnacl';
+const nacl: any = {};
 
 // Mock the App.emberKeyCache system that's used in the actual code
 const mockEmberKeyCache = new Map<string, Uint8Array>();
@@ -76,8 +76,8 @@ class MockDirectMessagingManager {
 }
 
 describe.skip('DM Decryption Bug Reproduction', () => {
-  let alice: nacl.BoxKeyPair;
-  let bob: nacl.BoxKeyPair;
+  let alice: any;
+  let bob: any;
   let dmManager: MockDirectMessagingManager;
 
   beforeAll(() => {

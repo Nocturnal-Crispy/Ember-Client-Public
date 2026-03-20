@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, net, shell, screen, desktopCa
 import * as path from "path";
 import * as nodeCrypto from "crypto";
 import Store from "electron-store";
-import { createLogger } from "./logger";
+import { createLogger, writeToFile } from "./logger";
 import { registerAudioCaptureHandlers, cleanOrphanedAudioModules, registerBeforeQuitCleanup } from "./audio-capture";
 import { isNewerVersion } from "./version-utils";
 import { isSteamUrl, toSteamProtocolUrl } from "./steam-utils";
@@ -316,6 +316,13 @@ ipcMain.on(
   }
 );
 
+// IPC: Renderer log to file (development only)
+ipcMain.on("log-to-file", (_event, logMessage: string) => {
+  if (typeof logMessage === "string") {
+    writeToFile(logMessage);
+  }
+});
+
 // ─── IPC: Window controls ─────────────────────────────────────────────────────
 
 ipcMain.on("window-minimize", () => {
@@ -558,6 +565,14 @@ ipcMain.handle("migrate-to-signal", async (_event, params: {
     // Store identity key pair in Signal DB
     if (signalDb) {
       const localAddress = `${params.user_id}.${params.device_id}`;
+      signalDb.initializeLocalIdentity(
+        {
+          publicKey: Buffer.from(migrationResult.identityKeyPair.publicKey),
+          privateKey: Buffer.from(migrationResult.identityKeyPair.privateKey),
+        },
+        migrationResult.registrationId,
+        localAddress,
+      );
       await signalDb.saveIdentity(localAddress, Buffer.from(migrationResult.identityKeyPair.publicKey));
       log.debug("Identity key stored in Signal DB", { address: localAddress });
     }
@@ -1179,7 +1194,11 @@ function handleInviteLink(url: string): void {
   }
   if (mainWindow && mainWindow.webContents) {
     log.info("Sending invite link to renderer");
-    log.debug("Invite data to send:", { invite });
+    // Never log invite codes (they can be used to join servers).
+    log.debug("Invite data to send:", {
+      has_code: invite.code.length > 0,
+      hostname: invite.hostname,
+    });
     mainWindow.webContents.send("handle-invite-link", invite);
     log.debug("Invite data sent successfully");
   } else {
@@ -1236,6 +1255,11 @@ if (!gotTheLock) {
     // Open signal database using the device private key for HKDF
     const authData = store.get("auth") as any;
     let privateKeyBytes: Buffer | null = null;
+
+    // Optional local Signal identity material for initialising libsignal store rows.
+    let localIdentityPrivateKeyBytes: Buffer | null = null;
+    let localRegistrationId: number | null = null;
+    let localIdentityAddress: string | null = null;
     
     if (authData && authData.user_id && authData.device_id) {
       // Try new safeStorage system first
@@ -1243,6 +1267,36 @@ if (!gotTheLock) {
       if (legacyKey) {
         privateKeyBytes = Buffer.from(legacyKey, "base64");
         log.debug("Signal database: Using private key from new safeStorage system");
+      }
+
+      localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
+
+      // The local Ed25519 identity private key is stored in safeStorage under `identity_key_*`.
+      const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
+        `identity_key_${authData.user_id}_${authData.device_id}`,
+      );
+      if (signalIdentityKey) {
+        const bytes = Buffer.from(signalIdentityKey, "base64");
+        if (bytes.length === 32) {
+          localIdentityPrivateKeyBytes = bytes;
+        } else {
+          // Some older builds may have stored the public key here; without a private key
+          // we can't initialise libsignal's local identity rows.
+          log.warn("Signal database: identity_key_* present but not a 32-byte Ed25519 private key", {
+            identityKeyLength: bytes.length,
+          });
+        }
+      }
+
+      // registration id is stored as a decimal string under `registration_id_*`.
+      const registrationIdStr = await electronSafeStorageFunctions.getSafeStorage(
+        `registration_id_${authData.user_id}_${authData.device_id}`,
+      );
+      if (registrationIdStr) {
+        const parsed = parseInt(registrationIdStr, 10);
+        if (!Number.isNaN(parsed)) {
+          localRegistrationId = parsed;
+        }
       }
     }
     
@@ -1269,7 +1323,11 @@ if (!gotTheLock) {
     
     if (privateKeyBytes) {
       try {
-        signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes);
+        signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes, {
+          localIdentityPrivateKey: localIdentityPrivateKeyBytes ?? undefined,
+          localRegistrationId: localRegistrationId ?? undefined,
+          localIdentityAddress: localIdentityAddress ?? undefined,
+        });
         registerEmberIpcHandlers(signalDb);
         log.info("Signal database opened and IPC handlers registered");
       } catch (err) {

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Global Exports Fix</title>
+</head>
+<body>
+    <h1>Verifying Global Exports Fix</h1>
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            console.log(message);
+            output.innerHTML += message + '<br>';
+        }
+        
+        // Mock the required globals
+        window.electronAPI = {
+            ipc: {
+                invoke: () => Promise.resolve(),
+                on: () => {},
+                removeAllListeners: () => {}
+            }
+        };
+        
+        window.getAuthSync = () => ({
+            token: 'test-token',
+            hostname: 'https://test.example.com',
+            user_id: 'test-user-id',
+            device_id: 'test-device-id',
+            username: 'testuser'
+        });
+        
+        async function testGlobalExports() {
+            try {
+                log('Testing global exports...');
+                
+                // Load ember-shared first
+                const emberSharedScript = document.createElement('script');
+                emberSharedScript.src = './node_modules/ember-shared/dist/index.js';
+                emberSharedScript.onload = () => {
+                    log('✅ ember-shared loaded');
+                    
+                    // Load services in order
+                    const services = [
+                        './dist/renderer/services/signal-service.js',
+                        './dist/renderer/services/epoch-service.js',
+                        './dist/renderer/services/epoch-history-service.js',
+                        './dist/renderer/services/invite-ephemeral-key-service.js',
+                        './dist/renderer/managers/signal-session-manager.js'
+                    ];
+                    
+                    let loadedCount = 0;
+                    
+                    services.forEach((serviceSrc, index) => {
+                        const script = document.createElement('script');
+                        script.src = serviceSrc;
+                        script.onload = () => {
+                            const serviceName = serviceSrc.split('/').pop().replace('.js', '');
+                            log(`✅ ${serviceName} loaded`);
+                            loadedCount++;
+                            
+                            if (loadedCount === services.length) {
+                                // Test global availability
+                                const tests = [
+                                    () => typeof window.SignalService !== 'undefined',
+                                    () => typeof window.EpochService !== 'undefined', 
+                                    () => typeof window.EpochHistoryService !== 'undefined',
+                                    () => typeof window.InviteEphemeralKeyService !== 'undefined',
+                                    () => typeof window.SignalSessionManager !== 'undefined'
+                                ];
+                                
+                                const serviceNames = ['SignalService', 'EpochService', 'EpochHistoryService', 'InviteEphemeralKeyService', 'SignalSessionManager'];
+                                
+                                let allPassed = true;
+                                tests.forEach((test, i) => {
+                                    if (test()) {
+                                        log(`✅ ${serviceNames[i]} available globally`);
+                                    } else {
+                                        log(`❌ ${serviceNames[i]} NOT available globally`);
+                                        allPassed = false;
+                                    }
+                                });
+                                
+                                if (allPassed) {
+                                    log('🎉 ALL TESTS PASSED! Global exports working correctly.');
+                                    
+                                    // Test SignalSessionManager instantiation
+                                    try {
+                                        const auth = window.getAuthSync();
+                                        const manager = new window.SignalSessionManager(auth);
+                                        log('✅ SignalSessionManager instantiated successfully');
+                                        log('✅ Message sending should now work!');
+                                    } catch (error) {
+                                        log('❌ SignalSessionManager instantiation failed: ' + error.message);
+                                    }
+                                } else {
+                                    log('❌ Some tests failed - global exports not working');
+                                }
+                            }
+                        };
+                        script.onerror = (error) => {
+                            log(`❌ Failed to load ${serviceSrc}: ${error}`);
+                        };
+                        document.head.appendChild(script);
+                    });
+                };
+                emberSharedScript.onerror = () => {
+                    log('❌ Failed to load ember-shared');
+                };
+                document.head.appendChild(emberSharedScript);
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        // Run the test
+        testGlobalExports();
+    </script>
+</body>
+</html>

@@ -273,7 +273,7 @@ function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionId
 
 function handleLoadDistributionId(db: SignalDatabase, args: LoadDistributionIdArgs): LoadDistributionIdData {
   const result = db.loadDistributionId(args.address);
-  return { distributionId: result };
+  return { distribution_id: result };
 }
 
 function handleStoreLegacyEmberKey(db: SignalDatabase, args: StoreLegacyEmberKeyArgs): void {

@@ -1,4 +1,7 @@
 import * as util from "util";
+import * as fs from "fs";
+import * as path from "path";
+import { app } from "electron";
 
 export enum LogLevel {
   DEBUG = 0,
@@ -17,6 +20,53 @@ const C = {
   context: "\x1b[35m", // magenta
   timestamp: "\x1b[90m", // gray
 };
+
+// File logging for development
+let logFileStream: fs.WriteStream | null = null;
+
+function isDevelopmentMode(): boolean {
+  return process.env.NODE_ENV !== 'production' || (app && !app.isPackaged);
+}
+
+function initializeFileLogging() {
+  if (!isDevelopmentMode()) return;
+  
+  try {
+    const logsDir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    
+    const logFileName = `ember-client-${new Date().toISOString().split('T')[0]}.log`;
+    const logFilePath = path.join(logsDir, logFileName);
+    
+    logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+    
+    // Write header when starting
+    logFileStream.write(`\n=== Ember Client Session Started at ${new Date().toISOString()} ===\n`);
+    
+    // Ensure file is closed on exit
+    process.on('exit', () => {
+      if (logFileStream) {
+        logFileStream.write(`\n=== Ember Client Session Ended at ${new Date().toISOString()} ===\n`);
+        logFileStream.end();
+      }
+    });
+    
+  } catch (error) {
+    console.warn('Failed to initialize file logging:', error);
+  }
+}
+
+function writeToFile(content: string) {
+  if (logFileStream) {
+    try {
+      logFileStream.write(content + '\n');
+    } catch (error) {
+      console.warn('Failed to write to log file:', error);
+    }
+  }
+}
 
 function formatTimestamp(): string {
   const currentTime = new Date();
@@ -56,12 +106,7 @@ function getLogLevelColor(level: LogLevel): string {
 
 const minLevel: LogLevel = LogLevel.DEBUG;
 
-function write(
-  level: LogLevel,
-  context: string,
-  message: string,
-  data?: Record<string, unknown>
-): void {
+export function write(level: LogLevel, context: string, message: string, data?: Record<string, unknown>): void {
   if (level < minLevel) return;
   const levelColor = getLogLevelColor(level);
   const levelLabel = getLogLevelLabel(level);
@@ -72,10 +117,17 @@ function write(
       .join(", ");
     logLine += ` ${C.dim}{ ${formattedData} }${C.reset}`;
   }
+  
+  // Write to console
   if (level >= LogLevel.ERROR) {
     process.stderr.write(logLine + "\n");
   } else {
     process.stdout.write(logLine + "\n");
+  }
+  
+  // Write to file in development
+  if (isDevelopmentMode()) {
+    writeToFile(logLine);
   }
 }
 
@@ -94,3 +146,9 @@ export function createLogger(context: string): Logger {
     error: (msg, data) => write(LogLevel.ERROR, context, msg, data),
   };
 }
+
+// Export file logging functions for IPC handler
+export { initializeFileLogging, writeToFile };
+
+// Initialize file logging when module is loaded
+initializeFileLogging();

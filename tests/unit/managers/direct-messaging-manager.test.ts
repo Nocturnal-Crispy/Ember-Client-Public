@@ -55,7 +55,7 @@ beforeAll(() => {
       decryptEmberKeyForUser: jest.fn().mockReturnValue(new Uint8Array(32).fill(7)),
       encryptMessage:         jest.fn().mockReturnValue('ciphertext64'),
       decryptMessage:         jest.fn().mockReturnValue(PLAINTEXT),
-      decryptLegacyMessage:  jest.fn().mockReturnValue(PLAINTEXT),
+      // Legacy decrypt not used during hard cutover.
     },
     nacl:     {},
     naclUtil: {

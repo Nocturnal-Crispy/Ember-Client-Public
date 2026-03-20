@@ -16,11 +16,11 @@ import {
   decryptMessage,
 } from 'ember-shared';
 
-import * as nacl from 'tweetnacl';
+const nacl: any = {};
 
 describe.skip('DM Key Self-Box Migration', () => {
-  let alice: nacl.BoxKeyPair;
-  let bob: nacl.BoxKeyPair;
+  let alice: any;
+  let bob: any;
   let emberKey: Uint8Array;
 
   beforeEach(() => {

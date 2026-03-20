@@ -7,7 +7,7 @@
 
 import { safeStorage } from 'electron';
 import Store from 'electron-store';
-import { setSafeStorageFunctions, type SafeStorageFunctions } from '../../../ember-shared/src/services/auth.js';
+import { setSafeStorageFunctions, type SafeStorageFunctions } from 'ember-shared';
 
 const store = new Store();
 

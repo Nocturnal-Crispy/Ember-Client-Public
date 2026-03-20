@@ -7,11 +7,65 @@
   const log = window.emberLog.createLogger("Auth");
   const emberCrypto = window.electronAPI.crypto;
 
+  /**
+   * Safely decodes a Base64 string to Uint8Array with proper validation.
+   * @param b64 - Base64 encoded string
+   * @returns Uint8Array of decoded bytes
+   * @throws Error with descriptive message for invalid inputs
+   */
   function decodeBase64ToBytes(b64: string): Uint8Array {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
+    // Input validation
+    if (b64 === null || b64 === undefined) {
+      throw new Error('Base64 input cannot be null or undefined');
+    }
+    
+    if (typeof b64 !== 'string') {
+      throw new Error('Base64 input must be a string');
+    }
+    
+    // Empty string is valid (decodes to empty array)
+    if (b64 === '') {
+      return new Uint8Array(0);
+    }
+    
+    // Check for correct padding first
+    const paddingIndex = b64.indexOf('=');
+    if (paddingIndex !== -1) {
+      // Padding can only appear at the end
+      const hasInvalidPadding = b64.slice(paddingIndex).split('').some(char => char !== '=');
+      if (hasInvalidPadding) {
+        throw new Error('Invalid Base64 format: padding characters must be at the end');
+      }
+      
+      // Maximum 2 padding characters allowed
+      const paddingCount = b64.slice(paddingIndex).length;
+      if (paddingCount > 2) {
+        throw new Error('Invalid Base64 format: too many padding characters');
+      }
+    }
+    
+    // Base64 validation regex - matches valid Base64 characters only
+    // Allows A-Z, a-z, 0-9, +, /, = for padding
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    
+    if (!base64Regex.test(b64)) {
+      throw new Error('Invalid Base64 format: contains characters outside valid Base64 alphabet');
+    }
+    
+    try {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    } catch (error) {
+      // Catch any remaining atob errors and provide a better message
+      if (error instanceof DOMException) {
+        throw new Error(`Base64 decoding failed: ${error.message}`);
+      }
+      throw new Error('Base64 decoding failed: unexpected error');
+    }
   }
 
   function compareVersions(a: string, b: string): number {
@@ -316,11 +370,52 @@
     return true;
   }
 
-  function generateDeviceIdentity(): DeviceIdentity {
+  async function generateDeviceIdentity(): Promise<DeviceIdentity> {
     log.info("Generating new device identity (keypair)");
-    const identity = window.electronAPI.authService.generateDeviceIdentity();
-    log.info("Device identity generated", { device_id: identity.device_id });
-    return identity;
+    
+    let signalIdentity;
+    try {
+      signalIdentity = await window.electronAPI.authService.generateDeviceIdentity() as any;
+    } catch (error) {
+      log.error("Failed to generate device identity", { error: (error as Error).message });
+      throw new Error('Failed to generate device identity: ' + (error as Error).message);
+    }
+    
+    if (!signalIdentity) {
+      log.error("generateDeviceIdentity returned null/undefined");
+      throw new Error('Failed to generate device identity: no response from service');
+    }
+    
+    // Check if the required properties exist
+    if (!signalIdentity.legacyPublicKey) {
+      log.error("Signal identity missing legacyPublicKey");
+      throw new Error('Failed to generate device identity: public key missing');
+    }
+    
+    if (!signalIdentity.legacyPrivateKey) {
+      log.error("Signal identity missing legacyPrivateKey");
+      throw new Error('Failed to generate device identity: private key missing');
+    }
+    
+    // Convert SignalDeviceIdentity to DeviceIdentity format for compatibility
+    // Use the same conversion logic as in ember-shared
+    function bytesToBase64(bytes: Uint8Array): string {
+      if (typeof Buffer !== 'undefined') {
+        return Buffer.from(bytes).toString('base64');
+      }
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+    
+    const publicKeyBase64 = bytesToBase64(signalIdentity.legacyPublicKey);
+    const privateKeyBase64 = bytesToBase64(signalIdentity.legacyPrivateKey);
+    
+    return {
+      device_id: signalIdentity.deviceId,
+      public_key: publicKeyBase64,
+      private_key: privateKeyBase64
+    };
   }
 
   async function register(
@@ -406,9 +501,13 @@
         "get-device-identity"
       )) as DeviceIdentity | null;
 
-      if (!deviceIdentity) {
-        log.info("No device identity found, generating new one");
-        deviceIdentity = generateDeviceIdentity();
+      if (!deviceIdentity || !deviceIdentity.private_key) {
+        if (!deviceIdentity) {
+          log.info("No device identity found, generating new one");
+        } else {
+          log.info("Existing device identity incomplete (missing private key), generating new one");
+        }
+        deviceIdentity = await generateDeviceIdentity();
         await ipcRenderer.invoke("save-device-identity", deviceIdentity);
         log.info("New device identity saved", {
           device_id: deviceIdentity.device_id,
@@ -437,6 +536,12 @@
         log.info("Initiating registration request", { username });
         const recoveryCode = emberCrypto.generateRecoveryCode();
         log.debug("Recovery code generated for new account");
+        
+        // Validate device identity private key before decoding
+        if (!deviceIdentity.private_key) {
+          throw new Error('Device identity private key is missing. Please try registering again.');
+        }
+        
         const privateKeyBytes = decodeBase64ToBytes(deviceIdentity.private_key);
         const recoveryData: RecoveryData =
           await emberCrypto.encryptPrivateKeyWithRecoveryCode(
@@ -495,39 +600,7 @@
         }
       }
 
-      // ── Signal migration check ─────────────────────────────────────────
-      if (isLoginMode && deviceIdentity.private_key && authData.migration_required) {
-        try {
-          log.info("Server indicated migration required", {
-            device_id: deviceIdentity.device_id,
-          });
-          showLoading("Upgrading encryption...", "Migrating to Signal Protocol");
-          const migrationResult = (await ipcRenderer.invoke(
-            "migrate-to-signal",
-            {
-              hostname,
-              token: authData.token,
-              device_id: deviceIdentity.device_id,
-              user_id: authData.user_id,
-              legacy_private_key_b64: deviceIdentity.private_key,
-            }
-          )) as { status: string; error?: string; recoveryCode?: string };
-          if (migrationResult.status === "complete") {
-            log.info("Signal migration completed successfully");
-            if (migrationResult.recoveryCode) {
-              authData._recoveryCode = migrationResult.recoveryCode;
-            }
-          } else {
-            log.warn("Signal migration failed, will retry next login", {
-              error: migrationResult.error,
-            });
-          }
-        } catch (migrationErr) {
-          log.warn("Migration check failed, continuing to app", {
-            error: (migrationErr as Error).message,
-          });
-        }
-      }
+      // No migration needed for fresh database - proceed with initialization
 
       hideLoading();
 

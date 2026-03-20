@@ -2,7 +2,7 @@ import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "ember
 import { contextBridge, ipcRenderer } from "electron";
 import * as emberCrypto from "ember-shared";
 import * as emberServices from "ember-shared";
-import * as nacl from "tweetnacl";
+import * as nodeCrypto from "crypto";
 import { refreshToken } from "./services/token-refresh-service";
 import { getTokenExpiry, isTokenExpiringSoon } from "./utils/token-utils";
 const { IPC_CHANNELS } = require("../shared/constants");
@@ -67,27 +67,56 @@ try {
     });
   }
 
-  if (
-    savedTheme &&
-    document.documentElement &&
-    isValidPreloadRgb(savedTheme.accentRgb) &&
-    isValidPreloadRgb(savedTheme.backgroundRgb) &&
-    isValidPreloadRgb(savedTheme.surfaceRgb)
-  ) {
-    const root = document.documentElement;
-    root.style.setProperty("--rgb-highlight", savedTheme.accentRgb);
-    root.style.setProperty("--rgb-background", savedTheme.backgroundRgb);
-    root.style.setProperty("--rgb-surface", savedTheme.surfaceRgb);
-    const hoverParts = savedTheme.surfaceRgb
-      .split(",")
-      .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
-    root.style.setProperty("--rgb-surface-hover", hoverParts.join(", "));
-    if (savedTheme.chatColor) {
-      root.style.setProperty("--chat-color", savedTheme.chatColor);
+  // Enhanced validation with detailed logging
+  if (savedTheme && document.documentElement) {
+    const validationResults = {
+      accentRgb: isValidPreloadRgb(savedTheme.accentRgb),
+      backgroundRgb: isValidPreloadRgb(savedTheme.backgroundRgb),
+      surfaceRgb: isValidPreloadRgb(savedTheme.surfaceRgb),
+      hasChatColor: typeof savedTheme.chatColor === 'string'
+    };
+    
+    preloadLog("debug", "Theme validation results", { 
+      themeId: 'unknown',
+      validationResults,
+      accentRgb: savedTheme.accentRgb,
+      backgroundRgb: savedTheme.backgroundRgb,
+      surfaceRgb: savedTheme.surfaceRgb,
+      hasChatColor: validationResults.hasChatColor
+    });
+
+    if (
+      validationResults.accentRgb &&
+      validationResults.backgroundRgb &&
+      validationResults.surfaceRgb
+    ) {
+      const root = document.documentElement;
+      root.style.setProperty("--rgb-highlight", savedTheme.accentRgb);
+      root.style.setProperty("--rgb-background", savedTheme.backgroundRgb);
+      root.style.setProperty("--rgb-surface", savedTheme.surfaceRgb);
+      const hoverParts = savedTheme.surfaceRgb
+        .split(",")
+        .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
+      root.style.setProperty("--rgb-surface-hover", hoverParts.join(", "));
+      if (savedTheme.chatColor) {
+        root.style.setProperty("--chat-color", savedTheme.chatColor);
+      }
+      preloadLog("debug", "Theme applied synchronously in preload");
+    } else {
+      preloadLog("warn", "Theme settings failed validation in preload; skipping early application", {
+        validationResults,
+        accentRgb: savedTheme.accentRgb,
+        backgroundRgb: savedTheme.backgroundRgb,
+        surfaceRgb: savedTheme.surfaceRgb
+      });
     }
-    preloadLog("debug", "Theme applied synchronously in preload");
   } else if (savedTheme) {
-    preloadLog("warn", "Theme settings failed validation in preload; skipping early application");
+    preloadLog("warn", "Theme settings failed validation in preload; missing document element", {
+      hasDocument: !!document.documentElement,
+      hasTheme: !!savedTheme
+    });
+  } else {
+    preloadLog("debug", "No saved theme settings found in preload");
   }
 } catch (e) {
   preloadLog("warn", "Failed to apply theme synchronously in preload", { error: String(e) });
@@ -103,6 +132,7 @@ const ALLOWED_SEND: readonly string[] = [
   "auth-success",
   "auth-logout",
   "log-to-console",
+  "log-to-file",
 ];
 
 const ALLOWED_INVOKE: readonly string[] = [
@@ -167,7 +197,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
         if (channel === "get-pending-invite") {
           const invite = pendingInvite;
           pendingInvite = null; // Clear after retrieving
-          preloadLog("debug", "Returning pending invite:", { invite });
+          const hasCode =
+            typeof invite?.code === "string" && invite.code.length > 0;
+          preloadLog("debug", "Returning pending invite:", {
+            has_code: hasCode,
+            hostname: invite?.hostname ?? null,
+          });
           return Promise.resolve(invite);
         }
         return ipcRenderer.invoke(channel, ...args);
@@ -179,21 +214,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
       if (ALLOWED_ON.includes(channel)) {
         preloadLog("debug", `Setting up IPC listener for channel: ${channel}`);
         ipcRenderer.on(channel, (_event, ...args) => {
-          preloadLog("debug", `IPC received on channel ${channel}:`, { args });
           if (channel === "handle-invite-link" && args.length > 0) {
-            // Store the invite data to work around context bridge argument passing issues
+            // Store the invite data to work around context bridge argument passing issues.
+            // Never log invite codes (they are effectively authentication material).
+            const inviteData = args[0] as { code?: string; hostname?: string | null };
+            const hasCode = typeof inviteData.code === "string" && inviteData.code.length > 0;
+            preloadLog("debug", "IPC received invite link", {
+              has_code: hasCode,
+              hostname: inviteData.hostname ?? null,
+            });
+
             pendingInvite = args[0] as { code: string; hostname: string | null };
-            preloadLog("debug", "Stored pending invite:", { pendingInvite });
-            // Just call the listener without arguments to trigger the invite processing
+            // Just call the listener without arguments to trigger the invite processing.
             listener();
-          } else {
-            preloadLog("debug", `Calling listener with ${args.length} arguments`);
-            try {
-              listener(...args);
-              preloadLog("debug", `Listener called successfully`);
-            } catch (error) {
-              preloadLog("error", `Error calling listener:`, { error: String(error) });
-            }
+            return;
+          }
+
+          // Generic IPC logging: do not log raw args (they may contain tokens or codes).
+          preloadLog("debug", `IPC received on channel ${channel}`, {
+            args_length: args.length,
+          });
+
+          preloadLog("debug", `Calling listener with ${args.length} arguments`);
+          try {
+            listener(...args);
+            preloadLog("debug", `Listener called successfully`);
+          } catch (error) {
+            preloadLog("error", `Error calling listener:`, { error: String(error) });
           }
         });
       } else {
@@ -232,29 +279,59 @@ contextBridge.exposeInMainWorld("electronAPI", {
         saltBase64
       );
     },
-    // Historical message decrypt only (legacy NaCl secretbox).
-    decryptLegacyMessage: (ciphertextBase64: string, emberKey: Uint8Array) => {
-      preloadLog("debug", "Crypto: decryptLegacyMessage");
-      return emberCrypto.decryptMessage(ciphertextBase64, emberKey);
-    },
     encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
-      const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-      const cipherBytes = nacl.secretbox(fileBytes, nonce, key);
-      const combined = new Uint8Array(nonce.length + cipherBytes.length);
-      combined.set(nonce, 0);
-      combined.set(cipherBytes, nonce.length);
-      return bytesToBase64(combined);
+      if (key.byteLength !== 32) {
+        throw new Error(`encryptFileBytes: expected 32-byte key, got ${key.byteLength}`);
+      }
+
+      const iv = nodeCrypto.randomBytes(12);
+      const cipher = nodeCrypto.createCipheriv(
+        "aes-256-gcm",
+        Buffer.from(key),
+        iv,
+      );
+      const ciphertext = Buffer.concat([cipher.update(Buffer.from(fileBytes)), cipher.final()]);
+      const tag = cipher.getAuthTag();
+
+      const combined = Buffer.concat([iv, tag, ciphertext]);
+      return bytesToBase64(new Uint8Array(combined));
     },
     decryptFileBytes: (encryptedBase64: string, key: Uint8Array): Uint8Array | null => {
-      const combined = base64ToBytes(encryptedBase64);
-      const nonce = combined.slice(0, nacl.secretbox.nonceLength);
-      const cipher = combined.slice(nacl.secretbox.nonceLength);
-      return nacl.secretbox.open(cipher, nonce, key);
+      if (key.byteLength !== 32) return null;
+
+      try {
+        const combined = base64ToBytes(encryptedBase64);
+        if (combined.byteLength < 12 + 16) return null;
+
+        const iv = Buffer.from(combined.slice(0, 12));
+        const tag = Buffer.from(combined.slice(12, 28));
+        const ciphertext = Buffer.from(combined.slice(28));
+
+        const decipher = nodeCrypto.createDecipheriv(
+          "aes-256-gcm",
+          Buffer.from(key),
+          iv,
+        );
+        decipher.setAuthTag(tag);
+
+        const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+        return new Uint8Array(plaintext);
+      } catch {
+        return null;
+      }
     },
   },
 
   authService: {
-    generateDeviceIdentity: () => emberServices.generateDeviceIdentity(),
+    generateDeviceIdentity: async () => {
+      try {
+        const result = await emberServices.generateDeviceIdentity();
+        return result;
+      } catch (error) {
+        console.error('Preload: generateDeviceIdentity failed', error);
+        throw error;
+      }
+    },
     login: (
       hostname: string,
       username: string,

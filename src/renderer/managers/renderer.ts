@@ -1332,10 +1332,23 @@
     
     // Initialize Direct Messaging system
     try {
+      // First ensure auth is loaded and cached
+      await window.getValidAuth();
+      
+      // Initialize SignalSessionManager
+      await window.App.initializeSignalSessionManager();
+      
       await window.initializeDirectMessaging();
       log.info("Direct Messaging system initialized");
     } catch (error) {
-      log.error("Failed to initialize Direct Messaging system", { error });
+      const err = error as Error;
+      log.error("Failed to initialize Direct Messaging system", { 
+        error: {
+          message: err.message || 'Unknown error',
+          stack: err.stack || 'No stack trace available',
+          name: err.name || 'Error'
+        }
+      });
     }
     const embers = await window.fetchEmbers();
     if (embers.length > 0) {

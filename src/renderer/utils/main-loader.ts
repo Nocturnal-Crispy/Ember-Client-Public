@@ -16,6 +16,12 @@
     "../../dist/renderer/utils/logger.js",
     "../../dist/renderer/managers/theme-manager.js",
     "../../dist/renderer/utils/auth-loader.js",
+    "../../node_modules/ember-shared/dist/index.js",
+    "../../dist/renderer/services/signal-service.js",
+    "../../dist/renderer/services/epoch-service.js",
+    "../../dist/renderer/services/epoch-history-service.js",
+    "../../dist/renderer/services/invite-ephemeral-key-service.js",
+    "../../dist/renderer/managers/signal-session-manager.js",
     "../../dist/renderer/managers/app-state.js",
     "../../dist/renderer/services/voice-service.js",
     "../../dist/renderer/services/websocket-service.js",
@@ -66,6 +72,7 @@
     return new Promise((resolve, reject) => {
       const el = document.createElement("script");
       el.src = src;
+      // Revert back to regular scripts - ES6 modules cause import resolution issues
       el.onload = () => {
         console.log(`[main-loader] Script loaded successfully: ${src}`);
         resolve();

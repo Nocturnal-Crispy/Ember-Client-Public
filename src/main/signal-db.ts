@@ -10,6 +10,7 @@
 import Database from 'better-sqlite3';
 import * as nodeCrypto from 'crypto';
 import * as path from 'path';
+import { PrivateKey } from '@signalapp/libsignal-client';
 
 import type {
   ISessionStore,
@@ -33,6 +34,18 @@ export interface SignalDatabase
   loadDistributionId(address: string): string | null;
   storeLegacyEmberKey(emberId: string, key: Uint8Array): void;
   loadLegacyEmberKey(emberId: string): Uint8Array | null;
+  /**
+   * Initialise (or overwrite) the local Signal Protocol identity and registration id.
+   *
+   * Writes:
+   * - `__local__` (public+private Ed25519 key pair)
+   * - `__registration_id__` (registration id stored in `key_pair_public`)
+   */
+  initializeLocalIdentity(
+    identityKeyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array },
+    registrationId: number,
+    localIdentityAddress?: string,
+  ): void;
   closeDatabase(): void;
 }
 
@@ -119,15 +132,34 @@ function encryptBlob(derivedKey: Buffer, plaintext: Uint8Array, aad: Buffer): Bu
 }
 
 function decryptBlob(derivedKey: Buffer, envelope: Buffer, aad: Buffer): Uint8Array {
-  const iv = envelope.subarray(0, IV_LENGTH);
-  const authTag = envelope.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-  const ciphertext = envelope.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  try {
+    if (envelope.length < IV_LENGTH + AUTH_TAG_LENGTH) {
+      throw new Error('Invalid envelope: too short');
+    }
+    
+    const iv = envelope.subarray(0, IV_LENGTH);
+    const authTag = envelope.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+    const ciphertext = envelope.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-  const decipher = nodeCrypto.createDecipheriv(ALGORITHM, derivedKey, iv);
-  decipher.setAAD(aad);
-  decipher.setAuthTag(authTag);
-  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return new Uint8Array(decrypted);
+    if (iv.length !== IV_LENGTH) {
+      throw new Error('Invalid IV length');
+    }
+    
+    if (authTag.length !== AUTH_TAG_LENGTH) {
+      throw new Error('Invalid auth tag length');
+    }
+
+    const decipher = nodeCrypto.createDecipheriv(ALGORITHM, derivedKey, iv);
+    decipher.setAAD(aad);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return new Uint8Array(decrypted);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('auth')) {
+      throw new Error('Authentication failed: data may be corrupted or tampered');
+    }
+    throw new Error(`Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 function bufferEquals(a: Uint8Array, b: Uint8Array): boolean {
@@ -147,19 +179,52 @@ function bufferEquals(a: Uint8Array, b: Uint8Array): boolean {
 export function openSignalDatabase(
   userDataPath: string,
   identityPrivateKey: Uint8Array,
+  options?: {
+    readonly localIdentityPrivateKey?: Uint8Array;
+    readonly localIdentityPublicKey?: Uint8Array;
+    readonly localRegistrationId?: number;
+    readonly localIdentityAddress?: string;
+  },
 ): SignalDatabase {
   const dbPath = path.join(userDataPath, DB_FILENAME);
-  const db = new Database(dbPath);
+  let db: Database.Database | undefined;
+  
+  try {
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
 
-  db.pragma('journal_mode = WAL');
-
-  // Create tables one at a time using prepared run statements to avoid
-  // the multi-statement exec API.
-  for (const ddl of DDL_STATEMENTS) {
-    db.prepare(ddl).run();
+    // Create tables one at a time using prepared run statements to avoid
+    // the multi-statement exec API.
+    for (const ddl of DDL_STATEMENTS) {
+      db.prepare(ddl).run();
+    }
+  } catch (error) {
+    // Ensure database is closed if initialization fails
+    if (db) {
+      try {
+        db.close();
+      } catch {
+        // Ignore errors during cleanup
+      }
+    }
+    throw error;
   }
 
   const encryptionKey = deriveEncryptionKey(identityPrivateKey);
+
+  // Local identity material used by getIdentityKeyPair() and saveIdentity().
+  // Optional at open-time; can be initialised later (e.g. after migration).
+  let localIdentityPrivateKey: Uint8Array | null = options?.localIdentityPrivateKey ?? null;
+  let localIdentityPublicKey: Uint8Array | null = options?.localIdentityPublicKey ?? null;
+  let localIdentityAddress: string | null = options?.localIdentityAddress ?? null;
+
+  function derivePublicKeyFromEd25519PrivateKey(priv: Uint8Array): Uint8Array {
+    if (priv.length !== 32) {
+      throw new Error('signal-db: expected 32-byte Ed25519 identity private key');
+    }
+    const key = PrivateKey.deserialize(Buffer.from(priv));
+    return new Uint8Array(key.getPublicKey().serialize());
+  }
 
   // ── Prepared statements ──────────────────────────────────────────────────
 
@@ -217,6 +282,122 @@ export function openSignalDatabase(
     ),
   };
 
+  // ── Local identity initialisation ─────────────────────────────────────────
+
+  const existingLocalRow = stmts.loadIdentityKeyRow.get('__local__') as
+    | { key_pair_public: Buffer; key_pair_private: Buffer }
+    | undefined;
+
+  if (existingLocalRow) {
+    const decryptedPublic = decryptBlob(
+      encryptionKey,
+      existingLocalRow.key_pair_public,
+      Buffer.from('identity_keys:__local__:public'),
+    );
+    const decryptedPrivate = decryptBlob(
+      encryptionKey,
+      existingLocalRow.key_pair_private,
+      Buffer.from('identity_keys:__local__:private'),
+    );
+
+    // Validate decrypted key material so libsignal doesn't later fail on empty/corrupt rows.
+    if (decryptedPublic.length === 0) {
+      throw new Error('signal-db: corrupted __local__ public key (empty)');
+    }
+    if (decryptedPrivate.length !== 32) {
+      throw new Error('signal-db: corrupted __local__ private key length');
+    }
+
+    localIdentityPublicKey = decryptedPublic;
+    localIdentityPrivateKey = decryptedPrivate;
+  }
+
+  if (
+    !existingLocalRow &&
+    localIdentityPrivateKey &&
+    !localIdentityPublicKey &&
+    options?.localIdentityPrivateKey
+  ) {
+    if (localIdentityPrivateKey.length !== 32) {
+      throw new Error('signal-db: expected 32-byte localIdentityPrivateKey');
+    }
+    localIdentityPublicKey = derivePublicKeyFromEd25519PrivateKey(options.localIdentityPrivateKey);
+  }
+
+  if (
+    !existingLocalRow &&
+    localIdentityPrivateKey &&
+    localIdentityPublicKey &&
+    options?.localRegistrationId !== undefined
+  ) {
+    if (options.localRegistrationId < 1 || options.localRegistrationId > 16383) {
+      throw new Error('signal-db: localRegistrationId out of range [1, 16383]');
+    }
+    if (localIdentityPrivateKey.length !== 32 || localIdentityPublicKey.length === 0) {
+      throw new Error('signal-db: local identity key material must have 32-byte private key and non-empty public key');
+    }
+
+    stmts.storeIdentityKey.run(
+      '__local__',
+      encryptBlob(
+        encryptionKey,
+        localIdentityPublicKey,
+        Buffer.from('identity_keys:__local__:public'),
+      ),
+      encryptBlob(
+        encryptionKey,
+        localIdentityPrivateKey,
+        Buffer.from('identity_keys:__local__:private'),
+      ),
+      0,
+    );
+
+    const registrationBytes = new Uint8Array(4);
+    new DataView(registrationBytes.buffer).setUint32(0, options.localRegistrationId, false); // big-endian
+    stmts.storeIdentityKey.run(
+      '__registration_id__',
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:public'),
+      ),
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:private'),
+      ),
+      0,
+    );
+  }
+
+  // If the local key pair exists but the registration row does not, initialise
+  // registration id independently.
+  const existingRegistrationRow = stmts.loadIdentityKeyRow.get('__registration_id__') as
+    | { key_pair_public: Buffer; key_pair_private: Buffer }
+    | undefined;
+
+  if (!existingRegistrationRow && options?.localRegistrationId !== undefined) {
+    if (options.localRegistrationId < 1 || options.localRegistrationId > 16383) {
+      throw new Error('signal-db: localRegistrationId out of range [1, 16383]');
+    }
+    const registrationBytes = new Uint8Array(4);
+    new DataView(registrationBytes.buffer).setUint32(0, options.localRegistrationId, false); // big-endian
+    stmts.storeIdentityKey.run(
+      '__registration_id__',
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:public'),
+      ),
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:private'),
+      ),
+      0,
+    );
+  }
+
   // ── ISessionStore ────────────────────────────────────────────────────────
 
   async function loadSession(address: string): Promise<Uint8Array | null> {
@@ -259,10 +440,12 @@ export function openSignalDatabase(
     if (!row) {
       throw new Error('signal-db: local identity key pair not initialised');
     }
-    return {
-      publicKey: decryptBlob(encryptionKey, row.key_pair_public, Buffer.from('identity_keys:__local__:public')),
-      privateKey: decryptBlob(encryptionKey, row.key_pair_private, Buffer.from('identity_keys:__local__:private')),
-    };
+    const publicKey = decryptBlob(encryptionKey, row.key_pair_public, Buffer.from('identity_keys:__local__:public'));
+    const privateKey = decryptBlob(encryptionKey, row.key_pair_private, Buffer.from('identity_keys:__local__:private'));
+    if (publicKey.length === 0 || privateKey.length !== 32) {
+      throw new Error('signal-db: corrupted __local__ key material');
+    }
+    return { publicKey, privateKey };
   }
 
   async function getLocalRegistrationId(): Promise<number> {
@@ -273,6 +456,9 @@ export function openSignalDatabase(
       throw new Error('signal-db: local registration ID not initialised');
     }
     const decrypted = decryptBlob(encryptionKey, row.key_pair_public, Buffer.from('identity_keys:__registration_id__:public'));
+    if (decrypted.length !== 4) {
+      throw new Error('signal-db: corrupted __registration_id__ value');
+    }
     const view = new DataView(
       decrypted.buffer,
       decrypted.byteOffset,
@@ -289,8 +475,23 @@ export function openSignalDatabase(
       | { key_pair_public: Buffer }
       | undefined;
 
-    const encryptedPublic = encryptBlob(encryptionKey, identityKey, Buffer.from(`identity_keys:${address}:public`));
-    const encryptedPrivate = encryptBlob(encryptionKey, new Uint8Array(0), Buffer.from(`identity_keys:${address}:private`));
+    const encryptedPublic = encryptBlob(
+      encryptionKey,
+      identityKey,
+      Buffer.from(`identity_keys:${address}:public`),
+    );
+    const needsLocalPrivate =
+      address === '__local__' ||
+      (localIdentityAddress !== null && address === localIdentityAddress);
+    if (needsLocalPrivate && !localIdentityPrivateKey) {
+      throw new Error('signal-db: local identity private key not initialised');
+    }
+    const privatePlaintext = needsLocalPrivate ? localIdentityPrivateKey! : new Uint8Array(0);
+    const encryptedPrivate = encryptBlob(
+      encryptionKey,
+      privatePlaintext,
+      Buffer.from(`identity_keys:${address}:private`),
+    );
     stmts.storeIdentityKey.run(address, encryptedPublic, encryptedPrivate, 0);
 
     if (!existing) return false;
@@ -428,10 +629,72 @@ export function openSignalDatabase(
     return decryptBlob(encryptionKey, row.key, Buffer.from(`legacy_ember_keys:${emberId}`));
   }
 
+  // ── Local identity initialisation ─────────────────────────────────────────
+
+  function initializeLocalIdentity(
+    identityKeyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array },
+    registrationId: number,
+    localIdentityAddressArg?: string,
+  ): void {
+    if (identityKeyPair.privateKey.length !== 32) {
+      throw new Error('signal-db: expected 32-byte Ed25519 identity private key');
+    }
+    if (identityKeyPair.publicKey.length === 0) {
+      throw new Error('signal-db: expected non-empty identityKeyPair.publicKey');
+    }
+    if (registrationId < 1 || registrationId > 16383) {
+      throw new Error('signal-db: registrationId out of range [1, 16383]');
+    }
+
+    if (localIdentityAddressArg) {
+      localIdentityAddress = localIdentityAddressArg;
+    }
+
+    localIdentityPrivateKey = identityKeyPair.privateKey;
+    localIdentityPublicKey = identityKeyPair.publicKey;
+
+    // __local__ identity keypair.
+    stmts.storeIdentityKey.run(
+      '__local__',
+      encryptBlob(
+        encryptionKey,
+        identityKeyPair.publicKey,
+        Buffer.from('identity_keys:__local__:public'),
+      ),
+      encryptBlob(
+        encryptionKey,
+        identityKeyPair.privateKey,
+        Buffer.from('identity_keys:__local__:private'),
+      ),
+      0,
+    );
+
+    // __registration_id__ row: value stored in `key_pair_public`.
+    const registrationBytes = new Uint8Array(4);
+    new DataView(registrationBytes.buffer).setUint32(0, registrationId, false); // big-endian
+
+    stmts.storeIdentityKey.run(
+      '__registration_id__',
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:public'),
+      ),
+      encryptBlob(
+        encryptionKey,
+        registrationBytes,
+        Buffer.from('identity_keys:__registration_id__:private'),
+      ),
+      0,
+    );
+  }
+
   // ── closeDatabase ────────────────────────────────────────────────────────
 
   function closeDatabase(): void {
-    db.close();
+    if (db) {
+      db.close();
+    }
   }
 
   return {
@@ -461,6 +724,7 @@ export function openSignalDatabase(
     loadDistributionId,
     storeLegacyEmberKey,
     loadLegacyEmberKey,
+    initializeLocalIdentity,
     closeDatabase,
   };
 }

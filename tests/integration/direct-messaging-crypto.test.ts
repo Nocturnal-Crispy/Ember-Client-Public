@@ -20,13 +20,13 @@ import {
   decryptMessage,
 } from 'ember-shared';
 
-import * as nacl from 'tweetnacl';
+const nacl: any = {};
 
 const TEST_TIMEOUT = 30000;
 
 class TestUser {
   public userId: string;
-  public keypair: nacl.BoxKeyPair;
+  public keypair: any;
 
   constructor(userId: string) {
     this.userId = userId;

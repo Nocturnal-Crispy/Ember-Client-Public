@@ -1,5 +1,6 @@
 /**
  * Renderer-side logger — forwards logs to the main process terminal via IPC.
+ * In development mode, also requests main process to write to ./logs directory.
  * Loaded before other renderer scripts so all modules can call window.emberLog.createLogger().
  */
 (function (): void {
@@ -19,6 +20,13 @@
     const now = new Date();
     const p2 = (n: number): string => String(n).padStart(2, "0");
     return `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
+  }
+
+  // Check if we're in development mode
+  function isDevelopment(): boolean {
+    return window.location.protocol === 'file:' || 
+           window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1';
   }
 
   function fmtData(data?: Record<string, unknown>): string {
@@ -68,8 +76,18 @@
       /* silently ignore — IPC not yet available */
     }
 
-    // Also mirror to browser DevTools
+    // Also mirror to browser DevTools and write to file in development
     const full = `[${ts()}] [${level.toUpperCase().padEnd(5)}] [${context}] ${message}${fmtData(data)}`;
+    
+    // In development, also request main process to write to file
+    if (isDevelopment()) {
+      try {
+        window.electronAPI?.ipc?.send("log-to-file", full);
+      } catch (error) {
+        // Ignore if file logging not available
+      }
+    }
+    
     switch (level) {
       case "debug":
         console.debug(full);

@@ -28,7 +28,11 @@
         log.error("No pending invite data found!");
         return;
       }
-      log.debug("Retrieved pending invite:", { code: invite.code, hostname: invite.hostname });
+      // Never log invite codes (they are effectively authentication tokens).
+      log.debug("Retrieved pending invite:", {
+        has_code: invite.code.length > 0,
+        hostname: invite.hostname,
+      });
       processInviteLink(invite.code, invite.hostname);
     } catch (error) {
       const err = error as Error;
@@ -345,11 +349,26 @@
         };
         throw new Error(errorData.error ?? "Failed to create invite");
       }
-      const data = (await response.json()) as { invite_url?: string };
+      const data = (await response.json()) as { invite_url?: string; invite_id?: string };
       const inviteLinkInput = getInviteLinkInput();
       const inviteLinkResult = getInviteLinkResult();
       if (inviteLinkInput) inviteLinkInput.value = data.invite_url ?? "";
       inviteLinkResult?.classList.remove("hidden");
+      
+      // Setup ephemeral keys for the invite if this is a Signal ember
+      if (isSignalEmber && data.invite_id && window.App.signalSessionManager) {
+        try {
+          log.info("Setting up invite ephemeral keys...", { invite_id: data.invite_id });
+          await window.App.signalSessionManager.setupInviteEphemeralKeys(data.invite_id, App.activeEmberId!);
+          log.info("Invite ephemeral keys setup complete");
+        } catch (error) {
+          const err = error as Error;
+          log.error("Failed to setup invite ephemeral keys:", { error: err.message });
+          // Don't fail the entire invite creation for ephemeral key setup errors
+          showCreateInviteError("Invite created but ephemeral key setup failed");
+        }
+      }
+      
       log.info("Invite created successfully", { ember_id: App.activeEmberId });
     } catch (error) {
       const err = error as Error;
@@ -542,6 +561,7 @@
       const data = (await response.json()) as {
         ember_id?: string;
         ember_name?: string;
+        invite_id?: string;
       };
       if (data.ember_id) {
         log.info("Joined server via invite", {
@@ -549,6 +569,19 @@
           name: data.ember_name ?? "",
           isSignalEmber,
         });
+
+        // Process ephemeral keys if this is a Signal Protocol v2.3 ember
+        if (isSignalEmber && data.invite_id && window.App.signalSessionManager) {
+          try {
+            log.info("Processing invite ephemeral keys...", { invite_id: data.invite_id });
+            await window.App.signalSessionManager.completeInviteAcceptance(data.invite_id, data.ember_id);
+            log.info("Invite ephemeral keys processed successfully");
+          } catch (error) {
+            const err = error as Error;
+            log.error("Failed to process invite ephemeral keys:", { error: err.message });
+            // Don't fail the entire invite acceptance for ephemeral key processing errors
+          }
+        }
       }
       closeAcceptInviteModal();
       window.hideWelcomeScreen();
@@ -573,7 +606,7 @@
     code: string,
     hostname: string | null
   ): Promise<void> {
-    log.info("Processing invite link", { code, hostname });
+    log.info("Processing invite link", { hostname, has_code: code.length > 0 });
     try {
       log.debug("Getting auth data...");
       const auth = (await ipcRenderer.invoke("get-auth")) as {
@@ -586,7 +619,7 @@
         return;
       }
       const targetHostname = hostname ?? auth.hostname!;
-      log.debug("Making request to:", { targetHostname, code });
+      log.debug("Making request to:", { targetHostname, has_code: code.length > 0 });
       const response = await fetch(`${targetHostname}/api/v1/invites/${code}`, {
         method: "GET",
         headers: { Authorization: `Bearer ${auth.token}` },
