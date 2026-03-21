@@ -580,7 +580,7 @@
     }
 
     // Signal Protocol is required for direct messaging
-    const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
+    const errMsg = "Encryption unavailable — session not established. Please restart the application.";
     (window as any).showInputError?.(errMsg);
     throw new Error(errMsg);
   }

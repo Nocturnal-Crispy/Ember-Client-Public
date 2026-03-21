@@ -215,8 +215,7 @@
         { distributionId }
       );
       if (!response.success || !response.data?.distributionMessage) {
-        // Handle both old format { success: false, error: ... } and new format { success: false, data: { error: ... } }
-        const errorMessage = response.data?.error || response.error || 'Unknown error';
+        const errorMessage = response.error ?? 'Unknown error';
         throw new Error(`Failed to create sender key distribution: ${errorMessage}`);
       }
       return {
@@ -268,17 +267,22 @@
         
         if (bundleResponse.ok) {
           const bundle = (await bundleResponse.json()) as Record<string, unknown>;
-          await window.emberAPI.invoke("ProcessPreKeyBundle", {
+          const signedPreKey = bundle["signed_pre_key"] as Record<string, unknown> | undefined;
+          const oneTimePreKey = bundle["one_time_pre_key"] as Record<string, unknown> | undefined;
+          const pkbResult = await window.emberAPI.invoke("ProcessPreKeyBundle", {
             recipientAddress: address,
             registrationId: bundle["registration_id"],
-            deviceId: Number(bundle["device_id"]),
-            preKeyId: bundle["prekey_id"] ?? undefined,
-            preKey: bundle["prekey_public"] ?? undefined,
-            signedPreKeyId: bundle["signed_prekey_id"],
-            signedPreKey: bundle["signed_prekey_public"],
-            signedPreKeySignature: bundle["signed_prekey_signature"],
+            deviceId: 1,
+            preKeyId: oneTimePreKey?.["id"] ?? undefined,
+            preKey: oneTimePreKey?.["public_key"] ?? undefined,
+            signedPreKeyId: signedPreKey?.["id"],
+            signedPreKey: signedPreKey?.["public_key"],
+            signedPreKeySignature: signedPreKey?.["signature"],
             identityKey: bundle["identity_key"],
           });
+          if (!pkbResult.success) {
+            throw new Error(`ProcessPreKeyBundle failed for ${address}: ${pkbResult.error ?? 'unknown'}`);
+          }
           log.info("Self-session established successfully", { address });
           return;
         } else {
@@ -311,17 +315,22 @@
         
         if (bundleResponse.ok) {
           const bundle = (await bundleResponse.json()) as Record<string, unknown>;
-          await window.emberAPI.invoke("ProcessPreKeyBundle", {
+          const signedPreKey = bundle["signed_pre_key"] as Record<string, unknown> | undefined;
+          const oneTimePreKey = bundle["one_time_pre_key"] as Record<string, unknown> | undefined;
+          const pkbResult = await window.emberAPI.invoke("ProcessPreKeyBundle", {
             recipientAddress: address,
             registrationId: bundle["registration_id"],
-            deviceId: Number(bundle["device_id"]),
-            preKeyId: bundle["prekey_id"] ?? undefined,
-            preKey: bundle["prekey_public"] ?? undefined,
-            signedPreKeyId: bundle["signed_prekey_id"],
-            signedPreKey: bundle["signed_prekey_public"],
-            signedPreKeySignature: bundle["signed_prekey_signature"],
+            deviceId: 1,
+            preKeyId: oneTimePreKey?.["id"] ?? undefined,
+            preKey: oneTimePreKey?.["public_key"] ?? undefined,
+            signedPreKeyId: signedPreKey?.["id"],
+            signedPreKey: signedPreKey?.["public_key"],
+            signedPreKeySignature: signedPreKey?.["signature"],
             identityKey: bundle["identity_key"],
           });
+          if (!pkbResult.success) {
+            throw new Error(`ProcessPreKeyBundle failed for ${address}: ${pkbResult.error ?? 'unknown'}`);
+          }
           log.info("Signal session established", { address });
           return; // Success - exit retry loop
         } else {
@@ -420,12 +429,11 @@
             device_id: currentUserAuth.device_id 
           });
         } else {
-          // CRITICAL FIX: Log encryption failures with context
           log.error("Self-encryption failed", {
             ember_id: emberId,
             user_id: currentUserAuth.user_id,
             device_id: currentUserAuth.device_id,
-            error: encResponse.error || 'Unknown encryption error'
+            error: encResponse.error ?? 'Unknown encryption error'
           });
         }
       }

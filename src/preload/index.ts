@@ -111,10 +111,29 @@ try {
       });
     }
   } else if (savedTheme) {
-    preloadLog("warn", "Theme settings failed validation in preload; missing document element", {
-      hasDocument: !!document.documentElement,
-      hasTheme: !!savedTheme
-    });
+    // document.documentElement not yet available — defer theme application to DOMContentLoaded
+    preloadLog("debug", "Theme deferred to DOMContentLoaded; document.documentElement not yet available");
+    document.addEventListener("DOMContentLoaded", () => {
+      const root = document.documentElement;
+      if (!root) return;
+      if (isValidPreloadRgb(savedTheme.accentRgb)) {
+        root.style.setProperty("--rgb-highlight", savedTheme.accentRgb);
+      }
+      if (isValidPreloadRgb(savedTheme.backgroundRgb)) {
+        root.style.setProperty("--rgb-background", savedTheme.backgroundRgb);
+      }
+      if (isValidPreloadRgb(savedTheme.surfaceRgb)) {
+        root.style.setProperty("--rgb-surface", savedTheme.surfaceRgb);
+        const hoverParts = savedTheme.surfaceRgb
+          .split(",")
+          .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
+        root.style.setProperty("--rgb-surface-hover", hoverParts.join(", "));
+      }
+      if (savedTheme.chatColor) {
+        root.style.setProperty("--chat-color", savedTheme.chatColor);
+      }
+      preloadLog("debug", "Theme applied on DOMContentLoaded");
+    }, { once: true });
   } else {
     preloadLog("debug", "No saved theme settings found in preload");
   }
@@ -179,6 +198,7 @@ const ALLOWED_ON: readonly string[] = [
   "update-download-error",
   "window-blur",
   "window-focus",
+  "signal-db-unavailable",
 ];
 
 preloadLog("debug", "Setting up contextBridge API");

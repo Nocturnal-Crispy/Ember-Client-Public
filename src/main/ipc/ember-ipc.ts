@@ -78,9 +78,11 @@ import {
 import {
   ProtocolAddress,
   PublicKey,
+  PrivateKey,
   PreKeyBundle as LibSignalPreKeyBundle,
   CiphertextMessageType,
   processPreKeyBundle,
+  KEMKeyPair,
 } from '@signalapp/libsignal-client';
 import type { Uuid } from '@signalapp/libsignal-client';
 import {
@@ -381,23 +383,72 @@ function buildSignalStores(db: SignalDatabase) {
 
 async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKeyBundleArgs): Promise<void> {
   const stores = buildSignalStores(db);
+
+  // Coerce numeric fields first — IPC serialization may deliver non-number types
+  const registrationId = Number(args.registrationId) || 0;
+  const deviceId = Number(args.deviceId) || 1;
+  const signedPreKeyId = Number(args.signedPreKeyId);
+  const preKeyId = args.preKeyId != null ? Number(args.preKeyId) : null;
+
+  log.debug('ProcessPreKeyBundle args', {
+    recipient: args.recipientAddress,
+    registrationId,
+    deviceId,
+    signedPreKeyId,
+    preKeyId,
+    hasIdentityKey: typeof args.identityKey === 'string' && args.identityKey.length > 0,
+    hasSignedPreKey: typeof args.signedPreKey === 'string' && args.signedPreKey.length > 0,
+    hasSignedPreKeySignature: typeof args.signedPreKeySignature === 'string' && args.signedPreKeySignature.length > 0,
+    hasPreKey: typeof args.preKey === 'string' && args.preKey.length > 0,
+    rawTypes: {
+      registrationId: typeof args.registrationId,
+      deviceId: typeof args.deviceId,
+      signedPreKeyId: typeof args.signedPreKeyId,
+      preKeyId: typeof args.preKeyId,
+    },
+  });
+
+  if (!Number.isFinite(signedPreKeyId)) {
+    throw new Error(`Invalid signedPreKeyId: ${String(args.signedPreKeyId)} (type: ${typeof args.signedPreKeyId})`);
+  }
+  if (!args.identityKey) {
+    throw new Error('Missing identityKey in ProcessPreKeyBundle args');
+  }
+  if (!args.signedPreKey) {
+    throw new Error('Missing signedPreKey in ProcessPreKeyBundle args');
+  }
+  if (!args.signedPreKeySignature) {
+    throw new Error('Missing signedPreKeySignature in ProcessPreKeyBundle args');
+  }
+
   const recipientAddress = ProtocolAddress.new(args.recipientAddress, 1);
   const identityKey = PublicKey.deserialize(Buffer.from(args.identityKey, 'base64'));
   const signedPreKey = PublicKey.deserialize(Buffer.from(args.signedPreKey, 'base64'));
   const signedPreKeySignature = Buffer.from(args.signedPreKeySignature, 'base64');
   const preKey = args.preKey ? PublicKey.deserialize(Buffer.from(args.preKey, 'base64')) : null;
+
+  // libsignal v0.89+ requires Kyber PQ pre-key fields (non-nullable).
+  // Generate an ephemeral Kyber keypair and sign it with the identity key
+  // so that PreKeyBundle.new() succeeds. The Kyber key is not persisted
+  // server-side yet; it only satisfies the bundle construction requirement.
+  const kyberKeyPair = KEMKeyPair.generate();
+  const kyberPublicKey = kyberKeyPair.getPublicKey();
+  const localIdentityKey = await stores.identityStore.getIdentityKey();
+  const kyberSignature = localIdentityKey.sign(new Uint8Array(kyberPublicKey.serialize()));
+  const kyberPreKeyId = signedPreKeyId; // reuse signed pre-key ID as placeholder
+
   const bundle = LibSignalPreKeyBundle.new(
-    args.registrationId,
-    args.deviceId,
-    args.preKeyId ?? null,
+    registrationId,
+    deviceId,
+    preKeyId,
     preKey,
-    args.signedPreKeyId,
+    signedPreKeyId,
     signedPreKey,
     signedPreKeySignature,
     identityKey,
-    // Kyber PQ prekey fields — not provided via IPC; native binding accepts null.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    null as any, null as any, null as any,
+    kyberPreKeyId,
+    kyberPublicKey,
+    new Uint8Array(kyberSignature),
   );
   await processPreKeyBundle(
     bundle,
@@ -537,7 +588,7 @@ export async function dispatchEmberCmd(
       .replace(/[A-Za-z0-9+/]{20,}={0,2}/g, '[REDACTED]')
       .replace(/[A-Za-z0-9\-_]{20,}/g, '[REDACTED]')
       .replace(/[0-9a-f]{40,}/g, '[REDACTED]');
-    return { success: false, data: { error: sanitised } };
+    return { success: false, error: sanitised };
   }
 }
 

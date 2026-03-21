@@ -15,11 +15,22 @@
   const SK_VERSION = 2;
 
   function textToBase64(text: string): string {
-    return Buffer.from(text, 'utf8').toString('base64');
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(text);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   function base64ToText(b64: string): string {
-    return Buffer.from(b64, 'base64').toString('utf8');
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
   }
 
   async function tryGroupEncrypt(
@@ -53,7 +64,7 @@
         log.warn("GroupEncrypt failed", {
           ember_id: emberId,
           distribution_id: distResp.data!.distribution_id,
-          error: (encResp as any).data?.error ?? (encResp as any).error ?? 'unknown',
+          error: encResp.error ?? 'unknown',
         });
         return null;
       }
@@ -67,7 +78,11 @@
         sa: `${auth.user_id}.${auth.device_id}`,
         ct: encResp.data.ciphertext,
       });
-    } catch {
+    } catch (err) {
+      log.error("tryGroupEncrypt exception", {
+        ember_id: emberId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
@@ -198,9 +213,13 @@
         messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey!);
         window.clearPendingAttachment();
       }
+      log.debug("Attempting group encrypt", {
+        ember_id: App.activeEmberId,
+        has_ember_id: !!App.activeEmberId,
+      });
       const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
       if (!groupCiphertext) {
-        const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
+        const errMsg = "Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.";
         (window as any).showInputError?.(errMsg);
         throw new Error(errMsg);
       }
@@ -237,7 +256,7 @@
         channel_id: App.activeChannelId ?? "",
         error: err.message,
       });
-      const showMsg = err.message.includes("Signal Protocol encryption not ready")
+      const showMsg = err.message.includes("Encryption unavailable")
         ? err.message
         : `Failed to send: ${err.message}`;
       (window as any).showInputError?.(showMsg);
@@ -286,7 +305,7 @@
         throw new Error(errBody.error ?? `Edit failed: ${response.status}`);
       }
     } else {
-      const errMsg = "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized";
+      const errMsg = "Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.";
       (window as any).showInputError?.(errMsg);
       throw new Error(errMsg);
     }

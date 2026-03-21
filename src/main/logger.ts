@@ -37,13 +37,19 @@ function initializeFileLogging() {
       fs.mkdirSync(logsDir, { recursive: true });
     }
     
-    const logFileName = `ember-client-${new Date().toISOString().split('T')[0]}.log`;
+    // Create timestamp-based filename for each app startup
+    const now = new Date();
+    const timestamp = now.toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_')
+      .split('.')[0]; // Remove milliseconds
+    const logFileName = `ember-client-${timestamp}.log`;
     const logFilePath = path.join(logsDir, logFileName);
     
-    logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+    logFileStream = fs.createWriteStream(logFilePath, { flags: 'w' });
     
-    // Write header when starting
-    logFileStream.write(`\n=== Ember Client Session Started at ${new Date().toISOString()} ===\n`);
+    // Write header when starting new session
+    logFileStream.write(`=== Ember Client Started at ${new Date().toISOString()} ===\n`);
     
     // Ensure file is closed on exit
     process.on('exit', () => {

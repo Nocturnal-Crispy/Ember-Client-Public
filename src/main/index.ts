@@ -20,7 +20,7 @@ import {
 import { isDev } from "./dev";
 import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../shared/types";
-import { openSignalDatabase } from "./signal-db";
+import { openSignalDatabase, ensureSignalDatabaseFile } from "./signal-db";
 import type { SignalDatabase } from "./signal-db";
 import { registerEmberIpcHandlers, updateSignalDatabase } from "./ipc/ember-ipc";
 import { resolveSignalKeyBytes } from "./signal-key-utils";
@@ -353,9 +353,9 @@ ipcMain.on("window-close", () => {
 
 // ─── Signal Database Management ─────────────────────────────────────────────────
 
-async function reinitializeSignalDatabase(): Promise<void> {
+async function reinitializeSignalDatabase(): Promise<boolean> {
   log.info("Re-initializing Signal database with current auth data");
-  
+
   // Close existing database if open
   if (signalDb) {
     signalDb.closeDatabase();
@@ -369,7 +369,7 @@ async function reinitializeSignalDatabase(): Promise<void> {
   let localIdentityPrivateKeyBytes: Buffer | null = null;
   let localRegistrationId: number | null = null;
   let localIdentityAddress: string | null = null;
-  
+
   if (authData && authData.user_id && authData.device_id) {
     // Get Signal identity private key for Signal database authentication
     const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
@@ -414,13 +414,26 @@ async function reinitializeSignalDatabase(): Promise<void> {
       });
       updateSignalDatabase(signalDb);
       log.info("Signal database re-initialized and IPC handlers updated");
+      return true;
     } catch (err) {
-      log.warn("Failed to re-initialize signal database; Signal IPC unavailable", { error: String(err) });
+      const errorStr = String(err);
+      log.error("Failed to re-initialize signal database; Signal IPC unavailable", { error: errorStr });
       updateSignalDatabase(null);
+
+      // Notify the user that encryption is broken and why
+      const isNativeModuleError = errorStr.includes('NODE_MODULE_VERSION') ||
+        errorStr.includes('did not self-register');
+      const userMessage = isNativeModuleError
+        ? 'Signal database failed to initialize: native module not compiled for Electron.\n\n'
+          + 'Run "npm run rebuild-native" then restart the application.'
+        : `Signal database failed to initialize: ${errorStr}\n\nEncryption is unavailable. Please restart the application.`;
+      dialog.showErrorBox('Signal Database Error', userMessage);
+      return false;
     }
   } else {
-    log.warn("No Signal identity key found for Signal database re-initialization");
+    log.error("No Signal identity key found for Signal database re-initialization");
     updateSignalDatabase(null);
+    return false;
   }
 }
 
@@ -428,10 +441,17 @@ async function reinitializeSignalDatabase(): Promise<void> {
 
 ipcMain.on("auth-success", async () => {
   log.info("Auth success signal received, re-initializing Signal database");
-  
-  // CRITICAL FIX: Re-initialize Signal database with new auth data
-  await reinitializeSignalDatabase();
-  
+
+  const dbReady = await reinitializeSignalDatabase();
+
+  if (!dbReady) {
+    log.error("Signal database initialization failed — app cannot proceed without encryption");
+    // Don't load the main window; the error dialog already told the user what to do.
+    // Close the app so the user can fix the native module and restart.
+    app.quit();
+    return;
+  }
+
   log.info("Loading main window");
   if (mainWindow) {
     mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
@@ -1200,11 +1220,34 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     log.info("App ready");
+
+    // ── Early Signal database check ──────────────────────────────────────────
+    // Create the database file + schema before anything else. This catches
+    // native-module issues (NODE_MODULE_VERSION / self-register) immediately
+    // at startup instead of after the user has gone through registration.
+    try {
+      ensureSignalDatabaseFile(app.getPath("userData"));
+      log.info("Signal database file verified");
+    } catch (err) {
+      const errorStr = String(err);
+      log.error("Signal database file check failed at startup", { error: errorStr });
+
+      const isNativeModuleError = errorStr.includes('NODE_MODULE_VERSION') ||
+        errorStr.includes('did not self-register');
+      const userMessage = isNativeModuleError
+        ? 'The native database module is not compiled for this version of Electron.\n\n'
+          + 'Run "npm run rebuild-native" and restart the application.'
+        : `Signal database could not be created:\n${errorStr}`;
+      dialog.showErrorBox('Signal Database Error', userMessage);
+      app.quit();
+      return;
+    }
+
     checkSafeStorageAtStartup();
-    
+
     // Initialize auth service with safeStorage
     initializeAuthWithElectronSafeStorage();
-    
+
     await cleanOrphanedAudioModules();
     registerAudioCaptureHandlers(process.pid);
 
@@ -1262,7 +1305,8 @@ if (!gotTheLock) {
         registerEmberIpcHandlers(signalDb);
         log.info("Signal database opened and IPC handlers registered");
       } catch (err) {
-        log.warn("Failed to open signal database; Signal IPC unavailable", { error: String(err) });
+        const errorStr = String(err);
+        log.error("Failed to open signal database; Signal IPC unavailable", { error: errorStr });
         registerEmberIpcHandlers(null);
       }
     } else {

@@ -223,7 +223,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
       
       // Handle null/undefined result as encryption not ready
       if (!result) {
-        throw new Error('Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized');
+        throw new Error('Encryption unavailable — sender key not established. Please rejoin or restart the application.');
       }
       
       return result;

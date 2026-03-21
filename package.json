@@ -8,9 +8,10 @@
     "build:shared": "cd ember-shared && npm install && npm run build && cd .. && mkdir -p node_modules/ember-shared && cp -r ember-shared/dist/. node_modules/ember-shared/dist/ && cp -r ember-shared/package.json node_modules/ember-shared/",
     "inject-key": "./scripts/secure-build.sh --inject-only",
     "secure-build": "./scripts/secure-build.sh",
+    "prestart": "electron-rebuild -f -w better-sqlite3",
     "start": "npm run build && electron .",
-    "dev": "NODE_ENV=development npm run build && electron .",
-    "dev:watch": "NODE_ENV=development npm run build && electron .",
+    "dev": "npm run prestart && NODE_ENV=development npm run build && electron .",
+    "dev:watch": "npm run prestart && NODE_ENV=development npm run build && electron .",
     "dist": "npm run secure-build && electron-builder",
     "dist:linux": "npm run secure-build && electron-builder --linux",
     "dist:win": "npm run secure-build && electron-builder --win",
@@ -25,7 +26,8 @@
     "test:e2e:report": "playwright show-report test-results-report",
     "test:all": "npm run test && npm run test:e2e",
     "release": "npm run build && ./scripts/release.sh",
-    "rebuild-native": "electron-rebuild -f -w better-sqlite3,windows-audio-capture,linux-audio-capture"
+    "rebuild-native": "electron-rebuild -f -w better-sqlite3,windows-audio-capture,linux-audio-capture",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "keywords": [
     "typescript",

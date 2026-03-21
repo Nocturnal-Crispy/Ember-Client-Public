@@ -171,6 +171,40 @@ function bufferEquals(a: Uint8Array, b: Uint8Array): boolean {
   return nodeCrypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
+// ─── Early startup check ──────────────────────────────────────────────────────
+
+/**
+ * Create the Signal database file and schema without binding an encryption key.
+ *
+ * Call this at app startup — before the login screen is shown — to verify that
+ * better-sqlite3 loads correctly and the database file is writable. If this
+ * throws, the native module is broken and the user should see an error
+ * immediately, not after they have already gone through registration.
+ *
+ * The call is idempotent: if the file and tables already exist, it is a no-op.
+ */
+export function ensureSignalDatabaseFile(userDataPath: string): void {
+  const dbPath = path.join(userDataPath, DB_FILENAME);
+  let db: Database.Database | undefined;
+
+  try {
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+
+    for (const ddl of DDL_STATEMENTS) {
+      db.prepare(ddl).run();
+    }
+  } finally {
+    if (db) {
+      try {
+        db.close();
+      } catch {
+        // Ignore errors during cleanup
+      }
+    }
+  }
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
@@ -192,18 +226,15 @@ export function openSignalDatabase(
 ): SignalDatabase {
   const dbPath = path.join(userDataPath, DB_FILENAME);
   let db: Database.Database | undefined;
-  
+
   try {
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
 
-    // Create tables one at a time using prepared run statements to avoid
-    // the multi-statement exec API.
     for (const ddl of DDL_STATEMENTS) {
       db.prepare(ddl).run();
     }
   } catch (error) {
-    // Ensure database is closed if initialization fails
     if (db) {
       try {
         db.close();

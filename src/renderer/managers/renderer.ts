@@ -1040,6 +1040,22 @@
 
   log.info("Ember renderer initialized");
 
+  // Listen for Signal database initialization failures from main process
+  window.electronAPI.ipc.on("signal-db-unavailable", (_event: unknown, ...args: unknown[]) => {
+    const data = (args[0] ?? {}) as { error?: string };
+    log.error("Signal database unavailable — encryption disabled", { error: data?.error });
+    const messageInput = document.getElementById("message-input") as HTMLTextAreaElement | null;
+    if (messageInput) {
+      messageInput.disabled = true;
+      messageInput.placeholder = "Encryption unavailable — restart required";
+    }
+    const dmInput = document.getElementById("dm-input-field") as HTMLTextAreaElement | null;
+    if (dmInput) {
+      dmInput.disabled = true;
+      dmInput.placeholder = "Encryption unavailable — restart required";
+    }
+  });
+
   async function fetchMembers(emberId: string): Promise<Member[]> {
     log.debug("Fetching members", { ember_id: emberId });
     try {
