@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { TEST_SELECTORS } from '../test-constants';
 
 /**
  * Test Helper Utilities
@@ -88,39 +89,73 @@ export async function ensureLoginScreen(page: Page): Promise<void> {
   if (currentUrl.includes('index.html')) {
     console.log('⚠️ On main app screen, attempting to logout...');
     
-    // Try to find and click logout button
-    const logoutSelectors = [
-      '[data-testid="logout-button"]',
-      '.logout-button',
-      '#logout-button',
-      'button:has-text("Logout")',
-      'button:has-text("Log Out")',
-      'a:has-text("Logout")',
-      'a:has-text("Log Out")'
-    ];
-    
-    for (const selector of logoutSelectors) {
-      try {
-        const button = await page.$(selector);
-        if (button && await button.isVisible()) {
-          console.log(`✅ Found logout button: ${selector}`);
-          await button.click();
-          await page.waitForTimeout(2000);
-          break;
-        }
-      } catch {
-        continue;
-      }
-    }
-    
-    // Wait for navigation to login screen
+    // Ember logout flow: click username -> click logout menu -> confirm in modal
     try {
-      await page.waitForFunction(() => {
-        return document.location.href.includes('login.html');
-      }, { timeout: 5000 });
-      console.log('✅ Successfully logged out and redirected to login');
-    } catch {
-      console.log('⚠️ Could not confirm logout redirect');
+      // Step 1: Click on username display to open menu
+      const usernameDisplay = await page.$(TEST_SELECTORS.USERNAME_DISPLAY);
+      if (usernameDisplay && await usernameDisplay.isVisible()) {
+        console.log('✅ Found username display, clicking to open menu');
+        await usernameDisplay.click();
+        await page.waitForTimeout(1000);
+      } else {
+        console.log('⚠️ Username display not found, trying alternative logout selectors');
+        
+        // Fallback to simple logout buttons
+        const logoutSelectors = [
+          '[data-testid="logout-button"]',
+          '.logout-button',
+          '#logout-button',
+          'button:has-text("Logout")',
+          'button:has-text("Log Out")',
+          'a:has-text("Logout")',
+          'a:has-text("Log Out")'
+        ];
+        
+        for (const selector of logoutSelectors) {
+          try {
+            const button = await page.$(selector);
+            if (button && await button.isVisible()) {
+              console.log(`✅ Found logout button: ${selector}`);
+              await button.click();
+              await page.waitForTimeout(2000);
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+      
+      // Step 2: Click logout menu item if menu was opened
+      const logoutMenuItem = await page.$(TEST_SELECTORS.LOGOUT_MENU_ITEM);
+      if (logoutMenuItem && await logoutMenuItem.isVisible()) {
+        console.log('✅ Found logout menu item, clicking');
+        await logoutMenuItem.click();
+        await page.waitForTimeout(1000);
+      }
+      
+      // Step 3: Confirm logout in modal if it appears
+      const logoutModal = await page.$(TEST_SELECTORS.LOGOUT_MODAL);
+      if (logoutModal && await logoutModal.isVisible()) {
+        console.log('✅ Found logout modal, confirming logout');
+        const confirmButton = await page.$(TEST_SELECTORS.LOGOUT_CONFIRM_BUTTON);
+        if (confirmButton && await confirmButton.isVisible()) {
+          await confirmButton.click();
+          await page.waitForTimeout(2000);
+        }
+      }
+      
+      // Wait for navigation to login screen
+      try {
+        await page.waitForFunction(() => {
+          return document.location.href.includes('login.html');
+        }, { timeout: 5000 });
+        console.log('✅ Successfully logged out and redirected to login');
+      } catch {
+        console.log('⚠️ Could not confirm logout redirect');
+      }
+    } catch (error) {
+      console.log('⚠️ Error during logout process:', error);
     }
   }
   
