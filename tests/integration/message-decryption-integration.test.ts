@@ -58,7 +58,7 @@ describe('Message Decryption Integration', () => {
     // Mock emberAPI to return successful responses
     mockWindow.emberAPI.invoke.mockImplementation((cmd: string) => {
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'GroupEncrypt') {
         return Promise.resolve({ success: true, data: { ciphertext: 'encrypted-text' } });
@@ -102,7 +102,7 @@ describe('Message Decryption Integration', () => {
         return Promise.resolve({ success: true, data: { plaintext: 'decrypted-text' } });
       }
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'GetAuth') {
         return Promise.resolve({ 

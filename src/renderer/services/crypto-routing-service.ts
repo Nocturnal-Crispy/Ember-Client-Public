@@ -71,24 +71,24 @@
     try {
       // Load distribution ID for this ember
       let distResp = await window.emberAPI.invoke<{
-        distribution_id: string | null;
+        distributionId: string | null;
       }>('LoadDistributionId', { address: emberId });
 
-      if (!distResp.success || !distResp.data?.distribution_id) {
+      if (!distResp.success || !distResp.data?.distributionId) {
         log.warn('Distribution ID missing — attempting sender key recovery', { ember_id: emberId });
         const recovered = await window.ensureSenderKeyForEmber?.(emberId);
         if (!recovered) {
           log.warn('Sender key recovery failed — falling back to pairwise', { ember_id: emberId });
           return null;
         }
-        distResp = { success: true, data: { distribution_id: recovered } };
+        distResp = { success: true, data: { distributionId: recovered } };
       }
 
       const plaintextB64 = textToBase64(plaintext);
       const encResp = await window.emberAPI.invoke<{ ciphertext: string }>(
         'GroupEncrypt',
         {
-          distributionId: distResp.data!.distribution_id!,
+          distributionId: distResp.data!.distributionId!,
           plaintext: plaintextB64,
         }
       );

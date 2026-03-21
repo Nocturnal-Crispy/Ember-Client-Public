@@ -277,7 +277,7 @@ describe('CryptoRoutingService', () => {
       });
 
       mockEmberAPI.invoke
-        .mockResolvedValueOnce({ success: true, data: { distribution_id: 'dist-multi' } }) // LoadDistributionId
+        .mockResolvedValueOnce({ success: true, data: { distributionId: 'dist-multi' } }) // LoadDistributionId
         .mockResolvedValueOnce({ success: true, data: { ciphertext: 'encrypted-data' } }); // GroupEncrypt
 
       mockIpcRenderer.invoke.mockResolvedValueOnce({

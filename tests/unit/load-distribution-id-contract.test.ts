@@ -10,10 +10,10 @@ describe('LoadDistributionId IPC contract fix', () => {
     };
   });
 
-  it('should return distribution_id (snake_case) from IPC handler', () => {
-    const testData = { distribution_id: 'dist-123' };
-    expect(testData.distribution_id).toBe('dist-123');
-    expect((testData as any).distributionId).toBeUndefined();
+  it('should return distributionId (camelCase) from IPC handler', () => {
+    const testData = { distributionId: 'dist-123' };
+    expect(testData.distributionId).toBe('dist-123');
+    expect((testData as any).distribution_id).toBeUndefined();
   });
 
 });

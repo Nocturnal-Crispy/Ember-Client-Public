@@ -360,7 +360,7 @@ describe('Self-Distribution Fix for Solo Users', () => {
         });
       }
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'CreateSenderKeyDistribution') {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
@@ -399,31 +399,22 @@ describe('Self-Distribution Fix for Solo Users', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    // This should not throw and should create a self-distribution
+    // This should not throw and should install sender key locally for self
     const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
     expect(result).toBeUndefined(); // Function returns void
 
-    // Verify that the distribution API was called with exactly 1 distribution (self)
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:8085/api/v1/embers/test-ember/sender-key-distributions',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('recipient_user_id'),
-      })
+    // ProcessSenderKeyDistribution IS called for self — the IPC handler
+    // stores under a "self-recv::" prefix to keep the encrypt chain intact.
+    expect(mockEmberApiInvoke).toHaveBeenCalledWith(
+      'ProcessSenderKeyDistribution',
+      expect.objectContaining({ senderAddress: 'u1.d1' })
     );
 
-    // Parse the request body to verify self-distribution
-    const distributionCall = mockFetch.mock.calls.find(call => 
-      call[0].includes('/sender-key-distributions')
+    // Solo user with no other members → no server POST needed
+    const distributionCall = mockFetch.mock.calls.find(call =>
+      call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
     );
-    expect(distributionCall).toBeDefined();
-    
-    const requestBody = JSON.parse(distributionCall![1].body);
-    expect(requestBody.distributions).toHaveLength(1);
-    expect(requestBody.distributions[0]).toMatchObject({
-      recipient_user_id: 'u1',
-      recipient_device_id: 'd1',
-    });
+    expect(distributionCall).toBeUndefined();
   });
 
   it('should not duplicate self-distribution when user is in members list', async () => {
@@ -446,19 +437,21 @@ describe('Self-Distribution Fix for Solo Users', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    // This should create exactly 1 distribution (not 2)
+    // Self is installed locally, member list contains only self → skip in loop
     const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
     expect(result).toBeUndefined();
 
-    const distributionCall = mockFetch.mock.calls.find(call => 
-      call[0].includes('/sender-key-distributions')
+    // ProcessSenderKeyDistribution called for self (IPC stores under self-recv:: prefix)
+    expect(mockEmberApiInvoke).toHaveBeenCalledWith(
+      'ProcessSenderKeyDistribution',
+      expect.objectContaining({ senderAddress: 'u1.d1' })
     );
-    const requestBody = JSON.parse(distributionCall![1].body);
-    expect(requestBody.distributions).toHaveLength(1); // Should not duplicate
-    expect(requestBody.distributions[0]).toMatchObject({
-      recipient_user_id: 'u1',
-      recipient_device_id: 'd1',
-    });
+
+    // No other members → no server POST
+    const distributionCall = mockFetch.mock.calls.find(call =>
+      call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
+    );
+    expect(distributionCall).toBeUndefined();
   });
 
   it('should handle multiple members including self correctly', async () => {
@@ -491,79 +484,62 @@ describe('Self-Distribution Fix for Solo Users', () => {
       call[0].includes('/sender-key-distributions')
     );
     const requestBody = JSON.parse(distributionCall![1].body);
-    expect(requestBody.distributions).toHaveLength(2); // Self + 1 other
-    expect(requestBody.distributions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ recipient_user_id: 'u1', recipient_device_id: 'd1' }),
-        expect.objectContaining({ recipient_user_id: 'u2', recipient_device_id: 'd2' }),
-      ])
+    // Self is installed locally, only other member goes to server
+    expect(requestBody.distributions).toHaveLength(1);
+    expect(requestBody.distributions[0]).toMatchObject({
+      recipient_user_id: 'u2',
+      recipient_device_id: 'd2',
+    });
+
+    // ProcessSenderKeyDistribution called for self (IPC stores under self-recv:: prefix)
+    expect(mockEmberApiInvoke).toHaveBeenCalledWith(
+      'ProcessSenderKeyDistribution',
+      expect.objectContaining({ senderAddress: 'u1.d1' })
     );
   });
 
-  it('should establish Signal session with self before encrypting self-distribution', async () => {
+  it('should call ProcessSenderKeyDistribution for self-receive copy', async () => {
     // Mock empty members response (solo user scenario)
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ members: [] }) // Empty - solo user
-        });
-      }
-      if (url.includes('/sender-key-distributions')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ status: 'ok' })
-        });
-      }
-      if (url.includes('/prekey-bundle')) {
-        // This should be called for self-session establishment
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ registrationId: 1, deviceId: 'd1', identityKey: 'test-key' })
+          json: () => Promise.resolve({ members: [] })
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    // Track emberAPI calls to verify session establishment
+    // Track emberAPI calls
     const emberApiCalls: string[] = [];
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       emberApiCalls.push(cmd);
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
+        return Promise.resolve({
+          success: true,
           data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
         });
       }
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'CreateSenderKeyDistribution') {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
       }
-      if (cmd === 'LoadSession') {
-        // First call for self-session should return null (no session exists)
-        return Promise.resolve({ success: true, data: { record: null } });
-      }
-      if (cmd === 'ProcessPreKeyBundle') {
+      if (cmd === 'ProcessSenderKeyDistribution') {
         return Promise.resolve({ success: true, data: null });
-      }
-      if (cmd === 'Encrypt') {
-        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
       }
       return Promise.resolve({ success: true, data: null });
     });
 
     await (window as any).distributeSenderKeyToMembers?.('test-ember');
 
-    // Verify session establishment sequence was called for self
-    expect(emberApiCalls).toContain('LoadSession');
-    expect(emberApiCalls).toContain('ProcessPreKeyBundle');
-    
-    // Verify the calls happened in the right order (LoadSession before Encrypt)
-    const loadSessionIndex = emberApiCalls.indexOf('LoadSession');
-    const encryptIndex = emberApiCalls.indexOf('Encrypt');
-    expect(loadSessionIndex).toBeLessThan(encryptIndex);
+    // ProcessSenderKeyDistribution IS called for self — the IPC handler stores
+    // the receiver copy under a "self-recv::" prefix to avoid corrupting encrypt chain.
+    expect(emberApiCalls).toContain('ProcessSenderKeyDistribution');
+    // No pairwise session needed
+    expect(emberApiCalls).not.toContain('LoadSession');
+    expect(emberApiCalls).not.toContain('ProcessPreKeyBundle');
   });
 });
 
@@ -594,7 +570,7 @@ describe('Race Condition: Messages Before Keys', () => {
         });
       }
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'CreateSenderKeyDistribution') {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
@@ -662,7 +638,7 @@ describe('Race Condition: Messages Before Keys', () => {
       }
       if (cmd === 'LoadDistributionId') {
         operationOrder.push('load-distribution-id');
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'CreateSenderKeyDistribution') {
         operationOrder.push('create-sender-key-distribution');
@@ -741,7 +717,7 @@ describe('Race Condition: Messages Before Keys', () => {
         });
       }
       if (cmd === 'LoadDistributionId') {
-        return Promise.resolve({ success: true, data: { distribution_id: 'test-dist-id' } });
+        return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'CreateSenderKeyDistribution') {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
@@ -835,13 +811,13 @@ describe('Current Error Reproduction from Logs', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       });
 
-      // Mock emberAPI to support the self-session establishment flow
+      // Mock emberAPI to support local self-distribution
       let callSequence: string[] = [];
       mockEmberApiInvoke.mockImplementation((cmd: string) => {
         callSequence.push(cmd);
         if (cmd === 'GetAuth') {
-          return Promise.resolve({ 
-            success: true, 
+          return Promise.resolve({
+            success: true,
             data: { token: 'tok', userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818', hostname: 'http://localhost:8085', username: 'Mike' }
           });
         }
@@ -849,27 +825,16 @@ describe('Current Error Reproduction from Logs', () => {
           return Promise.resolve({ success: true, data: { key: null } });
         }
         if (cmd === 'LoadDistributionId') {
-          return Promise.resolve({ success: true, data: { distribution_id: '5d4e6048-c154-4220-a9b0-a538930f67fd' } });
+          return Promise.resolve({ success: true, data: { distributionId: '5d4e6048-c154-4220-a9b0-a538930f67fd' } });
         }
         if (cmd === 'CreateSenderKeyDistribution') {
-          return Promise.resolve({ 
-            success: true, 
-            data: { distributionMessage: 'test-distribution-message' } 
+          return Promise.resolve({
+            success: true,
+            data: { distributionMessage: 'test-distribution-message' }
           });
         }
-        if (cmd === 'LoadSession') {
-          // Return null to indicate no session exists (triggers self-session establishment)
-          return Promise.resolve({ success: true, data: { record: null } });
-        }
-        if (cmd === 'ProcessPreKeyBundle') {
+        if (cmd === 'ProcessSenderKeyDistribution') {
           return Promise.resolve({ success: true, data: null });
-        }
-        if (cmd === 'Encrypt') {
-          // This should now SUCCEED because we established a self-session
-          return Promise.resolve({ 
-            success: true, 
-            data: { ciphertext: 'encrypted', messageType: 1 } 
-          });
         }
         return Promise.resolve({ success: true, data: null });
       });
@@ -883,40 +848,13 @@ describe('Current Error Reproduction from Logs', () => {
         username: 'Mike'
       });
 
-      // This should now work with the self-session fix
+      // This should work with local self-distribution (no pairwise self-session needed)
       await expect((window as any).distributeSenderKeyToMembers?.('1c7c8f25-ab25-4e1e-8809-bd1e2306b6b2')).resolves.toBeUndefined();
 
-      // Verify the self-session establishment sequence was called
-      expect(callSequence).toContain('LoadSession');
-      expect(callSequence).toContain('ProcessPreKeyBundle');
-      expect(callSequence).toContain('Encrypt');
-      
-      // Verify the calls happened in the right order (LoadSession before Encrypt)
-      const loadSessionIndex = callSequence.indexOf('LoadSession');
-      const encryptIndex = callSequence.indexOf('Encrypt');
-      expect(loadSessionIndex).toBeLessThan(encryptIndex);
-
-      // Verify that the distribution API was called (indicating successful distribution)
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8085/api/v1/embers/1c7c8f25-ab25-4e1e-8809-bd1e2306b6b2/sender-key-distributions',
-        expect.objectContaining({
-          method: 'POST',
-          body: expect.stringContaining('recipient_user_id'),
-        })
-      );
-
-      // Parse the request body to verify self-distribution was created
-      const distributionCall = mockFetch.mock.calls.find(call => 
-        call[0].includes('/sender-key-distributions')
-      );
-      expect(distributionCall).toBeDefined();
-      
-      const requestBody = JSON.parse(distributionCall![1].body);
-      expect(requestBody.distributions).toHaveLength(1);
-      expect(requestBody.distributions[0]).toMatchObject({
-        recipient_user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
-        recipient_device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
-      });
+      // ProcessSenderKeyDistribution IS called for self (stored under self-recv:: prefix)
+      expect(callSequence).toContain('ProcessSenderKeyDistribution');
+      expect(callSequence).not.toContain('LoadSession');
+      expect(callSequence).not.toContain('ProcessPreKeyBundle');
     });
   });
 
@@ -1012,7 +950,7 @@ describe('Current Error Reproduction from Logs', () => {
         if (cmd === 'LoadDistributionId') {
           return Promise.resolve({ 
             success: true, 
-            data: { distribution_id: 'test-distribution-id' } 
+            data: { distributionId: 'test-distribution-id' } 
           });
         }
         return Promise.resolve({ success: true, data: null });
@@ -1102,7 +1040,7 @@ describe('ensureSenderKeyForEmber — Signal DB unavailable', () => {
       }
       if (cmd === 'LoadDistributionId') {
         // DB is available, but no distribution ID stored yet
-        return Promise.resolve({ success: true, data: { distribution_id: null } });
+        return Promise.resolve({ success: true, data: { distributionId: null } });
       }
       if (cmd === 'StoreDistributionId') {
         return Promise.resolve({ success: true, data: null });

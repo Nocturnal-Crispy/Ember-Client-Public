@@ -49,22 +49,20 @@
     try {
       // Test basic crypto operation by loading a distribution ID
       // This validates that the Signal database is accessible and using correct keys
-      const testResult = await window.emberAPI.invoke<{ distribution_id: string | null }>(
+      const testResult = await window.emberAPI.invoke<{ distributionId: string | null }>(
         "LoadDistributionId",
         { address: `${auth.user_id}.${auth.device_id}` }
       );
-      
+
       // Check if the operation succeeded
       if (!testResult.success) {
         throw new Error(`Crypto validation failed: ${testResult.error || 'Unknown error'}`);
       }
-      
-      // The operation should succeed without authentication failures
-      // Even if distribution_id is null, the operation should not fail with crypto errors
+
       log.debug('Crypto state validation passed', {
         user_id: auth.user_id,
         device_id: auth.device_id,
-        has_distribution_id: testResult.data?.distribution_id ? true : false
+        has_distribution_id: testResult.data?.distributionId ? true : false
       });
       
     } catch (error) {
@@ -240,13 +238,13 @@
   async function loadOrCreateDistributionId(emberId: string): Promise<string> {
     const cached = senderKeyDistributionIds.get(emberId);
     if (cached) return cached;
-    const response = await window.emberAPI.invoke<{ distribution_id: string | null }>(
+    const response = await window.emberAPI.invoke<{ distributionId: string | null }>(
       "LoadDistributionId",
       { address: emberId }
     );
-    if (response.success && response.data?.distribution_id) {
-      senderKeyDistributionIds.set(emberId, response.data.distribution_id);
-      return response.data.distribution_id;
+    if (response.success && response.data?.distributionId) {
+      senderKeyDistributionIds.set(emberId, response.data.distributionId);
+      return response.data.distributionId;
     }
     // Fail fast: if the DB itself is unavailable, no point trying StoreDistributionId
     if (!response.success && (response as any).error?.includes('Signal database not available')) {
@@ -465,50 +463,25 @@
         distribution_message: string;
       }> = [];
       
-      // CRITICAL FIX: Always include the current user's device in distributions
-      // This is required for Signal Protocol even when solo in a channel
-      const currentUserAuth = auth; // Use consistent auth data
-      if (currentUserAuth?.user_id && currentUserAuth?.device_id) {
-        // CRITICAL FIX: Ensure session with self first before encrypting
-        await ensureSignalSession(auth, currentUserAuth.user_id, currentUserAuth.device_id);
-        
-        // Add current user's device first (self-distribution)
-        const selfAddress = `${currentUserAuth.user_id}.${currentUserAuth.device_id}`;
-        const encResponse = await window.emberAPI.invoke<{
-          ciphertext: string;
-          messageType: number;
-        }>("Encrypt", {
-          recipientAddress: selfAddress,
-          plaintext: distributionMessage,
+      // Install a self-receive copy of the sender key. The IPC handler stores it
+      // under a "self-recv::" prefixed address so it doesn't corrupt the encrypt
+      // chain. This allows self-decrypt of own messages on history reload.
+      const selfAddress = `${auth.user_id}.${auth.device_id}`;
+      const selfProcessResult = await window.emberAPI.invoke(
+        "ProcessSenderKeyDistribution",
+        { senderAddress: selfAddress, distributionMessage }
+      );
+      if (!selfProcessResult.success) {
+        log.error("Failed to install self-receive sender key", {
+          ember_id: emberId,
+          error: selfProcessResult.error ?? 'Unknown error',
         });
-        if (encResponse.success && encResponse.data) {
-          const envelope = JSON.stringify({
-            ct: encResponse.data.ciphertext,
-            mt: encResponse.data.messageType,
-          });
-          distributions.push({
-            recipient_user_id: currentUserAuth.user_id,
-            recipient_device_id: currentUserAuth.device_id,
-            distribution_message: btoa(envelope),
-          });
-          log.debug("Added self-distribution", { 
-            user_id: currentUserAuth.user_id, 
-            device_id: currentUserAuth.device_id 
-          });
-        } else {
-          log.error("Self-encryption failed", {
-            ember_id: emberId,
-            user_id: currentUserAuth.user_id,
-            device_id: currentUserAuth.device_id,
-            error: encResponse.error ?? 'Unknown encryption error'
-          });
-        }
       }
-      
-      // Then distribute to other members (if any)
+
+      // Distribute to other members (if any)
       for (const member of members) {
         // Skip if this is the current user's device (already added above)
-        if (member.user_id === currentUserAuth?.user_id && member.device_id === currentUserAuth?.device_id) {
+        if (member.user_id === auth.user_id && member.device_id === auth.device_id) {
           continue;
         }
         
@@ -559,18 +532,18 @@
         log.info("Sender key distributed", {
           ember_id: emberId,
           count: distributions.length,
-          self_included: currentUserAuth?.user_id ? true : false,
+          self_included: true,
         });
         
         // CRITICAL FIX: Log successful distribution operation
         const duration = Date.now() - startTime;
         logCryptoOperation('distribute', auth.user_id, distributionId, true, undefined, duration);
       } else {
-        log.warn("No distributions created", { ember_id: emberId });
-        
-        // CRITICAL FIX: Log failed distribution operation (no distributions)
+        // No other members to distribute to — this is normal for solo users.
+        // The sender already has the key from createSenderKeyDistribution.
+        log.debug("No remote distributions needed", { ember_id: emberId });
         const duration = Date.now() - startTime;
-        logCryptoOperation('distribute', auth.user_id, distributionId, false, 'No distributions created', duration);
+        logCryptoOperation('distribute', auth.user_id, distributionId, true, undefined, duration);
       }
     } catch (error) {
       const err = error as Error;

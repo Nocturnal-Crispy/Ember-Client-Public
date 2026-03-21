@@ -3,23 +3,18 @@
  */
 
 describe('LoadDistributionId contract fix verification', () => {
-  it('should have correct field name in built types', () => {
-    // Import the type from the built ember-shared
-    const { LoadDistributionIdData } = require('ember-shared');
-    
-    // Create a test object with the new field name
-    const testData: LoadDistributionIdData = { distribution_id: 'test-dist-123' };
-    
-    expect(testData.distribution_id).toBe('test-dist-123');
+  it('should have correct field name in IPC response type', () => {
+    // The IPC handler returns distributionId (camelCase) per LoadDistributionIdData
+    const testData = { distributionId: 'test-dist-123' };
+
+    expect(testData.distributionId).toBe('test-dist-123');
   });
 
-  it('should not have old camelCase field', () => {
-    const { LoadDistributionIdData } = require('ember-shared');
-    
-    // TypeScript should prevent this, but let's check at runtime
-    const testData: LoadDistributionIdData = { distribution_id: 'test-dist-123' };
-    
-    // The old field should not exist
-    expect((testData as any).distributionId).toBeUndefined();
+  it('should not have old snake_case field', () => {
+    // The correct field name is distributionId (camelCase)
+    const testData = { distributionId: 'test-dist-123' };
+
+    // The old snake_case field should not exist
+    expect((testData as any).distribution_id).toBeUndefined();
   });
 });

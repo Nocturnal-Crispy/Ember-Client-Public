@@ -491,8 +491,21 @@ async function handleGroupEncrypt(db: SignalDatabase, args: GroupEncryptArgs): P
 
 async function handleGroupDecrypt(db: SignalDatabase, args: GroupDecryptArgs): Promise<GroupDecryptData> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
-  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
   const ciphertext = Buffer.from(args.ciphertext, 'base64');
+
+  // Check if this is a self-sent message. Signal sender keys can't self-decrypt
+  // on the same chain because groupEncrypt advances the counter. Use the separate
+  // self-receive copy stored under the "self-recv::" prefix.
+  const localAddress = getLocalAddress();
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const isSelf = localAddress.name() === senderAddress.name();
+
+  if (isSelf) {
+    const selfRecvAddress = ProtocolAddress.new(`self-recv::${args.senderAddress}`, 1);
+    const plaintext = await groupDecryptMessage(selfRecvAddress, new Uint8Array(ciphertext), senderKeyStore);
+    return { plaintext: Buffer.from(plaintext).toString('base64') };
+  }
+
   const plaintext = await groupDecryptMessage(senderAddress, new Uint8Array(ciphertext), senderKeyStore);
   return { plaintext: Buffer.from(plaintext).toString('base64') };
 }
@@ -517,8 +530,20 @@ async function handleProcessSenderKeyDistribution(
   args: ProcessSenderKeyDistributionArgs,
 ): Promise<void> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
-  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
   const distributionMessage = Buffer.from(args.distributionMessage, 'base64');
+
+  // If processing our own distribution, store under self-recv:: prefix so that
+  // GroupDecrypt can read it without conflicting with the encrypt chain.
+  const localAddress = getLocalAddress();
+  const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
+  const isSelf = localAddress.name() === senderAddress.name();
+
+  if (isSelf) {
+    const selfRecvAddress = ProtocolAddress.new(`self-recv::${args.senderAddress}`, 1);
+    await processSenderKeyDistribution(selfRecvAddress, new Uint8Array(distributionMessage), senderKeyStore);
+    log.info('Self sender key distribution processed', { sender: args.senderAddress });
+    return;
+  }
   await processSenderKeyDistribution(senderAddress, new Uint8Array(distributionMessage), senderKeyStore);
   log.info('Sender key distribution processed', { sender: args.senderAddress });
 }
