@@ -6,6 +6,7 @@ import type {
   StoreIdentityData,
   LoadPreKeyData,
   LoadSignedPreKeyData,
+  LoadKyberPreKeyData,
   ProcessPreKeyBundleArgs,
   EncryptArgs,
   EncryptData,
@@ -178,28 +179,29 @@ export class IpcSignedPreKeyStore implements ISignedPreKeyStore {
     return response.data?.record ? fromBase64(response.data.record) : null;
   }
 
-  async removeSignedPreKey(_id: number): Promise<void> {
-    // RemoveSignedPreKey is not exposed via IPC — no-op in the renderer
+  async removeSignedPreKey(id: number): Promise<void> {
+    await window.emberAPI.invoke('RemoveSignedPreKey', { id });
   }
 }
 
 // ── IPC Kyber pre-key store stub ──────────────────────────────────────────────
 
 export class IpcKyberPreKeyStore implements IKyberPreKeyStore {
-  async loadKyberPreKey(_id: number): Promise<Uint8Array | null> {
-    return null;
+  async loadKyberPreKey(id: number): Promise<Uint8Array | null> {
+    const response = await window.emberAPI.invoke<LoadKyberPreKeyData>('LoadKyberPreKey', { id });
+    return response.data?.record ? fromBase64(response.data.record) : null;
   }
 
-  async storeKyberPreKey(_id: number, _record: Uint8Array): Promise<void> {
-    // Kyber pre-keys are not yet implemented at the IPC layer
+  async storeKyberPreKey(id: number, record: Uint8Array): Promise<void> {
+    await window.emberAPI.invoke('StoreKyberPreKey', { id, record: toBase64(record) });
   }
 
-  async removeKyberPreKey(_id: number): Promise<void> {
-    // Kyber pre-keys are not yet implemented at the IPC layer
+  async markKyberPreKeyUsed(id: number): Promise<void> {
+    await window.emberAPI.invoke('MarkKyberPreKeyUsed', { id });
   }
 
-  async markKyberPreKeyUsed(_id: number): Promise<void> {
-    // Kyber pre-keys are not yet implemented at the IPC layer
+  async removeKyberPreKey(id: number): Promise<void> {
+    await window.emberAPI.invoke('RemoveKyberPreKey', { id });
   }
 }
 

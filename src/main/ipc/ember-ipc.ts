@@ -41,12 +41,18 @@ import type {
   StoreSignedPreKeyArgs,
   LoadSignedPreKeyArgs,
   LoadSignedPreKeyData,
+  RemoveSignedPreKeyArgs,
   StoreSenderKeyArgs,
   LoadSenderKeyArgs,
   LoadSenderKeyData,
   StoreDistributionIdArgs,
   LoadDistributionIdArgs,
   LoadDistributionIdData,
+  LoadKyberPreKeyArgs,
+  LoadKyberPreKeyData,
+  StoreKyberPreKeyArgs,
+  MarkKyberPreKeyUsedArgs,
+  RemoveKyberPreKeyArgs,
   ProcessPreKeyBundleArgs,
   EncryptArgs,
   EncryptData,
@@ -107,10 +113,16 @@ const KNOWN_CMDS: Set<EmberCmd> = new Set<EmberCmd>([
   'RemovePreKey',
   'StoreSignedPreKey',
   'LoadSignedPreKey',
+  'RemoveSignedPreKey',
   'StoreSenderKey',
   'LoadSenderKey',
   'StoreDistributionId',
   'LoadDistributionId',
+  // Kyber pre-key operations
+  'LoadKyberPreKey',
+  'StoreKyberPreKey',
+  'MarkKyberPreKeyUsed',
+  'RemoveKyberPreKey',
   // Signal crypto operations
   'ProcessPreKeyBundle',
   'Encrypt',
@@ -253,6 +265,10 @@ async function handleLoadSignedPreKey(db: SignalDatabase, args: LoadSignedPreKey
   return { record: result ? Buffer.from(result).toString('base64') : null };
 }
 
+async function handleRemoveSignedPreKey(db: SignalDatabase, args: RemoveSignedPreKeyArgs): Promise<void> {
+  await db.removeSignedPreKey(args.id);
+}
+
 async function handleStoreSenderKey(db: SignalDatabase, args: StoreSenderKeyArgs): Promise<void> {
   // CRITICAL FIX: Validate input data before processing
   if (!args.address || typeof args.address !== 'string') {
@@ -320,6 +336,25 @@ function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionId
 function handleLoadDistributionId(db: SignalDatabase, args: LoadDistributionIdArgs): LoadDistributionIdData {
   const result = db.loadDistributionId(args.address);
   return { distribution_id: result };
+}
+
+// ── Kyber pre-key handlers (scaffolding only) ───────────────────────────────────
+
+async function handleLoadKyberPreKey(db: SignalDatabase, args: LoadKyberPreKeyArgs): Promise<LoadKyberPreKeyData> {
+  const result = await db.loadKyberPreKey(args.id);
+  return { record: result ? Buffer.from(result).toString('base64') : null };
+}
+
+async function handleStoreKyberPreKey(db: SignalDatabase, args: StoreKyberPreKeyArgs): Promise<void> {
+  await db.storeKyberPreKey(args.id, Buffer.from(args.record, 'base64'));
+}
+
+async function handleMarkKyberPreKeyUsed(db: SignalDatabase, args: MarkKyberPreKeyUsedArgs): Promise<void> {
+  await db.markKyberPreKeyUsed(args.id);
+}
+
+async function handleRemoveKyberPreKey(db: SignalDatabase, args: RemoveKyberPreKeyArgs): Promise<void> {
+  await db.removeKyberPreKey(args.id);
 }
 
 // ── Signal crypto handlers ────────────────────────────────────────────────────
@@ -553,6 +588,9 @@ async function dispatch(
       return undefined;
     case 'LoadSignedPreKey':
       return handleLoadSignedPreKey(requireDb(db), args as unknown as LoadSignedPreKeyArgs);
+    case 'RemoveSignedPreKey':
+      await handleRemoveSignedPreKey(requireDb(db), args as unknown as RemoveSignedPreKeyArgs);
+      return undefined;
     case 'StoreSenderKey':
       await handleStoreSenderKey(requireDb(db), args as unknown as StoreSenderKeyArgs);
       return undefined;
@@ -563,6 +601,17 @@ async function dispatch(
       return undefined;
     case 'LoadDistributionId':
       return handleLoadDistributionId(requireDb(db), args as unknown as LoadDistributionIdArgs);
+    case 'LoadKyberPreKey':
+      return handleLoadKyberPreKey(requireDb(db), args as unknown as LoadKyberPreKeyArgs);
+    case 'StoreKyberPreKey':
+      await handleStoreKyberPreKey(requireDb(db), args as unknown as StoreKyberPreKeyArgs);
+      return undefined;
+    case 'MarkKyberPreKeyUsed':
+      await handleMarkKyberPreKeyUsed(requireDb(db), args as unknown as MarkKyberPreKeyUsedArgs);
+      return undefined;
+    case 'RemoveKyberPreKey':
+      await handleRemoveKyberPreKey(requireDb(db), args as unknown as RemoveKyberPreKeyArgs);
+      return undefined;
     // Signal crypto operations
     case 'ProcessPreKeyBundle':
       await handleProcessPreKeyBundle(requireDb(db), args as unknown as ProcessPreKeyBundleArgs);

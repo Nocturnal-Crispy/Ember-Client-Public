@@ -581,41 +581,6 @@
           username: authData.username,
         });
         authData._recoveryCode = recoveryCode;
-        
-        // CRITICAL FIX: Store Signal identity private key in safeStorage
-        // This is required for Signal database initialization
-        // The registerWithSignalKeys function should do this, but we ensure it here as a workaround
-        if (signalIdentity.identityKeyPair?.privateKey) {
-          try {
-            // Use same pattern as auth.ts for base64 conversion
-            let privateKeyBase64: string;
-            if (typeof Buffer !== 'undefined') {
-              privateKeyBase64 = Buffer.from(signalIdentity.identityKeyPair.privateKey).toString('base64');
-            } else {
-              // Browser environment
-              const binary = Array.from(signalIdentity.identityKeyPair.privateKey, (byte: number) => String.fromCharCode(byte))
-                .join('');
-              privateKeyBase64 = btoa(binary);
-            }
-            
-            await ipcRenderer.invoke("set-safe-storage", {
-              key: `identity_key_${authData.user_id}_${authData.device_id}`,
-              value: privateKeyBase64
-            });
-            await ipcRenderer.invoke("set-safe-storage", {
-              key: `identity_pubkey_${authData.user_id}_${authData.device_id}`,
-              value: Buffer.from(signalIdentity.identityKeyPair.publicKey).toString('base64')
-            });
-            await ipcRenderer.invoke("set-safe-storage", {
-              key: `registration_id_${authData.user_id}_${authData.device_id}`,
-              value: String(signalIdentity.registrationId)
-            });
-            log.info("Signal identity keys stored in safeStorage");
-          } catch (storageErr) {
-            log.error("Failed to store Signal identity keys", { error: (storageErr as Error).message });
-            // Continue anyway - the registration succeeded
-          }
-        }
       }
 
       log.debug("Saving auth data to store");
