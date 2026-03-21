@@ -1171,7 +1171,9 @@ app.name = "ember-client";
 
 log.info("Application starting...");
 
-const gotTheLock = app.requestSingleInstanceLock();
+// Disable single instance lock for E2E testing
+const isE2ETest = process.env.E2E_TEST === 'true' || process.env.NODE_ENV === 'test';
+const gotTheLock = isE2ETest ? true : app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   log.warn("Another instance is already running; quitting");

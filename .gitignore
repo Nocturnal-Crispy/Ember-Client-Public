@@ -20,3 +20,6 @@ coverage/
 
 # Logs
 logs/
+
+# Test Results
+test-results/

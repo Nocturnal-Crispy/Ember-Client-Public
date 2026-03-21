@@ -17,6 +17,13 @@
     "dist:mac": "npm run secure-build && electron-builder --mac",
     "pretest": "npm rebuild better-sqlite3",
     "test": "jest --config ./tests/jest.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install",
+    "test:e2e:report": "playwright show-report test-results-report",
+    "test:all": "npm run test && npm run test:e2e",
     "release": "npm run build && ./scripts/release.sh",
     "rebuild-native": "electron-rebuild -f -w better-sqlite3,windows-audio-capture,linux-audio-capture"
   },
@@ -31,6 +38,7 @@
   },
   "license": "ISC",
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@types/electron-store": "^3.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",

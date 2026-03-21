@@ -587,7 +587,17 @@
         // The registerWithSignalKeys function should do this, but we ensure it here as a workaround
         if (signalIdentity.identityKeyPair?.privateKey) {
           try {
-            const privateKeyBase64 = Buffer.from(signalIdentity.identityKeyPair.privateKey).toString('base64');
+            // Use same pattern as auth.ts for base64 conversion
+            let privateKeyBase64: string;
+            if (typeof Buffer !== 'undefined') {
+              privateKeyBase64 = Buffer.from(signalIdentity.identityKeyPair.privateKey).toString('base64');
+            } else {
+              // Browser environment
+              const binary = Array.from(signalIdentity.identityKeyPair.privateKey, (byte: number) => String.fromCharCode(byte))
+                .join('');
+              privateKeyBase64 = btoa(binary);
+            }
+            
             await ipcRenderer.invoke("set-safe-storage", {
               key: `identity_key_${authData.user_id}_${authData.device_id}`,
               value: privateKeyBase64
