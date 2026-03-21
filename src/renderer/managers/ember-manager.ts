@@ -181,6 +181,11 @@
       senderKeyDistributionIds.set(emberId, response.data.distribution_id);
       return response.data.distribution_id;
     }
+    // Fail fast: if the DB itself is unavailable, no point trying StoreDistributionId
+    if (!response.success && (response as any).error?.includes('Signal database not available')) {
+      throw new Error('Signal database not available');
+    }
+    // DB is available but no ID stored yet — create a fresh one
     const distributionId = crypto.randomUUID();
     const storeResp = await window.emberAPI.invoke("StoreDistributionId", {
       address: emberId,
@@ -673,9 +678,7 @@
       .querySelectorAll<HTMLElement>(".server-icon:not(.add-server):not(.dm-icon)")
       .forEach((el) => el.remove());
 
-    App.emberMetadata.clear();
     embers.forEach((ember, index) => {
-      App.emberMetadata.set(ember.id, { protocol_version: ember.protocol_version ?? 0 });
       const serverIcon = document.createElement("div");
       serverIcon.className = "server-icon";
       serverIcon.dataset["emberId"] = ember.id;
@@ -795,9 +798,9 @@
     );
   }
 
-  async function fetchEmberKey(emberId: string): Promise<Uint8Array | null> {
-    // No backward compatibility - only Signal Protocol keys are supported
-    log.debug("Legacy ember key support removed", { ember_id: emberId });
+  async function fetchEmberKey(_emberId: string): Promise<Uint8Array | null> {
+    // Signal Protocol sender keys handle all group message encryption.
+    // Per-ember symmetric keys are not used.
     return null;
   }
 
@@ -1164,7 +1167,7 @@
         id?: string;
         name?: string;
       };
-      // Signal sender-keys replace legacy ember-keys for new messages.
+      // Signal sender-keys are used for all ember message encryption.
 
       if (newEmber.id) {
         try {
@@ -1518,7 +1521,7 @@
     }
   }
 
-  // Wrapper function for global assignment to maintain backward compatibility
+  // Wrapper function for global assignment (IIFE module pattern)
   const distributeSenderKeyToMembersWrapper = async (emberId: string): Promise<void> => {
     const auth = await getValidAuth();
     if (!auth || !auth.token || !auth.hostname) {

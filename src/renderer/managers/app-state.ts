@@ -58,14 +58,9 @@ window.App = {
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,
 
-  // ── Ember metadata ──────────────────────────────────────────────────────
-  emberMetadata: new Map<string, { protocol_version: number }>(),
-
   // ── Signal Protocol ───────────────────────────────────────────────────────
   signalSessionReady: new Map<string, boolean>(),
   signalSessionManager: null as any,
-  protocolVersion: 0 as number,
-  migrationStatus: 'idle' as 'idle' | 'in-progress' | 'complete' | 'failed',
 
   // ── Signal Session Manager Initialization ───────────────────────────────
   initializeSignalSessionManager: async function(): Promise<void> {

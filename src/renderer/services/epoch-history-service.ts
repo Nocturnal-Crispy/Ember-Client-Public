@@ -50,20 +50,14 @@ export class EpochHistoryService {
   }
 
   /**
-   * Decrypt a message, handling both current and historical epochs
+   * Decrypt a Signal Protocol epoch message.
    */
   async decryptMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
     try {
-      // Handle v2.3+ messages with epoch information
-      if (message.protocol_version >= 2) {
-        if (!message.epoch_id) {
-          throw new Error('Epoch message missing epoch_id');
-        }
-        return await this.decryptEpochMessage(message, emberId);
+      if (!message.epoch_id) {
+        throw new Error('Message missing epoch_id — only Signal Protocol epoch messages are supported');
       }
-
-      // Handle legacy messages (v1.x) using current Signal session
-      return await this.decryptLegacyMessage(message, emberId);
+      return await this.decryptEpochMessage(message, emberId);
     } catch (error) {
       console.error('Failed to decrypt message:', error);
       throw error;
@@ -143,27 +137,6 @@ export class EpochHistoryService {
     };
   }
 
-  /**
-   * Decrypt legacy message (v1.x) using current Signal session
-   */
-  private async decryptLegacyMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
-    try {
-      // Use the current SignalSessionManager for legacy decryption
-      const plaintext = await this.signalSessionManager.groupDecrypt(
-        emberId,
-        new TextEncoder().encode(message.ciphertext)
-      );
-
-      return {
-        id: message.id,
-        plaintext,
-        created_at: message.created_at,
-      };
-    } catch (error) {
-      console.error('Failed to decrypt legacy message:', error);
-      throw new Error('Legacy message decryption failed');
-    }
-  }
 
   /**
    * Get or decrypt an epoch key for the current user
@@ -325,23 +298,17 @@ export class EpochHistoryService {
     total: number;
     decryptable: number;
     requiresEpochKeys: number;
-    legacy: number;
   }> {
     let decryptable = 0;
     let requiresEpochKeys = 0;
-    let legacy = 0;
 
     for (const message of messages) {
       const canDecrypt = await this.canDecryptMessage(message);
-      
       if (canDecrypt) {
         decryptable++;
       }
-
-      if (message.protocol_version >= 2 && message.epoch_id) {
+      if (message.epoch_id) {
         requiresEpochKeys++;
-      } else {
-        legacy++;
       }
     }
 
@@ -349,7 +316,6 @@ export class EpochHistoryService {
       total: messages.length,
       decryptable,
       requiresEpochKeys,
-      legacy,
     };
   }
 }

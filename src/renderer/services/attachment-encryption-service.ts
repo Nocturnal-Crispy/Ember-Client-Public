@@ -1,8 +1,8 @@
 /**
- * AttachmentEncryptionService - Manages per-attachment encryption for Signal Protocol v2.3
+ * AttachmentEncryptionService - Manages per-attachment encryption keys for Signal Protocol.
  *
- * Handles the creation, distribution, and management of per-attachment encryption keys
- * for secure file sharing in the Signal Protocol migration.
+ * Handles creation, distribution, and management of per-attachment AES-256-GCM keys
+ * for secure file sharing.
  */
 
 import type { AuthData } from 'ember-shared';

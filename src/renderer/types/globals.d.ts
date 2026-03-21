@@ -446,11 +446,8 @@ declare global {
     _micTestAnimFrame: number | null;
     _cameraPreviewStream: MediaStream | null;
     _pttListening: boolean;
-    emberMetadata: Map<string, { protocol_version: number }>;
     signalSessionReady: Map<string, boolean>;
     signalSessionManager: import('../managers/signal-session-manager').SignalSessionManager | null;
-    protocolVersion: number;
-    migrationStatus: 'idle' | 'in-progress' | 'complete' | 'failed';
     initializeSignalSessionManager(): void;
   }
 

@@ -295,14 +295,7 @@
       showCreateInviteError("No server selected");
       return;
     }
-    const emberMeta = App.emberMetadata.get(App.activeEmberId);
-    const isSignalEmber = (emberMeta?.protocol_version ?? 0) === 1;
-    if (!isSignalEmber) {
-      showCreateInviteError("Invites for legacy embers are not supported after cutover");
-      return;
-    }
-
-    log.info("Creating invite", { ember_id: App.activeEmberId, isSignalEmber });
+    log.info("Creating invite", { ember_id: App.activeEmberId });
     try {
       const createInviteBtn = getCreateInviteBtn();
       if (createInviteBtn) {
@@ -355,8 +348,8 @@
       if (inviteLinkInput) inviteLinkInput.value = data.invite_url ?? "";
       inviteLinkResult?.classList.remove("hidden");
       
-      // Setup ephemeral keys for the invite if this is a Signal ember
-      if (isSignalEmber && data.invite_id && window.App.signalSessionManager) {
+      // Setup ephemeral keys for the invite
+      if (data.invite_id && window.App.signalSessionManager) {
         try {
           log.info("Setting up invite ephemeral keys...", { invite_id: data.invite_id });
           await window.App.signalSessionManager.setupInviteEphemeralKeys(data.invite_id, App.activeEmberId!);
@@ -532,12 +525,6 @@
 
       const info = App.pendingInvite as unknown as InviteInfo;
       const hostname = info.hostname ?? auth.hostname;
-      const isSignalEmber = (info.protocol_version ?? 0) === 1;
-      if (!isSignalEmber) {
-        showAcceptInviteError("This invite type is not supported after cutover");
-        return;
-      }
-
       // Signal ember invites are membership-only; no ember key exchange needed.
       const acceptBody: Record<string, unknown> = {};
 
@@ -567,11 +554,10 @@
         log.info("Joined server via invite", {
           ember_id: data.ember_id,
           name: data.ember_name ?? "",
-          isSignalEmber,
         });
 
-        // Process ephemeral keys if this is a Signal Protocol v2.3 ember
-        if (isSignalEmber && data.invite_id && window.App.signalSessionManager) {
+        // Process Signal Protocol ephemeral keys
+        if (data.invite_id && window.App.signalSessionManager) {
           try {
             log.info("Processing invite ephemeral keys...", { invite_id: data.invite_id });
             await window.App.signalSessionManager.completeInviteAcceptance(data.invite_id, data.ember_id);

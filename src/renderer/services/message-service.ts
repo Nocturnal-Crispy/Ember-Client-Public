@@ -173,10 +173,6 @@
   // ─── Message send ──────────────────────────────────────────────────────────
 
   async function sendEncryptedMessage(channelId: string, plaintext: string): Promise<string> {
-    if (App.migrationStatus === "in-progress") {
-      log.warn("Message send blocked: migration in progress");
-      throw new Error("Please wait — encryption upgrade in progress");
-    }
     const targetChannelId = channelId || App.activeChannelId;
     if (!targetChannelId || !App.activeEmberId) {
       throw new Error("No active channel or ember");
@@ -408,7 +404,7 @@
       return;
     }
 
-    // Hard cutover: any non-signal envelope is permanently unreadable.
+    // Non-Signal envelopes cannot be decrypted.
     textEl.textContent = "[This message cannot be decrypted — unsupported envelope]";
     markMessageAsEdited(messageDiv);
   }

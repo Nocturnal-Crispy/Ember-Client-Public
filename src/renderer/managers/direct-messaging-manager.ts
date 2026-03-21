@@ -2,14 +2,9 @@
  * Direct Messaging Manager — TypeScript module.
  *
  * Each DM is a private ember (kind='dm') created via a request/accept flow:
- *   1. Requester sends a DM request (no encryption — just a notification).
- *   2. Recipient accepts: generates ember key, creates self-box + peer-box.
- *   3. Requester loads the accepted DM, fetches their peer-box, migrates to self-box.
- *   4. Both parties use only self-box paths going forward.
- *
- * This eliminates the "authentication failed or wrong key" bug that occurred
- * when the requester tried to encrypt a key for the recipient using a stale
- * device public key fetched at request time.
+ *   1. Requester sends a DM request (just a notification — no encryption at this stage).
+ *   2. Recipient accepts: both parties exchange Signal prekey bundles.
+ *   3. Both parties use Signal Protocol Double Ratchet sessions for all DM messages.
  */
 (function (): void {
 
@@ -32,10 +27,8 @@
     requestId: string;
     /** True when the current user is the recipient of a pending request. */
     isRecipient: boolean;
-    /** Device ID of the partner when they are Signal-capable; null for legacy devices. */
+    /** Device ID of the partner used for Signal session management. */
     partnerDeviceId: string | null;
-    /** Protocol version: 1 = Signal, 0 = legacy NaCl. */
-    partnerProtocolVersion: number;
   }
 
   const dmByTextChannel = new Map<string, DmEntry>();
@@ -62,23 +55,9 @@
     return device as { public_key: string; private_key: string };
   }
 
-  // ─── Ember key helpers ─────────────────────────────────────────────────────
+  // ─── Ember key helpers (stub — Signal DMs use sender key sessions, not ember keys) ────
 
-  /**
-   * Fetches and caches the ember key for a DM channel.
-   *
-   * The server returns:
-   *   - encrypted_key: the NaCl box ciphertext
-   *   - sender_public_key (optional): present only for peer-boxes created during
-   *     DM acceptance. The stored key is always the one actually used for encryption,
-   *     so decryption is reliable even after device key rotation.
-   *
-   * On first fetch of a peer-box, the key is decrypted and immediately migrated
-   * to a self-box format so all future fetches use the simpler self-box path.
-   */
-  async function fetchAndCacheEmberKey(emberId: string): Promise<Uint8Array | null> {
-    // No backward compatibility - legacy ember keys are no longer supported
-    log.debug("Legacy ember key support removed", { ember_id: emberId });
+  async function fetchAndCacheEmberKey(_emberId: string): Promise<Uint8Array | null> {
     return null;
   }
 
@@ -114,7 +93,6 @@
           requestId,
           isRecipient,
           partnerDeviceId: null,
-          partnerProtocolVersion: 0,
         };
         if (entry.textChannelId) {
           dmByTextChannel.set(entry.textChannelId, entry);
@@ -226,19 +204,14 @@
       log.warn("Failed to fetch recipient devices for DM session", { participantId, error: (err as Error).message });
     }
 
-    // Generate encrypted_key_self for server compatibility (P0-1 fix)
-    // The server requires this field even though Signal Protocol replaces ember keys for DMs
+    // The server requires an encrypted_key_self field for DM creation (API contract).
+    // Signal Protocol sender keys handle all actual message encryption; this field
+    // is stored server-side but not used for decryption.
     const currentDevice = await getDevice();
     let encryptedKeySelf = "";
     if (currentDevice) {
-      // Generate a dummy encrypted key for server compatibility
-      // Since Signal Protocol will be used for actual encryption, this is just for API compatibility
-      // Compatibility placeholder — Signal Protocol sender keys handle actual DM encryption; 
-      // this value is stored server-side but never decrypted
       const emberKey = new Uint8Array(32);
       crypto.getRandomValues(emberKey);
-      
-      // Simple base64 encoding for server compatibility - just the 32 random bytes
       encryptedKeySelf = Buffer.from(emberKey).toString('base64');
     }
 
@@ -248,10 +221,9 @@
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      // P0-1 FIX: Include encrypted_key_self as required by server
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         user_id: participantId,
-        encrypted_key_self: encryptedKeySelf
+        encrypted_key_self: encryptedKeySelf,
       }),
     });
     if (!res.ok) {
@@ -272,8 +244,7 @@
 
     // Open the DM channel — key will be fetched after the recipient accepts.
     const channels = await fetchDmChannels(auth, emberId);
-    const partnerDeviceId = firstDevice?.protocol_version === 1 ? (firstDevice.id ?? null) : null;
-    const partnerProtocolVersion = firstDevice?.protocol_version === 1 ? 1 : 0;
+    const partnerDeviceId = firstDevice?.id ?? null;
 
     const entry: DmEntry = {
       emberId,
@@ -286,21 +257,19 @@
       requestId,
       isRecipient: false,
       partnerDeviceId,
-      partnerProtocolVersion,
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
 
-    // Initiate Signal session eagerly if the peer is Signal-capable.
-    if (partnerDeviceId && partnerProtocolVersion === 1 && App.signalSessionManager) {
+    // Initiate Signal session eagerly if we have the partner's device ID.
+    if (partnerDeviceId && App.signalSessionManager) {
       try {
         await App.signalSessionManager.ensureSession(participantId, partnerDeviceId);
       } catch (err: unknown) {
         const error = err as Error;
-        log.warn("Signal ensureSession failed, falling back to legacy", {
+        log.warn("Signal ensureSession failed", {
           participantId, partnerDeviceId, error: error.message,
         });
-        // Continue without Signal - will fall back to error message in sendDirectMessage
       }
     }
 
@@ -371,11 +340,8 @@
   }
 
   /**
-   * Accepts a pending DM request. The requester pre-computed a peer-box for the
-   * recipient at request time (stored with pending=true on the server). This call
-   * activates it (pending → false) and adds the recipient as a member. No key
-   * generation is needed here — the recipient fetches their pre-computed peer-box
-   * via fetchAndCacheEmberKey, which decrypts it and migrates to a self-box.
+   * Accepts a pending DM request. Activates the request (pending → false) and
+   * adds the recipient as a member. Both parties use Signal Protocol sessions for all DM encryption.
    */
   async function acceptDMRequest(
     requestId: string,
@@ -416,7 +382,6 @@
       requestId,
       isRecipient: true,
       partnerDeviceId: existingEntry?.partnerDeviceId ?? null,
-      partnerProtocolVersion: existingEntry?.partnerProtocolVersion ?? 0,
     };
     dmByTextChannel.set(channels.textChannelId, entry);
     dmByEmberId.set(emberId, entry);
@@ -436,10 +401,8 @@
     // Always subscribe — fixes BP-2 where subscription was skipped for existing entries
     window.wsSubscribeToChannel(channels.textChannelId);
 
-    // Fetch the pre-computed peer-box key the requester stored at request time.
-    // fetchAndCacheEmberKey handles the peer-box decrypt + self-box migration automatically.
     fetchAndCacheEmberKey(emberId).catch((err: Error) =>
-      log.warn("Failed to fetch peer-box key after DM acceptance", { emberId, error: err.message }),
+      log.warn("fetchAndCacheEmberKey error (no-op in Signal DMs)", { emberId, error: err.message }),
     );
 
     // Hide the pending banner now that the DM is accepted
@@ -557,7 +520,7 @@
             }
           }
 
-          // Hard cutover: any non-signal envelope is permanently unreadable.
+          // Non-Signal envelopes cannot be decrypted.
           return {
             id: msg.id,
             conversationId: channelId,
@@ -590,24 +553,22 @@
     const deviceId = device?.device_id ?? "";
 
     const signalManager = App.signalSessionManager;
-    if (signalManager && entry.partnerDeviceId && entry.partnerProtocolVersion === 1) {
+    if (signalManager && entry.partnerDeviceId) {
       const signalAddress = `${entry.partnerId}.${entry.partnerDeviceId}`;
       const hasSession = await signalManager.hasSession(entry.partnerId, entry.partnerDeviceId);
       if (hasSession) {
         const plaintextBytes = new TextEncoder().encode(plaintext);
         const { ciphertext, messageType } = await signalManager.encrypt(signalAddress, plaintextBytes);
-        // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
         const ciphertextBase64 = Buffer.from(ciphertext).toString('base64');
         const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-          // P1-1 FIX: Add protocol_version as required by server
-          body: JSON.stringify({ 
-            ciphertext: ciphertextBase64, 
-            envelope_type: "signal_dm", 
-            message_type: messageType, 
+          body: JSON.stringify({
+            ciphertext: ciphertextBase64,
+            envelope_type: "signal_dm",
+            message_type: messageType,
             device_id: deviceId,
-            protocol_version: 1 // P1-1 FIX: Required by server
+            protocol_version: 1,
           }),
         });
         if (!res.ok) throw new Error("Failed to send message");
@@ -691,7 +652,7 @@
 
     const isOwn = senderId === auth.user_id;
 
-    // Hard cutover: any non-signal envelope is permanently unreadable.
+    // Non-Signal envelopes cannot be decrypted.
     window.displayDmMessage({
       id: String(payload["id"] ?? ""),
       conversationId: channelId,
@@ -713,7 +674,7 @@
     });
   }
 
-  // ─── No-op stubs for backwards-compat ─────────────────────────────────────
+  // ─── No-op stubs ─────────────────────────────────────────────────────────
 
   async function initiateKeyExchange(_channelId: string, _participantId: string): Promise<void> {
     // Key exchange now happens at DM request acceptance time — no-op here
@@ -761,7 +722,6 @@
           requestId: r.id,
           isRecipient: true,
           partnerDeviceId: null,
-          partnerProtocolVersion: 0,
         };
         dmByTextChannel.set(channels.textChannelId, entry);
         dmByEmberId.set(r.ember_id, entry);

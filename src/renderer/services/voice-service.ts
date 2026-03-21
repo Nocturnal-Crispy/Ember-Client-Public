@@ -1058,7 +1058,6 @@ class VoiceManager {
       this._screenAudioCtx = null;
     }
 
-    // Legacy Phase 4 cleanup (kept for backward compat; no-ops in Phase 9)
     if (this._audioCaptureInterval !== null) {
       clearInterval(this._audioCaptureInterval);
       this._audioCaptureInterval = null;

@@ -217,7 +217,7 @@ export function openSignalDatabase(
   const encryptionKey = deriveEncryptionKey(identityPrivateKey);
 
   // Local identity material used by getIdentityKeyPair() and saveIdentity().
-  // Optional at open-time; can be initialised later (e.g. after migration).
+  // Optional at open-time; can be supplied after initial DB creation.
   let localIdentityPrivateKey: Uint8Array | null = options?.localIdentityPrivateKey ?? null;
   let localIdentityPublicKey: Uint8Array | null = options?.localIdentityPublicKey ?? null;
   let localIdentityAddress: string | null = options?.localIdentityAddress ?? null;

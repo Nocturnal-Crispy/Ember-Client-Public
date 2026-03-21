@@ -1,8 +1,8 @@
 /**
- * InviteEphemeralKeyService - Manages ephemeral key distributions for Signal Protocol v2.3 invites
+ * InviteEphemeralKeyService - Manages ephemeral key distributions for Signal Protocol invites.
  *
- * Handles the creation, distribution, and processing of ephemeral keys
- * for invite-based group key establishment in the Signal Protocol migration.
+ * Handles creation, distribution, and processing of ephemeral keys for
+ * invite-based Signal Protocol group key establishment.
  */
 
 import type { AuthData } from 'ember-shared';

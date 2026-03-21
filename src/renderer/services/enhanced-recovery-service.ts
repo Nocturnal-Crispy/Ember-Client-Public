@@ -13,7 +13,7 @@ export interface RecoveryCodeData {
   encrypted_device_key: string;
   salt: string;
   protocol_version: number;
-  identity_key_type: 'legacy' | 'ed25519' | 'curve25519';
+  identity_key_type: 'ed25519';
   encrypted_identity_key?: string;
   identity_key_salt?: string;
   epoch_id?: string;
@@ -26,7 +26,7 @@ export interface CreateRecoveryCodeRequest {
   encrypted_device_key: string;
   salt: string;
   protocol_version: number;
-  identity_key_type: 'legacy' | 'ed25519' | 'curve25519';
+  identity_key_type: 'ed25519';
   encrypted_identity_key?: string;
   identity_key_salt?: string;
   epoch_id?: string;
@@ -427,16 +427,6 @@ export class EnhancedRecoveryService {
         return true; // No recovery code exists, needs creation
       }
       
-      // Check if protocol version is outdated
-      if (recoveryData.protocol_version < 2) {
-        return true;
-      }
-      
-      // Check if identity key type is legacy
-      if (recoveryData.identity_key_type === 'legacy') {
-        return true;
-      }
-      
       // Check if last rotation was more than 90 days ago
       const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
       if (recoveryData.last_rotated_at && recoveryData.last_rotated_at < ninetyDaysAgo) {
@@ -468,12 +458,6 @@ export class EnhancedRecoveryService {
       if (!recoveryData) {
         recommendations.push('Create a recovery code to enable account recovery');
       } else {
-        if (recoveryData.protocol_version < 2) {
-          recommendations.push('Upgrade to enhanced recovery code for better security');
-        }
-        if (recoveryData.identity_key_type === 'legacy') {
-          recommendations.push('Update to use Ed25519 identity keys');
-        }
         if (needsRotation) {
           recommendations.push('Rotate recovery code for security');
         }
@@ -481,7 +465,7 @@ export class EnhancedRecoveryService {
       
       return {
         exists: !!recoveryData,
-        enhanced: (recoveryData?.protocol_version ?? 1) >= 2,
+        enhanced: true,
         needsRotation,
         recommendations,
       };

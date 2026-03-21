@@ -372,7 +372,7 @@
 
   async function generateDeviceIdentity(): Promise<DeviceIdentity> {
     log.info("Generating new device identity (keypair)");
-    
+
     let signalIdentity;
     try {
       signalIdentity = await window.electronAPI.authService.generateDeviceIdentity() as any;
@@ -380,25 +380,22 @@
       log.error("Failed to generate device identity", { error: (error as Error).message });
       throw new Error('Failed to generate device identity: ' + (error as Error).message);
     }
-    
+
     if (!signalIdentity) {
       log.error("generateDeviceIdentity returned null/undefined");
       throw new Error('Failed to generate device identity: no response from service');
     }
-    
-    // Check if the required properties exist
-    if (!signalIdentity.legacyPublicKey) {
-      log.error("Signal identity missing legacyPublicKey");
+
+    if (!signalIdentity.identityKeyPair?.publicKey) {
+      log.error("Signal identity missing identityKeyPair.publicKey");
       throw new Error('Failed to generate device identity: public key missing');
     }
-    
-    if (!signalIdentity.legacyPrivateKey) {
-      log.error("Signal identity missing legacyPrivateKey");
+
+    if (!signalIdentity.identityKeyPair?.privateKey) {
+      log.error("Signal identity missing identityKeyPair.privateKey");
       throw new Error('Failed to generate device identity: private key missing');
     }
-    
-    // Convert SignalDeviceIdentity to DeviceIdentity format for compatibility
-    // Use the same conversion logic as in ember-shared
+
     function bytesToBase64(bytes: Uint8Array): string {
       if (typeof Buffer !== 'undefined') {
         return Buffer.from(bytes).toString('base64');
@@ -407,14 +404,14 @@
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       return btoa(binary);
     }
-    
-    const publicKeyBase64 = bytesToBase64(signalIdentity.legacyPublicKey);
-    const privateKeyBase64 = bytesToBase64(signalIdentity.legacyPrivateKey);
-    
+
+    const publicKeyBase64 = bytesToBase64(signalIdentity.identityKeyPair.publicKey);
+    const privateKeyBase64 = bytesToBase64(signalIdentity.identityKeyPair.privateKey);
+
     return {
       device_id: signalIdentity.deviceId,
       public_key: publicKeyBase64,
-      private_key: privateKeyBase64
+      private_key: privateKeyBase64,
     };
   }
 
@@ -617,8 +614,6 @@
           });
         }
       }
-
-      // No migration needed for fresh database - proceed with initialization
 
       hideLoading();
 

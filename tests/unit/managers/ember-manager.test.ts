@@ -1040,3 +1040,89 @@ describe('Current Error Reproduction from Logs', () => {
     });
   });
 });
+
+// ─── ensureSenderKeyForEmber — Signal DB unavailable ─────────────────────────
+
+describe('ensureSenderKeyForEmber — Signal DB unavailable', () => {
+  it('returns null without calling StoreDistributionId when LoadDistributionId reports DB unavailable', async () => {
+    // Each test uses a unique ember ID to avoid hitting the distribution-ID cache
+    const emberId = `test-ember-db-null-${Date.now()}`;
+
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        return Promise.resolve({ success: false, error: 'Signal database not available' });
+      }
+      // StoreDistributionId must NOT be called — returning failure here to expose
+      // the bug with the current code (it calls Store even when Load fails with DB error)
+      if (cmd === 'StoreDistributionId') {
+        return Promise.resolve({ success: false, error: 'Signal database not available' });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    const result = await (window as any).ensureSenderKeyForEmber(emberId);
+
+    // ensureSenderKeyForEmber must return null (encryption unavailable)
+    expect(result).toBeNull();
+
+    // After the fix: StoreDistributionId must NOT be called when Load fails with DB error
+    const storeCalls = mockEmberApiInvoke.mock.calls.filter(
+      ([cmd]: [string]) => cmd === 'StoreDistributionId'
+    );
+    expect(storeCalls).toHaveLength(0);
+  });
+
+  it('creates a new distribution ID and returns it when DB is available but no ID exists yet', async () => {
+    const emberId = `test-ember-no-id-${Date.now()}`;
+
+    mockEmberApiInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'GetAuth') {
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
+        });
+      }
+      if (cmd === 'LoadDistributionId') {
+        // DB is available, but no distribution ID stored yet
+        return Promise.resolve({ success: true, data: { distribution_id: null } });
+      }
+      if (cmd === 'StoreDistributionId') {
+        return Promise.resolve({ success: true, data: null });
+      }
+      if (cmd === 'CreateSenderKeyDistribution') {
+        return Promise.resolve({ success: true, data: { distributionMessage: 'dGVzdA==' } });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
+    const result = await (window as any).ensureSenderKeyForEmber(emberId);
+
+    // Should succeed and return a distribution ID
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('string');
+
+    // StoreDistributionId MUST have been called to persist the new ID
+    const storeCalls = mockEmberApiInvoke.mock.calls.filter(
+      ([cmd]: [string]) => cmd === 'StoreDistributionId'
+    );
+    expect(storeCalls).toHaveLength(1);
+  });
+});

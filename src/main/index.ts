@@ -23,8 +23,9 @@ import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../
 import { openSignalDatabase } from "./signal-db";
 import type { SignalDatabase } from "./signal-db";
 import { registerEmberIpcHandlers, updateSignalDatabase } from "./ipc/ember-ipc";
+import { resolveSignalKeyBytes } from "./signal-key-utils";
 import { initializeAuthWithElectronSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
-import { migrateDeviceIdentity, generateRecoveryCode, encryptPrivateKeyWithRecoveryCode } from "ember-shared";
+import { generateRecoveryCode, encryptPrivateKeyWithRecoveryCode } from "ember-shared";
 import { uploadSignedPreKey, uploadOneTimePreKeys } from "ember-shared";
 import { PrivateKey } from "@signalapp/libsignal-client";
 const { IPC_CHANNELS } = require("../shared/constants");
@@ -374,19 +375,20 @@ async function reinitializeSignalDatabase(): Promise<void> {
     const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
       `identity_key_${authData.user_id}_${authData.device_id}`,
     );
-    if (signalIdentityKey) {
-      const bytes = Buffer.from(signalIdentityKey, "base64");
-      if (bytes.length === 32) {
-        privateKeyBytes = bytes;
-        localIdentityPrivateKeyBytes = bytes;
+    const { privateKeyBytes: resolvedKey, localIdentityPrivateKeyBytes: resolvedIdentityKey } =
+      resolveSignalKeyBytes(signalIdentityKey);
+    if (resolvedKey) {
+      privateKeyBytes = resolvedKey;
+      localIdentityPrivateKeyBytes = resolvedIdentityKey;
+      if (resolvedIdentityKey) {
         log.debug("Signal database: Using Signal identity private key");
       } else {
-        log.error("Signal database: identity_key_* is not a 32-byte Ed25519 private key", {
-          identityKeyLength: bytes.length,
+        log.warn("Signal database: stored key is not 32 bytes; Signal crypto ops may be limited", {
+          identityKeyLength: resolvedKey.length,
         });
       }
     } else {
-      log.error("Signal database: No Signal identity private key found - user must re-register");
+      log.error("Signal database: No Signal identity key found - user must re-register");
     }
 
     localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
@@ -402,7 +404,7 @@ async function reinitializeSignalDatabase(): Promise<void> {
       }
     }
   }
-  
+
   if (privateKeyBytes) {
     try {
       signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes, {
@@ -417,7 +419,7 @@ async function reinitializeSignalDatabase(): Promise<void> {
       updateSignalDatabase(null);
     }
   } else {
-    log.warn("No Signal identity private key found for Signal database re-initialization");
+    log.warn("No Signal identity key found for Signal database re-initialization");
     updateSignalDatabase(null);
   }
 }
@@ -558,9 +560,7 @@ ipcMain.handle("get-device-identity", async () => {
     return null;
   }
 
-  // Note: Legacy key system removed - device identity no longer contains private keys
-  // Signal identity keys are handled separately during registration
-  log.debug("Device identity retrieved (legacy keys removed)");
+  log.debug("Device identity retrieved");
   return device;
 });
 
@@ -571,10 +571,7 @@ ipcMain.handle("save-device-identity", async (_event, deviceIdentity) => {
   const { private_key, ...deviceWithoutKey } = deviceIdentity;
   store.set("device", deviceWithoutKey);
   
-  // Note: Legacy private key storage removed - Signal identity keys are used instead
-  // The Signal database will be initialized when user registers with Signal keys
-  
-  log.debug("Device identity saved (legacy key storage disabled)");
+  log.debug("Device identity saved");
   return true;
 });
 
@@ -1225,19 +1222,20 @@ if (!gotTheLock) {
       const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
         `identity_key_${authData.user_id}_${authData.device_id}`,
       );
-      if (signalIdentityKey) {
-        const bytes = Buffer.from(signalIdentityKey, "base64");
-        if (bytes.length === 32) {
-          privateKeyBytes = bytes;
-          localIdentityPrivateKeyBytes = bytes;
+      const { privateKeyBytes: resolvedKey, localIdentityPrivateKeyBytes: resolvedIdentityKey } =
+        resolveSignalKeyBytes(signalIdentityKey);
+      if (resolvedKey) {
+        privateKeyBytes = resolvedKey;
+        localIdentityPrivateKeyBytes = resolvedIdentityKey;
+        if (resolvedIdentityKey) {
           log.debug("Signal database: Using Signal identity private key");
         } else {
-          log.error("Signal database: identity_key_* is not a 32-byte Ed25519 private key", {
-            identityKeyLength: bytes.length,
+          log.warn("Signal database: stored key is not 32 bytes; Signal crypto ops may be limited", {
+            identityKeyLength: resolvedKey.length,
           });
         }
       } else {
-        log.debug("Signal database: No Signal identity private key found");
+        log.debug("Signal database: No Signal identity key found");
       }
 
       localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
