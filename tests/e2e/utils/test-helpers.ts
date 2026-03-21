@@ -124,6 +124,40 @@ export async function ensureLoginScreen(page: Page): Promise<void> {
     }
   }
   
+  // Check if we're on registration page and need to switch to login
+  try {
+    const submitButton = await page.$('#submit-btn');
+    if (submitButton) {
+      const buttonText = await submitButton.textContent();
+      if (buttonText && buttonText.includes('Register')) {
+        console.log('⚠️ On registration page, switching to login mode...');
+        
+        // Find and click the toggle mode button
+        const toggleSelectors = [
+          '#toggle-mode',
+          'button#toggle-mode',
+          '.link-btn#toggle-mode'
+        ];
+        
+        for (const selector of toggleSelectors) {
+          try {
+            const toggleButton = await page.$(selector);
+            if (toggleButton && await toggleButton.isVisible()) {
+              console.log(`✅ Found toggle button: ${selector}`);
+              await toggleButton.click();
+              await page.waitForTimeout(1000);
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+    }
+  } catch {
+    // Continue if we can't determine the current mode
+  }
+  
   // Wait for login container to be ready
   try {
     await page.waitForSelector('.login-container', { timeout: 10000 });

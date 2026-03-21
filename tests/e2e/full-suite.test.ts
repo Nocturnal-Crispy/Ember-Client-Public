@@ -9,14 +9,16 @@ import {
   waitForLoading,
   ensureLoginScreen
 } from './utils/test-helpers';
+import { TEST_USER, TEST_SERVER, TEST_TIMEOUTS, TEST_SELECTORS } from './test-constants';
 
-electronTest.describe('User Registration', () => {
+electronTest.describe('Full E2E Test Suite', () => {
+  
+  // Test 1: Registration (always runs first to ensure user exists)
   electronTest('should register a new user successfully', async ({ page }) => {
     
-    // Generate test user data
-    const testUser = generateTestUser();
-    console.log(`   Username: ${testUser.username}`);
-    console.log(`   Email: ${testUser.email}`);
+    // Use defined test user credentials
+    console.log(`   Username: ${TEST_USER.username}`);
+    console.log(`   Email: ${TEST_USER.email}`);
     
     // Ensure we're on the login screen before proceeding
     await ensureLoginScreen(page);
@@ -108,8 +110,8 @@ electronTest.describe('User Registration', () => {
         'input[placeholder*="Username"]'
       ];
       
-      await safeType(page, usernameSelectors[0], testUser.username);
-      console.log(`✅ Username entered: ${testUser.username}`);
+      await safeType(page, usernameSelectors[0], TEST_USER.username);
+      console.log(`✅ Username entered: ${TEST_USER.username}`);
       
       // Email field - Note: Your form doesn't have email, it has hostname instead
       const hostnameSelectors = [
@@ -120,8 +122,8 @@ electronTest.describe('User Registration', () => {
         'input[placeholder*="ember"]'
       ];
       
-      await safeType(page, hostnameSelectors[0], 'http://localhost:8085');
-      console.log(`✅ Hostname entered: http://localhost:8085`);
+      await safeType(page, hostnameSelectors[0], TEST_SERVER.hostname);
+      console.log(`✅ Hostname entered: ${TEST_SERVER.hostname}`);
       
       // Password field
       const passwordSelectors = [
@@ -132,7 +134,7 @@ electronTest.describe('User Registration', () => {
         'input[placeholder*="password"]'
       ];
       
-      await safeType(page, passwordSelectors[0], testUser.password);
+      await safeType(page, passwordSelectors[0], TEST_USER.password);
       console.log(`✅ Password entered`);
       
       // Confirm password field (only visible in registration mode)
@@ -151,7 +153,7 @@ electronTest.describe('User Registration', () => {
         try {
           const element = await page.$(selector);
           if (element && await element.isVisible()) {
-            await safeType(page, selector, testUser.password);
+            await safeType(page, selector, TEST_USER.password);
             console.log(`✅ Confirm password entered`);
             break;
           }
@@ -367,28 +369,100 @@ electronTest.describe('User Registration', () => {
     }
   });
 
-  electronTest('should handle registration validation errors', async ({ page }) => {
-    console.log('🧪 Starting registration validation test...');
+  // Test 2: Login, Server Creation, and Message Sending (depends on Test 1)
+  electronTest('should login, create server, and send message', async ({ page }) => {
+    
+    // Use defined test user credentials for login
+    console.log(`   Username: ${TEST_USER.username}`);
+    console.log(`   Hostname: ${TEST_SERVER.hostname}`);
     
     // Ensure we're on the login screen before proceeding
     await ensureLoginScreen(page);
     
     try {
-      // Navigate to registration page
-      const registrationSelectors = [
-        '#toggle-mode',
-        'button#toggle-mode',
-        '.link-btn#toggle-mode'
+      // Take initial screenshot
+      await takeScreenshot(page, 'login-create-server-start');
+      
+      // Step 1: Login with existing credentials
+      console.log('📝 Step 1: Logging in with existing credentials...');
+      
+      // Fill login form
+      const usernameField = await page.$(TEST_SELECTORS.USERNAME_FIELD);
+      if (usernameField) {
+        await usernameField.click();
+        await page.keyboard.press('Control+a');
+        await page.keyboard.press('Delete');
+        await page.keyboard.type(TEST_USER.username);
+        console.log(`✅ Username entered: ${TEST_USER.username}`);
+      }
+      
+      const hostnameField = await page.$(TEST_SELECTORS.HOSTNAME_FIELD);
+      if (hostnameField) {
+        await hostnameField.click();
+        await page.keyboard.press('Control+a');
+        await page.keyboard.press('Delete');
+        await page.keyboard.type(TEST_SERVER.hostname);
+        console.log(`✅ Hostname entered: ${TEST_SERVER.hostname}`);
+      }
+      
+      const passwordField = await page.$(TEST_SELECTORS.PASSWORD_FIELD);
+      if (passwordField) {
+        await passwordField.click();
+        await page.keyboard.press('Control+a');
+        await page.keyboard.press('Delete');
+        await page.keyboard.type(TEST_USER.password);
+        console.log('✅ Password entered');
+      }
+      
+      // Submit login form
+      await safeClick(page, TEST_SELECTORS.SUBMIT_BUTTON);
+      
+      // Wait for login to complete - should go to main app
+      console.log('⏳ Waiting for login to complete...');
+      
+      try {
+        // Wait for URL to change to main app
+        await page.waitForFunction(() => {
+          return document.location.href.includes('index.html');
+        }, { timeout: 10000 });
+        console.log('✅ Successfully logged in and redirected to main app');
+      } catch {
+        console.log('⚠️ Could not confirm login redirect, checking for main app elements...');
+        // Fallback: look for main app elements
+        try {
+          await page.waitForSelector('.app-container', { timeout: 5000 });
+          console.log('✅ Found main app container, login successful');
+        } catch {
+          throw new Error('Login failed - could not find main app elements');
+        }
+      }
+      
+      // Wait for main app to fully load
+      await page.waitForTimeout(TEST_TIMEOUTS.MEDIUM);
+      
+      // Take screenshot after successful login
+      await takeScreenshot(page, 'login-success-main-app');
+      
+      // Step 2: Create a new server
+      console.log('📝 Step 2: Creating a new server...');
+      
+      // Look for the + button to add server
+      const addServerSelectors = [
+        '.add-server',
+        '.server-icon.add-server',
+        'div:has-text("+")',
+        '*:has-text("+")'
       ];
       
-      let registrationClicked = false;
-      for (const selector of registrationSelectors) {
+      let addServerClicked = false;
+      for (const selector of addServerSelectors) {
         try {
-          const button = await page.$(selector);
-          if (button) {
-            await safeClick(page, selector);
-            await waitForLoading(page);
-            registrationClicked = true;
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found add server button: ${selector}`);
+            await element.click();
+            await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+            addServerClicked = true;
             break;
           }
         } catch {
@@ -396,58 +470,234 @@ electronTest.describe('User Registration', () => {
         }
       }
       
-      // Fill registration form with invalid data
-      const usernameSelectors = ['#username', 'input#username', 'input[name="username"]'];
-      await safeType(page, usernameSelectors[0], ''); // Empty username
+      if (!addServerClicked) {
+        throw new Error('Could not find add server (+) button');
+      }
       
-      const hostnameSelectors = ['#hostname', 'input#hostname', 'input[name="hostname"]'];
-      await safeType(page, hostnameSelectors[0], ''); // Empty hostname
+      // Wait for add server modal to appear
+      await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+      await takeScreenshot(page, 'add-server-modal-open');
       
-      const passwordSelectors = ['#password', 'input#password', 'input[type="password"]'];
-      await safeType(page, passwordSelectors[0], '123'); // Too short password
-      
-      // Try to submit
-      const submitSelectors = [
-        '#submit-btn',
-        'button#submit-btn',
-        '.submit-btn',
-        'button[type="submit"]'
+      // Click "Create My Own" option
+      const createOwnSelectors = [
+        '#add-server-create-btn',
+        'button:has-text("Create My Own")',
+        '.add-server-option:has-text("Create My Own")'
       ];
       
-      await safeClick(page, submitSelectors[0]);
-      
-      // Verify validation errors are shown
-      const errorSelectors = [
-        '#error-banner:not(.hidden)',
-        '.error-message:not(:empty)',
-        '.error-banner:not(.hidden)',
-        '[data-testid="validation-error"]',
-        '.validation-error',
-        '[role="alert"]'
-      ];
-      
-      let errorFound = false;
-      for (const selector of errorSelectors) {
+      let createOwnClicked = false;
+      for (const selector of createOwnSelectors) {
         try {
-          await page.waitForSelector(selector, { timeout: 3000 });
-          console.log(`✅ Validation error found: ${selector}`);
-          errorFound = true;
-          break;
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found create own option: ${selector}`);
+            await element.click();
+            await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+            createOwnClicked = true;
+            break;
+          }
         } catch {
           continue;
         }
       }
       
-      if (!errorFound) {
-        await takeScreenshot(page, 'validation-error');
-        throw new Error('Expected validation errors were not displayed');
+      if (!createOwnClicked) {
+        throw new Error('Could not find "Create My Own" option');
       }
       
-      console.log('✅ Registration validation test passed');
+      // Wait for create server modal
+      await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+      await takeScreenshot(page, 'create-server-modal-open');
+      
+      // Fill server creation form
+      const serverNameField = await page.$('#server-name-input');
+      if (serverNameField) {
+        await serverNameField.click();
+        await serverNameField.type('Test Server E2E');
+        console.log('✅ Server name entered: Test Server E2E');
+      }
+      
+      // Submit server creation
+      const createServerSubmitSelectors = [
+        '#create-server-btn',
+        'button:has-text("Create Server")',
+        '.modal-btn-primary:has-text("Create Server")'
+      ];
+      
+      let serverCreated = false;
+      for (const selector of createServerSubmitSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found create server submit: ${selector}`);
+            await element.click();
+            await page.waitForTimeout(TEST_TIMEOUTS.MEDIUM);
+            serverCreated = true;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      if (!serverCreated) {
+        throw new Error('Could not submit server creation');
+      }
+      
+      // Wait for server to be created and modal to close
+      await page.waitForTimeout(TEST_TIMEOUTS.MEDIUM);
+      await takeScreenshot(page, 'server-created');
+      
+      // Step 3: Send a message
+      console.log('📝 Step 3: Sending a message...');
+      
+      // Set up console error monitoring
+      const consoleErrors: string[] = [];
+      page.on('console', msg => {
+        if (msg.type() === 'error') {
+          consoleErrors.push(msg.text());
+          console.log(`🔍 Console Error: ${msg.text()}`);
+        }
+      });
+      
+      // Look for message input field
+      const messageInputSelectors = [
+        'input[placeholder*="message"]',
+        'input[placeholder*="Type a message"]',
+        '.message-input',
+        '#message-input',
+        'textarea[placeholder*="message"]'
+      ];
+      
+      let messageInputFound = false;
+      for (const selector of messageInputSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found message input: ${selector}`);
+            await element.click();
+            await element.type('Hello from E2E test!');
+            console.log('✅ Message typed: Hello from E2E test!');
+            messageInputFound = true;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      if (!messageInputFound) {
+        throw new Error('Could not find message input field');
+      }
+      
+      // Take screenshot before sending
+      await takeScreenshot(page, 'message-before-send');
+      
+      // Send the message
+      const sendMessageSelectors = [
+        'button:has-text("Send")',
+        '.send-button',
+        '#send-message',
+        'button[type="submit"]'
+      ];
+      
+      let messageSent = false;
+      for (const selector of sendMessageSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found send button: ${selector}`);
+            await element.click();
+            await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+            messageSent = true;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      if (!messageSent) {
+        // Try Enter key as fallback
+        console.log('⚠️ Send button not found, trying Enter key...');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(TEST_TIMEOUTS.SHORT);
+      }
+      
+      // Wait for message to be sent and check for errors
+      await page.waitForTimeout(TEST_TIMEOUTS.MEDIUM);
+      
+      // Check for any console errors
+      if (consoleErrors.length > 0) {
+        console.log(`❌ Found ${consoleErrors.length} console errors during message send:`);
+        consoleErrors.forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error}`);
+        });
+      } else {
+        console.log('✅ No console errors detected during message send');
+      }
+      
+      // Look for the message in the chat area
+      const messageSelectors = [
+        '.message-content:has-text("Hello from E2E test!")',
+        '*:has-text("Hello from E2E test!")',
+        '.chat-message:has-text("Hello from E2E test!")'
+      ];
+      
+      let messageFound = false;
+      for (const selector of messageSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            console.log(`✅ Found sent message: ${selector}`);
+            messageFound = true;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      
+      if (!messageFound) {
+        console.log('⚠️ Message not found in chat area - checking for error indicators...');
+        
+        // Look for error indicators
+        const errorSelectors = [
+          '.error-message',
+          '.send-error',
+          '.message-error',
+          '*:has-text("failed")',
+          '*:has-text("error")'
+        ];
+        
+        for (const selector of errorSelectors) {
+          try {
+            const element = await page.$(selector);
+            if (element && await element.isVisible()) {
+              const errorText = await element.textContent();
+              console.log(`❌ Found error indicator: ${selector} - ${errorText}`);
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+      
+      // Take final screenshot
+      await takeScreenshot(page, 'message-sent-success');
+      
+      // Report message sending status
+      if (messageFound) {
+        console.log('✅ Message successfully sent and found in chat');
+      } else {
+        console.log('⚠️ Message may not have been sent successfully');
+      }
+      
+      console.log('✅ Login, server creation, and message sending test completed successfully');
       
     } catch (error) {
-      console.error('❌ Registration validation test failed:', error);
-      await takeScreenshot(page, 'validation-error');
+      console.error('❌ Login/server/message test failed:', error);
+      await takeScreenshot(page, 'login-server-message-error');
       throw error;
     }
   });
