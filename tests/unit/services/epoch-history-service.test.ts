@@ -454,7 +454,6 @@ describe('EpochHistoryService', () => {
         total: 3,
         decryptable: 3, // All messages are decryptable in this test setup
         requiresEpochKeys: 2,
-        legacy: 1,
       });
     });
   });

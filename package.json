@@ -4,8 +4,7 @@
   "description": "Ember Client",
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "npm run build:shared && npm run inject-key && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && cp -r src/renderer/*.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/ && mkdir -p dist/renderer/assets/icons && cp -r assets/icons/* dist/renderer/assets/icons/",
-    "build:shared": "cd ember-shared && npm install && npm run build && cd .. && mkdir -p node_modules/ember-shared && cp -r ember-shared/dist/. node_modules/ember-shared/dist/ && cp -r ember-shared/package.json node_modules/ember-shared/",
+    "build": "npm run inject-key && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && cp -r src/renderer/*.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/ && mkdir -p dist/renderer/assets/icons && cp -r assets/icons/* dist/renderer/assets/icons/",
     "inject-key": "./scripts/secure-build.sh --inject-only",
     "secure-build": "./scripts/secure-build.sh",
     "prestart": "electron-rebuild -f -w better-sqlite3",
@@ -40,7 +39,6 @@
   },
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.48.0",
     "@types/electron-store": "^3.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
@@ -56,8 +54,7 @@
     "@signalapp/libsignal-client": "^0.89.0",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.8.0",
-    "electron-store": "^8.1.0",
-    "ember-shared": "file:./ember-shared"
+    "electron-store": "^8.1.0"
   },
   "build": {
     "appId": "com.ember.client",

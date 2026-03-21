@@ -5,7 +5,7 @@
  * invite-based Signal Protocol group key establishment.
  */
 
-import type { AuthData } from 'ember-shared';
+import type { AuthData } from '../../shared';
 import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface InviteEphemeralKeyPackage {

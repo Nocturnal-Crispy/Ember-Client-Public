@@ -184,6 +184,17 @@
           } else if (data.type === "device_key_fulfilled") {
             log.info("WebSocket: device_key_fulfilled");
             window.dispatchEvent(new CustomEvent("device-key-fulfilled", { detail: data.payload }));
+          } else if (data.type === "sender_key_rotation_required" && data.payload) {
+            log.info("WebSocket: sender key rotation required", {
+              ember_id: String(data.payload["ember_id"] ?? ""),
+              removed_user_id: String(data.payload["removed_user_id"] ?? ""),
+              new_epoch: Number(data.payload["new_epoch"] ?? 0),
+            });
+            const emberId = String(data.payload["ember_id"] ?? "");
+            if (emberId) {
+              window.cryptoRouting.onMemberRemoved(emberId, 0);
+              window.handleSenderKeyMemberLeft(emberId);
+            }
           }
         } catch (err) {
           log.error("WebSocket message parse error", { error: String(err) });
@@ -406,6 +417,14 @@
     // Refresh the members list to get the latest data
     const members = await window.fetchMembers(ember_id);
     window.renderMemberList(members);
+
+    // Update crypto routing state based on membership change
+    const memberCount = members.length;
+    if (action === 'joined') {
+      window.cryptoRouting.onMemberAdded(ember_id, memberCount);
+    } else if (action === 'left' || action === 'kicked') {
+      window.cryptoRouting.onMemberRemoved(ember_id, memberCount);
+    }
   }
 
   function disconnectWebSocket(): void {

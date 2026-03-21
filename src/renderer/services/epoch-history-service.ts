@@ -6,7 +6,7 @@
  * epoch boundaries.
  */
 
-import type { AuthData } from 'ember-shared';
+import type { AuthData } from '../../shared';
 import { EpochService, Epoch, EpochKey } from './epoch-service';
 import { SignalSessionManager } from '../managers/signal-session-manager';
 
@@ -55,12 +55,33 @@ export class EpochHistoryService {
   async decryptMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
     try {
       if (!message.epoch_id) {
-        throw new Error('Message missing epoch_id — only Signal Protocol epoch messages are supported');
+        if (message.protocol_version < 2) {
+          // Legacy v1.x message — delegate to SignalSessionManager
+          return await this.decryptLegacyMessage(message, emberId);
+        }
+        throw new Error('Epoch message missing epoch_id');
       }
       return await this.decryptEpochMessage(message, emberId);
     } catch (error) {
       console.error('Failed to decrypt message:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Decrypt a legacy v1.x message using SignalSessionManager
+   */
+  private async decryptLegacyMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
+    try {
+      const ciphertextBytes = new TextEncoder().encode(message.ciphertext);
+      const plaintext = await this.signalSessionManager.groupDecrypt(emberId, ciphertextBytes);
+      return {
+        id: message.id,
+        plaintext,
+        created_at: message.created_at,
+      };
+    } catch (error) {
+      throw new Error('Legacy message decryption failed: ' + (error as Error).message);
     }
   }
 

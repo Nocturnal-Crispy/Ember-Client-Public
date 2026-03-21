@@ -1,7 +1,7 @@
-import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse, SignalDeviceIdentity } from "ember-shared";
+import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "../shared";
 import { contextBridge, ipcRenderer } from "electron";
-import * as emberCrypto from "ember-shared";
-import * as emberServices from "ember-shared";
+import * as emberCrypto from "../shared";
+import * as emberServices from "../shared";
 import * as nodeCrypto from "crypto";
 import { refreshToken } from "./services/token-refresh-service";
 import { getTokenExpiry, isTokenExpiringSoon } from "./utils/token-utils";
@@ -291,31 +291,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   crypto: {
-    generateRecoveryCode: (length?: number) => {
-      preloadLog("debug", "Crypto: generateRecoveryCode", { length });
-      return emberCrypto.generateRecoveryCode(length);
+    generateRecoveryCode: (_length?: number): string => {
+      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
     },
     encryptPrivateKeyWithRecoveryCode: (
-      privateKey: Uint8Array,
-      recoveryCode: string
-    ) => {
-      preloadLog("debug", "Crypto: encryptPrivateKeyWithRecoveryCode");
-      return emberCrypto.encryptPrivateKeyWithRecoveryCode(
-        privateKey,
-        recoveryCode
-      );
+      _privateKey: Uint8Array,
+      _recoveryCode: string
+    ): Promise<{ encrypted: string; salt: string }> => {
+      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
     },
     decryptPrivateKeyWithRecoveryCode: (
-      encryptedBase64: string,
-      recoveryCode: string,
-      saltBase64: string
-    ) => {
-      preloadLog("debug", "Crypto: decryptPrivateKeyWithRecoveryCode");
-      return emberCrypto.decryptPrivateKeyWithRecoveryCode(
-        encryptedBase64,
-        recoveryCode,
-        saltBase64
-      );
+      _encryptedBase64: string,
+      _recoveryCode: string,
+      _saltBase64: string
+    ): Promise<Uint8Array | null> => {
+      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
     },
     encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
       if (key.byteLength !== 32) {
@@ -407,7 +397,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
         hostname,
         username,
         password,
-        signalIdentity as SignalDeviceIdentity,
+        signalIdentity as DeviceIdentity,
         publicKey,
         encryptedDeviceKey,
         salt

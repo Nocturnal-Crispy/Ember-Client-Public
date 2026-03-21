@@ -577,6 +577,15 @@
           user_id: authData.user_id,
           username: authData.username,
         });
+
+        // Store Signal identity public key in safe storage so getIdentityKeyPair() can retrieve it.
+        // Key: identity_pubkey_${authData.user_id}_${authData.device_id}
+        const publicKeyBase64Registration = Buffer.from(signalIdentity.identityKeyPair.publicKey).toString('base64');
+        await window.emberAPI.invoke('SetSafeStorage', {
+          key: `identity_pubkey_${authData.user_id}_${authData.device_id}`,
+          value: publicKeyBase64Registration,
+        });
+
         authData._recoveryCode = recoveryCode;
       }
 

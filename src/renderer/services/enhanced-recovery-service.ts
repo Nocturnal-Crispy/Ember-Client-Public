@@ -5,7 +5,7 @@
  * device fingerprinting, and improved cryptographic security.
  */
 
-import type { AuthData } from 'ember-shared';
+import type { AuthData } from '../../shared';
 import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface RecoveryCodeData {
@@ -454,18 +454,25 @@ export class EnhancedRecoveryService {
       const needsRotation = await this.needsRotation();
       
       const recommendations: string[] = [];
-      
+      const isEnhanced = !!recoveryData && recoveryData.protocol_version >= 2;
+
       if (!recoveryData) {
         recommendations.push('Create a recovery code to enable account recovery');
       } else {
+        if (recoveryData.protocol_version < 2) {
+          recommendations.push('Upgrade to enhanced recovery code for better security');
+        }
+        if (recoveryData.identity_key_type !== 'ed25519') {
+          recommendations.push('Update to use Ed25519 identity keys');
+        }
         if (needsRotation) {
           recommendations.push('Rotate recovery code for security');
         }
       }
-      
+
       return {
         exists: !!recoveryData,
-        enhanced: true,
+        enhanced: isEnhanced,
         needsRotation,
         recommendations,
       };

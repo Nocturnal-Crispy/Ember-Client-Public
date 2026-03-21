@@ -28,8 +28,8 @@ import type {
   IKyberPreKeyStore,
   AuthData,
   PreKeyBundle,
-} from 'ember-shared';
-import { fetchPreKeyBundle } from 'ember-shared';
+} from '../../shared';
+import { fetchPreKeyBundle } from '../../shared';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

@@ -66,7 +66,7 @@ import type {
   CreateSenderKeyDistributionArgs,
   CreateSenderKeyDistributionData,
   ProcessSenderKeyDistributionArgs,
-} from 'ember-shared';
+} from '../../shared';
 import {
   encryptSignalMessage,
   decryptSignalMessage,
@@ -74,7 +74,7 @@ import {
   processSenderKeyDistribution,
   groupEncryptMessage,
   groupDecryptMessage,
-} from 'ember-shared';
+} from '../../shared';
 import {
   ProtocolAddress,
   PublicKey,
@@ -337,7 +337,7 @@ function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionId
 
 function handleLoadDistributionId(db: SignalDatabase, args: LoadDistributionIdArgs): LoadDistributionIdData {
   const result = db.loadDistributionId(args.address);
-  return { distribution_id: result };
+  return { distributionId: result };
 }
 
 // ── Kyber pre-key handlers (scaffolding only) ───────────────────────────────────

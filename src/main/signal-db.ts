@@ -19,7 +19,7 @@ import type {
   ISignedPreKeyStore,
   IKyberPreKeyStore,
   ISenderKeyStore,
-} from 'ember-shared';
+} from '../shared';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 

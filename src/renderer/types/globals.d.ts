@@ -36,40 +36,40 @@ import type {
   SoundDef,
   EmberCmd,
   EmberIpcResponse,
-} from "ember-shared";
+} from "../../shared";
 
 declare global {
   // ─── Domain types re-exported from ember-shared ───────────────────────────
 
-  type AuthData = import("ember-shared").AuthData;
-  type DeviceIdentity = import("ember-shared").DeviceIdentity;
-  type RegistrationPayload = import("ember-shared").RegistrationPayload;
-  type LoginPayload = import("ember-shared").LoginPayload;
-  type AuthResponse = import("ember-shared").AuthResponse;
-  type RecoveryData = import("ember-shared").RecoveryData;
+  type AuthData = import("../../shared").AuthData;
+  type DeviceIdentity = import("../../shared").DeviceIdentity;
+  type RegistrationPayload = import("../../shared").RegistrationPayload;
+  type LoginPayload = import("../../shared").LoginPayload;
+  type AuthResponse = import("../../shared").AuthResponse;
+  type RecoveryData = import("../../shared").RecoveryData;
 
-  type Ember = import("ember-shared").Ember;
-  type Channel = import("ember-shared").Channel;
-  type Category = import("ember-shared").Category;
-  type Member = import("ember-shared").Member;
-  type UserStatus = import("ember-shared").UserStatus;
-  type ChannelReorderUpdate = import("ember-shared").ChannelReorderUpdate;
-  type CategoryReorderUpdate = import("ember-shared").CategoryReorderUpdate;
-  type DragItem = import("ember-shared").DragItem;
-  type ContextMenuTarget = import("ember-shared").ContextMenuTarget;
+  type Ember = import("../../shared").Ember;
+  type Channel = import("../../shared").Channel;
+  type Category = import("../../shared").Category;
+  type Member = import("../../shared").Member;
+  type UserStatus = import("../../shared").UserStatus;
+  type ChannelReorderUpdate = import("../../shared").ChannelReorderUpdate;
+  type CategoryReorderUpdate = import("../../shared").CategoryReorderUpdate;
+  type DragItem = import("../../shared").DragItem;
+  type ContextMenuTarget = import("../../shared").ContextMenuTarget;
 
-  type Message = import("ember-shared").Message;
-  type WsMessage = import("ember-shared").WsMessage;
-  type PresenceUpdatePayload = import("ember-shared").PresenceUpdatePayload;
-  type LogPayload = import("ember-shared").LogPayload;
+  type Message = import("../../shared").Message;
+  type WsMessage = import("../../shared").WsMessage;
+  type PresenceUpdatePayload = import("../../shared").PresenceUpdatePayload;
+  type LogPayload = import("../../shared").LogPayload;
 
-  type VoiceSettings = import("ember-shared").VoiceSettings;
-  type SoundType = import("ember-shared").SoundType;
-  type VoiceParticipant = import("ember-shared").VoiceParticipant;
-  type ICEServer = import("ember-shared").ICEServer;
-  type AuthForVoice = import("ember-shared").AuthForVoice;
-  type OscillatorType = import("ember-shared").OscillatorType;
-  type SoundDef = import("ember-shared").SoundDef;
+  type VoiceSettings = import("../../shared").VoiceSettings;
+  type SoundType = import("../../shared").SoundType;
+  type VoiceParticipant = import("../../shared").VoiceParticipant;
+  type ICEServer = import("../../shared").ICEServer;
+  type AuthForVoice = import("../../shared").AuthForVoice;
+  type OscillatorType = import("../../shared").OscillatorType;
+  type SoundDef = import("../../shared").SoundDef;
 
   // ─── Direct Messaging Types ───────────────────────────────────────────────
 
@@ -502,6 +502,43 @@ declare global {
     enterEditMode(messageDiv: HTMLElement, messageId: string): void;
     // Globals set by renderer.ts
     clearPendingAttachment(): void;
+    // Globals set by ember-manager.ts (crypto state)
+    getCryptoState(emberId: string): {
+      cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
+      senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
+      activeDistributionId: string | null;
+      senderKeyEpoch: number;
+    };
+    setCryptoState(emberId: string, update: Partial<{
+      cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
+      senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
+      activeDistributionId: string | null;
+      senderKeyEpoch: number;
+    }>): {
+      cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
+      senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
+      activeDistributionId: string | null;
+      senderKeyEpoch: number;
+    };
+    shouldUseSenderKey(emberId: string, memberCount: number): boolean;
+    syncCryptoStateFromServer(emberId: string, serverState: {
+      crypto_mode?: string;
+      sender_key_status?: string;
+      active_distribution_id?: string | null;
+      sender_key_epoch?: number;
+    }): void;
+    // Globals set by crypto-routing-service.ts
+    cryptoRouting: {
+      selectEncryptionMode(emberId: string, memberCount: number): 'pairwise' | 'sender_key';
+      encryptMessage(plaintext: string, emberId: string, memberCount: number): Promise<{ ciphertext: string; wireType: 'sender_key' } | null>;
+      decryptMessage(ciphertext: string, emberId: string): Promise<string | null>;
+      detectWireType(ciphertext: string): 'sender_key' | 'signal';
+      onMemberAdded(emberId: string, memberCount: number): void;
+      onMemberRemoved(emberId: string, memberCount: number): void;
+      onDistributionComplete(emberId: string, distributionId: string): void;
+      onRotationComplete(emberId: string, newDistributionId: string): void;
+      validateSenderKeyMessage(emberId: string, senderAddress: string): string | null;
+    };
     // Globals set by ember-manager.ts
     fetchEmbers(): Promise<Ember[]>;
     renderServerList(embers: Ember[]): void;

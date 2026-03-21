@@ -7,7 +7,7 @@
 
 import { safeStorage } from 'electron';
 import Store from 'electron-store';
-import { setSafeStorageFunctions, type SafeStorageFunctions } from 'ember-shared';
+import { setSafeStorageFunctions, type SafeStorageFunctions } from '../shared';
 
 const store = new Store();
 

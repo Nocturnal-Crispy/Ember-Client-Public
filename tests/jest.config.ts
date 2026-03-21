@@ -31,8 +31,8 @@ const config: Config = {
   // TS path alias @/* → src/*; resolve ember-shared to source for fast test compilation
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
-    "^ember-shared$": "<rootDir>/../ember-shared/src/index",
-    "^ember-shared/(.*)$": "<rootDir>/../ember-shared/src/$1",
+    "^ember-shared$": "<rootDir>/src/shared/index",
+    "^ember-shared/(.*)$": "<rootDir>/src/shared/$1",
     // ESM-style TS imports in ember-shared use explicit `.js` extensions.
     // Map relative `.js` imports back to TypeScript sources for Jest.
     "^(\\.{1,2}/.*)\\.js$": "$1",
@@ -45,7 +45,7 @@ const config: Config = {
   clearMocks: true,
   restoreMocks: true,
 
-  testPathIgnorePatterns: ["/node_modules/", "/dist/", "/build/"],
+  testPathIgnorePatterns: ["/node_modules/", "/dist/", "/build/", "/e2e/"],
 };
 
 export default config;

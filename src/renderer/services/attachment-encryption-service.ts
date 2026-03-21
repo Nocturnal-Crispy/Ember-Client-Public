@@ -5,7 +5,7 @@
  * for secure file sharing.
  */
 
-import type { AuthData } from 'ember-shared';
+import type { AuthData } from '../../shared';
 import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface AttachmentKey {

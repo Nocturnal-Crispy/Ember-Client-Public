@@ -97,6 +97,73 @@
 
   const senderKeyDistributionIds = new Map<string, string>();
 
+  // ─── Group Crypto State Machine ──────────────────────────────────────
+
+  type CryptoMode = 'pairwise_bootstrap' | 'sender_key_active';
+  type SenderKeyStatus = 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
+
+  interface ConversationCryptoState {
+    cryptoMode: CryptoMode;
+    senderKeyStatus: SenderKeyStatus;
+    activeDistributionId: string | null;
+    senderKeyEpoch: number;
+  }
+
+  const DEFAULT_CRYPTO_STATE: ConversationCryptoState = {
+    cryptoMode: 'pairwise_bootstrap',
+    senderKeyStatus: 'not_initialized',
+    activeDistributionId: null,
+    senderKeyEpoch: 0,
+  };
+
+  const emberCryptoStates = new Map<string, ConversationCryptoState>();
+
+  function getCryptoState(emberId: string): ConversationCryptoState {
+    return emberCryptoStates.get(emberId) ?? { ...DEFAULT_CRYPTO_STATE };
+  }
+
+  function setCryptoState(emberId: string, update: Partial<ConversationCryptoState>): ConversationCryptoState {
+    const current = getCryptoState(emberId);
+    const next: ConversationCryptoState = {
+      cryptoMode: update.cryptoMode ?? current.cryptoMode,
+      senderKeyStatus: update.senderKeyStatus ?? current.senderKeyStatus,
+      activeDistributionId: update.activeDistributionId !== undefined ? update.activeDistributionId : current.activeDistributionId,
+      senderKeyEpoch: update.senderKeyEpoch ?? current.senderKeyEpoch,
+    };
+    emberCryptoStates.set(emberId, next);
+    log.debug('Crypto state updated', {
+      ember_id: emberId,
+      crypto_mode: next.cryptoMode,
+      sender_key_status: next.senderKeyStatus,
+      epoch: next.senderKeyEpoch,
+      has_distribution_id: next.activeDistributionId !== null,
+    });
+    return next;
+  }
+
+  function shouldUseSenderKey(emberId: string, memberCount: number): boolean {
+    const state = getCryptoState(emberId);
+    return (
+      memberCount >= 3 &&
+      state.senderKeyStatus === 'active'
+    );
+  }
+
+  /** Sync crypto state from server response. */
+  function syncCryptoStateFromServer(emberId: string, serverState: {
+    crypto_mode?: string;
+    sender_key_status?: string;
+    active_distribution_id?: string | null;
+    sender_key_epoch?: number;
+  }): void {
+    setCryptoState(emberId, {
+      cryptoMode: (serverState.crypto_mode as CryptoMode) ?? 'pairwise_bootstrap',
+      senderKeyStatus: (serverState.sender_key_status as SenderKeyStatus) ?? 'not_initialized',
+      activeDistributionId: serverState.active_distribution_id ?? null,
+      senderKeyEpoch: serverState.sender_key_epoch ?? 0,
+    });
+  }
+
   // CRITICAL FIX: Add comprehensive instrumentation for crypto operations
   const senderKeyOperationLog = new Map<string, {
     createdAt: number;
@@ -596,10 +663,22 @@
       throw new Error('Not authenticated for sender key distribution');
     }
     await distributeSenderKeyToMembers(emberId, auth);
+
+    // Signal distribution complete to the crypto routing state machine
+    const distId = senderKeyDistributionIds.get(emberId);
+    if (distId) {
+      window.cryptoRouting.onDistributionComplete(emberId, distId);
+    }
   }
 
   async function handleSenderKeyMemberLeft(emberId: string): Promise<void> {
     log.info("Member left — rotating sender key", { ember_id: emberId });
+
+    const auth = await getValidAuth();
+    if (!auth || !auth.token || !auth.hostname) {
+      throw new Error('Not authenticated for sender key rotation');
+    }
+
     const newDistId = crypto.randomUUID();
     await window.emberAPI.invoke("StoreDistributionId", {
       address: emberId,
@@ -609,12 +688,10 @@
     await window.emberAPI.invoke("CreateSenderKeyDistribution", {
       distributionId: newDistId,
     });
-    
-    const auth = await getValidAuth();
-    if (!auth || !auth.token || !auth.hostname) {
-      throw new Error('Not authenticated for sender key distribution');
-    }
     await distributeSenderKeyToMembers(emberId, auth);
+
+    // Signal rotation complete to the crypto routing state machine
+    window.cryptoRouting.onRotationComplete(emberId, newDistId);
   }
 
   // ─── Ember order (localStorage) ───────────────────────────────────────────
@@ -892,6 +969,19 @@
     const members = await window.fetchMembers(emberId);
     window.renderMemberList(members);
     window.wsSubscribeToEmber(emberId);
+
+    // Sync crypto state from server
+    try {
+      const cryptoResp = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/crypto-state`, {
+        headers: { 'Authorization': `Bearer ${auth.token}` },
+      });
+      if (cryptoResp.ok) {
+        const cryptoData = await cryptoResp.json();
+        syncCryptoStateFromServer(emberId, cryptoData);
+      }
+    } catch (cryptoErr) {
+      log.warn('Failed to sync crypto state from server', { ember_id: emberId, error: (cryptoErr as Error).message });
+    }
   }
 
   // ─── Create Server Modal ───────────────────────────────────────────────────
@@ -1560,4 +1650,8 @@
   window.processIncomingDistributions = processIncomingSenderKeyDistributions;
   window.distributeSenderKeyToMembers = distributeSenderKeyToMembersWrapper;
   window.ensureSenderKeyForEmber = ensureSenderKeyForEmber;
+  window.getCryptoState = getCryptoState;
+  window.setCryptoState = setCryptoState;
+  window.shouldUseSenderKey = shouldUseSenderKey;
+  window.syncCryptoStateFromServer = syncCryptoStateFromServer;
 })();

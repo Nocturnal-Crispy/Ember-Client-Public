@@ -168,7 +168,7 @@ describe('EnhancedRecoveryService', () => {
       expect(needsRotation).toBe(true);
     });
 
-    it('should return true for legacy protocol version', async () => {
+    it('should return false for recently rotated recovery code regardless of protocol version', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -181,7 +181,7 @@ describe('EnhancedRecoveryService', () => {
       });
 
       const needsRotation = await enhancedRecoveryService.needsRotation();
-      expect(needsRotation).toBe(true);
+      expect(needsRotation).toBe(false);
     });
 
     it('should return false for enhanced recovery code', async () => {

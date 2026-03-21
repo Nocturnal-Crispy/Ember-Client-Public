@@ -329,11 +329,13 @@ describe('signal-service', () => {
     });
 
     describe('getLocalDevice', () => {
-      it('reads identity key and registration ID from safeStorage', async () => {
+      it('reads identity key, public key, and registration ID from safeStorage', async () => {
+        const mockPrivateKey = new Uint8Array([10, 20, 30]);
         const mockPublicKey = new Uint8Array([1, 2, 3, 4, 5]);
         const mockRegistrationId = '12345';
 
         mockInvoke
+          .mockResolvedValueOnce({ success: true, data: { value: toBase64(mockPrivateKey) } })
           .mockResolvedValueOnce({ success: true, data: { value: toBase64(mockPublicKey) } })
           .mockResolvedValueOnce({ success: true, data: { value: mockRegistrationId } });
 
@@ -343,22 +345,25 @@ describe('signal-service', () => {
           key: 'identity_key_user-123_device-1',
         });
         expect(mockInvoke).toHaveBeenNthCalledWith(2, 'GetSafeStorage', {
+          key: 'identity_pubkey_user-123_device-1',
+        });
+        expect(mockInvoke).toHaveBeenNthCalledWith(3, 'GetSafeStorage', {
           key: 'registration_id_user-123_device-1',
         });
         expect(result.publicKey).toEqual(mockPublicKey);
-        expect(result.privateKey).toEqual(new Uint8Array(0)); // Private key not exposed
         expect(result.registrationId).toBe(12345);
       });
 
       it('throws error when identity key is not found', async () => {
         mockInvoke.mockResolvedValueOnce({ success: true, data: { value: null } });
 
-        await expect(service.getLocalDevice()).rejects.toThrow('Identity key not found in secure storage');
+        await expect(service.getLocalDevice()).rejects.toThrow('Identity private key not found in secure storage');
       });
 
       it('throws error when registration ID is not found', async () => {
         mockInvoke
           .mockResolvedValueOnce({ success: true, data: { value: toBase64(new Uint8Array([1, 2, 3])) } })
+          .mockResolvedValueOnce({ success: true, data: { value: toBase64(new Uint8Array([4, 5, 6])) } })
           .mockResolvedValueOnce({ success: true, data: { value: null } });
 
         await expect(service.getLocalDevice()).rejects.toThrow('Registration ID not found in secure storage');

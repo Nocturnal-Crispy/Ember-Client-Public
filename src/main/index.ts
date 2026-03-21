@@ -25,8 +25,7 @@ import type { SignalDatabase } from "./signal-db";
 import { registerEmberIpcHandlers, updateSignalDatabase } from "./ipc/ember-ipc";
 import { resolveSignalKeyBytes } from "./signal-key-utils";
 import { initializeAuthWithElectronSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
-import { generateRecoveryCode, encryptPrivateKeyWithRecoveryCode } from "ember-shared";
-import { uploadSignedPreKey, uploadOneTimePreKeys } from "ember-shared";
+import { uploadSignedPreKey, uploadOneTimePreKeys } from "../shared";
 import { PrivateKey } from "@signalapp/libsignal-client";
 const { IPC_CHANNELS } = require("../shared/constants");
 
