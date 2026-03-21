@@ -74,6 +74,7 @@ beforeAll(() => {
 
   // 4. Globals used by the module
   (window as any).getValidAuth           = jest.fn().mockResolvedValue({ token: 'tok', hostname: HOSTNAME, user_id: MY_USER_ID });
+  (window as any).getDevice             = jest.fn().mockResolvedValue({ public_key: 'pubkey64', private_key: 'privkey64' });
   (window as any).wsSubscribeToChannel   = jest.fn();
   (window as any).wsUnsubscribeFromChannel = jest.fn();
   (window as any).addDmConversationToList = jest.fn();
@@ -195,5 +196,89 @@ describe('BP-5: dm-channel-message — dedup for optimistically rendered message
     const msg = (window as any).displayDmMessage.mock.calls[0][0];
     expect(msg.id).toBe('msg-from-partner-999');
     expect(msg.isOwn).toBe(false);
+  });
+});
+
+// ─── HIGH-07: DM placeholder key cryptographic correctness ────────────────────────
+
+describe('HIGH-07: DM placeholder key cryptographic correctness', () => {
+  const UNIQUE_PARTNER_ID = 'partner-high-07-unique';
+  
+  beforeEach(() => {
+    fetchMock.mockClear();
+    // Mock successful device fetch
+    fetchMock.mockImplementation((url: string, opts?: RequestInit) => {
+      if (String(url).includes(`/users/${UNIQUE_PARTNER_ID}/devices`) && !opts?.method) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ devices: [{ id: 'partner-dev-1', public_key: 'partnerPub', protocol_version: 1 }] }),
+        } as Response);
+      }
+      if (String(url).includes('/dm-requests') && opts?.method === 'POST')
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'req-1', ember_id: 'emb-high07', status: 'created' }) });
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it('uses crypto.getRandomValues instead of Math.random fallback', async () => {
+    // Mock crypto.getRandomValues to track if it's called
+    const mockGetRandomValues = jest.fn().mockImplementation((array: Uint8Array) => {
+      array.fill(42); // Fill with predictable value for testing
+      return array;
+    });
+    
+    // Override the global crypto to mock getRandomValues
+    Object.defineProperty(global, 'crypto', {
+      value: {
+        getRandomValues: mockGetRandomValues
+      },
+      writable: true
+    });
+
+    await (window as any).startDmConversation(UNIQUE_PARTNER_ID, 'Partner');
+
+    // Verify crypto.getRandomValues was called instead of Math.random
+    expect(mockGetRandomValues).toHaveBeenCalled();
+    
+    // Get the POST request that was made
+    const postCall = fetchMock.mock.calls.find(call => call[1]?.method === 'POST');
+    expect(postCall).toBeDefined();
+    
+    const requestBody = JSON.parse(postCall![1]!.body as string);
+    const encryptedKeySelf = requestBody.encrypted_key_self;
+    
+    // Should be base64 of 32 random bytes (not 56 bytes with fake nonce)
+    const decoded = Buffer.from(encryptedKeySelf, 'base64');
+    expect(decoded.length).toBe(32); // Should be 32 bytes, not 56 (32+24 fake nonce)
+    expect(decoded.every(byte => byte === 42)).toBe(true); // Should contain our mocked values
+  });
+
+  it('does not include fake nonce structure in encrypted_key_self', async () => {
+    // Reset fetch mock for this test
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, opts?: RequestInit) => {
+      if (String(url).includes(`/users/${UNIQUE_PARTNER_ID}/devices`) && !opts?.method) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ devices: [{ id: 'partner-dev-1', public_key: 'partnerPub', protocol_version: 1 }] }),
+        } as Response);
+      }
+      if (String(url).includes('/dm-requests') && opts?.method === 'POST')
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'req-2', ember_id: 'emb-high07-2', status: 'created' }) });
+      return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    });
+
+    await (window as any).startDmConversation(UNIQUE_PARTNER_ID + '-2', 'Partner');
+
+    // Get the POST request that was made
+    const postCall = fetchMock.mock.calls.find(call => call[1]?.method === 'POST');
+    expect(postCall).toBeDefined();
+    
+    const requestBody = JSON.parse(postCall![1]!.body as string);
+    const encryptedKeySelf = requestBody.encrypted_key_self;
+    
+    // Decode and verify it's exactly 32 bytes (no 24-byte zero nonce appended)
+    const decoded = Buffer.from(encryptedKeySelf, 'base64');
+    expect(decoded.length).toBe(32);
   });
 });

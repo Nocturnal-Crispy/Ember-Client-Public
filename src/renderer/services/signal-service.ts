@@ -93,12 +93,24 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
   constructor(private readonly auth: AuthData) {}
 
   async getIdentityKeyPair(): Promise<{ readonly publicKey: Uint8Array; readonly privateKey: Uint8Array }> {
-    const key = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
-    const response = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key });
-    if (!response.data?.value) {
+    // Read private key from identity_key_${user_id}_${device_id}
+    const privKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
+    const privKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key: privKey });
+    if (!privKeyResponse.data?.value) {
+      throw new Error('Identity private key not found in secure storage');
+    }
+
+    // Read public key from identity_pubkey_${user_id}_${device_id}
+    const pubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
+    const pubKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key: pubKey });
+    if (!pubKeyResponse.data?.value) {
       throw new Error('Identity public key not found in secure storage');
     }
-    return { publicKey: fromBase64(response.data.value), privateKey: new Uint8Array(0) };
+
+    return { 
+      publicKey: fromBase64(pubKeyResponse.data.value), 
+      privateKey: fromBase64(privKeyResponse.data.value) 
+    };
   }
 
   async getLocalRegistrationId(): Promise<number> {
@@ -209,10 +221,18 @@ export class SignalService {
   }
 
   async getLocalDevice(): Promise<{ readonly publicKey: Uint8Array; readonly privateKey: Uint8Array; readonly registrationId: number }> {
+    // Read private key from identity_key_${user_id}_${device_id}
     const identityKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
     const identityResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', { key: identityKey });
     if (!identityResponse.value) {
-      throw new Error('Identity key not found in secure storage');
+      throw new Error('Identity private key not found in secure storage');
+    }
+
+    // Read public key from identity_pubkey_${user_id}_${device_id}
+    const identityPubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
+    const identityPubResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', { key: identityPubKey });
+    if (!identityPubResponse.value) {
+      throw new Error('Identity public key not found in secure storage');
     }
 
     const registrationKey = `registration_id_${this.auth.user_id}_${this.auth.device_id}`;
@@ -222,8 +242,8 @@ export class SignalService {
     }
 
     return {
-      publicKey: fromBase64(identityResponse.value),
-      privateKey: new Uint8Array(0), // Private key not exposed to renderer
+      publicKey: fromBase64(identityPubResponse.value),
+      privateKey: fromBase64(identityResponse.value),
       registrationId: parseInt(registrationResponse.value, 10),
     };
   }

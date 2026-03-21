@@ -603,6 +603,10 @@
               value: privateKeyBase64
             });
             await ipcRenderer.invoke("set-safe-storage", {
+              key: `identity_pubkey_${authData.user_id}_${authData.device_id}`,
+              value: Buffer.from(signalIdentity.identityKeyPair.publicKey).toString('base64')
+            });
+            await ipcRenderer.invoke("set-safe-storage", {
               key: `registration_id_${authData.user_id}_${authData.device_id}`,
               value: String(signalIdentity.registrationId)
             });

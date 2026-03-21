@@ -608,4 +608,38 @@ describe('signal-service', () => {
       });
     });
   });
+
+  // ── Tests for CRITICAL-03: getIdentityKeyPair() returns privateKey: new Uint8Array(0) ──
+
+  describe('IpcIdentityKeyStore', () => {
+    let identityStore: IpcIdentityKeyStore;
+
+    beforeEach(() => {
+      identityStore = new IpcIdentityKeyStore(mockAuth);
+    });
+
+    describe('getIdentityKeyPair', () => {
+      
+      it('should read both private and public keys correctly when fixed', async () => {
+        // This test demonstrates the EXPECTED behavior after the fix
+        mockInvoke
+          .mockResolvedValueOnce({
+            success: true,
+            data: { value: toBase64(new Uint8Array([5, 6, 7, 8])) } // Private key
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            data: { value: toBase64(new Uint8Array([1, 2, 3, 4])) } // Public key
+          });
+
+        // After the fix, this should work correctly
+        // For now, this test will fail because the implementation is buggy
+        const result = await identityStore.getIdentityKeyPair();
+
+        // Expected behavior after fix (will fail with current implementation)
+        expect(result.privateKey).toEqual(new Uint8Array([5, 6, 7, 8]));
+        expect(result.publicKey).toEqual(new Uint8Array([1, 2, 3, 4]));
+      });
+    });
+  });
 });

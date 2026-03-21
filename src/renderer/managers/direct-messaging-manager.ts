@@ -233,26 +233,13 @@
     if (currentDevice) {
       // Generate a dummy encrypted key for server compatibility
       // Since Signal Protocol will be used for actual encryption, this is just for API compatibility
+      // Compatibility placeholder — Signal Protocol sender keys handle actual DM encryption; 
+      // this value is stored server-side but never decrypted
       const emberKey = new Uint8Array(32);
-      if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-        crypto.getRandomValues(emberKey);
-      } else {
-        // Fallback for environments without crypto.getRandomValues
-        for (let i = 0; i < emberKey.length; i++) {
-          emberKey[i] = Math.floor(Math.random() * 256);
-        }
-      }
+      crypto.getRandomValues(emberKey);
       
-      // Simple base64 encoding for server compatibility
-      // This is a placeholder since Signal Protocol handles the real encryption
-      const combined = new Uint8Array(32 + 24); // key + nonce placeholder
-      combined.set(emberKey);
-      // Add nonce placeholder (zeros)
-      for (let i = 32; i < combined.length; i++) {
-        combined[i] = 0;
-      }
-      
-      encryptedKeySelf = Buffer.from(combined).toString('base64');
+      // Simple base64 encoding for server compatibility - just the 32 random bytes
+      encryptedKeySelf = Buffer.from(emberKey).toString('base64');
     }
 
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
