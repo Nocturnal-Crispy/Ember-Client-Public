@@ -270,7 +270,8 @@ export class EpochService {
           new TextEncoder().encode(rotationPayload)
         );
         // Convert Uint8Array to base64 string for API transport
-        rotationData = btoa(String.fromCharCode(...encryptedRotationData));
+        // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
+        rotationData = Buffer.from(encryptedRotationData).toString('base64');
       }
 
       // Create new epoch

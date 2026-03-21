@@ -82,23 +82,24 @@ export class AttachmentEncryptionService {
   }
 
   /**
-   * Encrypt attachment data with a per-attachment key
+   * Encrypt attachment data with a per-attachment key using AES-256-GCM.
+   * Output format: base64(iv[12] || ciphertext || tag[16])
    */
   async encryptAttachmentData(data: Uint8Array, key: string): Promise<string> {
     try {
-      // Convert key to bytes
       const keyBytes = new Uint8Array(
         key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
       );
-
-      // For now, use a simple XOR encryption (in reality, would use AES-GCM)
-      const encryptedData = new Uint8Array(data.length);
-      for (let i = 0; i < data.length; i++) {
-        encryptedData[i] = data[i] ^ keyBytes[i % keyBytes.length];
+      if (keyBytes.length !== 32) {
+        throw new Error(`Invalid attachment key length: ${keyBytes.length}, expected 32`);
       }
-
-      // Return base64 encoded encrypted data
-      return btoa(String.fromCharCode(...encryptedData));
+      const cryptoKey = await crypto.subtle.importKey('raw', keyBytes as Uint8Array<ArrayBuffer>, 'AES-GCM', false, ['encrypt']);
+      const iv = crypto.getRandomValues(new Uint8Array(12)) as Uint8Array<ArrayBuffer>;
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, data as Uint8Array<ArrayBuffer>);
+      const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+      combined.set(iv);
+      combined.set(new Uint8Array(ciphertext), iv.length);
+      return Buffer.from(combined).toString('base64');
     } catch (error) {
       console.error('Failed to encrypt attachment data:', error);
       throw error;
@@ -106,27 +107,26 @@ export class AttachmentEncryptionService {
   }
 
   /**
-   * Decrypt attachment data with a per-attachment key
+   * Decrypt attachment data with a per-attachment key using AES-256-GCM.
+   * Expected input format: base64(iv[12] || ciphertext || tag[16])
    */
   async decryptAttachmentData(encryptedData: string, key: string): Promise<Uint8Array> {
     try {
-      // Convert key to bytes
       const keyBytes = new Uint8Array(
         key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
       );
-
-      // Decode base64 encrypted data
-      const encryptedBytes = new Uint8Array(
-        atob(encryptedData).split('').map(char => char.charCodeAt(0))
-      );
-
-      // For now, use a simple XOR decryption (in reality, would use AES-GCM)
-      const decryptedData = new Uint8Array(encryptedBytes.length);
-      for (let i = 0; i < encryptedBytes.length; i++) {
-        decryptedData[i] = encryptedBytes[i] ^ keyBytes[i % keyBytes.length];
+      if (keyBytes.length !== 32) {
+        throw new Error(`Invalid attachment key length: ${keyBytes.length}, expected 32`);
       }
-
-      return decryptedData;
+      const combined = new Uint8Array(Buffer.from(encryptedData, 'base64'));
+      if (combined.length < 12 + 16) {
+        throw new Error('Encrypted attachment data too short');
+      }
+      const iv = combined.slice(0, 12) as Uint8Array<ArrayBuffer>;
+      const ciphertext = combined.slice(12) as Uint8Array<ArrayBuffer>;
+      const cryptoKey = await crypto.subtle.importKey('raw', keyBytes as Uint8Array<ArrayBuffer>, 'AES-GCM', false, ['decrypt']);
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
+      return new Uint8Array(plaintext);
     } catch (error) {
       console.error('Failed to decrypt attachment data:', error);
       throw error;

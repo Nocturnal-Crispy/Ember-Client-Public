@@ -14,7 +14,7 @@ describe('Prekey endpoint path corrections', () => {
     
     const mockAuth = {
       token: 'test-token',
-      hostname: 'test.example.com',
+      hostname: 'https://test.example.com',
     };
 
     const mockSignedPreKey = {
@@ -43,7 +43,7 @@ describe('Prekey endpoint path corrections', () => {
     
     const mockAuth = {
       token: 'test-token',
-      hostname: 'test.example.com',
+      hostname: 'https://test.example.com',
     };
 
     const mockPreKeys = [
@@ -72,7 +72,7 @@ describe('Prekey endpoint path corrections', () => {
     
     const mockAuth = {
       token: 'test-token',
-      hostname: 'test.example.com',
+      hostname: 'https://test.example.com',
     };
 
     await getOneTimePreKeyCount(mockAuth);
@@ -103,7 +103,7 @@ describe('Prekey endpoint path corrections', () => {
     
     const mockAuth = {
       token: 'test-token',
-      hostname: 'test.example.com',
+      hostname: 'https://test.example.com',
     };
 
     await fetchPreKeyBundle(mockAuth, 'user-123', 'device-456');

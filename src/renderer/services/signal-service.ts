@@ -37,11 +37,12 @@ const PREKEY_MESSAGE_TYPE = 3;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
+  // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
+  return Buffer.from(bytes).toString('base64');
 }
 
 function fromBase64(s: string): Uint8Array {
-  return new Uint8Array(atob(s).split('').map((c) => c.charCodeAt(0)));
+  return new Uint8Array(Buffer.from(s, 'base64'));
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {

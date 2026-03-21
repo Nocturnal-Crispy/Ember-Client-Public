@@ -5,7 +5,7 @@
   "main": "dist/main/index.js",
   "scripts": {
     "build": "npm run build:shared && npm run inject-key && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && cp -r src/renderer/*.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/ && mkdir -p dist/renderer/assets/icons && cp -r assets/icons/* dist/renderer/assets/icons/",
-    "build:shared": "cd ../ember-shared && npm install && npm run build && cd - && cp -r ../ember-shared/dist/. node_modules/ember-shared/dist/",
+    "build:shared": "cd ember-shared && npm install && npm run build && cd .. && mkdir -p node_modules/ember-shared && cp -r ember-shared/dist/. node_modules/ember-shared/dist/ && cp -r ember-shared/package.json node_modules/ember-shared/",
     "inject-key": "./scripts/secure-build.sh --inject-only",
     "secure-build": "./scripts/secure-build.sh",
     "start": "npm run build && electron .",
@@ -15,9 +15,10 @@
     "dist:linux": "npm run secure-build && electron-builder --linux",
     "dist:win": "npm run secure-build && electron-builder --win",
     "dist:mac": "npm run secure-build && electron-builder --mac",
+    "pretest": "npm rebuild better-sqlite3",
     "test": "jest --config ./tests/jest.config.ts",
     "release": "npm run build && ./scripts/release.sh",
-    "rebuild-native": "electron-rebuild -f -w windows-audio-capture,linux-audio-capture"
+    "rebuild-native": "electron-rebuild -f -w better-sqlite3,windows-audio-capture,linux-audio-capture"
   },
   "keywords": [
     "typescript",
@@ -46,7 +47,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.8.0",
     "electron-store": "^8.1.0",
-    "ember-shared": "file:../ember-shared"
+    "ember-shared": "file:./ember-shared"
   },
   "build": {
     "appId": "com.ember.client",

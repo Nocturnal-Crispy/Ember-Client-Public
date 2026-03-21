@@ -45,7 +45,6 @@ export interface GifFavorite {
 export interface StoreSchema {
   auth?: AuthData;
   device?: DeviceIdentity;
-  devicePrivateKey?: string; // safeStorage-encrypted private key, stored as base64
   settings?: {
     last_hostname: string;
   };

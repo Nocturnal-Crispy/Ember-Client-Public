@@ -106,14 +106,14 @@ describe('AttachmentEncryptionService', () => {
       expect(decryptedData).toEqual(originalData);
     });
 
-    it('should produce different encrypted data for same input', async () => {
+    it('should produce different encrypted data for same input (random IV)', async () => {
       const originalData = new TextEncoder().encode('Hello, World!');
       const key = 'a'.repeat(64);
       
       const encryptedData1 = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
       const encryptedData2 = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
       
-      expect(encryptedData1).toBe(encryptedData2); // XOR encryption is deterministic
+      expect(encryptedData1).not.toBe(encryptedData2); // AES-GCM uses a random IV per encryption
     });
 
     it('should handle empty data', async () => {

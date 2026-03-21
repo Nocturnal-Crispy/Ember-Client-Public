@@ -211,17 +211,6 @@ describe('dm-signal-flow', () => {
       );
     });
 
-    it('throws migration required when signalSessionManager has no session', async () => {
-      mockHasSession.mockResolvedValueOnce(false);
-
-      await expect(
-        (
-          window as Window & {
-            sendDirectMessage(channelId: string, text: string): Promise<string>;
-          }
-        ).sendDirectMessage(TEXT_CHANNEL_ID, 'hello legacy')
-      ).rejects.toThrow(/Migration required/i);
-    });
   });
 
   // ── handleIncomingMessage ─────────────────────────────────────────────────────

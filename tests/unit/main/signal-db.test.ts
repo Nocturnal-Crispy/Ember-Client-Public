@@ -111,8 +111,6 @@ describe('openSignalDatabase — file creation', () => {
     expect(typeof db.removeKyberPreKey).toBe('function');
 
     // Extra methods
-    expect(typeof db.storeLegacyEmberKey).toBe('function');
-    expect(typeof db.loadLegacyEmberKey).toBe('function');
     expect(typeof db.closeDatabase).toBe('function');
   });
 });
@@ -354,50 +352,6 @@ describe('IKyberPreKeyStore', () => {
 
     expect(loaded).not.toBeNull();
     expect(Buffer.from(loaded!)).toEqual(Buffer.from(record));
-  });
-});
-
-// ─── Legacy ember key store ───────────────────────────────────────────────────
-
-describe('Legacy ember key store', () => {
-  beforeEach(() => {
-    db = openSignalDatabase(tmpDir, identityKey);
-  });
-
-  it('loadLegacyEmberKey returns null for an unknown emberId', () => {
-    expect(db.loadLegacyEmberKey('unknown-ember-id')).toBeNull();
-  });
-
-  it('storeLegacyEmberKey then loadLegacyEmberKey round-trip preserves bytes', () => {
-    const key = crypto.randomBytes(32);
-    db.storeLegacyEmberKey('ember-abc', key);
-    const loaded = db.loadLegacyEmberKey('ember-abc');
-
-    expect(loaded).not.toBeNull();
-    expect(Buffer.from(loaded!)).toEqual(Buffer.from(key));
-  });
-
-  it('legacy ember key persists across close and reopen', () => {
-    const key = crypto.randomBytes(32);
-    db.storeLegacyEmberKey('ember-xyz', key);
-    db.closeDatabase();
-
-    db = openSignalDatabase(tmpDir, identityKey);
-    const loaded = db.loadLegacyEmberKey('ember-xyz');
-
-    expect(loaded).not.toBeNull();
-    expect(Buffer.from(loaded!)).toEqual(Buffer.from(key));
-  });
-
-  it('overwrites an existing legacy ember key', () => {
-    const first = crypto.randomBytes(32);
-    const second = crypto.randomBytes(32);
-
-    db.storeLegacyEmberKey('ember-dup', first);
-    db.storeLegacyEmberKey('ember-dup', second);
-    const loaded = db.loadLegacyEmberKey('ember-dup');
-
-    expect(Buffer.from(loaded!)).toEqual(Buffer.from(second));
   });
 });
 

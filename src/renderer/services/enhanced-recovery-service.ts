@@ -389,7 +389,8 @@ export class EnhancedRecoveryService {
     try {
       // Enhanced encryption for identity keys with better security
       // In reality, this would use proper cryptographic operations
-      const encrypted = btoa(String.fromCharCode(...identityKey));
+      // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
+      const encrypted = Buffer.from(identityKey).toString('base64');
       const salt = crypto.randomUUID();
       
       return { encrypted, salt };

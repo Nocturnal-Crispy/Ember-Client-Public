@@ -18,7 +18,7 @@ describe('Prekey endpoint path corrections', () => {
       
       const mockAuth = {
         token: 'test-token',
-        hostname: 'test.example.com',
+        hostname: 'https://test.example.com',
       };
 
       const mockSignedPreKey = {
@@ -43,7 +43,7 @@ describe('Prekey endpoint path corrections', () => {
     });
 
     it('should NOT use the old /v1/prekeys/signed endpoint', async () => {
-      const mockFetch = jest.fn();
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
       global.fetch = mockFetch;
 
       const { uploadSignedPreKey } = require('ember-shared');
@@ -72,7 +72,7 @@ describe('Prekey endpoint path corrections', () => {
 
   describe('uploadOneTimePreKeys', () => {
     it('should use /api/v1/prekeys/one-time endpoint', async () => {
-      const mockFetch = jest.fn();
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
       global.fetch = mockFetch;
 
       const { uploadOneTimePreKeys } = require('ember-shared');
@@ -108,7 +108,7 @@ describe('Prekey endpoint path corrections', () => {
     });
 
     it('should NOT use the old /v1/prekeys/one-time endpoint', async () => {
-      const mockFetch = jest.fn();
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
       global.fetch = mockFetch;
 
       const { uploadOneTimePreKeys } = require('ember-shared');

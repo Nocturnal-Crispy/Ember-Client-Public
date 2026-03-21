@@ -137,7 +137,7 @@ describe("message-service cutover", () => {
 
     (global as any).fetch = jest.fn();
 
-    await expect((window as any).sendEncryptedMessage("ch-1", "hello")).rejects.toThrow(/Migration required/i);
+    await expect((window as any).sendEncryptedMessage("ch-1", "hello")).rejects.toThrow(/Signal Protocol encryption not ready/i);
     expect((window as any).showInputError).toHaveBeenCalled();
     expect((global as any).fetch).not.toHaveBeenCalled();
   });
@@ -156,7 +156,7 @@ describe("message-service cutover", () => {
     await (window as any).displayDecryptedMessage(msg, false);
 
     const messagesText = document.getElementById("messages")?.textContent ?? "";
-    expect(messagesText).toContain("unsupported envelope");
+    expect(messagesText).toContain("[Failed to decrypt message]");
   });
 });
 

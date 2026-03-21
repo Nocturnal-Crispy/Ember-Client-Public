@@ -1,4 +1,7 @@
 /**
+ * @jest-environment node
+ */
+/**
  * TDD Tests for Signal Database Error Handling
  * 
  * Tests for proper error handling in database operations
@@ -118,7 +121,7 @@ describe('Signal Database Error Handling', () => {
   });
 
   describe('Concurrent Access', () => {
-    it('should handle multiple database instances', () => {
+    it('should handle multiple database instances', async () => {
       const db1 = openSignalDatabase(tmpDir, identityKey);
       const db2 = openSignalDatabase(tmpDir, identityKey);
       
@@ -131,11 +134,8 @@ describe('Signal Database Error Handling', () => {
       const record1 = new Uint8Array([1, 2, 3]);
       const record2 = new Uint8Array([4, 5, 6]);
       
-      // These should not throw
-      expect(async () => {
-        await db1.storeSession(address1, record1);
-        await db2.storeSession(address2, record2);
-      }).not.toThrow();
+      await db1.storeSession(address1, record1);
+      await db2.storeSession(address2, record2);
       
       db1.closeDatabase();
       db2.closeDatabase();

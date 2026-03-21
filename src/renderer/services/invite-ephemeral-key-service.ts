@@ -261,7 +261,8 @@ export class InviteEphemeralKeyService {
       const distributionMessage = await this.signalSessionManager.createSenderKeyDistribution(emberId);
       
       // Convert to base64 for transport
-      const distributionMessageBase64 = btoa(String.fromCharCode(...distributionMessage));
+      // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
+      const distributionMessageBase64 = Buffer.from(distributionMessage).toString('base64');
 
       return {
         invite_id: inviteId,

@@ -264,6 +264,15 @@ declare global {
       encryptedDeviceKey: string,
       salt: string
     ): Promise<AuthResponse>;
+    registerWithSignalKeys(
+      hostname: string,
+      username: string,
+      password: string,
+      signalIdentity: SignalDeviceIdentity,
+      publicKey: string,
+      encryptedDeviceKey: string,
+      salt: string
+    ): Promise<AuthResponse>;
     registerWithRecovery(
       hostname: string,
       username: string,
@@ -508,6 +517,7 @@ declare global {
     handleSenderKeyMemberLeft(emberId: string): Promise<void>;
     processIncomingDistributions?(): Promise<void>;
     distributeSenderKeyToMembers(emberId: string): Promise<void>;
+    ensureSenderKeyForEmber(emberId: string): Promise<string | null>;
     // Globals set by channel-manager.ts
     fetchChannels(emberId: string): Promise<Channel[]>;
     fetchCategories(emberId: string): Promise<Category[]>;

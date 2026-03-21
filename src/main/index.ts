@@ -22,8 +22,8 @@ import { KLIPPY_API_KEY } from "./api-key";
 import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from "../shared/types";
 import { openSignalDatabase } from "./signal-db";
 import type { SignalDatabase } from "./signal-db";
-import { registerEmberIpcHandlers } from "./ipc/ember-ipc";
-import { initializeAuthWithElectronSafeStorage, migrateDevicePrivateKeyToSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
+import { registerEmberIpcHandlers, updateSignalDatabase } from "./ipc/ember-ipc";
+import { initializeAuthWithElectronSafeStorage, electronSafeStorageFunctions } from "./auth-safe-storage";
 import { migrateDeviceIdentity, generateRecoveryCode, encryptPrivateKeyWithRecoveryCode } from "ember-shared";
 import { uploadSignedPreKey, uploadOneTimePreKeys } from "ember-shared";
 import { PrivateKey } from "@signalapp/libsignal-client";
@@ -350,10 +350,87 @@ ipcMain.on("window-close", () => {
   }
 });
 
+// ─── Signal Database Management ─────────────────────────────────────────────────
+
+async function reinitializeSignalDatabase(): Promise<void> {
+  log.info("Re-initializing Signal database with current auth data");
+  
+  // Close existing database if open
+  if (signalDb) {
+    signalDb.closeDatabase();
+    signalDb = null;
+    log.debug("Closed existing Signal database");
+  }
+
+  // Get current auth data
+  const authData = store.get("auth") as any;
+  let privateKeyBytes: Buffer | null = null;
+  let localIdentityPrivateKeyBytes: Buffer | null = null;
+  let localRegistrationId: number | null = null;
+  let localIdentityAddress: string | null = null;
+  
+  if (authData && authData.user_id && authData.device_id) {
+    // Get Signal identity private key for Signal database authentication
+    const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
+      `identity_key_${authData.user_id}_${authData.device_id}`,
+    );
+    if (signalIdentityKey) {
+      const bytes = Buffer.from(signalIdentityKey, "base64");
+      if (bytes.length === 32) {
+        privateKeyBytes = bytes;
+        localIdentityPrivateKeyBytes = bytes;
+        log.debug("Signal database: Using Signal identity private key");
+      } else {
+        log.error("Signal database: identity_key_* is not a 32-byte Ed25519 private key", {
+          identityKeyLength: bytes.length,
+        });
+      }
+    } else {
+      log.error("Signal database: No Signal identity private key found - user must re-register");
+    }
+
+    localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
+
+    // Get registration ID
+    const registrationIdStr = await electronSafeStorageFunctions.getSafeStorage(
+      `registration_id_${authData.user_id}_${authData.device_id}`,
+    );
+    if (registrationIdStr) {
+      const parsed = parseInt(registrationIdStr, 10);
+      if (!Number.isNaN(parsed)) {
+        localRegistrationId = parsed;
+      }
+    }
+  }
+  
+  if (privateKeyBytes) {
+    try {
+      signalDb = openSignalDatabase(app.getPath("userData"), privateKeyBytes, {
+        localIdentityPrivateKey: localIdentityPrivateKeyBytes ?? undefined,
+        localRegistrationId: localRegistrationId ?? undefined,
+        localIdentityAddress: localIdentityAddress ?? undefined,
+      });
+      updateSignalDatabase(signalDb);
+      log.info("Signal database re-initialized and IPC handlers updated");
+    } catch (err) {
+      log.warn("Failed to re-initialize signal database; Signal IPC unavailable", { error: String(err) });
+      updateSignalDatabase(null);
+    }
+  } else {
+    log.warn("No Signal identity private key found for Signal database re-initialization");
+    updateSignalDatabase(null);
+  }
+}
+
 // ─── IPC: Auth ────────────────────────────────────────────────────────────────
 
-ipcMain.on("auth-success", () => {
-  log.info("Auth success signal received, loading main window");
+ipcMain.on("auth-success", async () => {
+  log.info("Auth success signal received, re-initializing Signal database");
+  
+  // CRITICAL FIX: Re-initialize Signal database with new auth data
+  await reinitializeSignalDatabase();
+  
+  log.info("Loading main window");
   if (mainWindow) {
     mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
@@ -362,6 +439,14 @@ ipcMain.on("auth-success", () => {
 ipcMain.on("auth-logout", () => {
   log.info("Logout signal received, clearing auth and loading login window");
   store.delete("auth");
+  
+  // CRITICAL FIX: Close Signal database on logout to prevent cross-user data leakage
+  if (signalDb) {
+    signalDb.closeDatabase();
+    signalDb = null;
+    log.debug("Signal database closed on logout");
+  }
+  
   if (mainWindow) {
     mainWindow.loadFile(path.join(__dirname, "../renderer/login.html"));
   }
@@ -382,33 +467,33 @@ ipcMain.on("auth-logout", () => {
 function checkSafeStorageAtStartup(): void {
   if (safeStorage.isEncryptionAvailable()) return;
 
-  const hasStoredKey = !!(store.get("devicePrivateKey") || store.get("device"));
+  const hasStoredKey = !!store.get("device");
   
-  // Also check new safeStorage system
+  // Check for Signal identity keys in safeStorage
   const authData = store.get("auth") as any;
-  let hasNewSafeStorageKeys = false;
+  let hasSignalKeys = false;
   if (authData && authData.user_id && authData.device_id) {
     // We can't check async functions here, but we'll assume there might be keys
     // This is a best-effort check since we can't await in this sync function
-    hasNewSafeStorageKeys = true;
+    hasSignalKeys = true;
   }
   
-  if (hasStoredKey || hasNewSafeStorageKeys) {
-    log.error("safeStorage unavailable at startup", { hasStoredKey, hasNewSafeStorageKeys });
+  if (hasStoredKey || hasSignalKeys) {
+    log.error("safeStorage unavailable at startup", { hasStoredKey, hasSignalKeys });
 
     const message = hasStoredKey
-      ? "Your device keyring is unavailable — private key at risk"
-      : "Your device keyring is unavailable — some features may not work";
+      ? "Your device identity is unavailable — private key at risk"
+      : "Your Signal identity keys are unavailable — encrypted messaging may not work";
 
     dialog.showErrorBox("SafeStorage Unavailable", message);
 
     const choice = dialog.showMessageBoxSync({
       type: "warning",
       title: "SafeStorage Unavailable",
-      message: "Your device keyring is unavailable due to system security settings.",
+      message: "Your keyring is unavailable due to system security settings.",
       detail: hasStoredKey
-        ? "Your private keys are stored without OS-level encryption, which poses a security risk. It's recommended to quit and resolve the safeStorage issue."
-        : "Some features may not work properly. Consider quitting and resolving the safeStorage issue.",
+        ? "Your device identity is stored without OS-level encryption, which poses a security risk. It's recommended to quit and resolve the safeStorage issue."
+        : "Your Signal identity keys may not work properly. Consider quitting and resolving the safeStorage issue.",
       buttons: ["Quit", "Continue Anyway"],
       defaultId: 0,
       cancelId: 1,
@@ -473,52 +558,9 @@ ipcMain.handle("get-device-identity", async () => {
     return null;
   }
 
-  // Try to get private key from new safeStorage system first
-  // Check for new Signal keys first
-  const authData = store.get("auth") as any;
-  if (authData && authData.user_id && authData.device_id) {
-    const identityKey = await electronSafeStorageFunctions.getSafeStorage(`identity_key_${authData.user_id}_${authData.device_id}`);
-    const legacyKey = await electronSafeStorageFunctions.getSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`);
-    
-    if (legacyKey) {
-      log.debug("Device identity retrieved with new safeStorage system");
-      return { ...device, private_key: legacyKey };
-    }
-  }
-
-  // Migration: old builds stored private_key directly in the device object
-  if (device.private_key) {
-    log.info("Migrating device private key to safeStorage");
-    const plaintextKey: string = device.private_key;
-    const { private_key, ...deviceWithoutKey } = device;
-    store.set("devicePrivateKey", encryptPrivateKey(plaintextKey));
-    store.set("device", deviceWithoutKey);
-    log.info("Device private key migration complete");
-    
-    // Also migrate to new safeStorage system if we have auth data
-    if (authData && authData.user_id && authData.device_id) {
-      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, plaintextKey);
-      store.delete("devicePrivateKey"); // Remove old storage after migration
-    }
-    
-    return { ...deviceWithoutKey, private_key: plaintextKey };
-  }
-
-  const storedKey = store.get("devicePrivateKey");
-  if (storedKey) {
-    log.debug("Device identity retrieved with encrypted private key");
-    const privateKey = decryptPrivateKey(storedKey as string);
-    
-    // Migrate to new safeStorage system if we have auth data
-    if (authData && authData.user_id && authData.device_id) {
-      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, privateKey);
-      store.delete("devicePrivateKey"); // Remove old storage after migration
-    }
-    
-    return { ...device, private_key: privateKey };
-  }
-
-  log.debug("Device identity retrieved (no private key stored)");
+  // Note: Legacy key system removed - device identity no longer contains private keys
+  // Signal identity keys are handled separately during registration
+  log.debug("Device identity retrieved (legacy keys removed)");
   return device;
 });
 
@@ -529,131 +571,11 @@ ipcMain.handle("save-device-identity", async (_event, deviceIdentity) => {
   const { private_key, ...deviceWithoutKey } = deviceIdentity;
   store.set("device", deviceWithoutKey);
   
-  if (private_key !== undefined) {
-    // Store in new safeStorage system if we have auth data
-    const authData = store.get("auth") as any;
-    if (authData && authData.user_id && authData.device_id) {
-      await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, String(private_key));
-      log.debug("Device identity saved with new safeStorage system");
-    } else {
-      // Fallback to old method for backward compatibility
-      store.set("devicePrivateKey", encryptPrivateKey(String(private_key)));
-      log.debug("Device identity saved with encrypted private key (fallback)");
-    }
-  } else {
-    log.debug("Device identity saved (no private key provided)");
-  }
+  // Note: Legacy private key storage removed - Signal identity keys are used instead
+  // The Signal database will be initialized when user registers with Signal keys
+  
+  log.debug("Device identity saved (legacy key storage disabled)");
   return true;
-});
-
-// ─── IPC: Signal migration ────────────────────────────────────────────────────
-
-ipcMain.handle("migrate-to-signal", async (_event, params: {
-  hostname: string;
-  token: string;
-  device_id: string;
-  user_id: string;
-  legacy_private_key_b64: string;
-}) => {
-  log.info("IPC: migrate-to-signal", { device_id: params.device_id });
-  try {
-    const legacyPrivateKey = Buffer.from(params.legacy_private_key_b64, "base64");
-    const migrationResult = await migrateDeviceIdentity(new Uint8Array(legacyPrivateKey));
-    const identityKeyBase64 = Buffer.from(migrationResult.identityKeyPair.publicKey).toString("base64");
-    const authData = { hostname: params.hostname, token: params.token, user_id: params.user_id, device_id: params.device_id, username: "" };
-
-    // Store identity key pair in Signal DB
-    if (signalDb) {
-      const localAddress = `${params.user_id}.${params.device_id}`;
-      signalDb.initializeLocalIdentity(
-        {
-          publicKey: Buffer.from(migrationResult.identityKeyPair.publicKey),
-          privateKey: Buffer.from(migrationResult.identityKeyPair.privateKey),
-        },
-        migrationResult.registrationId,
-        localAddress,
-      );
-      await signalDb.saveIdentity(localAddress, Buffer.from(migrationResult.identityKeyPair.publicKey));
-      log.debug("Identity key stored in Signal DB", { address: localAddress });
-    }
-
-    // Upload signed prekey to server
-    await uploadSignedPreKey(authData, migrationResult.signedPreKey);
-    log.debug("Signed prekey uploaded");
-
-    // Upload one-time prekeys to server
-    await uploadOneTimePreKeys(authData, migrationResult.oneTimePreKeys);
-    log.debug("One-time prekeys uploaded");
-
-    // Generate proof of possession: sign(deviceId + identityKeyBase64)
-    const message = Buffer.from(`${params.device_id}${identityKeyBase64}`);
-    const identityPrivKey = PrivateKey.deserialize(Buffer.from(migrationResult.identityKeyPair.privateKey));
-    const signature = identityPrivKey.sign(message);
-    const proofOfPossession = Buffer.from(signature).toString("base64");
-
-    // PATCH device on server
-    const patchUrl = `${params.hostname}/api/v1/devices/${params.device_id}`;
-    const patchResponse = await net.fetch(patchUrl, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.token}`,
-      },
-      body: JSON.stringify({
-        identity_key: identityKeyBase64,
-        protocol_version: 1,
-        proof_of_possession: proofOfPossession,
-      }),
-    });
-    if (!patchResponse.ok) {
-      const errText = await patchResponse.text().catch(() => "");
-      throw new Error(`Device PATCH failed: ${patchResponse.status} ${errText}`);
-    }
-
-    // Store new identity key in safeStorage
-    await electronSafeStorageFunctions.setSafeStorage(
-      `identity_key_${params.user_id}_${params.device_id}`,
-      Buffer.from(migrationResult.identityKeyPair.privateKey).toString("base64"),
-    );
-
-    // Re-encrypt recovery code with new identity key (24-digit code)
-    let recoveryCode: string | undefined;
-    try {
-      const newRecoveryCode = generateRecoveryCode(24);
-      const { encrypted, salt } = await encryptPrivateKeyWithRecoveryCode(
-        new Uint8Array(migrationResult.identityKeyPair.privateKey),
-        newRecoveryCode,
-      );
-      const recoveryPatchUrl = `${params.hostname}/api/v1/recovery-codes`;
-      const recoveryResponse = await net.fetch(recoveryPatchUrl, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${params.token}`,
-        },
-        body: JSON.stringify({ encrypted_device_key: encrypted, salt }),
-      });
-      if (recoveryResponse.ok) {
-        recoveryCode = newRecoveryCode;
-        log.info("Recovery code re-encrypted with new identity key");
-      } else {
-        log.warn("Recovery code re-encryption upload failed, user can re-encrypt later", {
-          status: recoveryResponse.status,
-        });
-      }
-    } catch (recoveryErr) {
-      log.warn("Recovery code re-encryption failed, non-fatal", {
-        error: (recoveryErr as Error).message,
-      });
-    }
-
-    log.info("Signal migration complete", { device_id: params.device_id });
-    return { status: "complete", identityKeyBase64, recoveryCode };
-  } catch (err) {
-    const error = err as Error;
-    log.error("Signal migration failed", { error: error.message });
-    return { status: "failed", error: error.message };
-  }
 });
 
 // ─── IPC: Auth storage ────────────────────────────────────────────────────────
@@ -678,6 +600,41 @@ ipcMain.handle("save-auth", (_event, authData) => {
     log.debug("Last hostname updated");
   }
   return true;
+});
+
+// ─── IPC: SafeStorage for ember-shared auth service ─────────────────────────────
+
+ipcMain.handle("get-safe-storage", async (_event, { key }) => {
+  log.debug("IPC: get-safe-storage", { key });
+  try {
+    const value = await electronSafeStorageFunctions.getSafeStorage(key);
+    return { success: true, data: { value } };
+  } catch (error) {
+    log.error("Failed to get safe storage", { key, error: (error as Error).message });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle("set-safe-storage", async (_event, { key, value }) => {
+  log.debug("IPC: set-safe-storage", { key });
+  try {
+    await electronSafeStorageFunctions.setSafeStorage(key, value);
+    return { success: true };
+  } catch (error) {
+    log.error("Failed to set safe storage", { key, error: (error as Error).message });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle("delete-safe-storage", async (_event, { key }) => {
+  log.debug("IPC: delete-safe-storage", { key });
+  try {
+    await electronSafeStorageFunctions.deleteSafeStorage(key);
+    return { success: true };
+  } catch (error) {
+    log.error("Failed to delete safe storage", { key, error: (error as Error).message });
+    return { success: false, error: (error as Error).message };
+  }
 });
 
 ipcMain.handle("get-last-hostname", () => {
@@ -1262,33 +1219,28 @@ if (!gotTheLock) {
     let localIdentityAddress: string | null = null;
     
     if (authData && authData.user_id && authData.device_id) {
-      // Try new safeStorage system first
-      const legacyKey = await electronSafeStorageFunctions.getSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`);
-      if (legacyKey) {
-        privateKeyBytes = Buffer.from(legacyKey, "base64");
-        log.debug("Signal database: Using private key from new safeStorage system");
-      }
-
-      localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
-
-      // The local Ed25519 identity private key is stored in safeStorage under `identity_key_*`.
+      // Get Signal identity private key for database authentication
       const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
         `identity_key_${authData.user_id}_${authData.device_id}`,
       );
       if (signalIdentityKey) {
         const bytes = Buffer.from(signalIdentityKey, "base64");
         if (bytes.length === 32) {
+          privateKeyBytes = bytes;
           localIdentityPrivateKeyBytes = bytes;
+          log.debug("Signal database: Using Signal identity private key");
         } else {
-          // Some older builds may have stored the public key here; without a private key
-          // we can't initialise libsignal's local identity rows.
-          log.warn("Signal database: identity_key_* present but not a 32-byte Ed25519 private key", {
+          log.error("Signal database: identity_key_* is not a 32-byte Ed25519 private key", {
             identityKeyLength: bytes.length,
           });
         }
+      } else {
+        log.debug("Signal database: No Signal identity private key found");
       }
 
-      // registration id is stored as a decimal string under `registration_id_*`.
+      localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
+
+      // Get registration ID
       const registrationIdStr = await electronSafeStorageFunctions.getSafeStorage(
         `registration_id_${authData.user_id}_${authData.device_id}`,
       );
@@ -1296,27 +1248,6 @@ if (!gotTheLock) {
         const parsed = parseInt(registrationIdStr, 10);
         if (!Number.isNaN(parsed)) {
           localRegistrationId = parsed;
-        }
-      }
-    }
-    
-    // Fallback to old devicePrivateKey system
-    if (!privateKeyBytes) {
-      const storedKey = store.get("devicePrivateKey");
-      if (storedKey) {
-        try {
-          const privateKeyStr = decryptPrivateKey(storedKey as string);
-          privateKeyBytes = Buffer.from(privateKeyStr, "base64");
-          log.debug("Signal database: Using private key from legacy storage");
-          
-          // Migrate to new system
-          if (authData && authData.user_id && authData.device_id) {
-            await electronSafeStorageFunctions.setSafeStorage(`legacy_private_key_${authData.user_id}_${authData.device_id}`, privateKeyStr);
-            store.delete("devicePrivateKey");
-            log.debug("Signal database: Migrated private key to new safeStorage system");
-          }
-        } catch (err) {
-          log.warn("Failed to decrypt legacy devicePrivateKey", { error: String(err) });
         }
       }
     }
@@ -1335,7 +1266,7 @@ if (!gotTheLock) {
         registerEmberIpcHandlers(null);
       }
     } else {
-      log.info("No device key yet — Signal IPC handlers registered without database");
+      log.info("No Signal identity private key yet — Signal IPC handlers registered without database");
       registerEmberIpcHandlers(null);
     }
 

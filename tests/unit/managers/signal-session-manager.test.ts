@@ -26,10 +26,9 @@ const mockElectronAPI = {
 
 // Setup global mocks
 beforeAll(() => {
-  (global as any).window = {
-    emberAPI: mockEmberAPI,
-    electronAPI: mockElectronAPI,
-  };
+  (window as any).SignalService = MockSignalService;
+  (window as any).emberAPI = mockEmberAPI;
+  (window as any).electronAPI = mockElectronAPI;
 });
 
 describe('SignalSessionManager', () => {

@@ -5,6 +5,30 @@
  * used in tests, avoiding the ES module import issues.
  */
 
+export class SessionStore {
+  constructor() {}
+}
+
+export class IdentityKeyStore {
+  constructor() {}
+}
+
+export class PreKeyStore {
+  constructor() {}
+}
+
+export class SignedPreKeyStore {
+  constructor() {}
+}
+
+export class KyberPreKeyStore {
+  constructor() {}
+}
+
+export class SenderKeyStore {
+  constructor() {}
+}
+
 export class PrivateKey {
   static generate(): PrivateKey {
     return new PrivateKey();

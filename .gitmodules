@@ -1,0 +1,3 @@
+[submodule "ember-shared"]
+	path = ember-shared
+	url = ../ember-shared

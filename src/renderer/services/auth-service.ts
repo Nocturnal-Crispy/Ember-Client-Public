@@ -549,20 +549,59 @@
             recoveryCode
           );
         log.debug("Private key encrypted with recovery code");
-        authData = await register(
+        
+        // CRITICAL FIX: Use registerWithSignalKeys to upload pre-keys during registration
+        // This prevents HTTP 404 errors when establishing self-sessions later
+        log.debug("Generating Signal identity for registration");
+        const signalIdentity = await window.electronAPI.authService.generateDeviceIdentity() as any;
+        
+        if (!signalIdentity || !signalIdentity.identityKeyPair || !signalIdentity.signedPreKey || !signalIdentity.oneTimePreKeys) {
+          throw new Error('Failed to generate Signal identity for registration');
+        }
+        
+        log.debug("Registering with Signal keys", {
+          deviceId: signalIdentity.deviceId,
+          hasIdentityKey: !!signalIdentity.identityKeyPair,
+          hasSignedPreKey: !!signalIdentity.signedPreKey,
+          oneTimePreKeysCount: signalIdentity.oneTimePreKeys?.length || 0
+        });
+        
+        authData = await window.electronAPI.authService.registerWithSignalKeys(
           hostname,
           username,
           password,
-          deviceIdentity.device_id,
+          signalIdentity,
           deviceIdentity.public_key,
           recoveryData.encrypted,
           recoveryData.salt
         );
-        log.info("Registration successful", {
+        
+        log.info("Registration successful with Signal keys", {
           user_id: authData.user_id,
           username: authData.username,
         });
         authData._recoveryCode = recoveryCode;
+        
+        // CRITICAL FIX: Store Signal identity private key in safeStorage
+        // This is required for Signal database initialization
+        // The registerWithSignalKeys function should do this, but we ensure it here as a workaround
+        if (signalIdentity.identityKeyPair?.privateKey) {
+          try {
+            const privateKeyBase64 = Buffer.from(signalIdentity.identityKeyPair.privateKey).toString('base64');
+            await ipcRenderer.invoke("set-safe-storage", {
+              key: `identity_key_${authData.user_id}_${authData.device_id}`,
+              value: privateKeyBase64
+            });
+            await ipcRenderer.invoke("set-safe-storage", {
+              key: `registration_id_${authData.user_id}_${authData.device_id}`,
+              value: String(signalIdentity.registrationId)
+            });
+            log.info("Signal identity keys stored in safeStorage");
+          } catch (storageErr) {
+            log.error("Failed to store Signal identity keys", { error: (storageErr as Error).message });
+            // Continue anyway - the registration succeeded
+          }
+        }
       }
 
       log.debug("Saving auth data to store");

@@ -77,10 +77,9 @@
    * to a self-box format so all future fetches use the simpler self-box path.
    */
   async function fetchAndCacheEmberKey(emberId: string): Promise<Uint8Array | null> {
-    // Cutover: server-side peer-box / self-box ember-keys are no longer fetched.
-    // However, we still support legacy decrypt if the ember key is already present
-    // in the local cache (e.g. loaded from SQLite archive).
-    return App.emberKeyCache.get(emberId) ?? null;
+    // No backward compatibility - legacy ember keys are no longer supported
+    log.debug("Legacy ember key support removed", { ember_id: emberId });
+    return null;
   }
 
   // ─── Load DM list ──────────────────────────────────────────────────────────
@@ -227,14 +226,46 @@
       log.warn("Failed to fetch recipient devices for DM session", { participantId, error: (err as Error).message });
     }
 
+    // Generate encrypted_key_self for server compatibility (P0-1 fix)
+    // The server requires this field even though Signal Protocol replaces ember keys for DMs
+    const currentDevice = await getDevice();
+    let encryptedKeySelf = "";
+    if (currentDevice) {
+      // Generate a dummy encrypted key for server compatibility
+      // Since Signal Protocol will be used for actual encryption, this is just for API compatibility
+      const emberKey = new Uint8Array(32);
+      if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+        crypto.getRandomValues(emberKey);
+      } else {
+        // Fallback for environments without crypto.getRandomValues
+        for (let i = 0; i < emberKey.length; i++) {
+          emberKey[i] = Math.floor(Math.random() * 256);
+        }
+      }
+      
+      // Simple base64 encoding for server compatibility
+      // This is a placeholder since Signal Protocol handles the real encryption
+      const combined = new Uint8Array(32 + 24); // key + nonce placeholder
+      combined.set(emberKey);
+      // Add nonce placeholder (zeros)
+      for (let i = 32; i < combined.length; i++) {
+        combined[i] = 0;
+      }
+      
+      encryptedKeySelf = Buffer.from(combined).toString('base64');
+    }
+
     const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${auth.token}`,
       },
-      // Cutover: peer-box / ember-keys no longer required for new DM sessions.
-      body: JSON.stringify({ user_id: participantId }),
+      // P0-1 FIX: Include encrypted_key_self as required by server
+      body: JSON.stringify({ 
+        user_id: participantId,
+        encrypted_key_self: encryptedKeySelf
+      }),
     });
     if (!res.ok) {
       const errData = (await res.json().catch(() => ({}))) as { error?: string };
@@ -286,9 +317,9 @@
       }
     }
 
-    // Legacy ember-keys are no longer used for new messages.
+  // Signal Protocol sender keys are used for all encrypted messaging
 
-    window.addDmConversationToList({
+  window.addDmConversationToList({
       id: channels.textChannelId,
       participantId,
       participantUsername,
@@ -578,11 +609,19 @@
       if (hasSession) {
         const plaintextBytes = new TextEncoder().encode(plaintext);
         const { ciphertext, messageType } = await signalManager.encrypt(signalAddress, plaintextBytes);
-        const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
+        // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
+        const ciphertextBase64 = Buffer.from(ciphertext).toString('base64');
         const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-          body: JSON.stringify({ ciphertext: ciphertextBase64, envelope_type: "signal_dm", message_type: messageType, device_id: deviceId }),
+          // P1-1 FIX: Add protocol_version as required by server
+          body: JSON.stringify({ 
+            ciphertext: ciphertextBase64, 
+            envelope_type: "signal_dm", 
+            message_type: messageType, 
+            device_id: deviceId,
+            protocol_version: 1 // P1-1 FIX: Required by server
+          }),
         });
         if (!res.ok) throw new Error("Failed to send message");
         const msg = (await res.json()) as { id: string };

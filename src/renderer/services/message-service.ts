@@ -15,17 +15,11 @@
   const SK_VERSION = 2;
 
   function textToBase64(text: string): string {
-    const bytes = new TextEncoder().encode(text);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
+    return Buffer.from(text, 'utf8').toString('base64');
   }
 
   function base64ToText(b64: string): string {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
+    return Buffer.from(b64, 'base64').toString('utf8');
   }
 
   async function tryGroupEncrypt(
@@ -33,19 +27,36 @@
     emberId: string
   ): Promise<string | null> {
     try {
-      const distResp = await window.emberAPI.invoke<{
+      let distResp = await window.emberAPI.invoke<{
         distribution_id: string | null;
       }>("LoadDistributionId", { address: emberId });
-      if (!distResp.success || !distResp.data?.distribution_id) return null;
+
+      if (!distResp.success || !distResp.data?.distribution_id) {
+        log.warn("Distribution ID missing — attempting sender key recovery", { ember_id: emberId });
+        const recovered = await window.ensureSenderKeyForEmber?.(emberId);
+        if (!recovered) {
+          log.warn("Sender key recovery failed — encryption unavailable", { ember_id: emberId });
+          return null;
+        }
+        distResp = { success: true, data: { distribution_id: recovered } };
+      }
+
       const plaintextB64 = textToBase64(plaintext);
       const encResp = await window.emberAPI.invoke<{ ciphertext: string }>(
         "GroupEncrypt",
         {
-          distributionId: distResp.data.distribution_id,
+          distributionId: distResp.data!.distribution_id!,
           plaintext: plaintextB64,
         }
       );
-      if (!encResp.success || !encResp.data?.ciphertext) return null;
+      if (!encResp.success || !encResp.data?.ciphertext) {
+        log.warn("GroupEncrypt failed", {
+          ember_id: emberId,
+          distribution_id: distResp.data!.distribution_id,
+          error: (encResp as any).data?.error ?? (encResp as any).error ?? 'unknown',
+        });
+        return null;
+      }
       const auth = (await ipcRenderer.invoke("get-auth")) as {
         user_id?: string;
         device_id?: string;

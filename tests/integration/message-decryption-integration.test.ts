@@ -29,50 +29,31 @@ const mockWindow = {
   showInputError: jest.fn(),
 };
 
-// Set up global window
-global.window = mockWindow as any;
-global.document = {
-  getElementById: jest.fn(() => null),
-  createElement: jest.fn(() => ({
-    className: '',
-    textContent: '',
-    appendChild: jest.fn(),
-    classList: { add: jest.fn(), remove: jest.fn() },
-    style: {},
-    querySelector: jest.fn(() => null),
-    querySelectorAll: jest.fn(() => []),
-    setAttribute: jest.fn(),
-    getAttribute: jest.fn(() => null),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    parentNode: null,
-    removeChild: jest.fn(),
-    insertBefore: jest.fn(),
-    appendChild: jest.fn(),
-    scrollTop: 0,
-    scrollHeight: 1000,
-  })),
-} as any;
+// Set up window properties directly (global === window in jsdom)
+(window as any).App = mockWindow.App;
+(window as any).electronAPI = mockWindow.electronAPI;
+(window as any).emberAPI = mockWindow.emberAPI;
+(window as any).emberLog = mockWindow.emberLog;
+(window as any).processIncomingDistributions = mockWindow.processIncomingDistributions;
+(window as any).registerSentMessageId = mockWindow.registerSentMessageId;
+(window as any).showInputError = mockWindow.showInputError;
+(window as any).getValidAuth = jest.fn().mockResolvedValue({
+  token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice',
+});
 
 global.fetch = jest.fn();
-global.TextEncoder = class {
-  encode(text: string) {
-    return new Uint8Array(text.split('').map(c => c.charCodeAt(0)));
-  }
-} as any;
-global.TextDecoder = class {
-  decode(bytes: Uint8Array) {
-    return String.fromCharCode(...bytes);
-  }
-} as any;
 global.btoa = (str: string) => Buffer.from(str).toString('base64');
 global.atob = (str: string) => Buffer.from(str, 'base64').toString('binary');
-global.crypto = { randomUUID: jest.fn(() => 'test-uuid') };
 
 describe('Message Decryption Integration', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
+
+    // Restore getValidAuth mock after clearAllMocks
+    (window as any).getValidAuth = jest.fn().mockResolvedValue({
+      token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice',
+    });
     
     // Mock emberAPI to return successful responses
     mockWindow.emberAPI.invoke.mockImplementation((cmd: string) => {
@@ -105,8 +86,8 @@ describe('Message Decryption Integration', () => {
   });
 
   it('should have processIncomingDistributions assigned after loading ember-manager', () => {
-    expect(mockWindow.processIncomingDistributions).toBeDefined();
-    expect(typeof mockWindow.processIncomingDistributions).toBe('function');
+    expect((window as any).processIncomingDistributions).toBeDefined();
+    expect(typeof (window as any).processIncomingDistributions).toBe('function');
   });
 
   it('should successfully call processIncomingDistributions when message decryption fails', async () => {
@@ -133,7 +114,7 @@ describe('Message Decryption Integration', () => {
     });
 
     // This should not throw and should process distributions
-    await expect(mockWindow.processIncomingDistributions?.()).resolves.not.toThrow();
+    await expect((window as any).processIncomingDistributions?.()).resolves.not.toThrow();
     
     // Verify that the distribution processing was attempted
     expect(global.fetch).toHaveBeenCalledWith(
@@ -162,7 +143,7 @@ describe('Message Decryption Integration', () => {
     require('../../src/renderer/services/message-service');
 
     // Verify that processIncomingDistributions is available for message-service to call
-    expect(mockWindow.processIncomingDistributions).toBeDefined();
+    expect((window as any).processIncomingDistributions).toBeDefined();
     
     // Mock a message that fails to decrypt
     const mockMessage = {
@@ -207,7 +188,7 @@ describe('Message Decryption Integration', () => {
     });
 
     // Call processIncomingDistributions directly to verify it works
-    await mockWindow.processIncomingDistributions?.();
+    await (window as any).processIncomingDistributions?.();
     
     // Verify the distribution fetch was called
     expect(distributionFetchCalled).toBe(true);

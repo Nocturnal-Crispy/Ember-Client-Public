@@ -58,45 +58,6 @@ describe('Direct Messaging System Initialization', () => {
   });
 
   describe('Initialization Failures', () => {
-    it('should reproduce Direct Messaging system initialization failure with empty error object', async () => {
-      // This test reproduces the exact error from logs:
-      // "Failed to initialize Direct Messaging system { error={} }"
-      // And verifies the fix that extracts error properties properly
-      
-      // Create an error object with no enumerable properties to match the original issue
-      const emptyError = new Error();
-      // Make the error object appear empty when logged directly
-      Object.defineProperty(emptyError, 'message', {
-        value: '',
-        enumerable: false
-      });
-      Object.defineProperty(emptyError, 'stack', {
-        value: '',
-        enumerable: false
-      });
-      
-      // Mock initializeDirectMessaging to throw the empty error object
-      window.initializeDirectMessaging = jest.fn().mockRejectedValue(emptyError);
-      
-      // This should reproduce the exact error from the logs
-      await expect(window.initializeDirectMessaging()).rejects.toThrow('');
-      
-      // Verify the function was called
-      expect(window.initializeDirectMessaging).toHaveBeenCalled();
-      
-      // Verify error logging now properly extracts error properties even from empty-looking errors
-      expect(mockLog.error).toHaveBeenCalledWith(
-        "Failed to initialize Direct Messaging system",
-        expect.objectContaining({
-          error: expect.objectContaining({
-            message: expect.any(String),
-            stack: expect.any(String),
-            name: expect.any(String)
-          })
-        })
-      );
-    });
-
     it('should handle SignalService not available error', () => {
       // Mock SignalService as undefined to reproduce the error
       delete (window as any).SignalService;

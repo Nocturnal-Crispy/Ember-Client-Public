@@ -25,7 +25,7 @@ interface RecoveryAuthParams {
  *
  * 1. Retrieves the new identity private key from safeStorage via ember IPC
  * 2. Generates a new 24-digit recovery code
- * 3. Encrypts the identity key with the recovery code (PBKDF2 + NaCl secretbox)
+ * 3. Encrypts the identity key with the recovery code (PBKDF2-SHA256 + AES-256-GCM)
  * 4. Uploads the encrypted data to the server via PATCH /api/v1/recovery-codes
  * 5. Returns the new recovery code for display to the user
  */

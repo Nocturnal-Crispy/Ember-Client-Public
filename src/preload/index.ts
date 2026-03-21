@@ -1,4 +1,4 @@
-import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "ember-shared";
+import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse, SignalDeviceIdentity } from "ember-shared";
 import { contextBridge, ipcRenderer } from "electron";
 import * as emberCrypto from "ember-shared";
 import * as emberServices from "ember-shared";
@@ -183,6 +183,24 @@ const ALLOWED_ON: readonly string[] = [
 
 preloadLog("debug", "Setting up contextBridge API");
 
+// CRITICAL FIX: Initialize SafeStorage functions for ember-shared auth service
+// This prevents "SafeStorage functions not initialized" error during registration
+const { setSafeStorageFunctions } = emberServices;
+setSafeStorageFunctions({
+  async getSafeStorage(key: string): Promise<string | null> {
+    const response = await ipcRenderer.invoke("get-safe-storage", { key });
+    return response.success ? response.data.value : null;
+  },
+  async setSafeStorage(key: string, value: string): Promise<void> {
+    await ipcRenderer.invoke("set-safe-storage", { key, value });
+  },
+  async deleteSafeStorage(key: string): Promise<void> {
+    await ipcRenderer.invoke("delete-safe-storage", { key });
+  }
+});
+
+preloadLog("debug", "SafeStorage functions initialized for ember-shared auth service");
+
 contextBridge.exposeInMainWorld("electronAPI", {
   ipc: {
     send(channel: string, ...args: unknown[]) {
@@ -352,6 +370,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
         username,
         password,
         deviceId,
+        publicKey,
+        encryptedDeviceKey,
+        salt
+      ),
+    registerWithSignalKeys: (
+      hostname: string,
+      username: string,
+      password: string,
+      signalIdentity: unknown,
+      publicKey: string,
+      encryptedDeviceKey: string,
+      salt: string
+    ) =>
+      emberServices.registerWithSignalKeys(
+        hostname,
+        username,
+        password,
+        signalIdentity as SignalDeviceIdentity,
         publicKey,
         encryptedDeviceKey,
         salt

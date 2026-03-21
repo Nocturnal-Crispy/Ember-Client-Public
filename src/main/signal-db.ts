@@ -32,8 +32,6 @@ export interface SignalDatabase
     ISenderKeyStore {
   storeDistributionId(address: string, distributionId: string): void;
   loadDistributionId(address: string): string | null;
-  storeLegacyEmberKey(emberId: string, key: Uint8Array): void;
-  loadLegacyEmberKey(emberId: string): Uint8Array | null;
   /**
    * Initialise (or overwrite) the local Signal Protocol identity and registration id.
    *
@@ -97,11 +95,6 @@ const DDL_STATEMENTS = [
     id INTEGER PRIMARY KEY,
     record BLOB NOT NULL
   )`,
-  `CREATE TABLE IF NOT EXISTS legacy_ember_keys (
-    ember_id TEXT PRIMARY KEY,
-    key BLOB NOT NULL,
-    archived_at INTEGER NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS distribution_ids (
     address TEXT PRIMARY KEY,
     distribution_id TEXT NOT NULL
@@ -118,6 +111,17 @@ function deriveEncryptionKey(identityPrivateKey: Uint8Array): Buffer {
     HKDF_INFO,
     DERIVED_KEY_LENGTH,
   ));
+}
+
+function validateIdentityKeyConsistency(storedKey: Uint8Array, providedKey: Uint8Array): boolean {
+  if (storedKey.length !== providedKey.length) {
+    return false;
+  }
+  try {
+    return nodeCrypto.timingSafeEqual(Buffer.from(storedKey), Buffer.from(providedKey));
+  } catch (error) {
+    return false;
+  }
 }
 
 // aad binds each ciphertext to its row context (table + primary key), preventing
@@ -268,12 +272,6 @@ export function openSignalDatabase(
       'INSERT OR REPLACE INTO kyber_pre_keys (id, record) VALUES (?, ?)',
     ),
     removeKyberPreKey: db.prepare('DELETE FROM kyber_pre_keys WHERE id = ?'),
-    storeLegacyEmberKeyStmt: db.prepare(
-      'INSERT OR REPLACE INTO legacy_ember_keys (ember_id, key, archived_at) VALUES (?, ?, ?)',
-    ),
-    loadLegacyEmberKeyStmt: db.prepare(
-      'SELECT key FROM legacy_ember_keys WHERE ember_id = ?',
-    ),
     storeDistributionIdStmt: db.prepare(
       'INSERT OR REPLACE INTO distribution_ids (address, distribution_id) VALUES (?, ?)',
     ),
@@ -306,6 +304,15 @@ export function openSignalDatabase(
     }
     if (decryptedPrivate.length !== 32) {
       throw new Error('signal-db: corrupted __local__ private key length');
+    }
+
+    // CRITICAL FIX: Validate identity key consistency to prevent crypto authentication failures
+    // If the stored identity key doesn't match the provided key, the database was opened with wrong key
+    if (!validateIdentityKeyConsistency(decryptedPrivate, identityPrivateKey)) {
+      throw new Error(
+        'Identity key mismatch: Signal database was opened with a different identity private key. ' +
+        'This causes "Authentication failed" errors. Please restart the application with the correct identity key.'
+      );
     }
 
     localIdentityPublicKey = decryptedPublic;
@@ -611,24 +618,6 @@ export function openSignalDatabase(
     return row ? row.distribution_id : null;
   }
 
-  // ── Legacy ember key helpers ─────────────────────────────────────────────
-
-  function storeLegacyEmberKey(emberId: string, key: Uint8Array): void {
-    stmts.storeLegacyEmberKeyStmt.run(
-      emberId,
-      encryptBlob(encryptionKey, key, Buffer.from(`legacy_ember_keys:${emberId}`)),
-      Date.now(),
-    );
-  }
-
-  function loadLegacyEmberKey(emberId: string): Uint8Array | null {
-    const row = stmts.loadLegacyEmberKeyStmt.get(emberId) as
-      | { key: Buffer }
-      | undefined;
-    if (!row) return null;
-    return decryptBlob(encryptionKey, row.key, Buffer.from(`legacy_ember_keys:${emberId}`));
-  }
-
   // ── Local identity initialisation ─────────────────────────────────────────
 
   function initializeLocalIdentity(
@@ -722,8 +711,6 @@ export function openSignalDatabase(
     removeKyberPreKey,
     storeDistributionId,
     loadDistributionId,
-    storeLegacyEmberKey,
-    loadLegacyEmberKey,
     initializeLocalIdentity,
     closeDatabase,
   };

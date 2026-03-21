@@ -44,9 +44,6 @@ import type {
   StoreSenderKeyArgs,
   LoadSenderKeyArgs,
   LoadSenderKeyData,
-  StoreLegacyEmberKeyArgs,
-  LoadLegacyEmberKeyArgs,
-  LoadLegacyEmberKeyData,
   StoreDistributionIdArgs,
   LoadDistributionIdArgs,
   LoadDistributionIdData,
@@ -114,8 +111,6 @@ const KNOWN_CMDS: Set<EmberCmd> = new Set<EmberCmd>([
   'LoadSenderKey',
   'StoreDistributionId',
   'LoadDistributionId',
-  'StoreLegacyEmberKey',
-  'LoadLegacyEmberKey',
   // Signal crypto operations
   'ProcessPreKeyBundle',
   'Encrypt',
@@ -259,12 +254,63 @@ async function handleLoadSignedPreKey(db: SignalDatabase, args: LoadSignedPreKey
 }
 
 async function handleStoreSenderKey(db: SignalDatabase, args: StoreSenderKeyArgs): Promise<void> {
-  await db.saveSenderKey(args.address, args.distributionId, Buffer.from(args.record, 'base64'));
+  // CRITICAL FIX: Validate input data before processing
+  if (!args.address || typeof args.address !== 'string') {
+    throw new Error('Invalid address: must be non-empty string');
+  }
+  if (!args.distributionId || typeof args.distributionId !== 'string') {
+    throw new Error('Invalid distributionId: must be non-empty string');
+  }
+  if (!args.record || typeof args.record !== 'string') {
+    throw new Error('Invalid record: must be base64 string');
+  }
+  
+  // Validate base64 format
+  try {
+    const decoded = Buffer.from(args.record, 'base64');
+    if (decoded.length === 0) {
+      throw new Error('Invalid record: empty after base64 decode');
+    }
+    // Store as Buffer (safe conversion)
+    await db.saveSenderKey(args.address, args.distributionId, decoded);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('base64')) {
+      throw new Error(`Invalid base64 in sender key record: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 async function handleLoadSenderKey(db: SignalDatabase, args: LoadSenderKeyArgs): Promise<LoadSenderKeyData> {
+  // CRITICAL FIX: Validate input parameters
+  if (!args.address || typeof args.address !== 'string') {
+    throw new Error('Invalid address: must be non-empty string');
+  }
+  if (!args.distributionId || typeof args.distributionId !== 'string') {
+    throw new Error('Invalid distributionId: must be non-empty string');
+  }
+  
   const result = await db.getSenderKey(args.address, args.distributionId);
-  return { record: result ? Buffer.from(result).toString('base64') : null };
+  
+  // CRITICAL FIX: Validate result before base64 encoding
+  if (!result) {
+    return { record: null };
+  }
+  
+  if (!(result instanceof Uint8Array)) {
+    throw new Error('Invalid sender key data type from database');
+  }
+  
+  if (result.length === 0) {
+    return { record: null }; // Empty record is treated as not found
+  }
+  
+  // Safe conversion to base64 string
+  try {
+    return { record: Buffer.from(result).toString('base64') };
+  } catch (error) {
+    throw new Error(`Failed to encode sender key to base64: ${error}`);
+  }
 }
 
 function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionIdArgs): void {
@@ -274,15 +320,6 @@ function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionId
 function handleLoadDistributionId(db: SignalDatabase, args: LoadDistributionIdArgs): LoadDistributionIdData {
   const result = db.loadDistributionId(args.address);
   return { distribution_id: result };
-}
-
-function handleStoreLegacyEmberKey(db: SignalDatabase, args: StoreLegacyEmberKeyArgs): void {
-  db.storeLegacyEmberKey(args.emberId, Buffer.from(args.key, 'base64'));
-}
-
-function handleLoadLegacyEmberKey(db: SignalDatabase, args: LoadLegacyEmberKeyArgs): LoadLegacyEmberKeyData {
-  const result = db.loadLegacyEmberKey(args.emberId);
-  return { key: result ? Buffer.from(result).toString('base64') : null };
 }
 
 // ── Signal crypto handlers ────────────────────────────────────────────────────
@@ -465,7 +502,7 @@ export async function dispatchEmberCmd(
       .replace(/[A-Za-z0-9+/]{20,}={0,2}/g, '[REDACTED]')
       .replace(/[A-Za-z0-9\-_]{20,}/g, '[REDACTED]')
       .replace(/[0-9a-f]{40,}/g, '[REDACTED]');
-    return { success: false, error: sanitised };
+    return { success: false, data: { error: sanitised } };
   }
 }
 
@@ -526,11 +563,6 @@ async function dispatch(
       return undefined;
     case 'LoadDistributionId':
       return handleLoadDistributionId(requireDb(db), args as unknown as LoadDistributionIdArgs);
-    case 'StoreLegacyEmberKey':
-      handleStoreLegacyEmberKey(requireDb(db), args as unknown as StoreLegacyEmberKeyArgs);
-      return undefined;
-    case 'LoadLegacyEmberKey':
-      return handleLoadLegacyEmberKey(requireDb(db), args as unknown as LoadLegacyEmberKeyArgs);
     // Signal crypto operations
     case 'ProcessPreKeyBundle':
       await handleProcessPreKeyBundle(requireDb(db), args as unknown as ProcessPreKeyBundleArgs);
@@ -564,14 +596,28 @@ function requireDb(db: SignalDatabase | null): SignalDatabase {
 
 // ── IPC registration ──────────────────────────────────────────────────────────
 
+// Global database reference that can be updated without re-registering handlers
+let currentSignalDb: SignalDatabase | null = null;
+
 /**
- * Register the single 'ember' IPC channel handler in the main process.
- * Must be called once during app startup after the Signal database is ready.
- *
- * @param db - Initialised SignalDatabase, or null if unavailable.
+ * Register the single 'ember' IPC handler.
+ * Must be called once during app startup.
  */
 export function registerEmberIpcHandlers(db: SignalDatabase | null): void {
-  ipcMain.handle('ember', async (_event, msg: unknown) => {
-    return dispatchEmberCmd(msg, db);
-  });
+  currentSignalDb = db;
+  
+  // Only register the handler once
+  if (ipcMain.listenerCount('ember') === 0) {
+    ipcMain.handle('ember', async (_event, msg: unknown) => {
+      return dispatchEmberCmd(msg, currentSignalDb);
+    });
+  }
+}
+
+/**
+ * Update the Signal database reference without re-registering IPC handlers.
+ * This allows re-initialization of the database after login/registration.
+ */
+export function updateSignalDatabase(db: SignalDatabase | null): void {
+  currentSignalDb = db;
 }
