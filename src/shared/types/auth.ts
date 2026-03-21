@@ -38,3 +38,22 @@ export interface RecoveryData {
   encrypted: string;
   salt: string;
 }
+
+export interface SignalDeviceCredentials {
+  readonly deviceId: string;
+  readonly registrationId: number;
+  readonly identityKeyPair: {
+    readonly publicKey: Uint8Array;
+    readonly privateKey: Uint8Array;
+  };
+  readonly signedPreKey: {
+    readonly id: number;
+    readonly keyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array };
+    readonly signature: Uint8Array;
+    readonly timestamp: number;
+  };
+  readonly oneTimePreKeys: ReadonlyArray<{
+    readonly id: number;
+    readonly keyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array };
+  }>;
+}

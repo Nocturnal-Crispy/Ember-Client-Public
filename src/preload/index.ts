@@ -1,4 +1,4 @@
-import type { AuthData, DeviceIdentity, EmberCmd, EmberIpcResponse } from "../shared";
+import type { AuthData, DeviceIdentity, SignalDeviceCredentials, EmberCmd, EmberIpcResponse } from "../shared";
 import { contextBridge, ipcRenderer } from "electron";
 import * as emberCrypto from "../shared";
 import * as emberServices from "../shared";
@@ -291,21 +291,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   crypto: {
-    generateRecoveryCode: (_length?: number): string => {
-      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
+    generateRecoveryCode: (length?: number): string => {
+      return emberCrypto.generateRecoveryCode(length);
     },
     encryptPrivateKeyWithRecoveryCode: (
-      _privateKey: Uint8Array,
-      _recoveryCode: string
+      privateKey: Uint8Array,
+      recoveryCode: string
     ): Promise<{ encrypted: string; salt: string }> => {
-      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
+      return emberCrypto.encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode);
     },
     decryptPrivateKeyWithRecoveryCode: (
-      _encryptedBase64: string,
-      _recoveryCode: string,
-      _saltBase64: string
+      encryptedBase64: string,
+      recoveryCode: string,
+      saltBase64: string
     ): Promise<Uint8Array | null> => {
-      throw new Error('NaCl crypto removed — use Signal Protocol recovery instead');
+      return emberCrypto.decryptPrivateKeyWithRecoveryCode(encryptedBase64, recoveryCode, saltBase64);
     },
     encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
       if (key.byteLength !== 32) {
@@ -397,7 +397,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
         hostname,
         username,
         password,
-        signalIdentity as DeviceIdentity,
+        signalIdentity as SignalDeviceCredentials,
         publicKey,
         encryptedDeviceKey,
         salt

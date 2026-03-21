@@ -10,10 +10,11 @@
  * libsignal store adapters that bridge the SignalDatabase to native types.
  */
 
-import { ipcMain, safeStorage } from 'electron';
+import { ipcMain } from 'electron';
 import Store from 'electron-store';
 import type { SignalDatabase } from '../signal-db';
 import { createLogger } from '../logger';
+import { electronSafeStorageFunctions } from '../auth-safe-storage';
 import type { StoreSchema, AuthData as LocalAuthData } from '../../shared/types/index';
 import type {
   EmberCmd,
@@ -159,40 +160,17 @@ function handleGetAuth(_args: GetAuthArgs): GetAuthData | null {
   };
 }
 
-function handleGetSafeStorage(args: GetSafeStorageArgs): GetSafeStorageData {
-  const storeKey = `safeStorage_${args.key}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stored = (store as any).get(storeKey) as string | undefined;
-  if (stored === undefined || stored === null) {
-    return { value: null };
-  }
-  try {
-    if (safeStorage.isEncryptionAvailable()) {
-      const buf = Buffer.from(stored, 'base64');
-      return { value: safeStorage.decryptString(buf) };
-    }
-    return { value: stored };
-  } catch {
-    return { value: null };
-  }
+async function handleGetSafeStorage(args: GetSafeStorageArgs): Promise<GetSafeStorageData> {
+  const value = await electronSafeStorageFunctions.getSafeStorage(args.key);
+  return { value };
 }
 
-function handleSetSafeStorage(args: SetSafeStorageArgs): void {
-  const storeKey = `safeStorage_${args.key}`;
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(args.value);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (store as any).set(storeKey, encrypted.toString('base64'));
-  } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (store as any).set(storeKey, args.value);
-  }
+async function handleSetSafeStorage(args: SetSafeStorageArgs): Promise<void> {
+  await electronSafeStorageFunctions.setSafeStorage(args.key, args.value);
 }
 
-function handleDeleteSafeStorage(args: DeleteSafeStorageArgs): void {
-  const storeKey = `safeStorage_${args.key}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (store as any).delete(storeKey);
+async function handleDeleteSafeStorage(args: DeleteSafeStorageArgs): Promise<void> {
+  await electronSafeStorageFunctions.deleteSafeStorage(args.key);
 }
 
 function handleLog(args: LogArgs): void {
@@ -602,12 +580,12 @@ async function dispatch(
     case 'GetAuth':
       return handleGetAuth(args as GetAuthArgs);
     case 'GetSafeStorage':
-      return handleGetSafeStorage(args as unknown as GetSafeStorageArgs);
+      return await handleGetSafeStorage(args as unknown as GetSafeStorageArgs);
     case 'SetSafeStorage':
-      handleSetSafeStorage(args as unknown as SetSafeStorageArgs);
+      await handleSetSafeStorage(args as unknown as SetSafeStorageArgs);
       return undefined;
     case 'DeleteSafeStorage':
-      handleDeleteSafeStorage(args as unknown as DeleteSafeStorageArgs);
+      await handleDeleteSafeStorage(args as unknown as DeleteSafeStorageArgs);
       return undefined;
     // Logging
     case 'Log':

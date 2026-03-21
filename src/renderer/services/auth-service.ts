@@ -578,12 +578,10 @@
           username: authData.username,
         });
 
-        // Store Signal identity public key in safe storage so getIdentityKeyPair() can retrieve it.
-        // Key: identity_pubkey_${authData.user_id}_${authData.device_id}
-        const publicKeyBase64Registration = Buffer.from(signalIdentity.identityKeyPair.publicKey).toString('base64');
+        // Store Signal registration ID for main process Signal database
         await window.emberAPI.invoke('SetSafeStorage', {
-          key: `identity_pubkey_${authData.user_id}_${authData.device_id}`,
-          value: publicKeyBase64Registration,
+          key: `registration_id_${authData.user_id}_${authData.device_id}`,
+          value: String(signalIdentity.registrationId),
         });
 
         authData._recoveryCode = recoveryCode;
@@ -601,6 +599,15 @@
         username: authData.username,
         user_id: authData.user_id,
       });
+
+      // Store Signal identity private key so main process can open the Signal database
+      if (deviceIdentity.private_key) {
+        await window.emberAPI.invoke('SetSafeStorage', {
+          key: `identity_key_${authData.user_id}_${authData.device_id}`,
+          value: deviceIdentity.private_key,
+        });
+        log.debug("Signal identity key stored in safeStorage");
+      }
 
       // ── Minimum client version gate ────────────────────────────────────
       if (authData.minimum_client_version) {

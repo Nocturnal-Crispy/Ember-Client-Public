@@ -1,5 +1,11 @@
-import type { AuthResponse, DeviceIdentity, RecoveryData } from '../types';
+import type { AuthResponse, DeviceIdentity, RecoveryData, SignalDeviceCredentials } from '../types';
 import { apiRequest, ApiError } from '../api';
+import {
+  generateIdentityKey,
+  generateRegistrationId,
+  generateSignedPreKey,
+  generateOneTimePreKeys,
+} from '../crypto/key-migration';
 
 function generateUUID(): string {
   const bytes = new Uint8Array(16);
@@ -10,8 +16,20 @@ function generateUUID(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function generateDeviceIdentity(): DeviceIdentity {
-  throw new Error('NaCl crypto removed — use Signal Protocol identity generation instead');
+export async function generateDeviceIdentity(): Promise<SignalDeviceCredentials> {
+  const deviceId = generateUUID();
+  const identityKeyPair = await generateIdentityKey();
+  const registrationId = generateRegistrationId();
+  const signedPreKey = await generateSignedPreKey(identityKeyPair, 1);
+  const oneTimePreKeys = await generateOneTimePreKeys(0, 100);
+
+  return {
+    deviceId,
+    registrationId,
+    identityKeyPair,
+    signedPreKey,
+    oneTimePreKeys,
+  };
 }
 
 export async function login(
@@ -59,7 +77,7 @@ export async function registerWithSignalKeys(
   hostname: string,
   username: string,
   password: string,
-  deviceIdentity: DeviceIdentity,
+  signalCredentials: SignalDeviceCredentials,
   publicKey: string,
   encryptedDeviceKey: string,
   salt: string,
@@ -68,7 +86,7 @@ export async function registerWithSignalKeys(
     hostname,
     username,
     password,
-    deviceIdentity.device_id,
+    signalCredentials.deviceId,
     publicKey,
     encryptedDeviceKey,
     salt,

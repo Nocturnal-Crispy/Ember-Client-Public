@@ -3,6 +3,7 @@ export * from './envelope';
 export * from './signal-store';
 export * from './key-migration';
 export * from './migration-flow';
+export * from './recovery';
 export * from './ember-ipc-types';
 export {
   initiateSession as initiateSignalSession,
