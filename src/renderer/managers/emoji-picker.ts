@@ -455,7 +455,6 @@
   let categoriesEl: HTMLElement | null = null;
   let gridEl: HTMLElement | null = null;
   let activeInput: HTMLTextAreaElement | HTMLInputElement | null = null;
-  let activeCategoryIndex = 0;
   let outsideClickHandler: ((e: MouseEvent) => void) | null = null;
   let escKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -519,7 +518,6 @@
   // ── Select a category tab ─────────────────────────────────────────────────
 
   function selectCategory(idx: number): void {
-    activeCategoryIndex = idx;
     categoriesEl?.querySelectorAll('.emoji-picker-category-btn').forEach((btn, i) => {
       btn.classList.toggle('active', i === idx);
     });

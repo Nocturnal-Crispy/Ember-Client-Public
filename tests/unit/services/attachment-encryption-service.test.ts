@@ -263,10 +263,10 @@ describe('AttachmentEncryptionService', () => {
 
       const mockMetadata = {
         id: 'attachment-456',
-        channelId: channelId,
+        channelId,
         uploaderId: 'user-123',
         originalName: fileName,
-        contentType: contentType,
+        contentType,
         sizeBytes: data.length,
         createdAt: Date.now(),
         attachmentKeyId: 'key-789',
@@ -313,10 +313,10 @@ describe('AttachmentEncryptionService', () => {
 
       const mockMetadata = {
         id: 'attachment-456',
-        conversationId: conversationId,
+        conversationId,
         uploaderId: 'user-123',
         originalName: fileName,
-        contentType: contentType,
+        contentType,
         sizeBytes: data.length,
         createdAt: Date.now(),
         attachmentKeyId: 'key-789',
@@ -361,7 +361,7 @@ describe('AttachmentEncryptionService', () => {
       const mockKeys = [
         {
           id: 'key-123',
-          attachmentId: attachmentId,
+          attachmentId,
           userId: 'user-123',
           deviceId: 'device-456',
           encrypted_key: btoa(

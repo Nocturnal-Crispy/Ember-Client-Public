@@ -340,14 +340,9 @@ export class EnhancedRecoveryService {
    * Get current ember epoch
    */
   private async getCurrentEmberEpoch(): Promise<{ id: string } | null> {
-    try {
-      // This would get the current epoch for the user's active ember
-      // For now, return null as a placeholder
-      return null;
-    } catch (error) {
-      console.error('Failed to get current ember epoch:', error);
-      return null;
-    }
+    // This would get the current epoch for the user's active ember
+    // For now, return null as a placeholder
+    return null;
   }
 
   /**
@@ -383,7 +378,7 @@ export class EnhancedRecoveryService {
    * Encrypt device key with recovery code
    */
   private async encryptDeviceKeyWithRecoveryCode(
-    recoveryCode: string
+    _recoveryCode: string
   ): Promise<{ encrypted: string; salt: string }> {
     // This would use the existing encryption method
     // For now, return a placeholder
@@ -397,9 +392,9 @@ export class EnhancedRecoveryService {
    * Decrypt device key with recovery code
    */
   private async decryptDeviceKeyWithRecoveryCode(
-    encryptedKey: string,
-    salt: string,
-    recoveryCode: string
+    _encryptedKey: string,
+    _salt: string,
+    _recoveryCode: string
   ): Promise<Uint8Array> {
     // This would use the existing decryption method
     // For now, return a placeholder
@@ -411,7 +406,7 @@ export class EnhancedRecoveryService {
    */
   private async encryptIdentityKeyWithRecoveryCode(
     identityKey: Uint8Array,
-    recoveryCode: string
+    _recoveryCode: string
   ): Promise<{ encrypted: string; salt: string }> {
     try {
       // Enhanced encryption for identity keys with better security
@@ -432,8 +427,8 @@ export class EnhancedRecoveryService {
    */
   private async decryptIdentityKeyWithRecoveryCode(
     encryptedKey: string,
-    salt: string,
-    recoveryCode: string
+    _salt: string,
+    _recoveryCode: string
   ): Promise<Uint8Array> {
     try {
       // Enhanced decryption for identity keys

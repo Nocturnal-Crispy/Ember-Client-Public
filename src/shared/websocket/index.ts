@@ -67,7 +67,7 @@ export class EmberWebSocket {
         resolve();
       };
 
-      this.ws.onclose = event => {
+      this.ws.onclose = _event => {
         this.isConnecting = false;
         this.notifyConnectionChange(false);
 

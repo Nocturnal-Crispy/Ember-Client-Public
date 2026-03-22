@@ -3,7 +3,6 @@
  * Manages the UI components for Direct Messaging functionality.
  */
 (function (): void {
-  const App = window.App;
   const log = window.emberLog.createLogger('DirectMessagingUI');
 
   // UI state
@@ -1087,14 +1086,6 @@
     previewEl.classList.remove('hidden');
   }
 
-  function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-  }
-
   /**
    * Display a new message in the chat
    */
@@ -1199,27 +1190,6 @@
   }
 
   /**
-   * Format message timestamp
-   */
-  function formatMessageTime(timestamp: number): string {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  }
-
-  /**
-   * Escape HTML to prevent XSS
-   */
-  function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  /**
    * Update the DM icon badge in the server list with the total unread count.
    */
   function updateDmIconBadge(): void {
@@ -1253,9 +1223,6 @@
 
     // Update UI element
     const nameElement = conversation.element.querySelector('.dm-conversation-name') as HTMLElement;
-    const lastMessageElement = conversation.element.querySelector(
-      '.dm-conversation-last-message'
-    ) as HTMLElement;
     const unreadElement = conversation.element.querySelector(
       '.dm-unread-count, .dm-unread-indicator'
     ) as HTMLElement;
@@ -1694,7 +1661,7 @@
    */
   function handleMessageKeydown(event: KeyboardEvent, element: HTMLElement): void {
     switch (event.key) {
-      case 'Enter':
+      case 'Enter': {
         event.preventDefault();
         // Focus the input field to reply
         const inputField = dmChatContainer?.querySelector('.message-input') as HTMLTextAreaElement;
@@ -1702,6 +1669,7 @@
           inputField.focus();
         }
         break;
+      }
       case 'ArrowDown':
         event.preventDefault();
         focusNextElement(element, '.dm-message');

@@ -638,7 +638,7 @@ describe('Phase 10: handleVoiceScreenShareStopped — spotlight cleanup', () => 
 // ─── Phase 10: onParticipantsChanged reconciles App.screenShareParticipants ───
 
 describe('Phase 10: onParticipantsChanged reconciles App.screenShareParticipants from voice_participants', () => {
-  let capturedCallback: ((participants: unknown[]) => void) | null = null;
+  let _capturedCallback: ((participants: unknown[]) => void) | null = null;
 
   beforeEach(() => {
     const App = (window as any).App;
@@ -653,7 +653,7 @@ describe('Phase 10: onParticipantsChanged reconciles App.screenShareParticipants
     App.activeVoiceChannelId = null;
     App.currentMembers = [];
 
-    capturedCallback = null;
+    _capturedCallback = null;
     mockIpcInvoke.mockResolvedValue(null);
 
     // Create a fresh VoiceManager spy that captures onParticipantsChanged

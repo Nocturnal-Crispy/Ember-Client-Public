@@ -5,49 +5,7 @@
 
 (function (): void {
   const App = window.App;
-  const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('EmberManager');
-  const emberCrypto = window.electronAPI.crypto;
-
-  function decodeBase64ToBytes(b64: string): Uint8Array {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-
-  // ─── Auth Consistency Validation ───────────────────────────────────────
-
-  function validateAuthConsistency(
-    auth1: AuthData | null,
-    auth2: AuthData | null,
-    context: string
-  ): void {
-    if (!auth1 || !auth2) {
-      throw new Error(`Auth data missing in ${context}`);
-    }
-
-    if (auth1.userId !== auth2.userId || auth1.deviceId !== auth2.deviceId) {
-      log.error('Auth data inconsistency detected', {
-        context,
-        auth1_user_id: auth1.userId,
-        auth1_device_id: auth1.deviceId,
-        auth2_user_id: auth2.userId,
-        auth2_device_id: auth2.deviceId,
-      });
-      throw new Error(`Auth data inconsistency in ${context}: user_id or device_id mismatch`);
-    }
-
-    if (auth1.token !== auth2.token || auth1.hostname !== auth2.hostname) {
-      log.error('Auth token/hostname inconsistency detected', {
-        context,
-        auth1_hostname: auth1.hostname,
-        auth2_hostname: auth2.hostname,
-        token_match: auth1.token === auth2.token,
-      });
-      throw new Error(`Auth data inconsistency in ${context}: token or hostname mismatch`);
-    }
-  }
 
   async function validateCryptoState(auth: AuthData): Promise<void> {
     try {
@@ -233,20 +191,6 @@
         duration,
       });
     }
-  }
-
-  function getCryptoOperationHistory(): Array<{
-    createdAt: number;
-    operation: string;
-    address: string;
-    distributionId: string;
-    success: boolean;
-    error?: string;
-    duration?: number;
-  }> {
-    return Array.from(senderKeyOperationLog.values())
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 20); // Return last 20 operations
   }
 
   async function loadOrCreateDistributionId(emberId: string): Promise<string> {
@@ -1086,7 +1030,7 @@
     try {
       App.currentIconData = url;
       updateIconPreview(url);
-    } catch (error) {
+    } catch {
       showCreateServerError('Failed to load image from URL');
     }
   });
@@ -1127,7 +1071,7 @@
     try {
       const url = new URL(string);
       return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch (_) {
+    } catch {
       return false;
     }
   }
@@ -1478,7 +1422,7 @@
     try {
       App.currentIconData = url;
       updateEditIconPreview(url);
-    } catch (error) {
+    } catch {
       showEditEmberError('Failed to load image from URL');
     }
   });

@@ -5,7 +5,7 @@
  */
 
 import * as crypto from 'crypto';
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 
 // Import the actual decryptBlob function by extracting it from signal-db
 // Since it's not exported, we'll test it through the database interface

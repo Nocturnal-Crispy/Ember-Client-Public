@@ -78,7 +78,7 @@
         // Fallback for environments where emberAPI is not yet available
         window.electronAPI.ipc.send('log-to-console', payload);
       }
-    } catch (_) {
+    } catch {
       /* silently ignore — IPC not yet available */
     }
 
@@ -89,7 +89,7 @@
     if (isDevelopment()) {
       try {
         window.electronAPI?.ipc?.send('log-to-file', full);
-      } catch (error) {
+      } catch {
         // Ignore if file logging not available
       }
     }

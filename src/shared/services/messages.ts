@@ -1,6 +1,6 @@
 import type { AuthData } from '../types';
 import type { Message } from '../protocol';
-import { apiRequest, ApiError } from '../api';
+import { apiRequest } from '../api';
 
 interface AttachmentMeta {
   name: string;

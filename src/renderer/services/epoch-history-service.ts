@@ -7,7 +7,7 @@
  */
 
 import type { AuthData } from '../../shared';
-import { EpochService, Epoch, EpochKey } from './epoch-service';
+import { EpochService } from './epoch-service';
 import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface MessageWithEpoch {
@@ -138,7 +138,7 @@ export class EpochHistoryService {
    */
   private async decryptWithEpochKeys(
     message: MessageWithEpoch,
-    emberId: string
+    _emberId: string
   ): Promise<DecryptedMessage> {
     if (!message.epoch_id) {
       throw new Error('Epoch ID required for epoch key decryption');
@@ -157,7 +157,7 @@ export class EpochHistoryService {
     }
 
     // Decrypt the epoch key (simplified implementation)
-    const decryptedKey = await this.decryptEpochKey(userKey.encrypted_key);
+    await this.decryptEpochKey(userKey.encrypted_key);
 
     // Decrypt the message with the epoch key (simplified)
     const messageBytes = new TextEncoder().encode(message.ciphertext);
@@ -287,7 +287,7 @@ export class EpochHistoryService {
     emberId: string,
     channelId: string,
     beforeId?: string,
-    limit = 50
+    _limit = 50
   ): Promise<DecryptedMessage[]> {
     try {
       // This would integrate with the existing message service
@@ -326,7 +326,7 @@ export class EpochHistoryService {
       }
 
       return false;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

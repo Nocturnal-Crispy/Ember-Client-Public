@@ -679,7 +679,7 @@
         } else {
           showReconnectionOverlay();
         }
-      } catch (_) {
+      } catch {
         showReconnectionOverlay();
       }
     }

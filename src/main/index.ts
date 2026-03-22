@@ -42,9 +42,6 @@ import {
   initializeAuthWithElectronSafeStorage,
   electronSafeStorageFunctions,
 } from './auth-safe-storage';
-import { uploadSignedPreKey, uploadOneTimePreKeys } from '../shared';
-import { PrivateKey } from '@signalapp/libsignal-client';
-const { IPC_CHANNELS } = require('../shared/constants');
 
 const log = createLogger('Main');
 
@@ -608,7 +605,7 @@ ipcMain.handle('save-device-identity', async (_event, deviceIdentity) => {
   log.debug('IPC: save-device-identity', {
     device_id: deviceIdentity?.deviceId,
   });
-  const { private_key, ...deviceWithoutKey } = deviceIdentity;
+  const { private_key: _, ...deviceWithoutKey } = deviceIdentity;
   store.set('device', deviceWithoutKey);
 
   log.debug('Device identity saved');
@@ -1154,7 +1151,7 @@ function parseInviteUrl(url: string): { code: string; hostname: string } | null 
   }
 
   // Validate host: must be a hostname or IP, no special characters
-  if (!/^[a-zA-Z0-9.\-]+$/.test(host)) {
+  if (!/^[a-zA-Z0-9.-]+$/.test(host)) {
     log.warn('Rejected invite URL: invalid host');
     return null;
   }

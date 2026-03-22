@@ -96,7 +96,7 @@ describe('Sender Key Distribution Failures', () => {
       // Force the manager to be uninitialized
       (sessionManager as any).isInitialized = false;
 
-      const distributionId = 'test-distribution-id';
+      const _distributionId = 'test-distribution-id';
 
       // This should throw the not initialized error
       expect(() => {

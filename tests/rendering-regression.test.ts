@@ -4,7 +4,7 @@
  * the build process and file structure before application startup
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import { execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';

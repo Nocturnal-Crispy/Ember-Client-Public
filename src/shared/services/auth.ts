@@ -1,4 +1,4 @@
-import type { AuthResponse, DeviceIdentity, RecoveryData, SignalDeviceCredentials } from '../types';
+import type { AuthResponse, DeviceIdentity, SignalDeviceCredentials } from '../types';
 import { apiRequest, ApiError } from '../api';
 import {
   generateIdentityKey,

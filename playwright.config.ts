@@ -1,5 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
-import * as path from 'path';
+import { defineConfig } from '@playwright/test';
 
 /**
  * Playwright configuration for Electron E2E testing

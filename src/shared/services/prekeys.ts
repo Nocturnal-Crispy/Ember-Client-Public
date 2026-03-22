@@ -122,7 +122,7 @@ export async function generateAndUploadSignedPreKey(
 export async function checkAndReplenishPreKeys(
   auth: AuthData,
   keyStore: IPreKeyStore,
-  identityKeyPair: IdentityKeyPair
+  _identityKeyPair: IdentityKeyPair
 ): Promise<void> {
   const currentCount = await getOneTimePreKeyCount(auth);
 

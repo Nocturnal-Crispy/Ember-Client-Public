@@ -206,7 +206,6 @@
 
   // ─── URL detection ─────────────────────────────────────────────────────────
 
-  const URL_REGEX_SOURCE = 'https?:\\/\\/[^\\s<>"\']+';
   const IMAGE_URL_REGEX = /^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg|bmp)(\?[^\s]*)?$/i;
 
   function isImageUrl(url: string): boolean {

@@ -30,7 +30,7 @@ class CssHotReloader {
    * Inject or update CSS in the DOM
    */
   private injectCss(message: CssHotReloadMessage): void {
-    const { path, content } = message;
+    const { path } = message;
 
     console.log(`CSS changed, forcing page reload for: ${path}`);
 
@@ -44,8 +44,8 @@ class CssHotReloader {
         window.location.reload();
       } catch (error) {
         console.error('Failed to reload:', error);
-        // Fallback: try alternative reload method
-        window.location.href = window.location.href;
+        // Fallback: force navigation reload
+        window.location.href = window.location.href.split('#')[0];
       }
     }, 500); // Small delay to show the indicator
   }

@@ -1233,7 +1233,7 @@
     try {
       const s = (await ipcRenderer.invoke('get-voice-video-settings')) as VoiceSettings | null;
       App._vvSounds = (s?.sounds as Partial<Record<string, boolean>> | null) ?? null;
-    } catch (_) {
+    } catch {
       App._vvSounds = null;
     }
   }

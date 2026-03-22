@@ -6,8 +6,6 @@
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('MessageManager');
-  const emberCrypto = window.electronAPI.crypto;
-
   const messagesContainer = document.getElementById('messages');
 
   // ─── Sender Key (Signal group) encrypt/decrypt helpers ──────────────────
@@ -126,11 +124,9 @@
   const messageElements = new Map<string, HTMLElement>(); // messageId -> HTMLElement
   const renderedMessageIds = new Set<string>(); // Track currently rendered messages
   let virtualScrollContainer: HTMLElement | null = null;
-  let intersectionObserver: IntersectionObserver | null = null;
   let messageResizeObserver: ResizeObserver | null = null;
 
   // Performance monitoring
-  let lastLoadTime = 0;
   let messageLoadCount = 0;
 
   // LRU cache tracking
@@ -575,7 +571,7 @@
           attachment
         );
         return;
-      } catch (_) {
+      } catch {
         // fall through to plain-text rendering
       }
     }
@@ -593,7 +589,7 @@
           parsed
         );
         return;
-      } catch (_) {
+      } catch {
         // fall through to plain-text rendering
       }
     }
@@ -692,7 +688,7 @@
     messagesContainer.appendChild(virtualScrollContainer);
 
     // Set up intersection observer for lazy loading
-    intersectionObserver = new IntersectionObserver(
+    new IntersectionObserver(
       entries => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
@@ -749,16 +745,6 @@
   }
 
   /**
-   * Optimize DOM operations by batching updates
-   */
-  function batchDOMUpdates(updates: (() => void)[]): void {
-    // Use requestAnimationFrame for smooth updates
-    requestAnimationFrame(() => {
-      updates.forEach(update => update());
-    });
-  }
-
-  /**
    * Clean up old messages to prevent memory leaks
    */
   function cleanupOldMessages(): void {
@@ -788,7 +774,6 @@
    */
   function monitorPerformance(operation: string, startTime: number): void {
     const duration = Date.now() - startTime;
-    lastLoadTime = duration;
     messageLoadCount++;
 
     log.debug('Performance metric', {

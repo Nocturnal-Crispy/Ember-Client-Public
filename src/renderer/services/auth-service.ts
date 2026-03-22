@@ -394,27 +394,6 @@
     };
   }
 
-  async function register(
-    hostname: string,
-    username: string,
-    password: string,
-    deviceId: string,
-    publicKey: string,
-    encryptedDeviceKey: string,
-    salt: string
-  ): Promise<AuthResponse> {
-    showLoading('Connecting to server...', 'Registering account');
-    return window.electronAPI.authService.register(
-      hostname,
-      username,
-      password,
-      deviceId,
-      publicKey,
-      encryptedDeviceKey,
-      salt
-    );
-  }
-
   async function login(
     hostname: string,
     username: string,

@@ -103,8 +103,8 @@ describe('Signal Protocol Encryption Errors', () => {
       // Force the manager to be uninitialized
       (sessionManager as any).isInitialized = false;
 
-      const recipientAddress = 'test-user.1';
-      const plaintext = new Uint8Array([1, 2, 3, 4]);
+      const _recipientAddress = 'test-user.1';
+      const _plaintext = new Uint8Array([1, 2, 3, 4]);
 
       // This should throw the not initialized error
       expect(() => {

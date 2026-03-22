@@ -160,12 +160,6 @@
     }
   }
 
-  function detachActivityListeners(): void {
-    for (const evt of ACTIVITY_EVENTS) {
-      document.removeEventListener(evt, resetActivity);
-    }
-  }
-
   // ─── Idle timer ──────────────────────────────────────────────────────────────
 
   function startIdleTimer(): void {

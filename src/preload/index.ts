@@ -41,7 +41,7 @@ function preloadLog(level: string, message: string, data?: Record<string, unknow
       message,
       data: data || null,
     });
-  } catch (_) {
+  } catch {
     /* ignore if IPC unavailable */
   }
 }

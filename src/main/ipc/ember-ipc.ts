@@ -79,7 +79,6 @@ import {
 import {
   ProtocolAddress,
   PublicKey,
-  PrivateKey,
   PreKeyBundle as LibSignalPreKeyBundle,
   CiphertextMessageType,
   processPreKeyBundle,

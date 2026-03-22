@@ -23,7 +23,7 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
-function fromBase64(s: string): Uint8Array {
+function _fromBase64(s: string): Uint8Array {
   return new Uint8Array(
     atob(s)
       .split('')

@@ -91,7 +91,7 @@ describe('InviteEphemeralKeyService', () => {
         ],
       };
 
-      const result = await inviteEphemeralKeyService.createInviteEphemeralKeys(request);
+      const _result = await inviteEphemeralKeyService.createInviteEphemeralKeys(request);
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://test.example.com/api/v1/invites/invite-123/ephemeral-keys',

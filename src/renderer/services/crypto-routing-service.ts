@@ -4,7 +4,6 @@
  * and sender key lifecycle transitions.
  */
 (function (): void {
-  const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('CryptoRoutingService');
 
@@ -289,7 +288,7 @@
    * Validate an incoming sender key message against the current crypto state.
    * Returns an error string if validation fails, null if valid.
    */
-  function validateSenderKeyMessage(emberId: string, senderAddress: string): string | null {
+  function validateSenderKeyMessage(emberId: string, _senderAddress: string): string | null {
     const state = window.getCryptoState(emberId);
 
     if (state.senderKeyStatus !== 'active') {

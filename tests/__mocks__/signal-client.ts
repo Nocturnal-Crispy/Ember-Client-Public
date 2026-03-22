@@ -34,7 +34,7 @@ export class PrivateKey {
     return new PrivateKey();
   }
 
-  static deserialize(data: Uint8Array): PrivateKey {
+  static deserialize(_data: Uint8Array): PrivateKey {
     return new PrivateKey();
   }
 
@@ -46,13 +46,13 @@ export class PrivateKey {
     return new PublicKey();
   }
 
-  sign(data: Uint8Array): Uint8Array {
+  sign(_data: Uint8Array): Uint8Array {
     return new Uint8Array(64);
   }
 }
 
 export class PublicKey {
-  static deserialize(data: Uint8Array): PublicKey {
+  static deserialize(_data: Uint8Array): PublicKey {
     return new PublicKey();
   }
 
@@ -97,7 +97,7 @@ export class SessionRecord {
 }
 
 export class Fingerprint {
-  static calculate(localIdentityKey: PublicKey, remoteIdentityKey: PublicKey): Uint8Array {
+  static calculate(_localIdentityKey: PublicKey, _remoteIdentityKey: PublicKey): Uint8Array {
     return new Uint8Array(32);
   }
 }

@@ -170,7 +170,7 @@ describe('Message Decryption Integration', () => {
     expect((window as any).processIncomingDistributions).toBeDefined();
 
     // Mock a message that fails to decrypt
-    const mockMessage = {
+    const _mockMessage = {
       id: 'test-message-id',
       ciphertext: '{"v":2,"sa":"u1.d1","ct":"encrypted"}',
       envelope_type: 'signal_group',
@@ -179,7 +179,7 @@ describe('Message Decryption Integration', () => {
     };
 
     // Mock the displayDecryptedMessage function to capture the distribution fetch call
-    const originalDisplayDecryptedMessage = (mockWindow as any).displayDecryptedMessage;
+    const _originalDisplayDecryptedMessage = (mockWindow as any).displayDecryptedMessage;
     let distributionFetchCalled = false;
 
     // Override the emberAPI invoke to track distribution processing

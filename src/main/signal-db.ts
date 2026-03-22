@@ -116,7 +116,7 @@ function validateIdentityKeyConsistency(storedKey: Uint8Array, providedKey: Uint
   }
   try {
     return nodeCrypto.timingSafeEqual(Buffer.from(storedKey), Buffer.from(providedKey));
-  } catch (error) {
+  } catch {
     return false;
   }
 }

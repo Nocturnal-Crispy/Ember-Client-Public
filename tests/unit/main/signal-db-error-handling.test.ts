@@ -11,7 +11,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { openSignalDatabase } from '../../../src/main/signal-db';
 import type { SignalDatabase } from '../../../src/main/signal-db';
 

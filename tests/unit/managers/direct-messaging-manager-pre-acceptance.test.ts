@@ -16,7 +16,7 @@
 let fetchMock: jest.Mock;
 
 // Body captured from the DM-request POST so PA-1 can inspect it after beforeAll runs.
-let capturedDmRequestBody: {
+let _capturedDmRequestBody: {
   user_id?: string;
   encrypted_key_self?: string;
   peer_box?: { recipient_id: string; encrypted_key: string; sender_public_key: string };
@@ -118,7 +118,7 @@ beforeAll(async () => {
       });
 
     if (String(url).includes('/dm-requests') && opts?.method === 'POST') {
-      capturedDmRequestBody = opts?.body ? JSON.parse(opts.body as string) : null;
+      _capturedDmRequestBody = opts?.body ? JSON.parse(opts.body as string) : null;
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ id: REQUEST_ID, ember_id: EMBER_ID, status: 'created' }),

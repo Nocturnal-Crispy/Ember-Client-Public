@@ -17,8 +17,6 @@
  *   - Disabled feature does not trigger lock
  */
 
-import { JSDOM } from 'jsdom';
-
 let mockIpcInvoke: jest.Mock;
 let mockGetPluginSettings: jest.Mock;
 

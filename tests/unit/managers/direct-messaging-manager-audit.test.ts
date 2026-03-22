@@ -382,7 +382,7 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       // Mock the buggy sendDirectMessage function (missing protocol_version)
       const mockSendDirectMessage = jest
         .fn()
-        .mockImplementation(async (channelId: string, plaintext: string) => {
+        .mockImplementation(async (channelId: string, _plaintext: string) => {
           const auth = await window.getValidAuth();
           if (!auth) throw new Error('Not authenticated');
 
@@ -443,7 +443,7 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       // Mock the fixed sendDirectMessage function
       const mockFixedSendDirectMessage = jest
         .fn()
-        .mockImplementation(async (channelId: string, plaintext: string) => {
+        .mockImplementation(async (channelId: string, _plaintext: string) => {
           const auth = await window.getValidAuth();
           if (!auth) throw new Error('Not authenticated');
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Global type declarations for the Ember renderer process.
  * Extends Window with custom APIs exposed by the preload bridge and module globals.

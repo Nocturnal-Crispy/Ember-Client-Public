@@ -3,13 +3,6 @@
  * These tests reproduce the "Cannot read properties of null (reading 'length')" error.
  */
 
-declare module global {
-  interface Window {
-    getValidAuth?: () => Promise<any>;
-    fetch?: (url: string, options?: any) => Promise<Response>;
-  }
-}
-
 describe('Direct Messaging UI User Search', () => {
   let mockAuth: any;
   let mockFetch: jest.Mock;
@@ -72,7 +65,7 @@ describe('Direct Messaging UI User Search', () => {
 
           const users = await response.json(); // This could be null
           return users; // Trying to access .length on null would cause error
-        } catch (error) {
+        } catch {
           return [];
         }
       }

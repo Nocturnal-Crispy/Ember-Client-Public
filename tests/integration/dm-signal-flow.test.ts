@@ -42,7 +42,7 @@ const mockSignalService = {
 
 // ── NaCl crypto mocks ────────────────────────────────────────────────────────
 
-const mockDecryptNaCl = jest.fn<
+const _mockDecryptNaCl = jest.fn<
   (ciphertext: string, key: Uint8Array) => string | null
 >() as jest.MockedFunction<(ciphertext: string, key: Uint8Array) => string | null>;
 const mockEncryptNaCl = jest.fn<(plaintext: string, key: Uint8Array) => string>(

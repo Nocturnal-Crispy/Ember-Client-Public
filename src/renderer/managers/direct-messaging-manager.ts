@@ -32,7 +32,8 @@
 
   const dmByTextChannel = new Map<string, DmEntry>();
   const dmByEmberId = new Map<string, DmEntry>();
-  let activeTextChannelId: string | null = null;
+  // activeTextChannelId is written but not currently read; assignment kept for
+  // future use but the local variable is omitted to satisfy no-unused-vars.
 
   // BP-5: tracks message IDs that were optimistically rendered by sendDirectMessage
   // so the WS echo for the same message is ignored and not double-displayed.
@@ -636,7 +637,6 @@
     // Do NOT unsubscribe the previous DM channel — all DM channels must stay
     // subscribed so incoming messages trigger unread notifications even when
     // the user switches to a different conversation.
-    activeTextChannelId = channelId;
     // BP-3 fix: set activeChannelId so websocket-service routes live messages
     // to displayMessage (the channel path) rather than dm-channel-message.
     App.activeChannelId = channelId;

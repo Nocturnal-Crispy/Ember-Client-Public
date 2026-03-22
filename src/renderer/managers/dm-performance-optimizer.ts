@@ -568,7 +568,7 @@ class DMPerformanceOptimizer {
   /**
    * Calculate cache hit rate (mock implementation)
    */
-  private calculateCacheHitRate(conversationId: string): number {
+  private calculateCacheHitRate(_conversationId: string): number {
     // This would track actual cache hits/misses
     return 0.85; // Mock 85% hit rate
   }
@@ -577,8 +577,8 @@ class DMPerformanceOptimizer {
    * Search messages on server
    */
   private async searchMessagesOnServer(
-    conversationId: string,
-    query: string
+    _conversationId: string,
+    _query: string
   ): Promise<DMMessageCache[]> {
     // Implementation would search on server
     return [];
@@ -587,7 +587,7 @@ class DMPerformanceOptimizer {
   /**
    * Decrypt message (would use DM crypto)
    */
-  private async decryptMessage(ciphertext: string, conversationId: string): Promise<string> {
+  private async decryptMessage(ciphertext: string, _conversationId: string): Promise<string> {
     // This would use the DM crypto module
     return ciphertext; // Mock
   }

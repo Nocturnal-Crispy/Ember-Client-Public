@@ -13,7 +13,7 @@ describe('Theme Settings Validation', () => {
     mockLog = [];
 
     // Mock console.log to capture preload logs
-    const originalConsoleLog = console.log;
+    const _originalConsoleLog = console.log;
     console.log = (...args: any[]) => {
       mockLog.push(args);
     };

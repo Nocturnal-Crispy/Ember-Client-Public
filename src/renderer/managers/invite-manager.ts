@@ -6,8 +6,6 @@
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('InviteManager');
-  const emberCrypto = window.electronAPI.crypto;
-
   // Setup IPC listener immediately to avoid missing messages
   log.debug('Setting up IPC listener for handle-invite-link');
   ipcRenderer.on('handle-invite-link', () => {
@@ -115,7 +113,7 @@
       try {
         const url = new URL(trimmed);
         return { code: urlMatch[1], hostname: url.origin };
-      } catch (_) {
+      } catch {
         return { code: urlMatch[1], hostname: null };
       }
     }

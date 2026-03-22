@@ -34,10 +34,6 @@ function addrKey(addr: ProtocolAddress): string {
   return `${addr.name()}.${addr.deviceId()}`;
 }
 
-function senderKeyMapKey(sender: ProtocolAddress, distributionId: Uuid): string {
-  return `${addrKey(sender)}:${distributionId}`;
-}
-
 // ── Session store adapter ────────────────────────────────────────────────────
 
 export class SignalDbSessionStore extends SessionStore {

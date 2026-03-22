@@ -117,6 +117,22 @@ Jest config: `tests/jest.config.ts` (rootDir is `../`, tests live in `tests/`).
 
 ---
 
+## Linting & Formatting
+
+**After every editing session**, run lint to check and fix your changes:
+
+```bash
+npm run lint:fix    # Auto-fix lint + formatting errors (Prettier runs as ESLint plugin)
+npm run lint        # Check only (no modifications)
+```
+
+- Prettier is integrated into ESLint via `eslint-plugin-prettier` — there is NO standalone Prettier
+- Config: `eslint.config.mjs` (ES module format)
+- Prettier settings (singleQuote, semi, trailingComma es5, printWidth 100) are inline in the ESLint config
+- Always run `npm run lint:fix` before committing
+
+---
+
 ## Code Style
 
 - **Naming**: PascalCase classes, camelCase functions/variables, kebab-case filenames

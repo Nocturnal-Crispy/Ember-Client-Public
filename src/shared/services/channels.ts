@@ -1,11 +1,6 @@
 import type { AuthData, Channel, Category } from '../types';
 import { apiRequest } from '../api';
 
-interface ChannelsResponse {
-  channels?: Channel[];
-  categories?: Category[];
-}
-
 interface EmberKeyResponse {
   encryptedKey?: string;
 }

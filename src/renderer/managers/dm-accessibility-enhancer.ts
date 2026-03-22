@@ -264,9 +264,7 @@ class DMAccessibilityEnhancer {
   /**
    * Handle Escape key
    */
-  private handleEscape(event: KeyboardEvent): void {
-    const currentElement = document.activeElement as HTMLElement;
-
+  private handleEscape(_event: KeyboardEvent): void {
     // Close modals, dropdowns, or return focus to main content
     const searchResults = document.querySelector('.dm-search-results') as HTMLElement;
     if (searchResults && searchResults.style.display !== 'none') {
@@ -365,7 +363,7 @@ class DMAccessibilityEnhancer {
       messageList.setAttribute('aria-label', 'Conversation messages');
     }
 
-    document.querySelectorAll('.dm-message').forEach((message, index) => {
+    document.querySelectorAll('.dm-message').forEach((message, _index) => {
       const element = message as HTMLElement;
       element.setAttribute('role', 'article');
 
@@ -511,7 +509,7 @@ class DMAccessibilityEnhancer {
   /**
    * Handle focus out
    */
-  private handleFocusOut(event: FocusEvent): void {
+  private handleFocusOut(_event: FocusEvent): void {
     // Clean up any focus indicators
   }
 

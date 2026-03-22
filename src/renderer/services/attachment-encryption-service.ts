@@ -433,7 +433,7 @@ export class AttachmentEncryptionService {
   /**
    * Download encrypted attachment data
    */
-  private async downloadEncryptedAttachment(attachmentId: string): Promise<string> {
+  private async downloadEncryptedAttachment(_attachmentId: string): Promise<string> {
     // This would download the encrypted attachment from the server
     // For now, return a placeholder
     return '';
@@ -443,7 +443,7 @@ export class AttachmentEncryptionService {
    * Get channel members
    */
   private async getChannelMembers(
-    channelId: string
+    _channelId: string
   ): Promise<{ userId: string; deviceId?: string }[]> {
     // This would fetch channel members from the server
     // For now, return the current user as a member
@@ -459,7 +459,7 @@ export class AttachmentEncryptionService {
    * Get conversation participants
    */
   private async getConversationParticipants(
-    conversationId: string
+    _conversationId: string
   ): Promise<{ userId: string; deviceId?: string }[]> {
     // This would fetch conversation participants from the server
     // For now, return the current user as a participant

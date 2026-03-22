@@ -309,7 +309,7 @@ export class InviteEphemeralKeyService {
   /**
    * Process invite ephemeral keys on acceptance
    */
-  async processInviteEphemeralKeys(inviteId: string, emberId: string): Promise<void> {
+  async processInviteEphemeralKeys(inviteId: string, _emberId: string): Promise<void> {
     try {
       // Get all ephemeral key packages for the invite
       const ephemeralKeys = await this.getInviteEphemeralKeys(inviteId);
@@ -340,7 +340,7 @@ export class InviteEphemeralKeyService {
   private async processEphemeralKeyPackage(keyPackage: InviteEphemeralKeyPackage): Promise<void> {
     try {
       // Decrypt the key package (simplified implementation)
-      const decryptedPackage = await this.decryptEphemeralKeyPackage(keyPackage.encrypted_package);
+      await this.decryptEphemeralKeyPackage(keyPackage.encrypted_package);
 
       // Store the ephemeral key for the current epoch
       // In reality, this would integrate with the SignalSessionManager

@@ -3,8 +3,6 @@
  * TDD RED Phase: Tests will fail initially because functionality doesn't exist yet
  */
 
-import { app } from 'electron';
-import * as path from 'path';
 import Store from 'electron-store';
 import { openSignalDatabase } from '../../../src/main/signal-db';
 import { registerEmberIpcHandlers } from '../../../src/main/ipc/ember-ipc';

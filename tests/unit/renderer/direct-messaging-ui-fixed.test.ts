@@ -3,13 +3,6 @@
  * These tests verify that the null reference error is properly handled.
  */
 
-declare module global {
-  interface Window {
-    getValidAuth?: () => Promise<any>;
-    fetch?: (url: string, options?: any) => Promise<Response>;
-  }
-}
-
 describe('Direct Messaging UI User Search - Fixed', () => {
   let mockAuth: any;
   let mockFetch: jest.Mock;
@@ -62,7 +55,7 @@ describe('Direct Messaging UI User Search - Fixed', () => {
           }
 
           return users;
-        } catch (error) {
+        } catch {
           return [];
         }
       }
@@ -103,7 +96,7 @@ describe('Direct Messaging UI User Search - Fixed', () => {
           }
 
           return users;
-        } catch (error) {
+        } catch {
           return [];
         }
       }
@@ -149,7 +142,7 @@ describe('Direct Messaging UI User Search - Fixed', () => {
           }
 
           return users;
-        } catch (error) {
+        } catch {
           return [];
         }
       }
@@ -190,7 +183,7 @@ describe('Direct Messaging UI User Search - Fixed', () => {
           }
 
           return users;
-        } catch (error) {
+        } catch {
           return [];
         }
       }

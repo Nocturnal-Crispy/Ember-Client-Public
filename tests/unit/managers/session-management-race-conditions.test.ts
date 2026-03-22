@@ -4,7 +4,7 @@
  * Tests for proper synchronization of Signal session operations
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
 // Mock Signal Session Manager
 class MockSignalSessionManager {
@@ -46,7 +46,7 @@ class MockSignalSessionManager {
   async decrypt(
     senderAddress: string,
     ciphertext: Uint8Array,
-    messageType: number
+    _messageType: number
   ): Promise<Uint8Array> {
     await new Promise(resolve => setTimeout(resolve, this.operationDelay));
     if (!this.sessions.has(senderAddress)) {
@@ -186,7 +186,7 @@ describe('Session Management Race Conditions', () => {
       signalManager.setOperationDelay(50);
 
       // Start multiple concurrent conversations with the same user
-      const promises = Array.from({ length: 5 }, (_, i) =>
+      const promises = Array.from({ length: 5 }, (_, _i) =>
         dmManager.startDmConversationFixed('user1', 'alice', 'device1')
       );
 
@@ -227,7 +227,7 @@ describe('Session Management Race Conditions', () => {
       const messages = ['Hello', 'World', 'Test', 'Message'];
 
       const results = await Promise.all(
-        messages.map(msg => dmManager.startDmConversationFixed('user1', 'alice', 'device1'))
+        messages.map(_msg => dmManager.startDmConversationFixed('user1', 'alice', 'device1'))
       );
 
       // All should succeed
@@ -269,7 +269,7 @@ describe('Session Management Race Conditions', () => {
       signalManager.setOperationDelay(10);
 
       // Start multiple conversations with the same user
-      const promises = Array.from({ length: 10 }, (_, i) =>
+      const promises = Array.from({ length: 10 }, (_, _i) =>
         dmManager.startDmConversationFixed('user1', 'alice', 'device1')
       );
 

@@ -341,7 +341,7 @@ export class EpochService {
       }
 
       // Decrypt the epoch key (this would involve proper cryptographic operations)
-      const decryptedKey = await this.decryptEpochKey(userKey.encrypted_key);
+      await this.decryptEpochKey(userKey.encrypted_key);
 
       // Decrypt the message with the epoch key (simplified)
       // In reality, this would use proper AEAD decryption

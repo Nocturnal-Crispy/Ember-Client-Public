@@ -34,8 +34,8 @@ describe('app lock conditional visibility', () => {
     const jsContent = fs.readFileSync(jsPath, 'utf8');
 
     expect(jsContent).toContain('updateAppLockDependentVisibility');
-    expect(jsContent).toContain('querySelectorAll(".app-lock-dependent")');
-    expect(jsContent).toContain('classList.add("hidden")');
-    expect(jsContent).toContain('classList.remove("hidden")');
+    expect(jsContent).toContain("querySelectorAll('.app-lock-dependent')");
+    expect(jsContent).toContain("classList.add('hidden')");
+    expect(jsContent).toContain("classList.remove('hidden')");
   });
 });
