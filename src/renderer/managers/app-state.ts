@@ -69,39 +69,90 @@ window.App = {
       return;
     }
 
+    const ssmLog = window.emberLog?.createLogger('AppSSM');
     try {
       const auth = await window.getValidAuth?.();
       if (!auth || !auth.token || !auth.hostname || !auth.userId || !auth.deviceId) {
         throw new Error('Not authenticated - cannot initialize SignalSessionManager');
       }
 
-      // Import and initialize SignalSessionManager using global reference
-      // Since dependencies are loaded in order, SignalSessionManager should be available globally
       if (typeof (window as any).SignalSessionManager === 'undefined') {
-        console.warn('[App] SignalSessionManager not yet available, deferring initialization...');
+        ssmLog?.warn('SignalSessionManager class not yet available');
         this.signalSessionManager = null;
-        return; // Don't throw - just defer initialization
+        return;
       }
 
       this.signalSessionManager = new (window as any).SignalSessionManager(auth);
-      console.log('[App] SignalSessionManager initialized successfully');
+      ssmLog?.info('SignalSessionManager initialized successfully');
+
+      // Upload signed prekey + one-time prekeys if not already on server
+      try {
+        const countResp = await fetch(`${auth.hostname}/api/v1/prekeys/one-time/count`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        const countData = countResp.ok ? await countResp.json() : { count: 0 };
+        if (countData.count === 0) {
+          ssmLog?.debug('No prekeys on server, uploading...');
+          const identity = (await window.electronAPI.ipc.invoke('get-device-identity')) as any;
+          if (identity?.signedPreKey) {
+            const spk = identity.signedPreKey;
+            await fetch(`${auth.hostname}/api/v1/prekeys/signed`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${auth.token}`,
+              },
+              body: JSON.stringify({
+                id: spk.id,
+                publicKey: btoa(String.fromCharCode(...new Uint8Array(spk.keyPair.publicKey))),
+                signature: btoa(String.fromCharCode(...new Uint8Array(spk.signature))),
+                timestamp: spk.timestamp,
+              }),
+            });
+            ssmLog?.info('Signed prekey uploaded');
+          }
+          if (identity?.oneTimePreKeys?.length > 0) {
+            const otpks = identity.oneTimePreKeys.map((pk: any) => ({
+              id: pk.id,
+              publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
+            }));
+            await fetch(`${auth.hostname}/api/v1/prekeys/one-time`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${auth.token}`,
+              },
+              body: JSON.stringify(otpks),
+            });
+            ssmLog?.info('One-time prekeys uploaded', { count: otpks.length });
+          }
+        } else {
+          ssmLog?.debug('Prekeys already on server', { count: countData.count });
+        }
+      } catch (prekeyErr) {
+        ssmLog?.warn('Prekey upload failed', { error: (prekeyErr as Error).message });
+      }
     } catch (error) {
-      console.error('[App] Failed to initialize SignalSessionManager:', error);
+      ssmLog?.error('Failed to initialize SignalSessionManager', {
+        error: (error as Error).message,
+      });
       this.signalSessionManager = null;
-      console.warn('[App] Continuing without Signal encryption - messages will not be encrypted');
     }
 
-    // Initialize HistoryCryptoService for Layer 2 history key encryption.
-    // Independent of SignalSessionManager — uses its own auth handling.
     try {
       const auth = await window.getValidAuth?.();
       if (auth && typeof (window as any).HistoryCryptoService !== 'undefined') {
         this.historyCryptoService = new (window as any).HistoryCryptoService(auth);
         (window as any).historyCryptoService = this.historyCryptoService;
-        console.log('[App] HistoryCryptoService initialized successfully');
+        ssmLog?.info('HistoryCryptoService initialized successfully');
+      } else {
+        ssmLog?.warn('HistoryCryptoService not initialized', {
+          hasAuth: !!auth,
+          hasClass: typeof (window as any).HistoryCryptoService,
+        });
       }
     } catch (historyError) {
-      console.warn('[App] HistoryCryptoService initialization failed:', historyError);
+      ssmLog?.warn('HistoryCryptoService init failed', { error: (historyError as Error).message });
     }
   },
 

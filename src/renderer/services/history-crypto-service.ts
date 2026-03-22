@@ -8,6 +8,8 @@
  * Key hierarchy: CRK → HKDF → EHK → HKDF → message_key → AES-256-GCM
  */
 (function (): void {
+  const log = window.emberLog.createLogger('HistoryCrypto');
+
   interface AuthData {
     token: string;
     userId: string;
@@ -205,13 +207,35 @@
         const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/crk`, {
           headers: { Authorization: `Bearer ${this.auth.token}` },
         });
-        if (!response.ok) return null;
+        if (!response.ok) {
+          log.warn('getCrk: server returned non-OK', { emberId, epoch, status: response.status });
+          return null;
+        }
 
         const data = (await response.json()) as { envelopes: CrkEnvelopeFromServer[] };
-        if (!data.envelopes || data.envelopes.length === 0) return null;
+        if (!data.envelopes || data.envelopes.length === 0) {
+          log.warn('getCrk: no envelopes from server', { emberId, epoch });
+          return null;
+        }
 
         const envelope = data.envelopes.find(e => e.epoch === epoch);
         if (!envelope) return null;
+
+        // Try OS safeStorage first (Signal self-session may not survive re-login)
+        try {
+          const resp = await (window as any).emberAPI.invoke('GetSafeStorage', {
+            key: `crk_${emberId}_${epoch}`,
+          });
+          if (resp?.success && resp.data?.value) {
+            const crkBytes = Uint8Array.from(atob(resp.data.value), c => c.charCodeAt(0));
+            if (crkBytes.length === 32) {
+              crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk: crkBytes });
+              return crkBytes;
+            }
+          }
+        } catch {
+          /* fall through to Signal decrypt */
+        }
 
         const signalManager = (window as any).App?.signalSessionManager;
         if (!signalManager) return null;
@@ -227,7 +251,8 @@
 
         crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk: crkBytes });
         return crkBytes;
-      } catch {
+      } catch (err) {
+        log.warn('getCrk: exception', { emberId, epoch, error: (err as Error).message });
         return null;
       }
     }
@@ -253,7 +278,10 @@
     ): Promise<{ ciphertext: string; nonce: string; epoch: number } | null> {
       const epoch = await this.getCurrentEpoch(emberId);
       const crk = await this.getCrk(emberId, epoch);
-      if (!crk) return null;
+      if (!crk) {
+        log.warn('encrypt failed: no CRK', { emberId, epoch, cacheSize: crkCache.size });
+        return null;
+      }
 
       const ehk = await deriveEhk(crk, epoch);
       const msgKey = await deriveMessageKey(ehk);
@@ -276,7 +304,10 @@
       _messageSequence: number
     ): Promise<string | null> {
       const crk = await this.getCrk(emberId, epoch);
-      if (!crk) return null;
+      if (!crk) {
+        log.warn('decrypt: getCrk returned null', { emberId, epoch });
+        return null;
+      }
 
       try {
         const ehk = await deriveEhk(crk, epoch);
@@ -298,10 +329,27 @@
     ): Promise<boolean> {
       try {
         const signalManager = (window as any).App?.signalSessionManager;
-        if (!signalManager) return false;
+        if (!signalManager) {
+          log.warn('createAndDistributeCrk: signalSessionManager is null');
+          return false;
+        }
+        log.debug('createAndDistributeCrk: starting', {
+          emberId,
+          epoch,
+          members: deviceMembers.length,
+        });
 
         const crk = crypto.getRandomValues(new Uint8Array(32));
         crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk });
+        // Persist to OS safeStorage so CRK survives logout/re-login
+        try {
+          await (window as any).emberAPI.invoke('SetSafeStorage', {
+            key: `crk_${emberId}_${epoch}`,
+            value: btoa(String.fromCharCode(...crk)),
+          });
+        } catch {
+          /* non-critical — CRK still in memory cache */
+        }
 
         const envelopes = [];
         for (const member of deviceMembers) {
@@ -322,9 +370,10 @@
           }
         }
 
-        // Also encrypt to self
+        // Also encrypt to self for recovery after re-login
         try {
           const selfAddress = `${this.auth.userId}.${this.auth.deviceId}`;
+          await signalManager.ensureSession(this.auth.userId, this.auth.deviceId);
           const selfEncrypted = await signalManager.encrypt(selfAddress, crk);
           envelopes.push({
             userId: this.auth.userId,
@@ -332,11 +381,17 @@
             encryptedKey: btoa(String.fromCharCode(...selfEncrypted.ciphertext)),
             messageType: selfEncrypted.messageType,
           });
-        } catch {
-          // Self-encryption may fail if no self-session exists — CRK is still cached locally
+        } catch (selfErr) {
+          log.warn('createAndDistributeCrk: self-encrypt failed', {
+            error: (selfErr as Error).message,
+          });
         }
 
-        if (envelopes.length === 0) return true; // CRK cached locally, no envelopes to upload
+        log.debug('createAndDistributeCrk: envelopes', { count: envelopes.length });
+        if (envelopes.length === 0) {
+          log.warn('createAndDistributeCrk: no envelopes to upload, CRK cached locally only');
+          return true;
+        }
 
         const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/crk`, {
           method: 'POST',

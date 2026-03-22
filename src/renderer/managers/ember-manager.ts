@@ -1225,21 +1225,34 @@
         // Initialize Layer 2 CRK (epoch 0) for history key encryption
         try {
           const historyCrypto = (window as any).historyCryptoService;
+          log.debug('CRK init check', { hasHistoryCrypto: !!historyCrypto, emberId: newEmber.id });
           if (historyCrypto) {
             const auth = await window.getValidAuth?.();
+            log.debug('CRK init: auth', { hasAuth: !!auth });
             if (auth) {
               const membersResp = await fetch(
                 `${auth.hostname}/api/v1/embers/${newEmber.id}/device-members`,
                 { headers: { Authorization: `Bearer ${auth.token}` } }
               );
+              log.debug('CRK init: members fetch', {
+                ok: membersResp.ok,
+                status: membersResp.status,
+              });
               if (membersResp.ok) {
                 const membersData = (await membersResp.json()) as {
                   members?: Array<{ userId: string; deviceId: string }>;
                 };
                 const members = membersData.members ?? [];
+                log.debug('CRK init: members', { count: members.length });
                 if (members.length > 0) {
-                  await historyCrypto.createAndDistributeCrk(newEmber.id, members);
-                  log.info('CRK initialized for new ember', { ember_id: newEmber.id, epoch: 0 });
+                  const result = await historyCrypto.createAndDistributeCrk(newEmber.id, members);
+                  log.info('CRK initialized for new ember', {
+                    ember_id: newEmber.id,
+                    epoch: 0,
+                    result,
+                  });
+                } else {
+                  log.warn('CRK init: no members found');
                 }
               }
             }

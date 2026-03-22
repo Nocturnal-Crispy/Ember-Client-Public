@@ -611,7 +611,11 @@
           } else {
             // Prevent default newline behavior and send message
             e.preventDefault();
-            const plaintext = messageInput.value.trim();
+            const rawText = messageInput.value.trim();
+            const plaintext =
+              typeof (window as any).resolveMentions === 'function'
+                ? (window as any).resolveMentions(rawText)
+                : rawText;
             if (plaintext || App.pendingAttachment) {
               messageInput.value = '';
               await window.sendEncryptedMessage(App.activeChannelId, plaintext);

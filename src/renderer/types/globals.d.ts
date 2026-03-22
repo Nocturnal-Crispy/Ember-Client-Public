@@ -49,6 +49,35 @@ declare global {
   type AuthResponse = import('../../shared').AuthResponse;
   type RecoveryData = import('../../shared').RecoveryData;
 
+  type EmberCmd = import('../../shared').EmberCmd;
+  type EmberIpcResponse<D = unknown> = import('../../shared').EmberIpcResponse<D>;
+  type LoadSessionData = import('../../shared').LoadSessionData;
+  type LoadIdentityData = import('../../shared').LoadIdentityData;
+  type StoreIdentityData = import('../../shared').StoreIdentityData;
+  type LoadPreKeyData = import('../../shared').LoadPreKeyData;
+  type LoadSignedPreKeyData = import('../../shared').LoadSignedPreKeyData;
+  type LoadKyberPreKeyData = import('../../shared').LoadKyberPreKeyData;
+  type ProcessPreKeyBundleArgs = import('../../shared').ProcessPreKeyBundleArgs;
+  type EncryptArgs = import('../../shared').EncryptArgs;
+  type EncryptData = import('../../shared').EncryptData;
+  type DecryptArgs = import('../../shared').DecryptArgs;
+  type DecryptData = import('../../shared').DecryptData;
+  type DecryptPreKeyArgs = import('../../shared').DecryptPreKeyArgs;
+  type GroupEncryptArgs = import('../../shared').GroupEncryptArgs;
+  type GroupEncryptData = import('../../shared').GroupEncryptData;
+  type GroupDecryptArgs = import('../../shared').GroupDecryptArgs;
+  type GroupDecryptData = import('../../shared').GroupDecryptData;
+  type CreateSenderKeyDistributionArgs = import('../../shared').CreateSenderKeyDistributionArgs;
+  type CreateSenderKeyDistributionData = import('../../shared').CreateSenderKeyDistributionData;
+  type ProcessSenderKeyDistributionArgs = import('../../shared').ProcessSenderKeyDistributionArgs;
+  type GetSafeStorageData = import('../../shared').GetSafeStorageData;
+  type ISessionStore = import('../../shared').ISessionStore;
+  type IIdentityKeyStore = import('../../shared').IIdentityKeyStore;
+  type IPreKeyStore = import('../../shared').IPreKeyStore;
+  type ISignedPreKeyStore = import('../../shared').ISignedPreKeyStore;
+  type IKyberPreKeyStore = import('../../shared').IKyberPreKeyStore;
+  type PreKeyBundle = import('../../shared').PreKeyBundle;
+
   type Ember = import('../../shared').Ember;
   type Channel = import('../../shared').Channel;
   type Category = import('../../shared').Category;
@@ -506,6 +535,7 @@ declare global {
     formatTimestamp(timestamp?: number): string;
     formatRelativeTimestamp(timestamp?: number): string;
     toChumhandle(username: string): string;
+    resolveMentions(text: string): string;
     // Globals set by message-service.ts
     enterEditMode(messageDiv: HTMLElement, messageId: string): void;
     // Globals set by renderer.ts

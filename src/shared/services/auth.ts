@@ -82,15 +82,22 @@ export async function registerWithSignalKeys(
   encryptedDeviceKey: string,
   salt: string
 ): Promise<AuthResponse> {
-  return register(
-    hostname,
-    username,
-    password,
-    signalCredentials.deviceId,
-    publicKey,
-    encryptedDeviceKey,
-    salt
+  const identityKeyB64 = btoa(
+    String.fromCharCode(...new Uint8Array(signalCredentials.identityKeyPair.publicKey))
   );
+  return apiRequest<AuthResponse>(hostname, '/api/v1/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      username,
+      password,
+      deviceId: signalCredentials.deviceId,
+      publicKey,
+      encryptedDeviceKey,
+      salt,
+      identityKey: identityKeyB64,
+      registrationId: signalCredentials.registrationId,
+    }),
+  });
 }
 
 export function validateLoginForm(

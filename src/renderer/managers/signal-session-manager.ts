@@ -8,25 +8,11 @@
  * a stable interface for DM encryption operations.
  */
 
-// Use global references to work with script loading system
-declare global {
-  interface Window {
-    SignalService?: any;
-  }
-}
-
-// Type definitions
-interface AuthData {
-  token: string;
-  user_id: string;
-  device_id: string;
-  hostname: string;
-  username: string;
-}
+// Uses global AuthData from globals.d.ts (shared/types/auth.ts)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface SignalSessionManagerInterface {
+interface SignalSessionManagerInterface {
   hasSession(userId: string, deviceId: string): Promise<boolean>;
   ensureSession(userId: string, deviceId: string): Promise<void>;
   encrypt(
@@ -45,7 +31,7 @@ export interface SignalSessionManagerInterface {
 
 // ─── SignalSessionManager ───────────────────────────────────────────────────────
 
-export class SignalSessionManager implements SignalSessionManagerInterface {
+class SignalSessionManager implements SignalSessionManagerInterface {
   private readonly auth: AuthData;
   private signalService: any;
   private isInitialized = false;
@@ -55,10 +41,10 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     this.auth = auth;
 
     // Use global references to work with script loading system
-    if (!window.SignalService) {
+    if (!(window as any).SignalService) {
       throw new Error('SignalService not available - check script loading order');
     }
-    this.signalService = new window.SignalService(auth);
+    this.signalService = new (window as any).SignalService(auth);
     this.isInitialized = true;
   }
 
@@ -70,7 +56,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
       throw new Error('Invalid auth data: auth is required');
     }
 
-    const requiredFields = ['token', 'hostname', 'user_id', 'device_id', 'username'];
+    const requiredFields = ['token', 'hostname', 'userId', 'deviceId', 'username'];
     for (const field of requiredFields) {
       if (!(field in auth) || !auth[field as keyof AuthData]) {
         throw new Error(`Invalid auth data: ${field} is required`);

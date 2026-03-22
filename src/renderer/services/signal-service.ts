@@ -1,35 +1,5 @@
-import type {
-  EmberCmd,
-  EmberIpcResponse,
-  LoadSessionData,
-  LoadIdentityData,
-  StoreIdentityData,
-  LoadPreKeyData,
-  LoadSignedPreKeyData,
-  LoadKyberPreKeyData,
-  ProcessPreKeyBundleArgs,
-  EncryptArgs,
-  EncryptData,
-  DecryptArgs,
-  DecryptData,
-  DecryptPreKeyArgs,
-  GroupEncryptArgs,
-  GroupEncryptData,
-  GroupDecryptArgs,
-  GroupDecryptData,
-  CreateSenderKeyDistributionArgs,
-  CreateSenderKeyDistributionData,
-  ProcessSenderKeyDistributionArgs,
-  GetSafeStorageData,
-  ISessionStore,
-  IIdentityKeyStore,
-  IPreKeyStore,
-  ISignedPreKeyStore,
-  IKyberPreKeyStore,
-  AuthData,
-  PreKeyBundle,
-} from '../../shared';
-import { fetchPreKeyBundle } from '../../shared';
+// Types from ../../shared are available globally via globals.d.ts
+// fetchPreKeyBundle is inlined in ensureSession() to avoid module import
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -38,12 +8,20 @@ const PREKEY_MESSAGE_TYPE = 3;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toBase64(bytes: Uint8Array): string {
-  // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
-  return Buffer.from(bytes).toString('base64');
+  // Chunked encoding to prevent stack overflow for large payloads
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 function fromBase64(s: string): Uint8Array {
-  return new Uint8Array(Buffer.from(s, 'base64'));
+  const binary = atob(s);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -53,7 +31,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 // ── EmberIpcError ─────────────────────────────────────────────────────────────
 
-export class EmberIpcError extends Error {
+class EmberIpcError extends Error {
   constructor(
     public readonly cmd: EmberCmd,
     message: string
@@ -65,7 +43,7 @@ export class EmberIpcError extends Error {
 
 // ── IPC session store ─────────────────────────────────────────────────────────
 
-export class IpcSessionStore implements ISessionStore {
+class IpcSessionStore implements ISessionStore {
   async storeSession(address: string, record: Uint8Array): Promise<void> {
     await window.emberAPI.invoke('StoreSession', { address, record: toBase64(record) });
   }
@@ -90,7 +68,7 @@ export class IpcSessionStore implements ISessionStore {
 
 // ── IPC identity key store ────────────────────────────────────────────────────
 
-export class IpcIdentityKeyStore implements IIdentityKeyStore {
+class IpcIdentityKeyStore implements IIdentityKeyStore {
   constructor(private readonly auth: AuthData) {}
 
   async getIdentityKeyPair(): Promise<{
@@ -159,7 +137,7 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
 
 // ── IPC pre-key store ─────────────────────────────────────────────────────────
 
-export class IpcPreKeyStore implements IPreKeyStore {
+class IpcPreKeyStore implements IPreKeyStore {
   async storePreKey(id: number, record: Uint8Array): Promise<void> {
     await window.emberAPI.invoke('StorePreKey', { id, record: toBase64(record) });
   }
@@ -176,7 +154,7 @@ export class IpcPreKeyStore implements IPreKeyStore {
 
 // ── IPC signed pre-key store ──────────────────────────────────────────────────
 
-export class IpcSignedPreKeyStore implements ISignedPreKeyStore {
+class IpcSignedPreKeyStore implements ISignedPreKeyStore {
   async storeSignedPreKey(id: number, record: Uint8Array): Promise<void> {
     await window.emberAPI.invoke('StoreSignedPreKey', { id, record: toBase64(record) });
   }
@@ -193,7 +171,7 @@ export class IpcSignedPreKeyStore implements ISignedPreKeyStore {
 
 // ── IPC Kyber pre-key store stub ──────────────────────────────────────────────
 
-export class IpcKyberPreKeyStore implements IKyberPreKeyStore {
+class IpcKyberPreKeyStore implements IKyberPreKeyStore {
   async loadKyberPreKey(id: number): Promise<Uint8Array | null> {
     const response = await window.emberAPI.invoke<LoadKyberPreKeyData>('LoadKyberPreKey', { id });
     return response.data?.record ? fromBase64(response.data.record) : null;
@@ -214,7 +192,7 @@ export class IpcKyberPreKeyStore implements IKyberPreKeyStore {
 
 // ── Signal service ────────────────────────────────────────────────────────────
 
-export class SignalService {
+class SignalService {
   private readonly auth: AuthData;
 
   constructor(auth: AuthData) {
@@ -279,17 +257,24 @@ export class SignalService {
     if (sessionData.record !== null) {
       return;
     }
-    const bundle: PreKeyBundle = await fetchPreKeyBundle(this.auth, userId, deviceId);
+    // Inline fetchPreKeyBundle — server returns base64-encoded keys
+    const bundleResp = await fetch(
+      `${this.auth.hostname}/api/v1/users/${userId}/devices/${deviceId}/prekey-bundle`,
+      { headers: { Authorization: `Bearer ${this.auth.token}` } }
+    );
+    if (!bundleResp.ok) throw new Error(`Failed to fetch prekey bundle: ${bundleResp.status}`);
+    const bd = await bundleResp.json();
+    // Server returns base64 strings — pass directly to IPC (no double-convert)
     const bundleArgs: ProcessPreKeyBundleArgs = {
       recipientAddress: address,
-      registrationId: bundle.registrationId,
-      deviceId: bundle.deviceId,
-      preKeyId: bundle.preKeyId,
-      preKey: bundle.preKey ? toBase64(bundle.preKey) : undefined,
-      signedPreKeyId: bundle.signedPreKeyId,
-      signedPreKey: toBase64(bundle.signedPreKey),
-      signedPreKeySignature: toBase64(bundle.signedPreKeySignature),
-      identityKey: toBase64(bundle.identityKey),
+      registrationId: bd.registrationId,
+      deviceId: bd.signedPreKey?.deviceId,
+      preKeyId: bd.oneTimePreKey?.id,
+      preKey: bd.oneTimePreKey?.publicKey,
+      signedPreKeyId: bd.signedPreKey?.id,
+      signedPreKey: bd.signedPreKey?.publicKey,
+      signedPreKeySignature: bd.signedPreKey?.signature,
+      identityKey: bd.identityKey,
     };
     await this.invoke<undefined>('ProcessPreKeyBundle', bundleArgs);
   }
@@ -357,3 +342,9 @@ export class SignalService {
 
 // Export globally for script loading compatibility
 (window as any).SignalService = SignalService;
+(window as any).IpcSessionStore = IpcSessionStore;
+(window as any).IpcIdentityKeyStore = IpcIdentityKeyStore;
+(window as any).IpcPreKeyStore = IpcPreKeyStore;
+(window as any).IpcSignedPreKeyStore = IpcSignedPreKeyStore;
+(window as any).IpcKyberPreKeyStore = IpcKyberPreKeyStore;
+(window as any).EmberIpcError = EmberIpcError;

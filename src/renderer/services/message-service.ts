@@ -275,7 +275,10 @@
         | undefined;
 
       const historyResult = historyCrypto
-        ? await historyCrypto.encrypt(App.activeEmberId, messageText).catch(() => null)
+        ? await historyCrypto.encrypt(App.activeEmberId, messageText).catch(err => {
+            log.warn('History encrypt threw', { error: (err as Error).message });
+            return null;
+          })
         : null;
 
       let requestBody: Record<string, unknown>;
@@ -706,7 +709,13 @@
             msgAny.epoch ?? 0,
             msgAny.messageSequence ?? 0
           )
-          .catch(() => null);
+          .catch(err => {
+            log.warn('history_channel decrypt failed', {
+              error: (err as Error).message,
+              msgId: msg.id,
+            });
+            return null;
+          });
       }
       if (plaintext === null) {
         addMessage(

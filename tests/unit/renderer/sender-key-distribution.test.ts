@@ -3,8 +3,6 @@
  * These tests reproduce the "Failed to create sender key distribution" errors.
  */
 
-import { SignalSessionManager } from '../../../src/renderer/managers/signal-session-manager';
-
 // Mock global window objects
 declare global {
   interface Window {
@@ -16,11 +14,24 @@ describe('Sender Key Distribution Failures', () => {
   let mockAuth: any;
   let mockSignalService: any;
 
+  beforeAll(() => {
+    (window as any).emberLog = {
+      createLogger: jest.fn().mockReturnValue({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+      }),
+    };
+    (window as any).SignalService = jest.fn();
+    require('../../../src/renderer/managers/signal-session-manager');
+  });
+
   beforeEach(() => {
     mockAuth = {
       token: 'test-token',
-      user_id: 'test-user-id',
-      device_id: 'test-device-id',
+      userId: 'test-user-id',
+      deviceId: 'test-device-id',
       hostname: 'http://localhost:8085',
       username: 'test-user',
     };
@@ -49,7 +60,7 @@ describe('Sender Key Distribution Failures', () => {
       // This test reproduces the exact error from logs:
       // "Failed to create sender key distribution"
 
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock createSenderKeyDistribution to throw an error
       const distributionError = new Error('Failed to create sender key distribution');
@@ -72,7 +83,7 @@ describe('Sender Key Distribution Failures', () => {
       // This test reproduces the warning from logs:
       // "Sender key setup deferred { ember_id='...', error='Failed to create sender key distribution' }"
 
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock createSenderKeyDistribution to throw the specific error
       const deferredError = new Error('Failed to create sender key distribution');
@@ -91,7 +102,7 @@ describe('Sender Key Distribution Failures', () => {
     });
 
     it('should handle uninitialized SignalSessionManager during sender key creation', () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Force the manager to be uninitialized
       (sessionManager as any).isInitialized = false;
@@ -105,7 +116,7 @@ describe('Sender Key Distribution Failures', () => {
     });
 
     it('should handle invalid distribution ID during sender key creation', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // This should throw validation error before even calling SignalService
       await expect(sessionManager.createSenderKeyDistribution('')).rejects.toThrow(
@@ -114,7 +125,7 @@ describe('Sender Key Distribution Failures', () => {
     });
 
     it('should handle SignalService.createSenderKeyDistribution throwing generic error', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock createSenderKeyDistribution to throw a generic error
       const genericError = new Error('Signal service unavailable');
@@ -130,7 +141,7 @@ describe('Sender Key Distribution Failures', () => {
 
   describe('Sender Key Processing Failures', () => {
     it('should handle sender key distribution processing failures', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock processSenderKeyDistribution to throw an error
       const processingError = new Error('Failed to process sender key distribution');
@@ -153,7 +164,7 @@ describe('Sender Key Distribution Failures', () => {
     });
 
     it('should handle invalid sender address format during processing', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       const distributionMessage = new Uint8Array([1, 2, 3, 4]);
 
@@ -169,12 +180,12 @@ describe('Sender Key Distribution Failures', () => {
       delete (window as any).SignalService;
 
       expect(() => {
-        new SignalSessionManager(mockAuth);
+        new (window as any).SignalSessionManager(mockAuth);
       }).toThrow('SignalService not available - check script loading order');
     });
 
     it('should handle SignalService.createSenderKeyDistribution returning null', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock createSenderKeyDistribution to return null
       mockSignalService.createSenderKeyDistribution = jest.fn().mockResolvedValue(null);

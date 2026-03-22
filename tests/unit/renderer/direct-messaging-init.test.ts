@@ -3,8 +3,6 @@
  * These tests reproduce the "Failed to initialize Direct Messaging system" error.
  */
 
-import { SignalSessionManager } from '../../../src/renderer/managers/signal-session-manager';
-
 // Mock global window objects
 declare global {
   interface Window {
@@ -20,11 +18,24 @@ describe('Direct Messaging System Initialization', () => {
   let mockAuth: any;
   let mockLog: any;
 
+  beforeAll(() => {
+    (window as any).emberLog = {
+      createLogger: jest.fn().mockReturnValue({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+      }),
+    };
+    (window as any).SignalService = jest.fn();
+    require('../../../src/renderer/managers/signal-session-manager');
+  });
+
   beforeEach(() => {
     mockAuth = {
       token: 'test-token',
-      user_id: 'test-user-id',
-      device_id: 'test-device-id',
+      userId: 'test-user-id',
+      deviceId: 'test-device-id',
       hostname: 'http://localhost:8085',
       username: 'test-user',
     };
@@ -62,7 +73,7 @@ describe('Direct Messaging System Initialization', () => {
       delete (window as any).SignalService;
 
       expect(() => {
-        new SignalSessionManager(mockAuth);
+        new (window as any).SignalSessionManager(mockAuth);
       }).toThrow('SignalService not available - check script loading order');
     });
 
@@ -73,7 +84,7 @@ describe('Direct Messaging System Initialization', () => {
       };
 
       expect(() => {
-        new SignalSessionManager(invalidAuth as any);
+        new (window as any).SignalSessionManager(invalidAuth as any);
       }).toThrow('Invalid auth data: hostname is required');
     });
 
@@ -90,7 +101,7 @@ describe('Direct Messaging System Initialization', () => {
         processSenderKeyDistribution: jest.fn(),
       }));
 
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Force the manager to be not initialized
       (sessionManager as any).isInitialized = false;

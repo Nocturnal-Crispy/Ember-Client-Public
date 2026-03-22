@@ -3,8 +3,6 @@
  * These tests reproduce the "Signal Protocol encryption not ready" errors.
  */
 
-import { SignalSessionManager } from '../../../src/renderer/managers/signal-session-manager';
-
 // Mock global window objects
 declare global {
   interface Window {
@@ -17,11 +15,24 @@ describe('Signal Protocol Encryption Errors', () => {
   let mockAuth: any;
   let mockSignalService: any;
 
+  beforeAll(() => {
+    (window as any).emberLog = {
+      createLogger: jest.fn().mockReturnValue({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+      }),
+    };
+    (window as any).SignalService = jest.fn();
+    require('../../../src/renderer/managers/signal-session-manager');
+  });
+
   beforeEach(() => {
     mockAuth = {
       token: 'test-token',
-      user_id: 'test-user-id',
-      device_id: 'test-device-id',
+      userId: 'test-user-id',
+      deviceId: 'test-device-id',
       hostname: 'http://localhost:8085',
       username: 'test-user',
     };
@@ -53,7 +64,7 @@ describe('Signal Protocol Encryption Errors', () => {
       // This test reproduces the exact error from logs:
       // "Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized"
 
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock groupEncrypt to return null/falsy to simulate encryption not ready
       mockSignalService.groupEncrypt = jest.fn().mockResolvedValue(null);
@@ -81,7 +92,7 @@ describe('Signal Protocol Encryption Errors', () => {
     });
 
     it('should handle SignalService.encrypt throwing encryption not ready error', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       const encryptionError = new Error(
         'Signal Protocol encryption not ready - please ensure Signal Session Manager is initialized'
@@ -98,7 +109,7 @@ describe('Signal Protocol Encryption Errors', () => {
     });
 
     it('should handle uninitialized SignalSessionManager', () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Force the manager to be uninitialized
       (sessionManager as any).isInitialized = false;
@@ -118,12 +129,12 @@ describe('Signal Protocol Encryption Errors', () => {
       delete (window as any).SignalService;
 
       expect(() => {
-        new SignalSessionManager(mockAuth);
+        new (window as any).SignalSessionManager(mockAuth);
       }).toThrow('SignalService not available - check script loading order');
     });
 
     it('should handle group encryption failures gracefully', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       // Mock groupEncrypt to throw an error
       const groupError = new Error('Group encryption failed');
@@ -138,7 +149,7 @@ describe('Signal Protocol Encryption Errors', () => {
     });
 
     it('should handle invalid distribution ID during group encryption', async () => {
-      const sessionManager = new SignalSessionManager(mockAuth);
+      const sessionManager = new (window as any).SignalSessionManager(mockAuth);
 
       const plaintext = new Uint8Array([1, 2, 3, 4]);
 

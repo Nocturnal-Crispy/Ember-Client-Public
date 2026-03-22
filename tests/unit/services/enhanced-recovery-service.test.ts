@@ -5,7 +5,6 @@
  */
 
 import { EnhancedRecoveryService } from '../../../src/renderer/services/enhanced-recovery-service';
-import { SignalSessionManager } from '../../../src/renderer/managers/signal-session-manager';
 
 // Mock fetch for API calls
 global.fetch = jest.fn();
@@ -78,7 +77,7 @@ Object.defineProperty(window, 'screen', {
 
 describe('EnhancedRecoveryService', () => {
   let enhancedRecoveryService: EnhancedRecoveryService;
-  let mockSignalSessionManager: jest.Mocked<SignalSessionManager>;
+  let mockSignalSessionManager: any;
 
   beforeEach(() => {
     // Reset mocks

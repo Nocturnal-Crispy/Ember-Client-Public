@@ -6,7 +6,6 @@
  */
 
 import type { AuthData } from '../../shared';
-import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface RecoveryCodeData {
   user_id: string;
@@ -44,9 +43,9 @@ export interface UpdateRecoveryCodeRequest {
 
 export class EnhancedRecoveryService {
   private auth: AuthData;
-  private signalSessionManager: SignalSessionManager;
+  private signalSessionManager: any;
 
-  constructor(auth: AuthData, signalSessionManager: SignalSessionManager) {
+  constructor(auth: AuthData, signalSessionManager: any) {
     if (!auth) {
       throw new Error('Auth data is required');
     }

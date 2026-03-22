@@ -8,14 +8,26 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { EmberIpcResponse } from 'ember-shared';
-import {
-  SignalService,
-  IpcSessionStore,
-  IpcIdentityKeyStore,
-  IpcPreKeyStore,
-  IpcSignedPreKeyStore,
-  EmberIpcError,
-} from '../../src/renderer/services/signal-service';
+
+// signal-service.ts is a non-module script; load via require after setting up window mocks
+const mockEmberLog = {
+  createLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  }),
+};
+(window as any).emberLog = mockEmberLog;
+
+require('../../src/renderer/services/signal-service');
+
+const SignalService = (window as any).SignalService as any;
+const IpcSessionStore = (window as any).IpcSessionStore as any;
+const IpcIdentityKeyStore = (window as any).IpcIdentityKeyStore as any;
+const IpcPreKeyStore = (window as any).IpcPreKeyStore as any;
+const IpcSignedPreKeyStore = (window as any).IpcSignedPreKeyStore as any;
+const EmberIpcError = (window as any).EmberIpcError as any;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

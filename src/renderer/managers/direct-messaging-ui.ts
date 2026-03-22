@@ -938,7 +938,11 @@
     const messageInput = dmChatContainer.querySelector('.message-input') as HTMLTextAreaElement;
     if (!messageInput) return;
 
-    let content = messageInput.value.trim();
+    const rawContent = messageInput.value.trim();
+    let content =
+      typeof (window as any).resolveMentions === 'function'
+        ? (window as any).resolveMentions(rawContent)
+        : rawContent;
     if (!content && !dmPendingAttachment) return;
 
     const sendAttachmentPreviewEl = dmChatContainer.querySelector(

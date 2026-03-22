@@ -8,7 +8,6 @@ export * from './history-key-types';
 export * from './hkdf';
 export * from './aes-gcm';
 export * from './dm-key-service';
-export * from './channel-key-service';
 export * from './replay-protection';
 export {
   initiateSession as initiateSignalSession,

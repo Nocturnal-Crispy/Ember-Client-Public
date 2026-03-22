@@ -95,6 +95,11 @@ export default [
               group: ['**/invite-ephemeral-key-service*'],
               message: 'invite-ephemeral-key-service.ts deleted — placeholder removed',
             },
+            {
+              group: ['**/attachment-encryption-service*'],
+              message:
+                'attachment-encryption-service.ts deleted — leaked plaintext key. Use message-service.ts WebCrypto path.',
+            },
           ],
         },
       ],

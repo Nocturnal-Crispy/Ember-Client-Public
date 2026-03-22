@@ -157,6 +157,20 @@
   color: var(--interactive-active);
 }
 
+/* Inline @mention styling */
+.message-mention {
+  color: var(--text-link);
+  background-color: rgba(var(--rgb-highlight), 15%);
+  border-radius: 3px;
+  padding: 0 2px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.message-mention:hover {
+  background-color: rgba(var(--rgb-highlight), 30%);
+  text-decoration: underline;
+}
+
 /* Message states */
 .message-mentioned {
   background-color: var(--background-mentioned);

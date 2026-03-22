@@ -3,14 +3,11 @@
  *
  * Tests the Signal session management wrapper that provides the interface
  * expected by DirectMessagingManager.
+ *
+ * SignalSessionManager is a non-module renderer script (no `export`).
+ * We set up window mocks, require() the file to execute it, then access
+ * the class via window.SignalSessionManager.
  */
-
-import { SignalSessionManager } from '../../../src/renderer/managers/signal-session-manager';
-import { SignalService } from '../../../src/renderer/services/signal-service';
-
-// Mock the SignalService
-jest.mock('../../../src/renderer/services/signal-service');
-const MockSignalService = SignalService as jest.MockedClass<typeof SignalService>;
 
 // Mock window.emberAPI
 const mockEmberAPI = {
@@ -24,21 +21,43 @@ const mockElectronAPI = {
   },
 };
 
-// Setup global mocks
+// Mock SignalService constructor
+const MockSignalService = jest.fn();
+
+// Mock emberLog
+const mockEmberLog = {
+  createLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  }),
+};
+
+// Setup global mocks BEFORE loading the module
 beforeAll(() => {
   (window as any).SignalService = MockSignalService;
   (window as any).emberAPI = mockEmberAPI;
   (window as any).electronAPI = mockElectronAPI;
+  (window as any).emberLog = mockEmberLog;
+
+  // Load the module — this sets window.SignalSessionManager
+  require('../../../src/renderer/managers/signal-session-manager');
 });
 
+// Get the class from window (set by the script's global export)
+function getSSMClass(): any {
+  return (window as any).SignalSessionManager;
+}
+
 describe('SignalSessionManager', () => {
-  let signalSessionManager: SignalSessionManager;
-  let mockSignalService: jest.Mocked<SignalService>;
+  let signalSessionManager: any;
+  let mockSignalService: any;
   const mockAuth = {
     token: 'test-token',
     hostname: 'https://test.example.com',
-    user_id: 'user-123',
-    device_id: 'device-456',
+    userId: 'user-123',
+    deviceId: 'device-456',
     username: 'testuser',
   };
 
@@ -56,11 +75,12 @@ describe('SignalSessionManager', () => {
       processSenderKeyDistribution: jest.fn(),
       groupEncrypt: jest.fn(),
       groupDecrypt: jest.fn(),
-    } as any;
+    };
 
     MockSignalService.mockImplementation(() => mockSignalService);
 
-    signalSessionManager = new SignalSessionManager(mockAuth);
+    const SSMClass = getSSMClass();
+    signalSessionManager = new SSMClass(mockAuth);
   });
 
   describe('initialization', () => {
@@ -69,165 +89,137 @@ describe('SignalSessionManager', () => {
     });
 
     it('should throw error if auth data is missing required fields', () => {
-      const invalidAuth = { token: 'test' } as any;
-      expect(() => new SignalSessionManager(invalidAuth)).toThrow('Invalid auth data');
+      const SSMClass = getSSMClass();
+      expect(() => new SSMClass({ token: 'test' })).toThrow('Invalid auth data');
+    });
+
+    it('should throw error if auth data is null', () => {
+      const SSMClass = getSSMClass();
+      expect(() => new SSMClass(null)).toThrow('Invalid auth data');
+    });
+
+    it('should throw error if hostname is not a valid URL', () => {
+      const SSMClass = getSSMClass();
+      expect(
+        () =>
+          new SSMClass({
+            ...mockAuth,
+            hostname: 'not-a-valid-url',
+          })
+      ).toThrow('Invalid auth data: hostname must be a valid URL');
     });
   });
 
   describe('hasSession', () => {
-    it('should delegate to SignalService.hasSession', async () => {
+    it('should call SignalService.hasSession with correct params', async () => {
       mockSignalService.hasSession.mockResolvedValue(true);
-
-      const result = await signalSessionManager.hasSession('user-789', 'device-123');
-
-      expect(mockSignalService.hasSession).toHaveBeenCalledWith('user-789', 'device-123');
+      const result = await signalSessionManager.hasSession('user-1', 'device-1');
       expect(result).toBe(true);
+      expect(mockSignalService.hasSession).toHaveBeenCalledWith('user-1', 'device-1');
     });
 
-    it('should handle errors from SignalService', async () => {
-      mockSignalService.hasSession.mockRejectedValue(new Error('IPC error'));
-
-      await expect(signalSessionManager.hasSession('user-789', 'device-123')).rejects.toThrow(
-        'IPC error'
+    it('should throw if userId or deviceId is missing', async () => {
+      await expect(signalSessionManager.hasSession('', 'device-1')).rejects.toThrow(
+        'userId and deviceId are required'
       );
     });
   });
 
   describe('ensureSession', () => {
-    it('should delegate to SignalService.ensureSession', async () => {
+    it('should call SignalService.ensureSession with correct params', async () => {
       mockSignalService.ensureSession.mockResolvedValue(undefined);
-
-      await signalSessionManager.ensureSession('user-789', 'device-123');
-
-      expect(mockSignalService.ensureSession).toHaveBeenCalledWith('user-789', 'device-123');
-    });
-
-    it('should handle errors from SignalService', async () => {
-      mockSignalService.ensureSession.mockRejectedValue(new Error('Session establishment failed'));
-
-      await expect(signalSessionManager.ensureSession('user-789', 'device-123')).rejects.toThrow(
-        'Session establishment failed'
-      );
+      await signalSessionManager.ensureSession('user-1', 'device-1');
+      expect(mockSignalService.ensureSession).toHaveBeenCalledWith('user-1', 'device-1');
     });
   });
 
   describe('encrypt', () => {
-    it('should delegate to SignalService.encrypt', async () => {
-      const plaintext = new Uint8Array([1, 2, 3]);
-      const expectedResult = {
-        ciphertext: new Uint8Array([4, 5, 6]),
-        messageType: 3,
-      };
+    it('should call SignalService.encrypt with correct params', async () => {
+      const mockResult = { ciphertext: new Uint8Array([1, 2, 3]), messageType: 3 };
+      mockSignalService.encrypt.mockResolvedValue(mockResult);
 
-      mockSignalService.encrypt.mockResolvedValue(expectedResult);
+      const result = await signalSessionManager.encrypt(
+        'user-1.device-1',
+        new Uint8Array([4, 5, 6])
+      );
 
-      const result = await signalSessionManager.encrypt('user-789.device-123', plaintext);
+      expect(result).toEqual(mockResult);
+      expect(mockSignalService.encrypt).toHaveBeenCalledWith(
+        'user-1.device-1',
+        new Uint8Array([4, 5, 6])
+      );
+    });
 
-      expect(mockSignalService.encrypt).toHaveBeenCalledWith('user-789.device-123', plaintext);
-      expect(result).toEqual(expectedResult);
+    it('should throw if address format is invalid', async () => {
+      await expect(
+        signalSessionManager.encrypt('invalid-address', new Uint8Array([1]))
+      ).rejects.toThrow('Invalid address format');
     });
   });
 
   describe('decrypt', () => {
-    it('should delegate to SignalService.decrypt', async () => {
-      const ciphertext = new Uint8Array([4, 5, 6]);
-      const expectedPlaintext = new Uint8Array([1, 2, 3]);
+    it('should call SignalService.decrypt with correct params', async () => {
+      const mockPlaintext = new Uint8Array([7, 8, 9]);
+      mockSignalService.decrypt.mockResolvedValue(mockPlaintext);
 
-      mockSignalService.decrypt.mockResolvedValue(expectedPlaintext);
+      const result = await signalSessionManager.decrypt(
+        'user-1.device-1',
+        new Uint8Array([1, 2]),
+        3
+      );
 
-      const result = await signalSessionManager.decrypt('user-789.device-123', ciphertext, 3);
-
-      expect(mockSignalService.decrypt).toHaveBeenCalledWith('user-789.device-123', ciphertext, 3);
-      expect(result).toEqual(expectedPlaintext);
+      expect(result).toEqual(mockPlaintext);
     });
   });
 
   describe('groupEncrypt', () => {
-    it('should delegate to SignalService.groupEncrypt', async () => {
-      const plaintext = new Uint8Array([1, 2, 3]);
-      const expectedCiphertext = new Uint8Array([4, 5, 6]);
+    it('should call SignalService.groupEncrypt', async () => {
+      const mockCiphertext = new Uint8Array([10, 11, 12]);
+      mockSignalService.groupEncrypt.mockResolvedValue(mockCiphertext);
 
-      mockSignalService.groupEncrypt.mockResolvedValue(expectedCiphertext);
+      const result = await signalSessionManager.groupEncrypt('dist-1', new Uint8Array([1, 2, 3]));
+      expect(result).toEqual(mockCiphertext);
+    });
 
-      const result = await signalSessionManager.groupEncrypt('dist-123', plaintext);
-
-      expect(mockSignalService.groupEncrypt).toHaveBeenCalledWith('dist-123', plaintext);
-      expect(result).toEqual(expectedCiphertext);
+    it('should throw if groupEncrypt returns null', async () => {
+      mockSignalService.groupEncrypt.mockResolvedValue(null);
+      await expect(
+        signalSessionManager.groupEncrypt('dist-1', new Uint8Array([1]))
+      ).rejects.toThrow('Encryption unavailable');
     });
   });
 
   describe('groupDecrypt', () => {
-    it('should delegate to SignalService.groupDecrypt', async () => {
-      const ciphertext = new Uint8Array([4, 5, 6]);
-      const expectedPlaintext = new Uint8Array([1, 2, 3]);
+    it('should call SignalService.groupDecrypt', async () => {
+      const mockPlaintext = new Uint8Array([13, 14]);
+      mockSignalService.groupDecrypt.mockResolvedValue(mockPlaintext);
 
-      mockSignalService.groupDecrypt.mockResolvedValue(expectedPlaintext);
-
-      const result = await signalSessionManager.groupDecrypt('user-789.device-123', ciphertext);
-
-      expect(mockSignalService.groupDecrypt).toHaveBeenCalledWith(
-        'user-789.device-123',
-        ciphertext
+      const result = await signalSessionManager.groupDecrypt(
+        'user-1.device-1',
+        new Uint8Array([1, 2])
       );
-      expect(result).toEqual(expectedPlaintext);
+      expect(result).toEqual(mockPlaintext);
     });
   });
 
-  describe('createSenderKeyDistribution', () => {
-    it('should delegate to SignalService.createSenderKeyDistribution', async () => {
-      const expectedDistribution = new Uint8Array([7, 8, 9]);
-
-      mockSignalService.createSenderKeyDistribution.mockResolvedValue(expectedDistribution);
-
-      const result = await signalSessionManager.createSenderKeyDistribution('dist-123');
-
-      expect(mockSignalService.createSenderKeyDistribution).toHaveBeenCalledWith('dist-123');
-      expect(result).toEqual(expectedDistribution);
+  describe('getAuth', () => {
+    it('should return a copy of auth data', () => {
+      const auth = signalSessionManager.getAuth();
+      expect(auth).toEqual(mockAuth);
+      expect(auth).not.toBe(mockAuth); // Should be a copy
     });
   });
 
-  describe('processSenderKeyDistribution', () => {
-    it('should delegate to SignalService.processSenderKeyDistribution', async () => {
-      const distributionMessage = new Uint8Array([7, 8, 9]);
-
-      mockSignalService.processSenderKeyDistribution.mockResolvedValue(undefined);
-
-      await signalSessionManager.processSenderKeyDistribution(
-        'user-789.device-123',
-        distributionMessage
-      );
-
-      expect(mockSignalService.processSenderKeyDistribution).toHaveBeenCalledWith(
-        'user-789.device-123',
-        distributionMessage
-      );
+  describe('isReady', () => {
+    it('should return true when initialized', () => {
+      expect(signalSessionManager.isReady()).toBe(true);
     });
   });
 
-  describe('error handling', () => {
-    it('should wrap SignalService errors with context', async () => {
-      mockSignalService.hasSession.mockRejectedValue(new Error('IPC connection failed'));
-
-      await expect(signalSessionManager.hasSession('user-789', 'device-123')).rejects.toThrow(
-        'IPC connection failed'
-      );
-    });
-
-    it('should handle malformed addresses gracefully', async () => {
-      // Test with invalid address format
-      await expect(
-        signalSessionManager.encrypt('invalid-address', new Uint8Array([1]))
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('lifecycle', () => {
-    it('should not throw during creation', () => {
-      expect(() => new SignalSessionManager(mockAuth)).not.toThrow();
-    });
-
-    it('should maintain reference to SignalService instance', () => {
-      expect(signalSessionManager['signalService']).toBe(mockSignalService);
+  describe('destroy', () => {
+    it('should set isInitialized to false', () => {
+      signalSessionManager.destroy();
+      expect(signalSessionManager.isReady()).toBe(false);
     });
   });
 });

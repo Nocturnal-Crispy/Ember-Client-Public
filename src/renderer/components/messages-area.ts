@@ -257,7 +257,8 @@
     | { type: 'italic'; children: InlineToken[] }
     | { type: 'strike'; children: InlineToken[] }
     | { type: 'code'; value: string }
-    | { type: 'spoiler'; children: InlineToken[] };
+    | { type: 'spoiler'; children: InlineToken[] }
+    | { type: 'mention'; userId: string };
 
   type Block =
     | { type: 'paragraph'; text: string }
@@ -362,6 +363,17 @@
         continue;
       }
 
+      // Mention: <@userId> — userId is a UUID (36 chars)
+      if (text[i] === '<' && text[i + 1] === '@') {
+        const closingBracket = text.indexOf('>', i + 2);
+        if (closingBracket !== -1 && closingBracket - (i + 2) <= 36) {
+          const userId = text.slice(i + 2, closingBracket);
+          tokens.push({ type: 'mention', userId });
+          i = closingBracket + 1;
+          continue;
+        }
+      }
+
       // Plain text — accumulate until next special character
       const start = i;
       while (i < text.length) {
@@ -369,6 +381,7 @@
         if (text[i] === '*') break;
         if (text[i] === '~' && text[i + 1] === '~') break;
         if (text[i] === '|' && text[i + 1] === '|') break;
+        if (text[i] === '<' && text[i + 1] === '@') break;
         if (text.startsWith('https://', i) || text.startsWith('http://', i)) break;
         i++;
       }
@@ -430,6 +443,16 @@
           span.classList.add('spoiler-text--revealed');
         });
         renderInlineTokens(token.children, span);
+        container.appendChild(span);
+      } else if (token.type === 'mention') {
+        const span = document.createElement('span');
+        span.className = 'message-mention';
+        span.dataset['userId'] = token.userId;
+        const member = App.currentMembers?.find(
+          (m: { userId: string }) => m.userId === token.userId
+        );
+        span.textContent = `@${member?.username ?? token.userId.slice(0, 8)}`;
+        (window as any).makeUsernameClickable?.(span, token.userId, span.textContent.slice(1));
         container.appendChild(span);
       }
     }
@@ -1030,6 +1053,15 @@
     return messageDiv;
   }
 
+  // ─── Mention resolution ────────────────────────────────────────────────────
+
+  function resolveMentions(text: string): string {
+    return text.replace(/@(\w{3,20})/g, (match, username) => {
+      const member = App.currentMembers?.find((m: { username: string }) => m.username === username);
+      return member ? `<@${member.userId}>` : match;
+    });
+  }
+
   // ─── Expose globals ────────────────────────────────────────────────────────
 
   window.createBasicMessageElement = createBasicMessageElement;
@@ -1037,4 +1069,5 @@
   window.formatTimestamp = formatTimestamp;
   window.formatRelativeTimestamp = formatRelativeTimestamp;
   window.toChumhandle = toChumhandle;
+  (window as any).resolveMentions = resolveMentions;
 })();

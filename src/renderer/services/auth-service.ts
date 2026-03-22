@@ -482,21 +482,7 @@
         const recoveryCode = emberCrypto.generateRecoveryCode();
         log.debug('Recovery code generated for new account');
 
-        // Validate device identity private key before decoding
-        if (!deviceIdentity.privateKey) {
-          throw new Error('Device identity private key is missing. Please try registering again.');
-        }
-
-        const privateKeyBytes = decodeBase64ToBytes(deviceIdentity.privateKey);
-        const recoveryData: RecoveryData = await emberCrypto.encryptPrivateKeyWithRecoveryCode(
-          privateKeyBytes,
-          recoveryCode
-        );
-        log.debug('Private key encrypted with recovery code');
-
-        // CRITICAL FIX: Use registerWithSignalKeys to upload pre-keys during registration
-        // This prevents HTTP 404 errors when establishing self-sessions later
-        log.debug('Generating Signal identity for registration');
+        // Generate a single Signal identity for everything
         const signalIdentity =
           (await window.electronAPI.authService.generateDeviceIdentity()) as any;
 
@@ -509,11 +495,28 @@
           throw new Error('Failed to generate Signal identity for registration');
         }
 
-        log.debug('Registering with Signal keys', {
+        // Derive deviceIdentity from signalIdentity (single source of truth)
+        function b64(bytes: Uint8Array): string {
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          return btoa(binary);
+        }
+        const publicKeyB64 = b64(new Uint8Array(signalIdentity.identityKeyPair.publicKey));
+        const privateKeyB64 = b64(new Uint8Array(signalIdentity.identityKeyPair.privateKey));
+        deviceIdentity = {
           deviceId: signalIdentity.deviceId,
-          hasIdentityKey: !!signalIdentity.identityKeyPair,
-          hasSignedPreKey: !!signalIdentity.signedPreKey,
-          oneTimePreKeysCount: signalIdentity.oneTimePreKeys?.length || 0,
+          publicKey: publicKeyB64,
+          privateKey: privateKeyB64,
+        };
+        await ipcRenderer.invoke('save-device-identity', deviceIdentity);
+
+        const privateKeyBytes = decodeBase64ToBytes(privateKeyB64);
+        const recoveryData: RecoveryData = await emberCrypto.encryptPrivateKeyWithRecoveryCode(
+          privateKeyBytes,
+          recoveryCode
+        );
+        log.debug('Recovery code generated, registering with Signal keys', {
+          deviceId: signalIdentity.deviceId,
         });
 
         authData = await window.electronAPI.authService.registerWithSignalKeys(
@@ -521,7 +524,7 @@
           username,
           password,
           signalIdentity,
-          deviceIdentity.publicKey,
+          publicKeyB64,
           recoveryData.encrypted,
           recoveryData.salt
         );
@@ -530,6 +533,43 @@
           user_id: authData.userId,
           username: authData.username,
         });
+
+        // Upload signed prekey + one-time prekeys to server
+        try {
+          const spk = signalIdentity.signedPreKey;
+          await fetch(`${hostname}/api/v1/prekeys/signed`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authData.token}`,
+            },
+            body: JSON.stringify({
+              id: spk.id,
+              publicKey: btoa(String.fromCharCode(...new Uint8Array(spk.keyPair.publicKey))),
+              signature: btoa(String.fromCharCode(...new Uint8Array(spk.signature))),
+              timestamp: spk.timestamp,
+            }),
+          });
+          log.info('Signed prekey uploaded');
+
+          const otpks = signalIdentity.oneTimePreKeys.map((pk: any) => ({
+            id: pk.id,
+            publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
+          }));
+          await fetch(`${hostname}/api/v1/prekeys/one-time`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authData.token}`,
+            },
+            body: JSON.stringify(otpks),
+          });
+          log.info('One-time prekeys uploaded', { count: otpks.length });
+        } catch (prekeyErr) {
+          log.warn('Prekey upload failed during registration', {
+            error: (prekeyErr as Error).message,
+          });
+        }
 
         // Store Signal registration ID for main process Signal database
         await window.emberAPI.invoke('SetSafeStorage', {
