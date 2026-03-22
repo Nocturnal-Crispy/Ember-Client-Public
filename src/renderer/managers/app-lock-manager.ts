@@ -14,7 +14,7 @@
  *   updateAppLockSettings(settings)  — update settings and reset timers
  */
 (function (): void {
-  const log = window.emberLog.createLogger("AppLockManager");
+  const log = window.emberLog.createLogger('AppLockManager');
 
   const MAX_FAILED_ATTEMPTS = 5;
   const LOCKOUT_DURATION_MS = 30_000;
@@ -32,11 +32,11 @@
 
   // ─── DOM refs ────────────────────────────────────────────────────────────────
 
-  const overlay = document.getElementById("app-lock-overlay");
-  const pinInput = document.getElementById("app-lock-pin-input") as HTMLInputElement | null;
-  const errorEl = document.getElementById("app-lock-error");
-  const lockoutEl = document.getElementById("app-lock-lockout");
-  const submitBtn = document.getElementById("app-lock-submit-btn");
+  const overlay = document.getElementById('app-lock-overlay');
+  const pinInput = document.getElementById('app-lock-pin-input') as HTMLInputElement | null;
+  const errorEl = document.getElementById('app-lock-error');
+  const lockoutEl = document.getElementById('app-lock-lockout');
+  const submitBtn = document.getElementById('app-lock-submit-btn');
 
   // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -49,20 +49,20 @@
 
   function showOverlay(): void {
     if (!overlay) return;
-    overlay.classList.remove("hidden");
+    overlay.classList.remove('hidden');
     if (pinInput) {
-      pinInput.value = "";
+      pinInput.value = '';
       pinInput.focus();
     }
-    if (errorEl) errorEl.classList.add("hidden");
-    if (lockoutEl) lockoutEl.classList.add("hidden");
+    if (errorEl) errorEl.classList.add('hidden');
+    if (lockoutEl) lockoutEl.classList.add('hidden');
   }
 
   function hideOverlay(): void {
     if (!overlay) return;
-    overlay.classList.add("hidden");
-    if (errorEl) errorEl.classList.add("hidden");
-    if (lockoutEl) lockoutEl.classList.add("hidden");
+    overlay.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
+    if (lockoutEl) lockoutEl.classList.add('hidden');
   }
 
   async function lockApp(): Promise<void> {
@@ -71,15 +71,17 @@
 
     // Check if PIN is set before allowing lock
     try {
-      const hasPin = (await window.electronAPI.ipc.invoke("has-pin")) as boolean;
+      const hasPin = (await window.electronAPI.ipc.invoke('has-pin')) as boolean;
       if (!hasPin) {
         // Show bold red alert for missing PIN
-        alert("🚨 SECURITY ALERT: No PIN set!\n\nApp Lock cannot be enabled without setting a PIN first.\n\nPlease set a PIN in Settings > Plugins > App Lock before enabling this feature.");
-        log.warn("App lock blocked - no PIN set");
+        alert(
+          '🚨 SECURITY ALERT: No PIN set!\n\nApp Lock cannot be enabled without setting a PIN first.\n\nPlease set a PIN in Settings > Plugins > App Lock before enabling this feature.'
+        );
+        log.warn('App lock blocked - no PIN set');
         return;
       }
     } catch (err) {
-      log.error("Failed to check PIN status", { error: String(err) });
+      log.error('Failed to check PIN status', { error: String(err) });
       // Don't proceed if we can't verify PIN status
       return;
     }
@@ -89,7 +91,7 @@
     lockedOutUntil = null;
     lastActivityTime = Date.now();
     showOverlay();
-    log.info("Application locked");
+    log.info('Application locked');
   }
 
   async function unlockApp(pin: string): Promise<boolean> {
@@ -98,20 +100,20 @@
     // Check lockout
     if (lockedOutUntil !== null) {
       if (Date.now() < lockedOutUntil) {
-        log.warn("Unlock attempt blocked — lockout active");
+        log.warn('Unlock attempt blocked — lockout active');
         return false;
       }
       // Lockout expired
       lockedOutUntil = null;
       failedAttempts = 0;
-      if (lockoutEl) lockoutEl.classList.add("hidden");
+      if (lockoutEl) lockoutEl.classList.add('hidden');
     }
 
     let verified = false;
     try {
-      verified = (await window.electronAPI.ipc.invoke("verify-pin", pin)) as boolean;
+      verified = (await window.electronAPI.ipc.invoke('verify-pin', pin)) as boolean;
     } catch (err) {
-      log.error("PIN verification failed", { error: String(err) });
+      log.error('PIN verification failed', { error: String(err) });
       return false;
     }
 
@@ -121,20 +123,20 @@
       lockedOutUntil = null;
       lastActivityTime = Date.now();
       hideOverlay();
-      log.info("Application unlocked");
+      log.info('Application unlocked');
       return true;
     }
 
     failedAttempts++;
-    log.warn("Incorrect PIN entered", { attempt: String(failedAttempts) });
+    log.warn('Incorrect PIN entered', { attempt: String(failedAttempts) });
 
-    if (errorEl) errorEl.classList.remove("hidden");
+    if (errorEl) errorEl.classList.remove('hidden');
 
     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
       lockedOutUntil = Date.now() + LOCKOUT_DURATION_MS;
-      if (lockoutEl) lockoutEl.classList.remove("hidden");
-      if (errorEl) errorEl.classList.add("hidden");
-      log.warn("Too many failed attempts — lockout started");
+      if (lockoutEl) lockoutEl.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+      log.warn('Too many failed attempts — lockout started');
     }
 
     return false;
@@ -150,7 +152,7 @@
     lastActivityTime = Date.now();
   }
 
-  const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "mousedown"] as const;
+  const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'mousedown'] as const;
 
   function attachActivityListeners(): void {
     for (const evt of ACTIVITY_EVENTS) {
@@ -174,7 +176,7 @@
     idleIntervalId = setInterval(async () => {
       if (locked) return;
       if (Date.now() - lastActivityTime >= timeoutMs) {
-        log.info("Idle timeout reached — locking application");
+        log.info('Idle timeout reached — locking application');
         await lockApp();
       }
     }, IDLE_CHECK_INTERVAL_MS);
@@ -208,11 +210,11 @@
 
   function setupSubmitHandler(): void {
     if (!submitBtn || !pinInput) return;
-    submitBtn.addEventListener("click", async () => {
+    submitBtn.addEventListener('click', async () => {
       await unlockApp(pinInput.value);
     });
-    pinInput.addEventListener("keydown", async (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
+    pinInput.addEventListener('keydown', async (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
         await unlockApp(pinInput.value);
       }
     });
@@ -222,7 +224,7 @@
 
   function updateAppLockSettings(settings: Partial<AppLockSettings>): void {
     currentSettings = { ...currentSettings, ...settings };
-    log.info("App lock settings updated", {
+    log.info('App lock settings updated', {
       enabled: String(currentSettings.enabled),
       idleTimeoutMinutes: String(currentSettings.idleTimeoutMinutes),
     });
@@ -245,10 +247,10 @@
     attachActivityListeners();
     startIdleTimer();
     // Use IPC events from main process for reliable OS-level focus detection
-    window.electronAPI.ipc.on("window-blur", handleBlur);
-    window.electronAPI.ipc.on("window-focus", handleFocus);
+    window.electronAPI.ipc.on('window-blur', handleBlur);
+    window.electronAPI.ipc.on('window-focus', handleFocus);
     setupSubmitHandler();
-    log.info("AppLockManager initialized", {
+    log.info('AppLockManager initialized', {
       enabled: String(currentSettings.enabled),
       idleTimeoutMinutes: String(currentSettings.idleTimeoutMinutes),
     });

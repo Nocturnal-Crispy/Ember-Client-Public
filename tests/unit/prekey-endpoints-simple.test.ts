@@ -11,7 +11,7 @@ describe('Prekey endpoint path corrections', () => {
     global.fetch = mockFetch;
 
     const { uploadSignedPreKey } = require('ember-shared');
-    
+
     const mockAuth = {
       token: 'test-token',
       hostname: 'https://test.example.com',
@@ -40,7 +40,7 @@ describe('Prekey endpoint path corrections', () => {
     global.fetch = mockFetch;
 
     const { uploadOneTimePreKeys } = require('ember-shared');
-    
+
     const mockAuth = {
       token: 'test-token',
       hostname: 'https://test.example.com',
@@ -69,7 +69,7 @@ describe('Prekey endpoint path corrections', () => {
     global.fetch = mockFetch;
 
     const { getOneTimePreKeyCount } = require('ember-shared');
-    
+
     const mockAuth = {
       token: 'test-token',
       hostname: 'https://test.example.com',
@@ -100,7 +100,7 @@ describe('Prekey endpoint path corrections', () => {
     global.fetch = mockFetch;
 
     const { fetchPreKeyBundle } = require('ember-shared');
-    
+
     const mockAuth = {
       token: 'test-token',
       hostname: 'https://test.example.com',

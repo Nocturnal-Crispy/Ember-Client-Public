@@ -12,13 +12,13 @@
   // ─── Format definitions ────────────────────────────────────────────────────
 
   interface WrapFormat {
-    kind: "wrap";
+    kind: 'wrap';
     open: string;
     close: string;
   }
 
   interface LineFormat {
-    kind: "line";
+    kind: 'line';
     prefix: string;
   }
 
@@ -30,56 +30,56 @@
 
   const FORMATS: FormatDef[] = [
     {
-      label: "B",
-      title: "Bold",
-      format: { kind: "wrap", open: "**", close: "**" },
+      label: 'B',
+      title: 'Bold',
+      format: { kind: 'wrap', open: '**', close: '**' },
     },
     {
-      label: "I",
-      title: "Italic",
-      format: { kind: "wrap", open: "*", close: "*" },
+      label: 'I',
+      title: 'Italic',
+      format: { kind: 'wrap', open: '*', close: '*' },
     },
     {
-      label: "S",
-      title: "Strikethrough",
-      format: { kind: "wrap", open: "~~", close: "~~" },
+      label: 'S',
+      title: 'Strikethrough',
+      format: { kind: 'wrap', open: '~~', close: '~~' },
     },
     {
       label: '"',
-      title: "Blockquote",
-      format: { kind: "line", prefix: "> " },
+      title: 'Blockquote',
+      format: { kind: 'line', prefix: '> ' },
     },
     {
-      label: "<>",
-      title: "Code",
-      format: { kind: "wrap", open: "`", close: "`" },
+      label: '<>',
+      title: 'Code',
+      format: { kind: 'wrap', open: '`', close: '`' },
     },
     {
-      label: "||",
-      title: "Spoiler",
-      format: { kind: "wrap", open: "||", close: "||" },
+      label: '||',
+      title: 'Spoiler',
+      format: { kind: 'wrap', open: '||', close: '||' },
     },
   ];
 
   // ─── Build toolbar DOM ─────────────────────────────────────────────────────
 
-  const toolbar = document.createElement("div");
-  toolbar.id = "format-toolbar";
-  toolbar.className = "format-toolbar format-toolbar--hidden";
+  const toolbar = document.createElement('div');
+  toolbar.id = 'format-toolbar';
+  toolbar.className = 'format-toolbar format-toolbar--hidden';
   document.body.appendChild(toolbar);
 
-  FORMATS.forEach((def) => {
-    const btn = document.createElement("button");
-    btn.className = "format-toolbar-btn";
+  FORMATS.forEach(def => {
+    const btn = document.createElement('button');
+    btn.className = 'format-toolbar-btn';
     btn.title = def.title;
-    btn.setAttribute("data-format", def.title.toLowerCase());
+    btn.setAttribute('data-format', def.title.toLowerCase());
     btn.textContent = def.label;
 
-    if (def.title === "Bold") btn.style.fontWeight = "bold";
-    if (def.title === "Italic") btn.style.fontStyle = "italic";
+    if (def.title === 'Bold') btn.style.fontWeight = 'bold';
+    if (def.title === 'Italic') btn.style.fontStyle = 'italic';
 
     // mousedown (not click) prevents the textarea from losing focus/selection
-    btn.addEventListener("mousedown", (e) => {
+    btn.addEventListener('mousedown', e => {
       e.preventDefault();
       if (activeInput) applyFormat(activeInput, def.format);
       hideToolbar();
@@ -95,13 +95,13 @@
   // ─── Show / hide ───────────────────────────────────────────────────────────
 
   function hideToolbar(): void {
-    toolbar.classList.add("format-toolbar--hidden");
+    toolbar.classList.add('format-toolbar--hidden');
     activeInput = null;
   }
 
   function showToolbar(input: HTMLTextAreaElement, clientX: number, clientY: number): void {
     activeInput = input;
-    toolbar.classList.remove("format-toolbar--hidden");
+    toolbar.classList.remove('format-toolbar--hidden');
 
     // Measure after removing hidden so offsetWidth is accurate
     const tw = toolbar.offsetWidth || 230;
@@ -120,7 +120,7 @@
 
   function showToolbarAboveTextarea(input: HTMLTextAreaElement): void {
     activeInput = input;
-    toolbar.classList.remove("format-toolbar--hidden");
+    toolbar.classList.remove('format-toolbar--hidden');
 
     const rect = input.getBoundingClientRect();
     const tw = toolbar.offsetWidth || 230;
@@ -145,12 +145,12 @@
     const selected = value.slice(start, end);
     let replacement: string;
 
-    if (fmt.kind === "line") {
+    if (fmt.kind === 'line') {
       // Prefix every line in the selection
       replacement = selected
-        .split("\n")
-        .map((line) => fmt.prefix + line)
-        .join("\n");
+        .split('\n')
+        .map(line => fmt.prefix + line)
+        .join('\n');
     } else {
       const { open, close } = fmt;
       // Toggle: unwrap if already wrapped, otherwise wrap
@@ -171,20 +171,17 @@
     input.focus();
 
     // Notify auto-resize listener
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   // ─── Event wiring ──────────────────────────────────────────────────────────
 
   function isMessageInput(el: EventTarget | null): el is HTMLTextAreaElement {
-    return (
-      el instanceof HTMLTextAreaElement &&
-      el.classList.contains("message-input")
-    );
+    return el instanceof HTMLTextAreaElement && el.classList.contains('message-input');
   }
 
   // Mouse selection — show at cursor position
-  document.addEventListener("mouseup", (e) => {
+  document.addEventListener('mouseup', e => {
     if (toolbar.contains(e.target as Node)) return;
 
     if (!isMessageInput(e.target)) {
@@ -202,7 +199,7 @@
   });
 
   // Keyboard selection — show above the textarea
-  document.addEventListener("keyup", (e) => {
+  document.addEventListener('keyup', e => {
     if (!isMessageInput(e.target)) return;
 
     const input = e.target;
@@ -214,15 +211,17 @@
   });
 
   // Hide when clicking outside the toolbar
-  document.addEventListener("mousedown", (e) => {
-    if (!toolbar.classList.contains("format-toolbar--hidden") &&
-        !toolbar.contains(e.target as Node)) {
+  document.addEventListener('mousedown', e => {
+    if (
+      !toolbar.classList.contains('format-toolbar--hidden') &&
+      !toolbar.contains(e.target as Node)
+    ) {
       hideToolbar();
     }
   });
 
   // Hide on Escape
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") hideToolbar();
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideToolbar();
   });
 })();

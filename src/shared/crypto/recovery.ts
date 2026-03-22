@@ -15,7 +15,9 @@ const KEY_BYTES = 32;
 
 export function generateRecoveryCode(length = 16): string {
   const digits = nodeCrypto.randomBytes(length);
-  const code = Array.from(digits).map(b => b % 10).join('');
+  const code = Array.from(digits)
+    .map(b => b % 10)
+    .join('');
   return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}-${code.slice(12, 16)}`;
 }
 
@@ -26,7 +28,7 @@ function deriveKey(recoveryCode: string, salt: Uint8Array): Buffer {
 
 export async function encryptPrivateKeyWithRecoveryCode(
   privateKey: Uint8Array,
-  recoveryCode: string,
+  recoveryCode: string
 ): Promise<{ encrypted: string; salt: string }> {
   const salt = nodeCrypto.randomBytes(SALT_BYTES);
   const key = deriveKey(recoveryCode, salt);
@@ -48,7 +50,7 @@ export async function encryptPrivateKeyWithRecoveryCode(
 export async function decryptPrivateKeyWithRecoveryCode(
   encryptedBase64: string,
   recoveryCode: string,
-  saltBase64: string,
+  saltBase64: string
 ): Promise<Uint8Array | null> {
   try {
     const combined = Buffer.from(encryptedBase64, 'base64');

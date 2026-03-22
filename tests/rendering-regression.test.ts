@@ -35,35 +35,35 @@ describe('Ember Client Rendering Regression Tests', () => {
 
     it('should have all required JavaScript files after build', () => {
       const requiredScripts = [
-        "utils/logger.js",
-        "managers/theme-manager.js",
-        "utils/auth-loader.js",
-        "managers/app-state.js",
-        "services/voice-service.js",
-        "services/websocket-service.js",
-        "services/user-service.js",
-        "components/user-details-modal.js",
-        "utils/username-click-handler.js",
-        "components/messages-area.js",
-        "components/format-toolbar.js",
-        "services/message-service.js",
-        "managers/channel-manager.js",
-        "managers/ember-manager.js",
-        "managers/invite-manager.js",
-        "components/screen-share-modal.js",
-        "managers/voice-ui-manager.js",
-        "managers/notification-settings.js",
-        "managers/plugin-settings.js",
-        "managers/app-lock-manager.js",
-        "managers/update-notifier.js",
-        "components/update-modal.js",
-        "managers/version-display.js",
-        "managers/direct-messaging-manager.js",
-        "managers/direct-messaging-ui.js",
-        "managers/read-all-manager.js",
-        "managers/emoji-picker.js",
-        "managers/gif-picker.js",
-        "managers/renderer.js",
+        'utils/logger.js',
+        'managers/theme-manager.js',
+        'utils/auth-loader.js',
+        'managers/app-state.js',
+        'services/voice-service.js',
+        'services/websocket-service.js',
+        'services/user-service.js',
+        'components/user-details-modal.js',
+        'utils/username-click-handler.js',
+        'components/messages-area.js',
+        'components/format-toolbar.js',
+        'services/message-service.js',
+        'managers/channel-manager.js',
+        'managers/ember-manager.js',
+        'managers/invite-manager.js',
+        'components/screen-share-modal.js',
+        'managers/voice-ui-manager.js',
+        'managers/notification-settings.js',
+        'managers/plugin-settings.js',
+        'managers/app-lock-manager.js',
+        'managers/update-notifier.js',
+        'components/update-modal.js',
+        'managers/version-display.js',
+        'managers/direct-messaging-manager.js',
+        'managers/direct-messaging-ui.js',
+        'managers/read-all-manager.js',
+        'managers/emoji-picker.js',
+        'managers/gif-picker.js',
+        'managers/renderer.js',
       ];
 
       const missingFiles: string[] = [];
@@ -80,37 +80,37 @@ describe('Ember Client Rendering Regression Tests', () => {
 
     it('should have all required HTML fragments after build', () => {
       const requiredFragments = [
-        "title-bar.html",
-        "server-list.html",
-        "channel-list.html",
-        "dm-screen.html",
-        "welcome-screen.html",
-        "chat-container.html",
-        "member-list.html",
-        "modal-logout.html",
-        "modal-add-server.html",
-        "modal-join-server.html",
-        "modal-create-server.html",
-        "modal-edit-ember.html",
-        "modal-create-invite.html",
-        "modal-accept-invite.html",
-        "context-menu-channel.html",
-        "context-menu-ember.html",
-        "modal-channel-name.html",
-        "modal-delete-confirm.html",
-        "modal-settings.html",
-        "overlay-reconnection.html",
-        "version-display.html",
-        "modal-attachment.html",
-        "modal-image-viewer.html",
-        "emoji-picker.html",
-        "gif-picker.html",
-        "modal-external-link.html",
-        "modal-custom-status.html",
-        "modal-user-details.html",
-        "modal-update.html",
-        "modal-app-lock.html",
-        "modal-screen-share.html",
+        'title-bar.html',
+        'server-list.html',
+        'channel-list.html',
+        'dm-screen.html',
+        'welcome-screen.html',
+        'chat-container.html',
+        'member-list.html',
+        'modal-logout.html',
+        'modal-add-server.html',
+        'modal-join-server.html',
+        'modal-create-server.html',
+        'modal-edit-ember.html',
+        'modal-create-invite.html',
+        'modal-accept-invite.html',
+        'context-menu-channel.html',
+        'context-menu-ember.html',
+        'modal-channel-name.html',
+        'modal-delete-confirm.html',
+        'modal-settings.html',
+        'overlay-reconnection.html',
+        'version-display.html',
+        'modal-attachment.html',
+        'modal-image-viewer.html',
+        'emoji-picker.html',
+        'gif-picker.html',
+        'modal-external-link.html',
+        'modal-custom-status.html',
+        'modal-user-details.html',
+        'modal-update.html',
+        'modal-app-lock.html',
+        'modal-screen-share.html',
       ];
 
       const missingFragments: string[] = [];
@@ -130,7 +130,7 @@ describe('Ember Client Rendering Regression Tests', () => {
       expect(existsSync(mainLoaderPath)).toBe(true);
 
       const content = readFileSync(mainLoaderPath, 'utf8');
-      
+
       // Verify main-loader contains expected patterns
       expect(content).toContain('main-loader');
       expect(content).toContain('SCRIPTS');
@@ -170,7 +170,7 @@ describe('Ember Client Rendering Regression Tests', () => {
         'utils/login-loader.js',
         'managers/renderer.js',
         'services/websocket-service.js',
-        'managers/app-state.js'
+        'managers/app-state.js',
       ];
 
       for (const file of criticalJsFiles) {
@@ -179,7 +179,9 @@ describe('Ember Client Rendering Regression Tests', () => {
 
         const content = readFileSync(filePath, 'utf8');
         expect(content.length).toBeGreaterThan(100); // Should have substantial content
-        expect(content.includes('function') || content.includes('class') || content.includes('const')).toBe(true);
+        expect(
+          content.includes('function') || content.includes('class') || content.includes('const')
+        ).toBe(true);
       }
     });
 
@@ -188,14 +190,14 @@ describe('Ember Client Rendering Regression Tests', () => {
       const jsFiles = [
         'utils/main-loader.js',
         'managers/renderer.js',
-        'services/websocket-service.js'
+        'services/websocket-service.js',
       ];
 
       for (const file of jsFiles) {
         const filePath = join(rendererDistPath, file);
         if (existsSync(filePath)) {
           const content = readFileSync(filePath, 'utf8');
-          
+
           // Should not contain actual TypeScript type annotations
           expect(content).not.toMatch(/:\s*(string|number|boolean|object|void|any)\s*[=,;)]/);
           expect(content).not.toMatch(/^interface\s+\w+/m);

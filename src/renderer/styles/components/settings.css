@@ -16,8 +16,12 @@
 }
 
 @keyframes settingsFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .settings-container {
@@ -66,7 +70,9 @@
   font-size: 14px;
   font-weight: 500;
   color: rgba(var(--rgb-text), 0.8);
-  transition: background-color 0.05s ease, color 0.05s ease;
+  transition:
+    background-color 0.05s ease,
+    color 0.05s ease;
   user-select: none;
   font-family: 'Courier New', Courier, monospace;
   border-left: 2px solid transparent;
@@ -130,7 +136,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.05s ease, color 0.05s ease, border-color 0.05s ease;
+  transition:
+    background-color 0.05s ease,
+    color 0.05s ease,
+    border-color 0.05s ease;
   z-index: 10003;
   font-family: 'Courier New', Courier, monospace;
 }
@@ -559,7 +568,9 @@
   padding: 7px 14px;
   font-size: 13px;
   cursor: pointer;
-  transition: background-color var(--transition-time), border-color var(--transition-time);
+  transition:
+    background-color var(--transition-time),
+    border-color var(--transition-time);
   white-space: nowrap;
   font-family: 'Courier New', Courier, monospace;
 }
@@ -619,7 +630,9 @@
   cursor: pointer;
   min-width: 140px;
   text-align: center;
-  transition: border-color var(--transition-time), background-color var(--transition-time);
+  transition:
+    border-color var(--transition-time),
+    background-color var(--transition-time);
   font-family: 'Courier New', Courier, monospace;
 }
 
@@ -687,7 +700,9 @@
   border: 2px solid rgba(var(--rgb-highlight), 0.15);
   background-color: rgba(var(--rgb-highlight), 0.04);
   cursor: pointer;
-  transition: border-color 0.05s ease, background-color 0.05s ease;
+  transition:
+    border-color 0.05s ease,
+    background-color 0.05s ease;
   user-select: none;
 }
 
@@ -907,7 +922,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background-color: #FF7850;
+  background-color: #ff7850;
   color: white;
   text-decoration: none;
   border-radius: 6px;

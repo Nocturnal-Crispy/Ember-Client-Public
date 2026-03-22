@@ -58,14 +58,17 @@ describe('launchInstaller', () => {
     });
 
     it('still calls openPath even when chmod throws', async () => {
-      mockChmodSync.mockImplementation(() => { throw new Error('permission denied'); });
+      mockChmodSync.mockImplementation(() => {
+        throw new Error('permission denied');
+      });
       mockOpenPath.mockResolvedValue('');
       await launchInstaller('/tmp/Ember-1.0.AppImage');
       expect(mockOpenPath).toHaveBeenCalledWith('/tmp/Ember-1.0.AppImage');
     });
 
     it('throws when shell.openPath returns a KIO security error', async () => {
-      const kioError = 'KIO Client: For security reasons, launching executables is not allowed in this context';
+      const kioError =
+        'KIO Client: For security reasons, launching executables is not allowed in this context';
       mockOpenPath.mockResolvedValue(kioError);
       await expect(launchInstaller('/tmp/Ember-1.0.AppImage')).rejects.toThrow(kioError);
     });
@@ -87,7 +90,9 @@ describe('launchInstaller', () => {
 
     it('opens the installer without error', async () => {
       mockOpenPath.mockResolvedValue('');
-      await expect(launchInstaller(path.join(os.tmpdir(), 'Ember-Setup.exe'))).resolves.toBeUndefined();
+      await expect(
+        launchInstaller(path.join(os.tmpdir(), 'Ember-Setup.exe'))
+      ).resolves.toBeUndefined();
     });
   });
 

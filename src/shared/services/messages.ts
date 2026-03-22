@@ -30,7 +30,7 @@ interface MessagesResponse {
 export async function fetchMessages(
   auth: AuthData,
   channelId: string,
-  beforeId?: string,
+  beforeId?: string
 ): Promise<{ messages: Message[]; hasMore: boolean }> {
   const params = new URLSearchParams({ limit: '20' });
   if (beforeId) params.set('before', beforeId);
@@ -39,7 +39,7 @@ export async function fetchMessages(
     auth.hostname,
     `/api/v1/channels/${channelId}/messages?${params}`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
 
   return {
@@ -52,7 +52,7 @@ export async function sendMessage(
   auth: AuthData,
   channelId: string,
   plaintext: string,
-  _emberKey?: Uint8Array,
+  _emberKey?: Uint8Array
 ): Promise<Message> {
   const ciphertext = plaintext;
   return apiRequest<Message>(
@@ -62,7 +62,7 @@ export async function sendMessage(
       method: 'POST',
       body: JSON.stringify({ ciphertext }),
     },
-    auth.token,
+    auth.token
   );
 }
 
@@ -71,7 +71,7 @@ export async function editMessage(
   channelId: string,
   messageId: string,
   plaintext: string,
-  _emberKey?: Uint8Array,
+  _emberKey?: Uint8Array
 ): Promise<void> {
   const ciphertext = plaintext;
   await apiRequest<unknown>(
@@ -81,20 +81,20 @@ export async function editMessage(
       method: 'PATCH',
       body: JSON.stringify({ ciphertext }),
     },
-    auth.token,
+    auth.token
   );
 }
 
 export async function deleteMessage(
   auth: AuthData,
   channelId: string,
-  messageId: string,
+  messageId: string
 ): Promise<void> {
   await apiRequest<unknown>(
     auth.hostname,
     `/api/v1/channels/${channelId}/messages/${messageId}`,
     { method: 'DELETE' },
-    auth.token,
+    auth.token
   );
 }
 
@@ -102,32 +102,32 @@ export async function uploadAttachment(
   auth: AuthData,
   channelId: string,
   encryptedData: string,
-  meta: AttachmentMeta,
+  meta: AttachmentMeta
 ): Promise<AttachmentUploadResponse> {
   return apiRequest<AttachmentUploadResponse>(
     auth.hostname,
     `/api/v1/channels/${channelId}/attachments`,
     {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         encrypted_data: encryptedData,
-        ...meta 
+        ...meta,
       }),
     },
-    auth.token,
+    auth.token
   );
 }
 
 export async function downloadAttachment(
   auth: AuthData,
   channelId: string,
-  attachmentId: string,
+  attachmentId: string
 ): Promise<AttachmentDownloadResponse> {
   return apiRequest<AttachmentDownloadResponse>(
     auth.hostname,
     `/api/v1/channels/${channelId}/attachments/${attachmentId}`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
 }
 
@@ -135,31 +135,31 @@ export async function uploadDMAttachment(
   auth: AuthData,
   conversationId: string,
   encryptedData: string,
-  meta: AttachmentMeta,
+  meta: AttachmentMeta
 ): Promise<AttachmentUploadResponse> {
   return apiRequest<AttachmentUploadResponse>(
     auth.hostname,
     `/api/v1/conversations/${conversationId}/attachments`,
     {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         encrypted_data: encryptedData,
-        ...meta 
+        ...meta,
       }),
     },
-    auth.token,
+    auth.token
   );
 }
 
 export async function downloadDMAttachment(
   auth: AuthData,
   conversationId: string,
-  attachmentId: string,
+  attachmentId: string
 ): Promise<AttachmentDownloadResponse> {
   return apiRequest<AttachmentDownloadResponse>(
     auth.hostname,
     `/api/v1/conversations/${conversationId}/attachments/${attachmentId}`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
 }

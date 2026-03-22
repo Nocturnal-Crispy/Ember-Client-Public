@@ -29,7 +29,9 @@ describe('IPC contract consistency', () => {
         data: { distributionId: 'dist-123' },
       });
 
-      const response = await (window as any).emberAPI.invoke('LoadDistributionId', { address: 'ember-1' });
+      const response = await (window as any).emberAPI.invoke('LoadDistributionId', {
+        address: 'ember-1',
+      });
 
       expect(response.success).toBe(true);
       expect(response.data).toHaveProperty('distributionId');
@@ -38,5 +40,4 @@ describe('IPC contract consistency', () => {
       expect(response.data).not.toHaveProperty('distribution_id');
     });
   });
-
 });

@@ -26,7 +26,7 @@ describe('InviteEphemeralKeyService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock SignalSessionManager
     mockSignalSessionManager = {
       hasSession: jest.fn(),
@@ -98,7 +98,7 @@ describe('InviteEphemeralKeyService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify(request),
@@ -119,7 +119,9 @@ describe('InviteEphemeralKeyService', () => {
         status: 500,
       });
 
-      await expect(inviteEphemeralKeyService.createInviteEphemeralKeys(request)).rejects.toThrow('Failed to create invite ephemeral keys: 500');
+      await expect(inviteEphemeralKeyService.createInviteEphemeralKeys(request)).rejects.toThrow(
+        'Failed to create invite ephemeral keys: 500'
+      );
     });
   });
 
@@ -154,7 +156,7 @@ describe('InviteEphemeralKeyService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -188,7 +190,7 @@ describe('InviteEphemeralKeyService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify(request),
@@ -254,7 +256,7 @@ describe('InviteEphemeralKeyService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -272,7 +274,10 @@ describe('InviteEphemeralKeyService', () => {
 
       mockSignalSessionManager.getCurrentEpoch.mockResolvedValue(mockEpoch as any);
 
-      const result = await inviteEphemeralKeyService.generateInviteEphemeralKeys('invite-123', 'ember-456');
+      const result = await inviteEphemeralKeyService.generateInviteEphemeralKeys(
+        'invite-123',
+        'ember-456'
+      );
 
       expect(result).toEqual({
         invite_id: 'invite-123',
@@ -293,16 +298,23 @@ describe('InviteEphemeralKeyService', () => {
     it('should throw error when no current epoch exists', async () => {
       mockSignalSessionManager.getCurrentEpoch.mockResolvedValue(null);
 
-      await expect(inviteEphemeralKeyService.generateInviteEphemeralKeys('invite-123', 'ember-456')).rejects.toThrow('No current epoch found for ember');
+      await expect(
+        inviteEphemeralKeyService.generateInviteEphemeralKeys('invite-123', 'ember-456')
+      ).rejects.toThrow('No current epoch found for ember');
     });
   });
 
   describe('generateInviteSenderKeyDistribution', () => {
     it('should generate sender key distribution for invite', async () => {
       const mockDistributionMessage = new TextEncoder().encode('distribution-message');
-      mockSignalSessionManager.createSenderKeyDistribution.mockResolvedValue(mockDistributionMessage);
+      mockSignalSessionManager.createSenderKeyDistribution.mockResolvedValue(
+        mockDistributionMessage
+      );
 
-      const result = await inviteEphemeralKeyService.generateInviteSenderKeyDistribution('invite-123', 'ember-456');
+      const result = await inviteEphemeralKeyService.generateInviteSenderKeyDistribution(
+        'invite-123',
+        'ember-456'
+      );
 
       expect(result).toEqual({
         invite_id: 'invite-123',
@@ -310,7 +322,9 @@ describe('InviteEphemeralKeyService', () => {
         distribution_message: expect.any(String), // base64 encoded
       });
 
-      expect(mockSignalSessionManager.createSenderKeyDistribution).toHaveBeenCalledWith('ember-456');
+      expect(mockSignalSessionManager.createSenderKeyDistribution).toHaveBeenCalledWith(
+        'ember-456'
+      );
     });
   });
 
@@ -321,11 +335,13 @@ describe('InviteEphemeralKeyService', () => {
           invite_id: 'invite-123',
           ember_id: 'ember-456',
           epoch_id: 'epoch-789',
-          encrypted_package: btoa(JSON.stringify({
-            ephemeral_key: 'test-key',
-            epoch_id: 'epoch-789',
-            timestamp: Date.now(),
-          })),
+          encrypted_package: btoa(
+            JSON.stringify({
+              ephemeral_key: 'test-key',
+              epoch_id: 'epoch-789',
+              timestamp: Date.now(),
+            })
+          ),
           created_at: Date.now(),
         },
       ];
@@ -336,14 +352,22 @@ describe('InviteEphemeralKeyService', () => {
           ember_id: 'ember-456',
           sender_user_id: 'user-789',
           sender_device_id: 'device-012',
-          distribution_message: btoa(String.fromCharCode(...new TextEncoder().encode('distribution-message'))),
+          distribution_message: btoa(
+            String.fromCharCode(...new TextEncoder().encode('distribution-message'))
+          ),
           created_at: Date.now(),
         },
       ];
 
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ ephemeral_keys: mockEphemeralKeys }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ sender_key_distributions: mockSenderKeyDistributions }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ephemeral_keys: mockEphemeralKeys }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ sender_key_distributions: mockSenderKeyDistributions }),
+        })
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       await inviteEphemeralKeyService.processInviteEphemeralKeys('invite-123', 'ember-456');
@@ -369,7 +393,9 @@ describe('InviteEphemeralKeyService', () => {
       const mockDistributionMessage = new TextEncoder().encode('distribution-message');
 
       mockSignalSessionManager.getCurrentEpoch.mockResolvedValue(mockEpoch as any);
-      mockSignalSessionManager.createSenderKeyDistribution.mockResolvedValue(mockDistributionMessage);
+      mockSignalSessionManager.createSenderKeyDistribution.mockResolvedValue(
+        mockDistributionMessage
+      );
 
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // createInviteEphemeralKeys
@@ -378,7 +404,9 @@ describe('InviteEphemeralKeyService', () => {
       await inviteEphemeralKeyService.setupInviteEphemeralKeys('invite-123', 'ember-456');
 
       expect(mockSignalSessionManager.getCurrentEpoch).toHaveBeenCalledWith('ember-456');
-      expect(mockSignalSessionManager.createSenderKeyDistribution).toHaveBeenCalledWith('ember-456');
+      expect(mockSignalSessionManager.createSenderKeyDistribution).toHaveBeenCalledWith(
+        'ember-456'
+      );
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
@@ -390,11 +418,13 @@ describe('InviteEphemeralKeyService', () => {
           invite_id: 'invite-123',
           ember_id: 'ember-456',
           epoch_id: 'epoch-789',
-          encrypted_package: btoa(JSON.stringify({
-            ephemeral_key: 'test-key',
-            epoch_id: 'epoch-789',
-            timestamp: Date.now(),
-          })),
+          encrypted_package: btoa(
+            JSON.stringify({
+              ephemeral_key: 'test-key',
+              epoch_id: 'epoch-789',
+              timestamp: Date.now(),
+            })
+          ),
           created_at: Date.now(),
         },
       ];
@@ -405,14 +435,22 @@ describe('InviteEphemeralKeyService', () => {
           ember_id: 'ember-456',
           sender_user_id: 'user-789',
           sender_device_id: 'device-012',
-          distribution_message: btoa(String.fromCharCode(...new TextEncoder().encode('distribution-message'))),
+          distribution_message: btoa(
+            String.fromCharCode(...new TextEncoder().encode('distribution-message'))
+          ),
           created_at: Date.now(),
         },
       ];
 
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ ephemeral_keys: mockEphemeralKeys }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ sender_key_distributions: mockSenderKeyDistributions }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ephemeral_keys: mockEphemeralKeys }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ sender_key_distributions: mockSenderKeyDistributions }),
+        })
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
       await inviteEphemeralKeyService.completeInviteAcceptance('invite-123', 'ember-456');
@@ -430,7 +468,9 @@ describe('InviteEphemeralKeyService', () => {
     it('should handle network errors gracefully', async () => {
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(inviteEphemeralKeyService.getInviteEphemeralKeys('invite-123')).rejects.toThrow('Network error');
+      await expect(inviteEphemeralKeyService.getInviteEphemeralKeys('invite-123')).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should handle invalid JSON responses', async () => {
@@ -441,7 +481,9 @@ describe('InviteEphemeralKeyService', () => {
         },
       });
 
-      await expect(inviteEphemeralKeyService.getInviteEphemeralKeys('invite-123')).rejects.toThrow('Invalid JSON');
+      await expect(inviteEphemeralKeyService.getInviteEphemeralKeys('invite-123')).rejects.toThrow(
+        'Invalid JSON'
+      );
     });
   });
 });

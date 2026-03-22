@@ -99,7 +99,9 @@ describe('refreshToken', () => {
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://localhost:8085/api/v1/refresh');
     expect(options.method).toBe('POST');
-    expect((options.headers as Record<string, string>)['Authorization']).toBe('Bearer old-token-abc');
+    expect((options.headers as Record<string, string>)['Authorization']).toBe(
+      'Bearer old-token-abc'
+    );
     expect(result.token).toBe('new-token-xyz');
     expect(result.user_id).toBe('user1');
   });
@@ -117,6 +119,8 @@ describe('refreshToken', () => {
   it('throws when the server is unreachable', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-    await expect(refreshToken('http://localhost:8085', 'any-token')).rejects.toThrow('Network error');
+    await expect(refreshToken('http://localhost:8085', 'any-token')).rejects.toThrow(
+      'Network error'
+    );
   });
 });

@@ -7,20 +7,20 @@
  * operations — no server call is needed since read state is not persisted.
  */
 (function (): void {
-  const log = window.emberLog.createLogger("ReadAllManager");
+  const log = window.emberLog.createLogger('ReadAllManager');
 
-  const btn = document.getElementById("read-all-btn") as HTMLElement | null;
+  const btn = document.getElementById('read-all-btn') as HTMLElement | null;
   if (!btn) {
-    log.warn("Read All button not found in DOM");
+    log.warn('Read All button not found in DOM');
     return;
   }
 
   function executeReadAll(): void {
     window.clearAllChannelUnread?.();
     window.clearAllDmUnread?.();
-    log.info("All messages marked as read");
+    log.info('All messages marked as read');
   }
 
-  btn.addEventListener("click", executeReadAll);
+  btn.addEventListener('click', executeReadAll);
   window.readAll = executeReadAll;
 })();

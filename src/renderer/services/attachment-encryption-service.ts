@@ -68,7 +68,9 @@ export class AttachmentEncryptionService {
    * Get the base URL for API calls
    */
   private getBaseUrl(): string {
-    return this.auth.hostname.startsWith('http') ? this.auth.hostname : `https://${this.auth.hostname}`;
+    return this.auth.hostname.startsWith('http')
+      ? this.auth.hostname
+      : `https://${this.auth.hostname}`;
   }
 
   /**
@@ -87,15 +89,23 @@ export class AttachmentEncryptionService {
    */
   async encryptAttachmentData(data: Uint8Array, key: string): Promise<string> {
     try {
-      const keyBytes = new Uint8Array(
-        key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-      );
+      const keyBytes = new Uint8Array(key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
       if (keyBytes.length !== 32) {
         throw new Error(`Invalid attachment key length: ${keyBytes.length}, expected 32`);
       }
-      const cryptoKey = await crypto.subtle.importKey('raw', keyBytes as Uint8Array<ArrayBuffer>, 'AES-GCM', false, ['encrypt']);
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyBytes as Uint8Array<ArrayBuffer>,
+        'AES-GCM',
+        false,
+        ['encrypt']
+      );
       const iv = crypto.getRandomValues(new Uint8Array(12)) as Uint8Array<ArrayBuffer>;
-      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, data as Uint8Array<ArrayBuffer>);
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        cryptoKey,
+        data as Uint8Array<ArrayBuffer>
+      );
       const combined = new Uint8Array(iv.length + ciphertext.byteLength);
       combined.set(iv);
       combined.set(new Uint8Array(ciphertext), iv.length);
@@ -112,9 +122,7 @@ export class AttachmentEncryptionService {
    */
   async decryptAttachmentData(encryptedData: string, key: string): Promise<Uint8Array> {
     try {
-      const keyBytes = new Uint8Array(
-        key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-      );
+      const keyBytes = new Uint8Array(key.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
       if (keyBytes.length !== 32) {
         throw new Error(`Invalid attachment key length: ${keyBytes.length}, expected 32`);
       }
@@ -124,7 +132,13 @@ export class AttachmentEncryptionService {
       }
       const iv = combined.slice(0, 12) as Uint8Array<ArrayBuffer>;
       const ciphertext = combined.slice(12) as Uint8Array<ArrayBuffer>;
-      const cryptoKey = await crypto.subtle.importKey('raw', keyBytes as Uint8Array<ArrayBuffer>, 'AES-GCM', false, ['decrypt']);
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyBytes as Uint8Array<ArrayBuffer>,
+        'AES-GCM',
+        false,
+        ['decrypt']
+      );
       const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
       return new Uint8Array(plaintext);
     } catch (error) {
@@ -136,11 +150,15 @@ export class AttachmentEncryptionService {
   /**
    * Create attachment keys for all members of a channel
    */
-  async createChannelAttachmentKeys(attachmentId: string, channelId: string, key: string): Promise<void> {
+  async createChannelAttachmentKeys(
+    attachmentId: string,
+    channelId: string,
+    key: string
+  ): Promise<void> {
     try {
       // Get channel members
       const members = await this.getChannelMembers(channelId);
-      
+
       // Create encrypted keys for each member's devices
       const keyRequests = [];
       for (const member of members) {
@@ -162,7 +180,7 @@ export class AttachmentEncryptionService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/attachments/${attachmentId}/keys`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
@@ -180,11 +198,15 @@ export class AttachmentEncryptionService {
   /**
    * Create attachment keys for conversation participants
    */
-  async createConversationAttachmentKeys(attachmentId: string, conversationId: string, key: string): Promise<void> {
+  async createConversationAttachmentKeys(
+    attachmentId: string,
+    conversationId: string,
+    key: string
+  ): Promise<void> {
     try {
       // Get conversation participants
       const participants = await this.getConversationParticipants(conversationId);
-      
+
       // Create encrypted keys for each participant's devices
       const keyRequests = [];
       for (const participant of participants) {
@@ -205,7 +227,7 @@ export class AttachmentEncryptionService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/attachments/${attachmentId}/keys`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
@@ -228,7 +250,7 @@ export class AttachmentEncryptionService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/attachments/${attachmentId}/keys`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -257,10 +279,10 @@ export class AttachmentEncryptionService {
     try {
       // Generate per-attachment key
       const attachmentKey = this.generateAttachmentKey();
-      
+
       // Encrypt the attachment data
       const encryptedData = await this.encryptAttachmentData(data, attachmentKey);
-      
+
       // Upload the attachment
       const uploadRequest: UploadAttachmentRequest = {
         channel_id: channelId,
@@ -271,24 +293,27 @@ export class AttachmentEncryptionService {
         attachment_key: attachmentKey,
       };
 
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/channels/${channelId}/attachments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadRequest),
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/channels/${channelId}/attachments`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(uploadRequest),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to upload attachment: ${response.status}`);
       }
 
-      const metadata = await response.json() as AttachmentMetadata;
-      
+      const metadata = (await response.json()) as AttachmentMetadata;
+
       // Create keys for all channel members
       await this.createChannelAttachmentKeys(metadata.id, channelId, attachmentKey);
-      
+
       return metadata;
     } catch (error) {
       console.error('Failed to upload channel attachment:', error);
@@ -308,10 +333,10 @@ export class AttachmentEncryptionService {
     try {
       // Generate per-attachment key
       const attachmentKey = this.generateAttachmentKey();
-      
+
       // Encrypt the attachment data
       const encryptedData = await this.encryptAttachmentData(data, attachmentKey);
-      
+
       // Upload the attachment
       const uploadRequest: UploadAttachmentRequest = {
         conversation_id: conversationId,
@@ -322,24 +347,27 @@ export class AttachmentEncryptionService {
         attachment_key: attachmentKey,
       };
 
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/conversations/${conversationId}/attachments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadRequest),
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/conversations/${conversationId}/attachments`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(uploadRequest),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to upload conversation attachment: ${response.status}`);
       }
 
-      const metadata = await response.json() as AttachmentMetadata;
-      
+      const metadata = (await response.json()) as AttachmentMetadata;
+
       // Create keys for conversation participants
       await this.createConversationAttachmentKeys(metadata.id, conversationId, attachmentKey);
-      
+
       return metadata;
     } catch (error) {
       console.error('Failed to upload conversation attachment:', error);
@@ -350,32 +378,34 @@ export class AttachmentEncryptionService {
   /**
    * Download and decrypt an attachment
    */
-  async downloadAttachment(attachmentId: string): Promise<{ data: Uint8Array; metadata: AttachmentMetadata }> {
+  async downloadAttachment(
+    attachmentId: string
+  ): Promise<{ data: Uint8Array; metadata: AttachmentMetadata }> {
     try {
       // Get attachment metadata
       const metadata = await this.getAttachmentMetadata(attachmentId);
-      
+
       // Get attachment keys for current user
       const keys = await this.getAttachmentKeys(attachmentId);
-      
+
       // Find the key for the current user/device
-      const userKey = keys.find(key => 
-        key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+      const userKey = keys.find(
+        key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
       );
-      
+
       if (!userKey) {
         throw new Error('No attachment key found for current user');
       }
-      
+
       // Decrypt the attachment key
       const attachmentKey = await this.decryptAttachmentKeyForUser(userKey.encrypted_key);
-      
+
       // Download the encrypted attachment
       const encryptedData = await this.downloadEncryptedAttachment(attachmentId);
-      
+
       // Decrypt the attachment data
       const decryptedData = await this.decryptAttachmentData(encryptedData, attachmentKey);
-      
+
       return { data: decryptedData, metadata };
     } catch (error) {
       console.error('Failed to download attachment:', error);
@@ -412,7 +442,9 @@ export class AttachmentEncryptionService {
   /**
    * Get channel members
    */
-  private async getChannelMembers(channelId: string): Promise<{ user_id: string; device_id?: string }[]> {
+  private async getChannelMembers(
+    channelId: string
+  ): Promise<{ user_id: string; device_id?: string }[]> {
     // This would fetch channel members from the server
     // For now, return the current user as a member
     return [
@@ -426,7 +458,9 @@ export class AttachmentEncryptionService {
   /**
    * Get conversation participants
    */
-  private async getConversationParticipants(conversationId: string): Promise<{ user_id: string; device_id?: string }[]> {
+  private async getConversationParticipants(
+    conversationId: string
+  ): Promise<{ user_id: string; device_id?: string }[]> {
     // This would fetch conversation participants from the server
     // For now, return the current user as a participant
     return [
@@ -450,7 +484,7 @@ export class AttachmentEncryptionService {
         created_by: this.auth.user_id,
         timestamp: Date.now(),
       });
-      
+
       return btoa(keyData);
     } catch (error) {
       console.error('Failed to encrypt attachment key for user:', error);

@@ -92,11 +92,9 @@ Generate code, corrections, and refactorings that comply with the basic principl
 - Write acceptance tests for each module.
   - Follow the Given-When-Then convention.
 
-
   ## Specific to NestJS
 
   ### Basic Principles
-  
   - Use modular architecture.
   - Encapsulate the API in modules.
     - One module per main domain/route.
@@ -108,7 +106,6 @@ Generate code, corrections, and refactorings that comply with the basic principl
     - A services module with business logic and persistence.
       - Entities with MikroORM for data persistence.
       - One service per entity.
-  
   - Common Module: Create a common module (e.g., @app/common) for shared, reusable code across the application.
     - This module should include:
       - Configs: Global configuration settings.
@@ -121,7 +118,6 @@ Generate code, corrections, and refactorings that comply with the basic principl
       - Types: Common TypeScript types or interfaces.
       - Utils: Helper functions and utilities.
       - Validators: Custom validators for consistent input validation.
-  
   - Core module functionalities:
     - Global filters for exception handling.
     - Global middlewares for request management.
@@ -134,4 +130,3 @@ Generate code, corrections, and refactorings that comply with the basic principl
 - Write tests for each controller and service.
 - Write end to end tests for each api module.
 - Add a admin/test method to each controller as a smoke test.
- 

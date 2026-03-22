@@ -10,16 +10,13 @@
  * for providing a fallback.
  */
 
-const STEAM_DOMAINS = [
-  'https://store.steampowered.com/',
-  'https://steamcommunity.com/',
-] as const;
+const STEAM_DOMAINS = ['https://store.steampowered.com/', 'https://steamcommunity.com/'] as const;
 
 /**
  * Returns true when `url` targets a known Steam web property.
  */
 export function isSteamUrl(url: string): boolean {
-  return STEAM_DOMAINS.some((domain) => url.startsWith(domain));
+  return STEAM_DOMAINS.some(domain => url.startsWith(domain));
 }
 
 /**

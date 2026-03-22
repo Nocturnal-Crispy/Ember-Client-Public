@@ -184,9 +184,7 @@ describe('openScreenShareModal', () => {
     window.openScreenShareModal([SCREEN_SOURCE, WINDOW_SOURCE], true, mockOnSelect);
 
     const grid = document.getElementById('screen-share-source-grid')!;
-    const names = Array.from(grid.querySelectorAll('[data-source-name]')).map(
-      (el) => el.textContent
-    );
+    const names = Array.from(grid.querySelectorAll('[data-source-name]')).map(el => el.textContent);
     expect(names).toContain('Entire Screen');
     expect(names).toContain('Firefox');
   });
@@ -209,7 +207,9 @@ describe('openScreenShareModal', () => {
   it('enables the confirm button after clicking a source card', () => {
     window.openScreenShareModal([SCREEN_SOURCE], true, mockOnSelect);
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
 
     const btn = document.getElementById('screen-share-confirm') as HTMLButtonElement;
@@ -260,7 +260,9 @@ describe('openScreenShareModal — audioAvailable: false', () => {
   });
 
   it('invokes onSelect callback with includeAudio: false when confirmed', () => {
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 
@@ -294,7 +296,9 @@ describe('openScreenShareModal — audioAvailable: true', () => {
     cb.checked = true;
     cb.dispatchEvent(new Event('change'));
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 
@@ -308,7 +312,9 @@ describe('openScreenShareModal — audioAvailable: true', () => {
     const cb = document.getElementById('screen-share-audio-checkbox') as HTMLInputElement;
     cb.checked = false;
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 
@@ -368,7 +374,9 @@ describe('openScreenShareModal — settings', () => {
     sel.value = '1080p';
     sel.dispatchEvent(new Event('change'));
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 
@@ -383,7 +391,9 @@ describe('openScreenShareModal — settings', () => {
     sel.value = '30';
     sel.dispatchEvent(new Event('change'));
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 
@@ -422,7 +432,9 @@ describe('onSelect callback', () => {
   it('hides the modal after onSelect is invoked', () => {
     window.openScreenShareModal([SCREEN_SOURCE], true, mockOnSelect);
 
-    const card = document.querySelector('#screen-share-source-grid [data-source-id]') as HTMLElement;
+    const card = document.querySelector(
+      '#screen-share-source-grid [data-source-id]'
+    ) as HTMLElement;
     card.click();
     document.getElementById('screen-share-confirm')!.click();
 

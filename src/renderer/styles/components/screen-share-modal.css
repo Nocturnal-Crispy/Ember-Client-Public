@@ -44,7 +44,9 @@
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
   z-index: 1;
 }
 
@@ -84,7 +86,10 @@
   border: 2px solid rgba(var(--rgb-highlight), 0.1);
   background: rgba(var(--rgb-surface), 0.6);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.1s;
   user-select: none;
 }
 
@@ -229,7 +234,9 @@
   cursor: pointer;
   background: var(--highlight);
   color: rgb(var(--rgb-background));
-  transition: opacity 0.15s, transform 0.1s;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
 }
 
 .screen-share-confirm-btn:hover:not(:disabled) {

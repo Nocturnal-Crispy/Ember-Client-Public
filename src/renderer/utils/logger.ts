@@ -4,9 +4,9 @@
  * Loaded before other renderer scripts so all modules can call window.emberLog.createLogger().
  */
 (function (): void {
-  "use strict";
+  'use strict';
 
-  type LogLevel = "debug" | "info" | "warn" | "error";
+  type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
   const LEVEL_RANKS: Record<LogLevel, number> = {
     debug: 0,
@@ -18,30 +18,32 @@
 
   function ts(): string {
     const now = new Date();
-    const p2 = (n: number): string => String(n).padStart(2, "0");
+    const p2 = (n: number): string => String(n).padStart(2, '0');
     return `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
   }
 
   // Check if we're in development mode
   function isDevelopment(): boolean {
-    return window.location.protocol === 'file:' || 
-           window.location.hostname === 'localhost' || 
-           window.location.hostname === '127.0.0.1';
+    return (
+      window.location.protocol === 'file:' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    );
   }
 
   function fmtData(data?: Record<string, unknown>): string {
-    if (!data) return "";
+    if (!data) return '';
     const parts = [];
     for (const [k, v] of Object.entries(data)) {
       const vs =
         v === null || v === undefined
           ? String(v)
-          : typeof v === "object"
+          : typeof v === 'object'
             ? JSON.stringify(v)
             : String(v);
       parts.push(`${k}=${vs}`);
     }
-    return parts.length ? ` { ${parts.join(", ")} }` : "";
+    return parts.length ? ` { ${parts.join(', ')} }` : '';
   }
 
   function sendLog(
@@ -62,15 +64,19 @@
     // Forward to main process for terminal output
     try {
       if (window.emberAPI) {
-        window.emberAPI.invoke('Log', {
-          level: payload.level,
-          context: payload.context,
-          message: payload.message,
-          data: payload.data ? JSON.stringify(payload.data) : undefined,
-        }).catch(() => { /* fire-and-forget */ });
+        window.emberAPI
+          .invoke('Log', {
+            level: payload.level,
+            context: payload.context,
+            message: payload.message,
+            data: payload.data ? JSON.stringify(payload.data) : undefined,
+          })
+          .catch(() => {
+            /* fire-and-forget */
+          });
       } else if (window.electronAPI && window.electronAPI.ipc) {
         // Fallback for environments where emberAPI is not yet available
-        window.electronAPI.ipc.send("log-to-console", payload);
+        window.electronAPI.ipc.send('log-to-console', payload);
       }
     } catch (_) {
       /* silently ignore — IPC not yet available */
@@ -78,27 +84,27 @@
 
     // Also mirror to browser DevTools and write to file in development
     const full = `[${ts()}] [${level.toUpperCase().padEnd(5)}] [${context}] ${message}${fmtData(data)}`;
-    
+
     // In development, also request main process to write to file
     if (isDevelopment()) {
       try {
-        window.electronAPI?.ipc?.send("log-to-file", full);
+        window.electronAPI?.ipc?.send('log-to-file', full);
       } catch (error) {
         // Ignore if file logging not available
       }
     }
-    
+
     switch (level) {
-      case "debug":
+      case 'debug':
         console.debug(full);
         break;
-      case "info":
+      case 'info':
         console.info(full);
         break;
-      case "warn":
+      case 'warn':
         console.warn(full);
         break;
-      case "error":
+      case 'error':
         console.error(full);
         break;
       default:
@@ -108,14 +114,10 @@
 
   function createLogger(context: string): EmberLogger {
     return {
-      debug: (msg: string, data?: Record<string, unknown>) =>
-        sendLog("debug", context, msg, data),
-      info: (msg: string, data?: Record<string, unknown>) =>
-        sendLog("info", context, msg, data),
-      warn: (msg: string, data?: Record<string, unknown>) =>
-        sendLog("warn", context, msg, data),
-      error: (msg: string, data?: Record<string, unknown>) =>
-        sendLog("error", context, msg, data),
+      debug: (msg: string, data?: Record<string, unknown>) => sendLog('debug', context, msg, data),
+      info: (msg: string, data?: Record<string, unknown>) => sendLog('info', context, msg, data),
+      warn: (msg: string, data?: Record<string, unknown>) => sendLog('warn', context, msg, data),
+      error: (msg: string, data?: Record<string, unknown>) => sendLog('error', context, msg, data),
     };
   }
 

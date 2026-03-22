@@ -130,11 +130,13 @@ describe('processInviteLink', () => {
 
   it('does not throw when the server returns a non-ok response', async () => {
     mockIpcInvoke.mockResolvedValueOnce({ token: 'tok', hostname: 'http://localhost:8085' });
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, json: jest.fn().mockResolvedValue({}) });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: jest.fn().mockResolvedValue({}),
+    });
 
-    await expect(
-      (window as any).processInviteLink('notfound', null)
-    ).resolves.toBeUndefined();
+    await expect((window as any).processInviteLink('notfound', null)).resolves.toBeUndefined();
   });
 });
 
@@ -177,7 +179,12 @@ describe('openAcceptInviteModal / closeAcceptInviteModal', () => {
     // The closure-captured acceptInviteModal is null so openAcceptInviteModal
     // returns early before assigning App.pendingInvite. This test verifies
     // that behaviour and that no exception is thrown.
-    const inviteInfo = { ember_name: 'Test', encrypted_ember_key: 'enc', code: 'c1', key_salt: 's1' };
+    const inviteInfo = {
+      ember_name: 'Test',
+      encrypted_ember_key: 'enc',
+      code: 'c1',
+      key_salt: 's1',
+    };
     expect(() => (window as any).openAcceptInviteModal(inviteInfo)).not.toThrow();
   });
 
@@ -196,4 +203,3 @@ describe('openAcceptInviteModal / closeAcceptInviteModal', () => {
     expect(typeof (window as any).processInviteLink).toBe('function');
   });
 });
-

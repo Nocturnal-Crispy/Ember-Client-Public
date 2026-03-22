@@ -81,6 +81,7 @@ src/
 ### Adding a New IPC Channel
 
 When you add a new IPC channel, these files **always change together**:
+
 - `src/preload/index.ts` — add to `ALLOWED_SEND`, `ALLOWED_INVOKE`, or `ALLOWED_ON`
 - `src/main/index.ts` — add `ipcMain.handle(...)` or `ipcMain.on(...)` handler
 - `src/renderer/types/globals.d.ts` — add method signature to `window.electronAPI`
@@ -88,6 +89,7 @@ When you add a new IPC channel, these files **always change together**:
 ### Adding a New UI Feature (with CSS)
 
 When adding any UI with styling, expect co-changes in:
+
 - `src/renderer/managers/[feature].ts` (or existing manager)
 - `src/renderer/styles/components/[feature].css`
 - `src/renderer/[feature].html` (if new modal/section)
@@ -100,12 +102,12 @@ When adding any UI with styling, expect co-changes in:
 
 Files are organized by concern, **never a single monolithic CSS file**:
 
-| Category | Location | Examples |
-|----------|----------|---------|
-| Base | `styles/base/` | `reset.css`, `typography.css`, `variables.css` |
-| Components | `styles/components/` | `settings.css`, `voice.css`, `chat.css` |
-| Layout | `styles/layout/` | `channel-list.css`, `server-list.css` |
-| Utilities | `styles/utilities/` | `color-variables.css`, `spacing.css` |
+| Category   | Location             | Examples                                       |
+| ---------- | -------------------- | ---------------------------------------------- |
+| Base       | `styles/base/`       | `reset.css`, `typography.css`, `variables.css` |
+| Components | `styles/components/` | `settings.css`, `voice.css`, `chat.css`        |
+| Layout     | `styles/layout/`     | `channel-list.css`, `server-list.css`          |
+| Utilities  | `styles/utilities/`  | `color-variables.css`, `spacing.css`           |
 
 CSS variable root is defined in `styles/base/variables.css` and `styles/utilities/color-variables.css`.
 
@@ -142,6 +144,7 @@ All renderer modules **except `renderer.ts`** use IIFEs to avoid `SyntaxError: I
 - Crypto/integration tests require `@jest-environment node`
 
 **IIFE module tests** require window mock setup before `require()`:
+
 ```typescript
 beforeAll(() => {
   (global as any).window = {
@@ -154,6 +157,7 @@ beforeAll(() => {
 ```
 
 **Most-tested files** (highest churn → most test coverage needed):
+
 - `src/renderer/managers/channel-manager.ts`
 - `src/renderer/services/websocket-service.ts`
 - `src/renderer/managers/ember-manager.ts`
@@ -162,14 +166,14 @@ beforeAll(() => {
 
 ## Hot Files (Change Often — Handle with Care)
 
-| File | Why It Changes |
-|------|---------------|
-| `src/renderer/types/globals.d.ts` | Every new global or IPC channel |
-| `src/renderer/utils/main-loader.ts` | Every new module or HTML fragment |
-| `src/preload/index.ts` | Every new IPC channel |
-| `src/main/index.ts` | Every new IPC handler |
-| `src/renderer/services/voice-service.ts` | Complex WebRTC logic — fragile |
-| `src/renderer/managers/voice-ui-manager.ts` | Voice UI state — fragile |
+| File                                        | Why It Changes                    |
+| ------------------------------------------- | --------------------------------- |
+| `src/renderer/types/globals.d.ts`           | Every new global or IPC channel   |
+| `src/renderer/utils/main-loader.ts`         | Every new module or HTML fragment |
+| `src/preload/index.ts`                      | Every new IPC channel             |
+| `src/main/index.ts`                         | Every new IPC handler             |
+| `src/renderer/services/voice-service.ts`    | Complex WebRTC logic — fragile    |
+| `src/renderer/managers/voice-ui-manager.ts` | Voice UI state — fragile          |
 
 ---
 
@@ -180,6 +184,7 @@ beforeAll(() => {
 ```
 
 Manual steps if needed:
+
 1. `npm test` — all 106 tests must pass
 2. Update `package.json` version (semver: `0.0.X`)
 3. `npm run dist:linux` / `dist:win` / `dist:mac`

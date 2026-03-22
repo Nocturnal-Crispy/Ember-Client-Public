@@ -10,7 +10,7 @@
   --rgb-afk-color: 250, 179, 86; /* Muted yellow for idle */
   --rgb-dnd-color: 240, 71, 71; /* Muted red for do not disturb */
   --rgb-streaming-color: 156, 89, 209; /* Muted purple for streaming */
-  
+
   /* Additional modern colors */
   --rgb-surface: 30, 30, 35; /* Slightly lighter than background */
   --rgb-surface-hover: 40, 40, 45; /* Hover state for surfaces */
@@ -18,7 +18,7 @@
   --rgb-status-positive-rgb: var(--rgb-online-color);
   --rgb-status-negative-rgb: var(--rgb-dnd-color);
 
-  --transition-time: .3s; /* How fast animations added by the theme happen. Default is 0.3 seconds */
+  --transition-time: 0.3s; /* How fast animations added by the theme happen. Default is 0.3 seconds */
 
   --background-image: unset; /* To add an image, replace unset with url(https://www.YOUR-URL-HERE.com) */
   --background-position: center; /* Positions the background image */
@@ -226,5 +226,5 @@
   --border-faint: rgb(var(--rgb-highlight));
   --border-subtle: rgb(var(--rgb-highlight));
   --app-border-frame: rgb(var(--rgb-highlight));
-  --background-modifier-accent: rgb(var(--rgb-highlight))
+  --background-modifier-accent: rgb(var(--rgb-highlight));
 }

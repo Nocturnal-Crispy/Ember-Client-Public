@@ -26,29 +26,29 @@ describe('Direct Messaging System Initialization', () => {
       user_id: 'test-user-id',
       device_id: 'test-device-id',
       hostname: 'http://localhost:8085',
-      username: 'test-user'
+      username: 'test-user',
     };
 
     // Mock window.getValidAuth
     window.getValidAuth = jest.fn().mockResolvedValue(mockAuth);
-    
+
     // Mock window.App with minimal required properties
     window.App = {
       initializeSignalSessionManager: jest.fn(),
-      emberKeyCache: new Map()
+      emberKeyCache: new Map(),
     } as any;
-    
+
     // Mock logger
     mockLog = {
       info: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
-      warn: jest.fn()
+      warn: jest.fn(),
     };
     window.emberLog = {
-      createLogger: jest.fn().mockReturnValue(mockLog)
+      createLogger: jest.fn().mockReturnValue(mockLog),
     } as any;
-    
+
     // Mock window.initializeDirectMessaging
     window.initializeDirectMessaging = jest.fn().mockResolvedValue(undefined);
   });
@@ -61,7 +61,7 @@ describe('Direct Messaging System Initialization', () => {
     it('should handle SignalService not available error', () => {
       // Mock SignalService as undefined to reproduce the error
       delete (window as any).SignalService;
-      
+
       expect(() => {
         new SignalSessionManager(mockAuth);
       }).toThrow('SignalService not available - check script loading order');
@@ -70,9 +70,9 @@ describe('Direct Messaging System Initialization', () => {
     it('should handle invalid auth data during initialization', () => {
       const invalidAuth = {
         // Missing required fields
-        token: 'test-token'
+        token: 'test-token',
       };
-      
+
       expect(() => {
         new SignalSessionManager(invalidAuth as any);
       }).toThrow('Invalid auth data: hostname is required');
@@ -88,14 +88,14 @@ describe('Direct Messaging System Initialization', () => {
         groupEncrypt: jest.fn(),
         groupDecrypt: jest.fn(),
         createSenderKeyDistribution: jest.fn(),
-        processSenderKeyDistribution: jest.fn()
+        processSenderKeyDistribution: jest.fn(),
       }));
-      
+
       const sessionManager = new SignalSessionManager(mockAuth);
-      
+
       // Force the manager to be not initialized
       (sessionManager as any).isInitialized = false;
-      
+
       expect(() => {
         (sessionManager as any).ensureInitialized();
       }).toThrow('SignalSessionManager is not initialized');
@@ -106,7 +106,7 @@ describe('Direct Messaging System Initialization', () => {
     it('should fail when window.getValidAuth throws error', async () => {
       const authError = new Error('Authentication failed');
       window.getValidAuth = jest.fn().mockRejectedValue(authError);
-      
+
       await expect(window.getValidAuth()).rejects.toThrow('Authentication failed');
     });
 
@@ -115,7 +115,7 @@ describe('Direct Messaging System Initialization', () => {
       window.App.initializeSignalSessionManager = jest.fn().mockImplementation(() => {
         throw signalError;
       });
-      
+
       expect(() => {
         window.App.initializeSignalSessionManager();
       }).toThrow('Signal session initialization failed');

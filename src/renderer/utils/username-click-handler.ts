@@ -17,15 +17,11 @@
    * @param userId   - The user's ID.
    * @param username - The user's display name.
    */
-  function makeUsernameClickable(
-    el: HTMLElement,
-    userId: string,
-    username: string
-  ): void {
+  function makeUsernameClickable(el: HTMLElement, userId: string, username: string): void {
     el.style.cursor = 'pointer';
     el.classList.add('username-clickable');
 
-    el.addEventListener('click', (e) => {
+    el.addEventListener('click', e => {
       e.stopPropagation();
       log.debug('Username clicked', { userId, username });
       (window as any).openUserDetailsModal?.(userId, username);

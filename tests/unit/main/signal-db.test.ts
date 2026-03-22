@@ -433,16 +433,18 @@ describe('Local identity initialization', () => {
 
     // Intentionally pass init options even if openSignalDatabase doesn't support them yet.
     // The test will fail until signal-db.ts is updated to honour these options.
-    db = (openSignalDatabase as unknown as (
-      userDataPath: string,
-      identityPrivateKey: Uint8Array,
-      opts: {
-        localIdentityPrivateKey: Uint8Array;
-        localIdentityPublicKey: Uint8Array;
-        localRegistrationId: number;
-        localIdentityAddress: string;
-      },
-    ) => SignalDatabase)(tmpDir, encryptionKey, {
+    db = (
+      openSignalDatabase as unknown as (
+        userDataPath: string,
+        identityPrivateKey: Uint8Array,
+        opts: {
+          localIdentityPrivateKey: Uint8Array;
+          localIdentityPublicKey: Uint8Array;
+          localRegistrationId: number;
+          localIdentityAddress: string;
+        }
+      ) => SignalDatabase
+    )(tmpDir, encryptionKey, {
       localIdentityPrivateKey,
       localIdentityPublicKey,
       localRegistrationId,
@@ -500,7 +502,7 @@ describe('Local identity initialization', () => {
         privateKey: localIdentityPrivateKey,
       },
       localRegistrationId,
-      localIdentityAddress,
+      localIdentityAddress
     );
 
     const pair = await db.getIdentityKeyPair();
@@ -564,7 +566,7 @@ describe('Edge cases', () => {
   });
 
   it('handles special characters in address strings', async () => {
-    const address = "user@domain.org.1";
+    const address = 'user@domain.org.1';
     const record = makeRecord();
     await db.storeSession(address, record);
     const loaded = await db.loadSession(address);

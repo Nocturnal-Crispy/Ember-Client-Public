@@ -135,21 +135,41 @@ describe('GIF Favorites — query functions', () => {
 
 describe('GIF Favorites — addGifFavorite', () => {
   it('adds a GIF to App.gifFavorites', () => {
-    const fav = { url: 'https://example.com/gif1.gif', title: 'Test', thumbnailUrl: 'https://example.com/t.gif', addedAt: 1000 };
+    const fav = {
+      url: 'https://example.com/gif1.gif',
+      title: 'Test',
+      thumbnailUrl: 'https://example.com/t.gif',
+      addedAt: 1000,
+    };
     (window as any).addGifFavorite(fav);
     expect((window as any).App.gifFavorites).toHaveLength(1);
     expect((window as any).App.gifFavorites[0].url).toBe(fav.url);
   });
 
   it('persists to IPC storage on add', () => {
-    const fav = { url: 'https://example.com/gif2.gif', title: 'Test', thumbnailUrl: 'https://example.com/t.gif', addedAt: 1000 };
+    const fav = {
+      url: 'https://example.com/gif2.gif',
+      title: 'Test',
+      thumbnailUrl: 'https://example.com/t.gif',
+      addedAt: 1000,
+    };
     (window as any).addGifFavorite(fav);
     expect(mockIpcInvoke).toHaveBeenCalledWith('save-gif-favorites', expect.any(Array));
   });
 
   it('new favorite is prepended to the list', () => {
-    const first = { url: 'https://example.com/first.gif', title: 'First', thumbnailUrl: 'https://example.com/f.gif', addedAt: 1 };
-    const second = { url: 'https://example.com/second.gif', title: 'Second', thumbnailUrl: 'https://example.com/s.gif', addedAt: 2 };
+    const first = {
+      url: 'https://example.com/first.gif',
+      title: 'First',
+      thumbnailUrl: 'https://example.com/f.gif',
+      addedAt: 1,
+    };
+    const second = {
+      url: 'https://example.com/second.gif',
+      title: 'Second',
+      thumbnailUrl: 'https://example.com/s.gif',
+      addedAt: 2,
+    };
     (window as any).addGifFavorite(first);
     (window as any).addGifFavorite(second);
     expect((window as any).App.gifFavorites[0].url).toBe(second.url);
@@ -157,7 +177,12 @@ describe('GIF Favorites — addGifFavorite', () => {
   });
 
   it('does not add duplicate URLs', () => {
-    const fav = { url: 'https://example.com/dup.gif', title: 'Dup', thumbnailUrl: 'https://example.com/d.gif', addedAt: 1 };
+    const fav = {
+      url: 'https://example.com/dup.gif',
+      title: 'Dup',
+      thumbnailUrl: 'https://example.com/d.gif',
+      addedAt: 1,
+    };
     (window as any).addGifFavorite(fav);
     (window as any).addGifFavorite({ ...fav, addedAt: 999 });
     expect((window as any).App.gifFavorites).toHaveLength(1);
@@ -183,7 +208,12 @@ describe('GIF Favorites — addGifFavorite', () => {
   });
 
   it('isGifFavorited returns true after adding', () => {
-    const fav = { url: 'https://example.com/check.gif', title: 'Check', thumbnailUrl: 'https://example.com/c.gif', addedAt: 1 };
+    const fav = {
+      url: 'https://example.com/check.gif',
+      title: 'Check',
+      thumbnailUrl: 'https://example.com/c.gif',
+      addedAt: 1,
+    };
     (window as any).addGifFavorite(fav);
     expect((window as any).isGifFavorited('https://example.com/check.gif')).toBe(true);
   });
@@ -192,7 +222,12 @@ describe('GIF Favorites — addGifFavorite', () => {
 describe('GIF Favorites — removeGifFavorite', () => {
   it('removes a GIF from App.gifFavorites by URL', () => {
     (window as any).App.gifFavorites = [
-      { url: 'https://example.com/remove.gif', title: 'Remove', thumbnailUrl: 'https://example.com/r.gif', addedAt: 1 },
+      {
+        url: 'https://example.com/remove.gif',
+        title: 'Remove',
+        thumbnailUrl: 'https://example.com/r.gif',
+        addedAt: 1,
+      },
     ];
     (window as any).removeGifFavorite('https://example.com/remove.gif');
     expect((window as any).App.gifFavorites).toHaveLength(0);
@@ -200,7 +235,12 @@ describe('GIF Favorites — removeGifFavorite', () => {
 
   it('persists to IPC storage on remove', () => {
     (window as any).App.gifFavorites = [
-      { url: 'https://example.com/store.gif', title: 'Store', thumbnailUrl: 'https://example.com/s.gif', addedAt: 1 },
+      {
+        url: 'https://example.com/store.gif',
+        title: 'Store',
+        thumbnailUrl: 'https://example.com/s.gif',
+        addedAt: 1,
+      },
     ];
     (window as any).removeGifFavorite('https://example.com/store.gif');
     expect(mockIpcInvoke).toHaveBeenCalledWith('save-gif-favorites', expect.any(Array));
@@ -208,7 +248,12 @@ describe('GIF Favorites — removeGifFavorite', () => {
 
   it('isGifFavorited returns false after removing', () => {
     (window as any).App.gifFavorites = [
-      { url: 'https://example.com/gone.gif', title: 'Gone', thumbnailUrl: 'https://example.com/g.gif', addedAt: 1 },
+      {
+        url: 'https://example.com/gone.gif',
+        title: 'Gone',
+        thumbnailUrl: 'https://example.com/g.gif',
+        addedAt: 1,
+      },
     ];
     (window as any).removeGifFavorite('https://example.com/gone.gif');
     expect((window as any).isGifFavorited('https://example.com/gone.gif')).toBe(false);
@@ -216,7 +261,12 @@ describe('GIF Favorites — removeGifFavorite', () => {
 
   it('no-ops when URL is not in favorites', () => {
     (window as any).App.gifFavorites = [
-      { url: 'https://example.com/keep.gif', title: 'Keep', thumbnailUrl: 'https://example.com/k.gif', addedAt: 1 },
+      {
+        url: 'https://example.com/keep.gif',
+        title: 'Keep',
+        thumbnailUrl: 'https://example.com/k.gif',
+        addedAt: 1,
+      },
     ];
     (window as any).removeGifFavorite('https://example.com/nonexistent.gif');
     expect((window as any).App.gifFavorites).toHaveLength(1);

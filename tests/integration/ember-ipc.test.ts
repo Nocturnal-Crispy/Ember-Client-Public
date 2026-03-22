@@ -33,4 +33,3 @@ describe('ember IPC dispatcher', () => {
     expect(true).toBe(true);
   });
 });
-

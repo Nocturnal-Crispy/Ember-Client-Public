@@ -12,7 +12,9 @@ let windowControls: HTMLDivElement;
 beforeAll(() => {
   (window as any).App = {};
 
-  mockIpcInvoke = jest.fn().mockResolvedValue({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: null });
+  mockIpcInvoke = jest
+    .fn()
+    .mockResolvedValue({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: null });
 
   (window as any).electronAPI = {
     ipc: {
@@ -62,7 +64,11 @@ describe('checkForUpdate', () => {
   test('does not create a notification when no update is available', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: false, currentVersion: '0.0.13', latestVersion: '0.0.13' });
+      .mockResolvedValueOnce({
+        updateAvailable: false,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.13',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -73,7 +79,11 @@ describe('checkForUpdate', () => {
   test('creates a notification when an update is available', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -84,7 +94,11 @@ describe('checkForUpdate', () => {
   test('notification is inserted before the minimize button', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -99,7 +113,11 @@ describe('checkForUpdate', () => {
   test('notification displays the correct version string', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -124,7 +142,11 @@ describe('dismissUpdateNotification', () => {
   test('removes the notification element', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay
@@ -139,7 +161,11 @@ describe('dismissUpdateNotification', () => {
   test('dismissing same version prevents re-showing', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -149,7 +175,11 @@ describe('dismissUpdateNotification', () => {
     // Mock the IPC calls for the manual checkForUpdate call
     mockIpcInvoke
       .mockResolvedValueOnce('0.0.14') // get-skipped-version returns the dismissed version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     await (window as any).checkForUpdate();
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -160,7 +190,11 @@ describe('dismissUpdateNotification', () => {
   test('a different newer version shows notification after dismiss', async () => {
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.14' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.14',
+      });
 
     require('../../../src/renderer/managers/update-notifier');
     await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay
@@ -169,7 +203,11 @@ describe('dismissUpdateNotification', () => {
 
     mockIpcInvoke
       .mockResolvedValueOnce(null) // get-skipped-version for second check
-      .mockResolvedValueOnce({ updateAvailable: true, currentVersion: '0.0.13', latestVersion: '0.0.15' });
+      .mockResolvedValueOnce({
+        updateAvailable: true,
+        currentVersion: '0.0.13',
+        latestVersion: '0.0.15',
+      });
 
     await (window as any).checkForUpdate();
     await new Promise(resolve => setTimeout(resolve, 10)); // Increased delay

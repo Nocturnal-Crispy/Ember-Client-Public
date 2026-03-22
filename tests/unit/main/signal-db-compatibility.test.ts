@@ -40,7 +40,7 @@ describe('Signal Database Compatibility', () => {
     it('should perform basic database operations', () => {
       const identityKey = new Uint8Array(32).fill(1);
       signalDb = openSignalDatabase(tempDir, identityKey);
-      
+
       // Initialize the database with required data
       signalDb.initializeLocalIdentity(
         {
@@ -72,7 +72,7 @@ describe('Signal Database Compatibility', () => {
       // Database file should be created
       const dbPath = path.join(tempDir, 'signal-state.db');
       expect(fs.existsSync(dbPath)).toBe(true);
-      
+
       // Verify it's a valid SQLite file (should have SQLite header)
       const dbStats = fs.statSync(dbPath);
       expect(dbStats.size).toBeGreaterThan(100); // SQLite files have minimum size

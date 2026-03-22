@@ -26,11 +26,11 @@ npm run dist:mac                     # dmg + zip
 
 Always edit TypeScript sources; compiled JS is auto-generated:
 
-| Source | Output |
-|--------|--------|
-| `src/main.ts` | `public/src/js/main.js` |
-| `src/preload.ts` | `public/src/js/preload.js` |
-| `src/renderer/**/*.ts` | `public/src/js/**/*.js` |
+| Source                 | Output                     |
+| ---------------------- | -------------------------- |
+| `src/main.ts`          | `public/src/js/main.js`    |
+| `src/preload.ts`       | `public/src/js/preload.js` |
+| `src/renderer/**/*.ts` | `public/src/js/**/*.js`    |
 
 `tsconfig.json` compiles everything under `src/` → `public/src/js/` (single config, `module: "none"`).
 
@@ -47,6 +47,7 @@ ember-shared → ../ember-shared/src/index
 ```
 
 Functions exposed via `contextBridge` in `preload.ts`:
+
 - `window.electronAPI.authService.*` — login, register, form validation
 - `window.electronAPI.messageService.*` — fetch/send encrypted messages
 - `window.electronAPI.emberService.*` — fetch ember list
@@ -105,11 +106,11 @@ All globally exported functions/properties are typed in `src/renderer/types/glob
 
 Jest config: `tests/jest.config.ts` (rootDir is `../`, tests live in `tests/`).
 
-| Test type | Location | Import depth |
-|-----------|----------|--------------|
-| Unit — managers | `tests/unit/managers/` | `../../../src/...` |
+| Test type             | Location                                    | Import depth       |
+| --------------------- | ------------------------------------------- | ------------------ |
+| Unit — managers       | `tests/unit/managers/`                      | `../../../src/...` |
 | Unit — services/utils | `tests/unit/services/`, `tests/unit/utils/` | `../../../src/...` |
-| Integration | `tests/integration/` | `../../src/...` |
+| Integration           | `tests/integration/`                        | `../../src/...`    |
 
 - Crypto and integration tests require `@jest-environment node` (for SubtleCrypto).
 - IIFE module tests: set up `window.App`, `window.electronAPI`, `window.emberLog` mocks in `beforeAll`, then `require()` the module.

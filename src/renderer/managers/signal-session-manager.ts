@@ -32,12 +32,18 @@ interface AuthData {
 export interface SignalSessionManagerInterface {
   hasSession(userId: string, deviceId: string): Promise<boolean>;
   ensureSession(userId: string, deviceId: string): Promise<void>;
-  encrypt(recipientAddress: string, plaintext: Uint8Array): Promise<{ ciphertext: Uint8Array; messageType: number }>;
+  encrypt(
+    recipientAddress: string,
+    plaintext: Uint8Array
+  ): Promise<{ ciphertext: Uint8Array; messageType: number }>;
   decrypt(senderAddress: string, ciphertext: Uint8Array, messageType: number): Promise<Uint8Array>;
   groupEncrypt(distributionId: string, plaintext: Uint8Array): Promise<Uint8Array>;
   groupDecrypt(senderAddress: string, ciphertext: Uint8Array): Promise<Uint8Array>;
   createSenderKeyDistribution(distributionId: string): Promise<Uint8Array>;
-  processSenderKeyDistribution(senderAddress: string, distributionMessage: Uint8Array): Promise<void>;
+  processSenderKeyDistribution(
+    senderAddress: string,
+    distributionMessage: Uint8Array
+  ): Promise<void>;
 }
 
 // ─── SignalSessionManager ───────────────────────────────────────────────────────
@@ -53,7 +59,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
   constructor(auth: AuthData) {
     this.validateAuthData(auth);
     this.auth = auth;
-    
+
     // Use global references to work with script loading system
     if (!window.SignalService) {
       throw new Error('SignalService not available - check script loading order');
@@ -69,7 +75,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     if (!auth || typeof auth !== 'object') {
       throw new Error('Invalid auth data: auth is required');
     }
-    
+
     const requiredFields = ['token', 'hostname', 'user_id', 'device_id', 'username'];
     for (const field of requiredFields) {
       if (!(field in auth) || !auth[field as keyof AuthData]) {
@@ -117,14 +123,13 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
   /**
    * Wrap SignalService calls with consistent error handling
    */
-  private async wrapSignalServiceCall<T>(
-    operation: string,
-    call: () => Promise<T>
-  ): Promise<T> {
+  private async wrapSignalServiceCall<T>(operation: string, call: () => Promise<T>): Promise<T> {
     try {
       return await call();
     } catch (error) {
-      throw new Error(`Failed to ${operation}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to ${operation}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -133,7 +138,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   async hasSession(userId: string, deviceId: string): Promise<boolean> {
     this.ensureInitialized();
-    
+
     if (!userId || !deviceId) {
       throw new Error('userId and deviceId are required');
     }
@@ -141,7 +146,9 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     try {
       return await this.signalService.hasSession(userId, deviceId);
     } catch (error) {
-      throw new Error(`Failed to check session existence: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to check session existence: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -151,7 +158,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   async ensureSession(userId: string, deviceId: string): Promise<void> {
     this.ensureInitialized();
-    
+
     if (!userId || !deviceId) {
       throw new Error('userId and deviceId are required');
     }
@@ -159,7 +166,9 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     try {
       await this.signalService.ensureSession(userId, deviceId);
     } catch (error) {
-      throw new Error(`Failed to ensure session: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to ensure session: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -167,15 +176,15 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    * Encrypt a message for the specified recipient using Signal Protocol
    */
   async encrypt(
-    recipientAddress: string, 
+    recipientAddress: string,
     plaintext: Uint8Array
   ): Promise<{ ciphertext: Uint8Array; messageType: number }> {
     this.ensureInitialized();
-    
+
     this.validateRequiredParams({ recipientAddress, plaintext }, ['recipientAddress', 'plaintext']);
     this.validateAddressFormat(recipientAddress);
 
-    return this.wrapSignalServiceCall('encrypt message', () => 
+    return this.wrapSignalServiceCall('encrypt message', () =>
       this.signalService.encrypt(recipientAddress, plaintext)
     );
   }
@@ -184,12 +193,12 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    * Decrypt a message from the specified sender using Signal Protocol
    */
   async decrypt(
-    senderAddress: string, 
-    ciphertext: Uint8Array, 
+    senderAddress: string,
+    ciphertext: Uint8Array,
     messageType: number
   ): Promise<Uint8Array> {
     this.ensureInitialized();
-    
+
     if (!senderAddress || !ciphertext) {
       throw new Error('senderAddress and ciphertext are required');
     }
@@ -206,7 +215,9 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     try {
       return await this.signalService.decrypt(senderAddress, ciphertext, messageType);
     } catch (error) {
-      throw new Error(`Failed to decrypt message: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to decrypt message: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -215,17 +226,19 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   async groupEncrypt(distributionId: string, plaintext: Uint8Array): Promise<Uint8Array> {
     this.ensureInitialized();
-    
+
     this.validateRequiredParams({ distributionId, plaintext }, ['distributionId', 'plaintext']);
 
     return this.wrapSignalServiceCall('encrypt group message', async () => {
       const result = await this.signalService.groupEncrypt(distributionId, plaintext);
-      
+
       // Handle null/undefined result as encryption not ready
       if (!result) {
-        throw new Error('Encryption unavailable — sender key not established. Please rejoin or restart the application.');
+        throw new Error(
+          'Encryption unavailable — sender key not established. Please rejoin or restart the application.'
+        );
       }
-      
+
       return result;
     });
   }
@@ -235,7 +248,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   async groupDecrypt(senderAddress: string, ciphertext: Uint8Array): Promise<Uint8Array> {
     this.ensureInitialized();
-    
+
     if (!senderAddress || !ciphertext) {
       throw new Error('senderAddress and ciphertext are required');
     }
@@ -248,7 +261,9 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     try {
       return await this.signalService.groupDecrypt(senderAddress, ciphertext);
     } catch (error) {
-      throw new Error(`Failed to decrypt group message: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to decrypt group message: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -257,7 +272,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   async createSenderKeyDistribution(distributionId: string): Promise<Uint8Array> {
     this.ensureInitialized();
-    
+
     if (!distributionId) {
       throw new Error('distributionId is required');
     }
@@ -265,17 +280,25 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     try {
       return await this.signalService.createSenderKeyDistribution(distributionId);
     } catch (error) {
-      throw new Error(`Failed to create sender key distribution: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to create sender key distribution: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
   /**
    * Process a sender key distribution message
    */
-  async processSenderKeyDistribution(senderAddress: string, distributionMessage: Uint8Array): Promise<void> {
+  async processSenderKeyDistribution(
+    senderAddress: string,
+    distributionMessage: Uint8Array
+  ): Promise<void> {
     this.ensureInitialized();
-    
-    this.validateRequiredParams({ senderAddress, distributionMessage }, ['senderAddress', 'distributionMessage']);
+
+    this.validateRequiredParams({ senderAddress, distributionMessage }, [
+      'senderAddress',
+      'distributionMessage',
+    ]);
     this.validateAddressFormat(senderAddress);
 
     return this.wrapSignalServiceCall('process sender key distribution', () =>
@@ -379,7 +402,7 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   destroy(): void {
     this.isInitialized = false;
-    
+
     // Clean up services
     if (this.epochService) {
       this.epochService = null;
@@ -390,12 +413,12 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     if (this.inviteEphemeralKeyService) {
       this.inviteEphemeralKeyService = null;
     }
-    
+
     // Clean up signal service if it has cleanup method
     if (this.signalService && typeof (this.signalService as any).destroy === 'function') {
       (this.signalService as any).destroy();
     }
-    
+
     this.signalService = null as any;
   }
 }

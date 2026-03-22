@@ -83,7 +83,7 @@ describe('EnhancedRecoveryService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock SignalSessionManager
     mockSignalSessionManager = {
       hasSession: jest.fn(),
@@ -139,7 +139,7 @@ describe('EnhancedRecoveryService', () => {
   describe('generateDeviceFingerprint', () => {
     it('should generate a device fingerprint', () => {
       const fingerprint = enhancedRecoveryService.generateDeviceFingerprint();
-      
+
       expect(fingerprint).toMatch(/^[a-f0-9]{8}$/); // 8 character hex string
       expect(fingerprint.length).toBe(8);
     });
@@ -148,10 +148,10 @@ describe('EnhancedRecoveryService', () => {
       // Change device ID
       const differentAuth = { ...mockAuth, device_id: 'different-device' };
       const differentService = new EnhancedRecoveryService(differentAuth, mockSignalSessionManager);
-      
+
       const fingerprint1 = enhancedRecoveryService.generateDeviceFingerprint();
       const fingerprint2 = differentService.generateDeviceFingerprint();
-      
+
       expect(fingerprint1).not.toBe(fingerprint2);
     });
   });
@@ -210,7 +210,7 @@ describe('EnhancedRecoveryService', () => {
       });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
-      
+
       expect(status).toEqual({
         exists: false,
         enhanced: false,
@@ -232,7 +232,7 @@ describe('EnhancedRecoveryService', () => {
       });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
-      
+
       expect(status.exists).toBe(true);
       expect(status.enhanced).toBe(true);
       // Due to the mock setup, needsRotation will be true
@@ -248,14 +248,16 @@ describe('EnhancedRecoveryService', () => {
           recovery_code: {
             protocol_version: 1,
             identity_key_type: 'legacy',
-            last_rotated_at: Date.now() - (100 * 24 * 60 * 60 * 1000), // 100 days ago
+            last_rotated_at: Date.now() - 100 * 24 * 60 * 60 * 1000, // 100 days ago
           },
         }),
       });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
-      
-      expect(status.recommendations).toContain('Upgrade to enhanced recovery code for better security');
+
+      expect(status.recommendations).toContain(
+        'Upgrade to enhanced recovery code for better security'
+      );
       expect(status.recommendations).toContain('Update to use Ed25519 identity keys');
       expect(status.recommendations).toContain('Rotate recovery code for security');
     });

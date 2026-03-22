@@ -18,7 +18,7 @@ describe('Sender Key Setup', () => {
   beforeEach(() => {
     // Mock emberAPI
     mockEmberAPI = {
-      invoke: jest.fn()
+      invoke: jest.fn(),
     };
     window.emberAPI = mockEmberAPI;
   });
@@ -33,11 +33,11 @@ describe('Sender Key Setup', () => {
   ): Promise<{ distributionId: string; distributionMessage: string }> {
     const distributionId = await loadOrCreateDistributionId(emberId);
     const response = await window.emberAPI!.invoke<{ distributionMessage: string }>(
-      "CreateSenderKeyDistribution",
+      'CreateSenderKeyDistribution',
       { distributionId }
     );
     if (!response.success || !response.data?.distributionMessage) {
-      throw new Error("Failed to create sender key distribution");
+      throw new Error('Failed to create sender key distribution');
     }
     return {
       distributionId,
@@ -47,11 +47,11 @@ describe('Sender Key Setup', () => {
 
   async function loadOrCreateDistributionId(emberId: string): Promise<string> {
     const response = await window.emberAPI!.invoke<{ distributionId: string }>(
-      "LoadOrCreateDistributionId",
+      'LoadOrCreateDistributionId',
       { emberId }
     );
     if (!response.success || !response.data?.distributionId) {
-      throw new Error("Failed to load or create distribution ID");
+      throw new Error('Failed to load or create distribution ID');
     }
     return response.data.distributionId;
   }
@@ -59,31 +59,35 @@ describe('Sender Key Setup', () => {
   describe('Sender Key Distribution Creation Failures', () => {
     it('should reproduce sender key setup failure when CreateSenderKeyDistribution fails', async () => {
       const emberId = 'test-ember-id';
-      
+
       // Mock the API calls
       mockEmberAPI.invoke
         .mockResolvedValueOnce({ success: true, data: { distributionId: 'test-dist-id' } }) // loadOrCreateDistributionId
         .mockResolvedValueOnce({ success: false, data: null }); // CreateSenderKeyDistribution fails
 
       // This should throw the error
-      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow('Failed to create sender key distribution');
+      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow(
+        'Failed to create sender key distribution'
+      );
     });
 
     it('should reproduce sender key setup failure when CreateSenderKeyDistribution returns no distribution message', async () => {
       const emberId = 'test-ember-id';
-      
+
       // Mock the API calls
       mockEmberAPI.invoke
         .mockResolvedValueOnce({ success: true, data: { distributionId: 'test-dist-id' } }) // loadOrCreateDistributionId
         .mockResolvedValueOnce({ success: true, data: null }); // CreateSenderKeyDistribution succeeds but no message
 
       // This should throw the error
-      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow('Failed to create sender key distribution');
+      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow(
+        'Failed to create sender key distribution'
+      );
     });
 
     it('should reproduce sender key setup failure when CreateSenderKeyDistribution throws error', async () => {
       const emberId = 'test-ember-id';
-      
+
       // Mock the API calls
       mockEmberAPI.invoke
         .mockResolvedValueOnce({ success: true, data: { distributionId: 'test-dist-id' } }) // loadOrCreateDistributionId
@@ -95,19 +99,21 @@ describe('Sender Key Setup', () => {
 
     it('should reproduce sender key setup failure when loadOrCreateDistributionId fails', async () => {
       const emberId = 'test-ember-id';
-      
+
       // Mock the API call to fail at the first step
       mockEmberAPI.invoke.mockResolvedValueOnce({ success: false, data: null }); // loadOrCreateDistributionId fails
 
       // This should throw the error
-      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow('Failed to load or create distribution ID');
+      await expect(createSenderKeyForEmber(emberId)).rejects.toThrow(
+        'Failed to load or create distribution ID'
+      );
     });
   });
 
   describe('Success Cases', () => {
     it('should successfully create sender key distribution when all API calls succeed', async () => {
       const emberId = 'test-ember-id';
-      
+
       // Mock successful API calls
       mockEmberAPI.invoke
         .mockResolvedValueOnce({ success: true, data: { distributionId: 'test-dist-id' } }) // loadOrCreateDistributionId
@@ -117,7 +123,7 @@ describe('Sender Key Setup', () => {
 
       expect(result).toEqual({
         distributionId: 'test-dist-id',
-        distributionMessage: 'test-message'
+        distributionMessage: 'test-message',
       });
     });
   });
@@ -126,9 +132,9 @@ describe('Sender Key Setup', () => {
     it('should demonstrate the error handling pattern used in initializeEmber', async () => {
       const emberId = 'test-ember-id';
       const mockLog = {
-        warn: jest.fn()
+        warn: jest.fn(),
       };
-      
+
       // Mock the API calls to fail sender key creation
       mockEmberAPI.invoke
         .mockResolvedValueOnce({ success: true, data: { distributionId: 'test-dist-id' } }) // loadOrCreateDistributionId
@@ -143,14 +149,14 @@ describe('Sender Key Setup', () => {
         // This is the expected behavior - error should be caught and logged as warning
         expect(skErr).toBeInstanceOf(Error);
         expect((skErr as Error).message).toBe('Failed to create sender key distribution');
-        
+
         // Simulate the warning log that would occur
-        mockLog.warn("Sender key setup deferred", {
+        mockLog.warn('Sender key setup deferred', {
           ember_id: emberId,
           error: (skErr as Error).message,
         });
-        
-        expect(mockLog.warn).toHaveBeenCalledWith("Sender key setup deferred", {
+
+        expect(mockLog.warn).toHaveBeenCalledWith('Sender key setup deferred', {
           ember_id: emberId,
           error: 'Failed to create sender key distribution',
         });

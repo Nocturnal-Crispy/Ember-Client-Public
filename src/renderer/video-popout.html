@@ -1,91 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:; object-src 'none';">
-  <title>Voice</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #111;
-      color: #eee;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-    #popout-header {
-      padding: 8px 12px;
-      background: #1a1a1a;
-      font-size: 13px;
-      font-weight: 600;
-      color: #7dcea0;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      flex-shrink: 0;
-    }
-    #popout-grid {
-      flex: 1;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px;
-      overflow-y: auto;
-      align-content: flex-start;
-    }
-    .popout-tile {
-      position: relative;
-      background: #1a1a1a;
-      border-radius: 8px;
-      overflow: hidden;
-      aspect-ratio: 16 / 9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(255,255,255,0.1);
-      min-width: 200px;
-      flex: 1;
-    }
-    .popout-tile video { width: 100%; height: 100%; object-fit: cover; }
-    .popout-tile-label {
-      position: absolute;
-      bottom: 6px;
-      left: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-    }
-    #popout-status {
-      padding: 20px;
-      text-align: center;
-      color: rgba(255,255,255,0.5);
-      font-size: 14px;
-    }
-  </style>
-</head>
-<body>
-  <div id="popout-header">🔊 Voice</div>
-  <div id="popout-grid">
-    <div id="popout-status">Connecting…</div>
-  </div>
-  <script>
-    (async function () {
-      const ctx = await window.popoutAPI.getVoiceContext();
-      if (!ctx || !ctx.token) {
-        document.getElementById('popout-status').textContent = 'Could not connect: no auth context.';
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:; object-src 'none';"
+    />
+    <title>Voice</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
       }
-      if (ctx.channelName) {
-        document.getElementById('popout-header').textContent = '\uD83D\uDD0A ' + ctx.channelName;
-        document.title = 'Voice \u2014 ' + ctx.channelName;
+      body {
+        margin: 0;
+        background: #111;
+        color: #eee;
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
       }
-      // Token is available in ctx.token for future WebSocket subscription.
-      // Full subscriber WebRTC wiring goes here in a future iteration.
-      document.getElementById('popout-status').textContent = 'Connected to ' + (ctx.channelName || 'voice channel') + '.';
-    })();
-  </script>
-</body>
+      #popout-header {
+        padding: 8px 12px;
+        background: #1a1a1a;
+        font-size: 13px;
+        font-weight: 600;
+        color: #7dcea0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex-shrink: 0;
+      }
+      #popout-grid {
+        flex: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        overflow-y: auto;
+        align-content: flex-start;
+      }
+      .popout-tile {
+        position: relative;
+        background: #1a1a1a;
+        border-radius: 8px;
+        overflow: hidden;
+        aspect-ratio: 16 / 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        min-width: 200px;
+        flex: 1;
+      }
+      .popout-tile video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .popout-tile-label {
+        position: absolute;
+        bottom: 6px;
+        left: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      }
+      #popout-status {
+        padding: 20px;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="popout-header">🔊 Voice</div>
+    <div id="popout-grid">
+      <div id="popout-status">Connecting…</div>
+    </div>
+    <script>
+      (async function () {
+        const ctx = await window.popoutAPI.getVoiceContext();
+        if (!ctx || !ctx.token) {
+          document.getElementById('popout-status').textContent =
+            'Could not connect: no auth context.';
+          return;
+        }
+        if (ctx.channelName) {
+          document.getElementById('popout-header').textContent = '\uD83D\uDD0A ' + ctx.channelName;
+          document.title = 'Voice \u2014 ' + ctx.channelName;
+        }
+        // Token is available in ctx.token for future WebSocket subscription.
+        // Full subscriber WebRTC wiring goes here in a future iteration.
+        document.getElementById('popout-status').textContent =
+          'Connected to ' + (ctx.channelName || 'voice channel') + '.';
+      })();
+    </script>
+  </body>
 </html>

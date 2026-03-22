@@ -24,7 +24,10 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
   font-family: 'Courier New', Courier, monospace;
   font-weight: bold;
   font-size: 14px;
@@ -54,9 +57,17 @@
 }
 
 @keyframes badgePop {
-  0%   { transform: scale(0.5); opacity: 0; }
-  70%  { transform: scale(1.15); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .server-icon:hover {
@@ -135,7 +146,10 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .read-all-btn:hover {

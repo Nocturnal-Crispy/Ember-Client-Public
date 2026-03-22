@@ -21,12 +21,15 @@ function makeMockTrack(kind = 'video'): MediaStreamTrack {
   return { kind, stop: jest.fn(), id: 'track-' + kind } as unknown as MediaStreamTrack;
 }
 
-function makeMockStream(tracks: MediaStreamTrack[] = [], id = `stream-${Math.random().toString(36).slice(2)}`): MediaStream {
+function makeMockStream(
+  tracks: MediaStreamTrack[] = [],
+  id = `stream-${Math.random().toString(36).slice(2)}`
+): MediaStream {
   return {
     id,
     getTracks: () => tracks,
-    getVideoTracks: () => tracks.filter((t) => t.kind === 'video'),
-    getAudioTracks: () => tracks.filter((t) => t.kind === 'audio'),
+    getVideoTracks: () => tracks.filter(t => t.kind === 'video'),
+    getAudioTracks: () => tracks.filter(t => t.kind === 'audio'),
   } as unknown as MediaStream;
 }
 
@@ -52,11 +55,18 @@ function makeMockPC(offer = makeMockOffer()) {
 function makeMockWs(capturedMessages: string[]) {
   return {
     readyState: 1, // OPEN
-    send: jest.fn((msg: string) => { capturedMessages.push(msg); }),
+    send: jest.fn((msg: string) => {
+      capturedMessages.push(msg);
+    }),
   } as unknown as WebSocket;
 }
 
-const MOCK_AUTH = { user_id: 'user-1', username: 'Alice', token: 'tok', hostname: 'http://localhost:8085' };
+const MOCK_AUTH = {
+  user_id: 'user-1',
+  username: 'Alice',
+  token: 'tok',
+  hostname: 'http://localhost:8085',
+};
 const MOCK_CHANNEL_ID = 'ch-voice-test';
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -83,13 +93,15 @@ beforeAll(() => {
   (global as any).AudioContext = jest.fn(() => ({
     createMediaStreamSource: jest.fn(() => ({ connect: jest.fn() })),
     createAnalyser: jest.fn(() => ({
-      fftSize: 0, smoothingTimeConstant: 0,
+      fftSize: 0,
+      smoothingTimeConstant: 0,
       connect: jest.fn(),
       frequencyBinCount: 0,
       getByteFrequencyData: jest.fn(),
     })),
     close: jest.fn().mockResolvedValue(undefined),
-    currentTime: 0, state: 'running',
+    currentTime: 0,
+    state: 'running',
   }));
   (global as any).requestAnimationFrame = jest.fn();
 
@@ -129,7 +141,12 @@ beforeEach(() => {
 
 describe('startScreenShare', () => {
   const SOURCE_ID = 'screen:0:0';
-  const SETTINGS: ScreenShareSettings = { sourceId: SOURCE_ID, includeAudio: false, resolution: '720p', frameRate: 15 };
+  const SETTINGS: ScreenShareSettings = {
+    sourceId: SOURCE_ID,
+    includeAudio: false,
+    resolution: '720p',
+    frameRate: 15,
+  };
 
   it('calls getUserMedia with desktop constraints', async () => {
     const track = makeMockTrack('video');
@@ -211,9 +228,7 @@ describe('startScreenShare', () => {
   });
 
   it('returns false and cleans up stream when getUserMedia throws', async () => {
-    mockGetUserMedia.mockRejectedValue(
-      new Error('Permission denied')
-    );
+    mockGetUserMedia.mockRejectedValue(new Error('Permission denied'));
 
     const result = await (vm as any).startScreenShare(SOURCE_ID, SETTINGS);
 
@@ -261,7 +276,7 @@ describe('stopScreenShare', () => {
   it('stops all tracks on localScreenStream', async () => {
     const tracks = (vm as any).localScreenStream.getTracks() as ReturnType<typeof makeMockTrack>[];
     await (vm as any).stopScreenShare();
-    tracks.forEach((t) => expect(t.stop).toHaveBeenCalled());
+    tracks.forEach(t => expect(t.stop).toHaveBeenCalled());
   });
 
   it('sends voice_renegotiate and screen_share_stop after stopping', async () => {
@@ -486,7 +501,12 @@ describe('Phase 10: handleParticipants reconciles screen share state', () => {
     (vm as any)._userToScreenStreamId.set('user-A', 'stream-OLD');
 
     (vm as any).handleParticipants([
-      { user_id: 'user-A', username: 'Alice', screen_sharing: true, screen_stream_id: 'stream-NEW' },
+      {
+        user_id: 'user-A',
+        username: 'Alice',
+        screen_sharing: true,
+        screen_stream_id: 'stream-NEW',
+      },
     ]);
 
     // Existing mapping is preserved (not overwritten)
@@ -528,7 +548,12 @@ describe('Phase 10: ontrack routes screen streams to remoteScreenStreams', () =>
     (vm as any)._userToScreenStreamId.set('user-A', 'stream-scr');
 
     // Simulate subscriberPC.ontrack firing for a screen stream
-    const mockStream = { id: 'stream-scr', getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+    const mockStream = {
+      id: 'stream-scr',
+      getTracks: () => [],
+      getVideoTracks: () => [],
+      getAudioTracks: () => [],
+    } as unknown as MediaStream;
     const mockTrack = { kind: 'video' } as MediaStreamTrack;
 
     // Trigger ontrack by calling the internal handler directly
@@ -540,7 +565,12 @@ describe('Phase 10: ontrack routes screen streams to remoteScreenStreams', () =>
 
   it('routes a video stream with unknown ID to remoteVideoStreams', () => {
     // No pre-registered mapping → should go to camera streams
-    const mockStream = { id: 'stream-cam', getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+    const mockStream = {
+      id: 'stream-cam',
+      getTracks: () => [],
+      getVideoTracks: () => [],
+      getAudioTracks: () => [],
+    } as unknown as MediaStream;
     const mockTrack = { kind: 'video' } as MediaStreamTrack;
 
     (vm as any)._handleSubscriberTrack?.({ track: mockTrack, streams: [mockStream] });

@@ -204,7 +204,10 @@ async function handleStoreSession(db: SignalDatabase, args: StoreSessionArgs): P
   await db.storeSession(args.address, Buffer.from(args.record, 'base64'));
 }
 
-async function handleLoadSession(db: SignalDatabase, args: LoadSessionArgs): Promise<LoadSessionData> {
+async function handleLoadSession(
+  db: SignalDatabase,
+  args: LoadSessionArgs
+): Promise<LoadSessionData> {
   const result = await db.loadSession(args.address);
   return { record: result ? Buffer.from(result).toString('base64') : null };
 }
@@ -213,12 +216,18 @@ async function handleRemoveSession(db: SignalDatabase, args: RemoveSessionArgs):
   await db.removeSession(args.address);
 }
 
-async function handleStoreIdentity(db: SignalDatabase, args: StoreIdentityArgs): Promise<StoreIdentityData> {
+async function handleStoreIdentity(
+  db: SignalDatabase,
+  args: StoreIdentityArgs
+): Promise<StoreIdentityData> {
   const changed = await db.saveIdentity(args.address, Buffer.from(args.identityKey, 'base64'));
   return { changed };
 }
 
-async function handleLoadIdentity(db: SignalDatabase, args: LoadIdentityArgs): Promise<LoadIdentityData> {
+async function handleLoadIdentity(
+  db: SignalDatabase,
+  args: LoadIdentityArgs
+): Promise<LoadIdentityData> {
   const result = await db.getIdentity(args.address);
   return { identityKey: result ? Buffer.from(result).toString('base64') : null };
 }
@@ -236,16 +245,25 @@ async function handleRemovePreKey(db: SignalDatabase, args: RemovePreKeyArgs): P
   await db.removePreKey(args.id);
 }
 
-async function handleStoreSignedPreKey(db: SignalDatabase, args: StoreSignedPreKeyArgs): Promise<void> {
+async function handleStoreSignedPreKey(
+  db: SignalDatabase,
+  args: StoreSignedPreKeyArgs
+): Promise<void> {
   await db.storeSignedPreKey(args.id, Buffer.from(args.record, 'base64'));
 }
 
-async function handleLoadSignedPreKey(db: SignalDatabase, args: LoadSignedPreKeyArgs): Promise<LoadSignedPreKeyData> {
+async function handleLoadSignedPreKey(
+  db: SignalDatabase,
+  args: LoadSignedPreKeyArgs
+): Promise<LoadSignedPreKeyData> {
   const result = await db.loadSignedPreKey(args.id);
   return { record: result ? Buffer.from(result).toString('base64') : null };
 }
 
-async function handleRemoveSignedPreKey(db: SignalDatabase, args: RemoveSignedPreKeyArgs): Promise<void> {
+async function handleRemoveSignedPreKey(
+  db: SignalDatabase,
+  args: RemoveSignedPreKeyArgs
+): Promise<void> {
   await db.removeSignedPreKey(args.id);
 }
 
@@ -260,7 +278,7 @@ async function handleStoreSenderKey(db: SignalDatabase, args: StoreSenderKeyArgs
   if (!args.record || typeof args.record !== 'string') {
     throw new Error('Invalid record: must be base64 string');
   }
-  
+
   // Validate base64 format
   try {
     const decoded = Buffer.from(args.record, 'base64');
@@ -277,7 +295,10 @@ async function handleStoreSenderKey(db: SignalDatabase, args: StoreSenderKeyArgs
   }
 }
 
-async function handleLoadSenderKey(db: SignalDatabase, args: LoadSenderKeyArgs): Promise<LoadSenderKeyData> {
+async function handleLoadSenderKey(
+  db: SignalDatabase,
+  args: LoadSenderKeyArgs
+): Promise<LoadSenderKeyData> {
   // CRITICAL FIX: Validate input parameters
   if (!args.address || typeof args.address !== 'string') {
     throw new Error('Invalid address: must be non-empty string');
@@ -285,22 +306,22 @@ async function handleLoadSenderKey(db: SignalDatabase, args: LoadSenderKeyArgs):
   if (!args.distributionId || typeof args.distributionId !== 'string') {
     throw new Error('Invalid distributionId: must be non-empty string');
   }
-  
+
   const result = await db.getSenderKey(args.address, args.distributionId);
-  
+
   // CRITICAL FIX: Validate result before base64 encoding
   if (!result) {
     return { record: null };
   }
-  
+
   if (!(result instanceof Uint8Array)) {
     throw new Error('Invalid sender key data type from database');
   }
-  
+
   if (result.length === 0) {
     return { record: null }; // Empty record is treated as not found
   }
-  
+
   // Safe conversion to base64 string
   try {
     return { record: Buffer.from(result).toString('base64') };
@@ -313,27 +334,42 @@ function handleStoreDistributionId(db: SignalDatabase, args: StoreDistributionId
   db.storeDistributionId(args.address, args.distributionId);
 }
 
-function handleLoadDistributionId(db: SignalDatabase, args: LoadDistributionIdArgs): LoadDistributionIdData {
+function handleLoadDistributionId(
+  db: SignalDatabase,
+  args: LoadDistributionIdArgs
+): LoadDistributionIdData {
   const result = db.loadDistributionId(args.address);
   return { distributionId: result };
 }
 
 // ── Kyber pre-key handlers (scaffolding only) ───────────────────────────────────
 
-async function handleLoadKyberPreKey(db: SignalDatabase, args: LoadKyberPreKeyArgs): Promise<LoadKyberPreKeyData> {
+async function handleLoadKyberPreKey(
+  db: SignalDatabase,
+  args: LoadKyberPreKeyArgs
+): Promise<LoadKyberPreKeyData> {
   const result = await db.loadKyberPreKey(args.id);
   return { record: result ? Buffer.from(result).toString('base64') : null };
 }
 
-async function handleStoreKyberPreKey(db: SignalDatabase, args: StoreKyberPreKeyArgs): Promise<void> {
+async function handleStoreKyberPreKey(
+  db: SignalDatabase,
+  args: StoreKyberPreKeyArgs
+): Promise<void> {
   await db.storeKyberPreKey(args.id, Buffer.from(args.record, 'base64'));
 }
 
-async function handleMarkKyberPreKeyUsed(db: SignalDatabase, args: MarkKyberPreKeyUsedArgs): Promise<void> {
+async function handleMarkKyberPreKeyUsed(
+  db: SignalDatabase,
+  args: MarkKyberPreKeyUsedArgs
+): Promise<void> {
   await db.markKyberPreKeyUsed(args.id);
 }
 
-async function handleRemoveKyberPreKey(db: SignalDatabase, args: RemoveKyberPreKeyArgs): Promise<void> {
+async function handleRemoveKyberPreKey(
+  db: SignalDatabase,
+  args: RemoveKyberPreKeyArgs
+): Promise<void> {
   await db.removeKyberPreKey(args.id);
 }
 
@@ -359,7 +395,10 @@ function buildSignalStores(db: SignalDatabase) {
   };
 }
 
-async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKeyBundleArgs): Promise<void> {
+async function handleProcessPreKeyBundle(
+  db: SignalDatabase,
+  args: ProcessPreKeyBundleArgs
+): Promise<void> {
   const stores = buildSignalStores(db);
 
   // Coerce numeric fields first — IPC serialization may deliver non-number types
@@ -376,7 +415,8 @@ async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKey
     preKeyId,
     hasIdentityKey: typeof args.identityKey === 'string' && args.identityKey.length > 0,
     hasSignedPreKey: typeof args.signedPreKey === 'string' && args.signedPreKey.length > 0,
-    hasSignedPreKeySignature: typeof args.signedPreKeySignature === 'string' && args.signedPreKeySignature.length > 0,
+    hasSignedPreKeySignature:
+      typeof args.signedPreKeySignature === 'string' && args.signedPreKeySignature.length > 0,
     hasPreKey: typeof args.preKey === 'string' && args.preKey.length > 0,
     rawTypes: {
       registrationId: typeof args.registrationId,
@@ -387,7 +427,9 @@ async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKey
   });
 
   if (!Number.isFinite(signedPreKeyId)) {
-    throw new Error(`Invalid signedPreKeyId: ${String(args.signedPreKeyId)} (type: ${typeof args.signedPreKeyId})`);
+    throw new Error(
+      `Invalid signedPreKeyId: ${String(args.signedPreKeyId)} (type: ${typeof args.signedPreKeyId})`
+    );
   }
   if (!args.identityKey) {
     throw new Error('Missing identityKey in ProcessPreKeyBundle args');
@@ -426,14 +468,9 @@ async function handleProcessPreKeyBundle(db: SignalDatabase, args: ProcessPreKey
     identityKey,
     kyberPreKeyId,
     kyberPublicKey,
-    new Uint8Array(kyberSignature),
+    new Uint8Array(kyberSignature)
   );
-  await processPreKeyBundle(
-    bundle,
-    recipientAddress,
-    stores.sessionStore,
-    stores.identityStore,
-  );
+  await processPreKeyBundle(bundle, recipientAddress, stores.sessionStore, stores.identityStore);
   log.info('Signal session established', { recipient: args.recipientAddress });
 }
 
@@ -448,7 +485,10 @@ async function handleEncrypt(db: SignalDatabase, args: EncryptArgs): Promise<Enc
   };
 }
 
-async function handleDecryptPreKey(db: SignalDatabase, args: DecryptPreKeyArgs): Promise<DecryptData> {
+async function handleDecryptPreKey(
+  db: SignalDatabase,
+  args: DecryptPreKeyArgs
+): Promise<DecryptData> {
   const stores = buildSignalStores(db);
   const senderAddress = ProtocolAddress.new(args.senderAddress, 1);
   const ciphertext = Buffer.from(args.ciphertext, 'base64');
@@ -476,7 +516,10 @@ async function handleDecryptWhisper(db: SignalDatabase, args: DecryptArgs): Prom
   return { plaintext: Buffer.from(plaintext).toString('base64') };
 }
 
-async function handleGroupEncrypt(db: SignalDatabase, args: GroupEncryptArgs): Promise<GroupEncryptData> {
+async function handleGroupEncrypt(
+  db: SignalDatabase,
+  args: GroupEncryptArgs
+): Promise<GroupEncryptData> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
   const localAddress = getLocalAddress();
   const plaintext = Buffer.from(args.plaintext, 'base64');
@@ -484,12 +527,15 @@ async function handleGroupEncrypt(db: SignalDatabase, args: GroupEncryptArgs): P
     localAddress,
     args.distributionId as unknown as Uuid,
     new Uint8Array(plaintext),
-    senderKeyStore,
+    senderKeyStore
   );
   return { ciphertext: Buffer.from(ciphertext).toString('base64') };
 }
 
-async function handleGroupDecrypt(db: SignalDatabase, args: GroupDecryptArgs): Promise<GroupDecryptData> {
+async function handleGroupDecrypt(
+  db: SignalDatabase,
+  args: GroupDecryptArgs
+): Promise<GroupDecryptData> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
   const ciphertext = Buffer.from(args.ciphertext, 'base64');
 
@@ -502,24 +548,32 @@ async function handleGroupDecrypt(db: SignalDatabase, args: GroupDecryptArgs): P
 
   if (isSelf) {
     const selfRecvAddress = ProtocolAddress.new(`self-recv::${args.senderAddress}`, 1);
-    const plaintext = await groupDecryptMessage(selfRecvAddress, new Uint8Array(ciphertext), senderKeyStore);
+    const plaintext = await groupDecryptMessage(
+      selfRecvAddress,
+      new Uint8Array(ciphertext),
+      senderKeyStore
+    );
     return { plaintext: Buffer.from(plaintext).toString('base64') };
   }
 
-  const plaintext = await groupDecryptMessage(senderAddress, new Uint8Array(ciphertext), senderKeyStore);
+  const plaintext = await groupDecryptMessage(
+    senderAddress,
+    new Uint8Array(ciphertext),
+    senderKeyStore
+  );
   return { plaintext: Buffer.from(plaintext).toString('base64') };
 }
 
 async function handleCreateSenderKeyDistribution(
   db: SignalDatabase,
-  args: CreateSenderKeyDistributionArgs,
+  args: CreateSenderKeyDistributionArgs
 ): Promise<CreateSenderKeyDistributionData> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
   const localAddress = getLocalAddress();
   const distributionBytes = await createSenderKeyDistribution(
     localAddress,
     args.distributionId as unknown as Uuid,
-    senderKeyStore,
+    senderKeyStore
   );
   log.info('Sender key distribution created', { distributionId: args.distributionId });
   return { distributionMessage: Buffer.from(distributionBytes).toString('base64') };
@@ -527,7 +581,7 @@ async function handleCreateSenderKeyDistribution(
 
 async function handleProcessSenderKeyDistribution(
   db: SignalDatabase,
-  args: ProcessSenderKeyDistributionArgs,
+  args: ProcessSenderKeyDistributionArgs
 ): Promise<void> {
   const senderKeyStore = new SignalDbSenderKeyStore(db);
   const distributionMessage = Buffer.from(args.distributionMessage, 'base64');
@@ -540,11 +594,19 @@ async function handleProcessSenderKeyDistribution(
 
   if (isSelf) {
     const selfRecvAddress = ProtocolAddress.new(`self-recv::${args.senderAddress}`, 1);
-    await processSenderKeyDistribution(selfRecvAddress, new Uint8Array(distributionMessage), senderKeyStore);
+    await processSenderKeyDistribution(
+      selfRecvAddress,
+      new Uint8Array(distributionMessage),
+      senderKeyStore
+    );
     log.info('Self sender key distribution processed', { sender: args.senderAddress });
     return;
   }
-  await processSenderKeyDistribution(senderAddress, new Uint8Array(distributionMessage), senderKeyStore);
+  await processSenderKeyDistribution(
+    senderAddress,
+    new Uint8Array(distributionMessage),
+    senderKeyStore
+  );
   log.info('Sender key distribution processed', { sender: args.senderAddress });
 }
 
@@ -557,7 +619,7 @@ async function handleProcessSenderKeyDistribution(
  */
 export async function dispatchEmberCmd(
   msg: unknown,
-  db: SignalDatabase | null,
+  db: SignalDatabase | null
 ): Promise<EmberIpcResponse<unknown>> {
   // 1. Validate shape
   if (
@@ -598,7 +660,7 @@ export async function dispatchEmberCmd(
 async function dispatch(
   cmd: EmberCmd,
   args: Record<string, unknown>,
-  db: SignalDatabase | null,
+  db: SignalDatabase | null
 ): Promise<unknown> {
   switch (cmd) {
     // Auth
@@ -681,9 +743,15 @@ async function dispatch(
     case 'GroupDecrypt':
       return handleGroupDecrypt(requireDb(db), args as unknown as GroupDecryptArgs);
     case 'CreateSenderKeyDistribution':
-      return handleCreateSenderKeyDistribution(requireDb(db), args as unknown as CreateSenderKeyDistributionArgs);
+      return handleCreateSenderKeyDistribution(
+        requireDb(db),
+        args as unknown as CreateSenderKeyDistributionArgs
+      );
     case 'ProcessSenderKeyDistribution':
-      await handleProcessSenderKeyDistribution(requireDb(db), args as unknown as ProcessSenderKeyDistributionArgs);
+      await handleProcessSenderKeyDistribution(
+        requireDb(db),
+        args as unknown as ProcessSenderKeyDistributionArgs
+      );
       return undefined;
     default:
       return undefined;
@@ -708,7 +776,7 @@ let currentSignalDb: SignalDatabase | null = null;
  */
 export function registerEmberIpcHandlers(db: SignalDatabase | null): void {
   currentSignalDb = db;
-  
+
   // Only register the handler once
   if (ipcMain.listenerCount('ember') === 0) {
     ipcMain.handle('ember', async (_event, msg: unknown) => {

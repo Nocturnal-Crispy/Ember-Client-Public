@@ -9,7 +9,7 @@ describe('app lock conditional visibility', () => {
     const fs = require('fs');
     const cssPath = `${__dirname}/../../../src/renderer/styles/components/settings.css`;
     const cssContent = fs.readFileSync(cssPath, 'utf8');
-    
+
     expect(cssContent).toContain('.app-lock-dependent');
     expect(cssContent).toContain('.app-lock-dependent.hidden');
     expect(cssContent).toContain('display: none');
@@ -20,7 +20,7 @@ describe('app lock conditional visibility', () => {
     const fs = require('fs');
     const htmlPath = `${__dirname}/../../../src/renderer/modal-settings.html`;
     const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-    
+
     expect(htmlContent).toContain('app-lock-dependent');
     // Check that all the dependent options have the class
     expect(htmlContent).toMatch(/class="vv-row app-lock-dependent"/);
@@ -32,7 +32,7 @@ describe('app lock conditional visibility', () => {
     const fs = require('fs');
     const jsPath = `${__dirname}/../../../src/renderer/managers/plugin-settings.ts`;
     const jsContent = fs.readFileSync(jsPath, 'utf8');
-    
+
     expect(jsContent).toContain('updateAppLockDependentVisibility');
     expect(jsContent).toContain('querySelectorAll(".app-lock-dependent")');
     expect(jsContent).toContain('classList.add("hidden")');

@@ -1,6 +1,6 @@
 /**
  * Mock for @signalapp/libsignal-client
- * 
+ *
  * This mock provides basic implementations for the Signal client classes
  * used in tests, avoiding the ES module import issues.
  */
@@ -66,7 +66,10 @@ export class IdentityKeyPair {
     return new IdentityKeyPair(new PublicKey(), new PrivateKey());
   }
 
-  constructor(public readonly publicKey: PublicKey, public readonly privateKey: PrivateKey) {}
+  constructor(
+    public readonly publicKey: PublicKey,
+    public readonly privateKey: PrivateKey
+  ) {}
 }
 
 export class ProtocolAddress {
@@ -94,10 +97,7 @@ export class SessionRecord {
 }
 
 export class Fingerprint {
-  static calculate(
-    localIdentityKey: PublicKey,
-    remoteIdentityKey: PublicKey
-  ): Uint8Array {
+  static calculate(localIdentityKey: PublicKey, remoteIdentityKey: PublicKey): Uint8Array {
     return new Uint8Array(32);
   }
 }

@@ -56,7 +56,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 export class EmberIpcError extends Error {
   constructor(
     public readonly cmd: EmberCmd,
-    message: string,
+    message: string
   ) {
     super(message);
     this.name = 'EmberIpcError';
@@ -93,24 +93,31 @@ export class IpcSessionStore implements ISessionStore {
 export class IpcIdentityKeyStore implements IIdentityKeyStore {
   constructor(private readonly auth: AuthData) {}
 
-  async getIdentityKeyPair(): Promise<{ readonly publicKey: Uint8Array; readonly privateKey: Uint8Array }> {
+  async getIdentityKeyPair(): Promise<{
+    readonly publicKey: Uint8Array;
+    readonly privateKey: Uint8Array;
+  }> {
     // Read private key from identity_key_${user_id}_${device_id}
     const privKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
-    const privKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key: privKey });
+    const privKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', {
+      key: privKey,
+    });
     if (!privKeyResponse.data?.value) {
       throw new Error('Identity private key not found in secure storage');
     }
 
     // Read public key from identity_pubkey_${user_id}_${device_id}
     const pubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
-    const pubKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key: pubKey });
+    const pubKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', {
+      key: pubKey,
+    });
     if (!pubKeyResponse.data?.value) {
       throw new Error('Identity public key not found in secure storage');
     }
 
-    return { 
-      publicKey: fromBase64(pubKeyResponse.data.value), 
-      privateKey: fromBase64(privKeyResponse.data.value) 
+    return {
+      publicKey: fromBase64(pubKeyResponse.data.value),
+      privateKey: fromBase64(privKeyResponse.data.value),
     };
   }
 
@@ -134,7 +141,7 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
   async isTrustedIdentity(
     address: string,
     identityKey: Uint8Array,
-    _direction: 'sending' | 'receiving',
+    _direction: 'sending' | 'receiving'
   ): Promise<boolean> {
     const response = await window.emberAPI.invoke<LoadIdentityData>('LoadIdentity', { address });
     const storedBase64 = response.data?.identityKey;
@@ -222,23 +229,33 @@ export class SignalService {
     return response.data as D;
   }
 
-  async getLocalDevice(): Promise<{ readonly publicKey: Uint8Array; readonly privateKey: Uint8Array; readonly registrationId: number }> {
+  async getLocalDevice(): Promise<{
+    readonly publicKey: Uint8Array;
+    readonly privateKey: Uint8Array;
+    readonly registrationId: number;
+  }> {
     // Read private key from identity_key_${user_id}_${device_id}
     const identityKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
-    const identityResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', { key: identityKey });
+    const identityResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
+      key: identityKey,
+    });
     if (!identityResponse.value) {
       throw new Error('Identity private key not found in secure storage');
     }
 
     // Read public key from identity_pubkey_${user_id}_${device_id}
     const identityPubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
-    const identityPubResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', { key: identityPubKey });
+    const identityPubResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
+      key: identityPubKey,
+    });
     if (!identityPubResponse.value) {
       throw new Error('Identity public key not found in secure storage');
     }
 
     const registrationKey = `registration_id_${this.auth.user_id}_${this.auth.device_id}`;
-    const registrationResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', { key: registrationKey });
+    const registrationResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
+      key: registrationKey,
+    });
     if (!registrationResponse.value) {
       throw new Error('Registration ID not found in secure storage');
     }
@@ -279,7 +296,7 @@ export class SignalService {
 
   async encrypt(
     recipientAddress: string,
-    plaintext: Uint8Array,
+    plaintext: Uint8Array
   ): Promise<{ ciphertext: Uint8Array; messageType: number }> {
     const args: EncryptArgs = { recipientAddress, plaintext: toBase64(plaintext) };
     const data = await this.invoke<EncryptData>('Encrypt', args);
@@ -289,10 +306,14 @@ export class SignalService {
   async decrypt(
     senderAddress: string,
     ciphertext: Uint8Array,
-    messageType: number,
+    messageType: number
   ): Promise<Uint8Array> {
     if (messageType === PREKEY_MESSAGE_TYPE) {
-      const args: DecryptPreKeyArgs = { senderAddress, ciphertext: toBase64(ciphertext), messageType };
+      const args: DecryptPreKeyArgs = {
+        senderAddress,
+        ciphertext: toBase64(ciphertext),
+        messageType,
+      };
       const data = await this.invoke<DecryptData>('DecryptPreKey', args);
       return fromBase64(data.plaintext);
     }
@@ -317,14 +338,14 @@ export class SignalService {
     const args: CreateSenderKeyDistributionArgs = { distributionId };
     const data = await this.invoke<CreateSenderKeyDistributionData>(
       'CreateSenderKeyDistribution',
-      args,
+      args
     );
     return fromBase64(data.distributionMessage);
   }
 
   async processSenderKeyDistribution(
     senderAddress: string,
-    distributionMessage: Uint8Array,
+    distributionMessage: Uint8Array
   ): Promise<void> {
     const args: ProcessSenderKeyDistributionArgs = {
       senderAddress,

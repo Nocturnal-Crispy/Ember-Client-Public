@@ -4,11 +4,7 @@
 export type CryptoMode = 'pairwise_bootstrap' | 'sender_key_active';
 
 /** Sender key distribution lifecycle status. */
-export type SenderKeyStatus =
-  | 'not_initialized'
-  | 'distributing'
-  | 'active'
-  | 'rotation_required';
+export type SenderKeyStatus = 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
 
 /** Wire type for message envelope routing. */
 export type WireType = 'prekey' | 'signal' | 'sender_key';

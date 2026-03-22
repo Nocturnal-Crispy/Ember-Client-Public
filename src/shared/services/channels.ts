@@ -12,7 +12,7 @@ interface EmberKeyResponse {
 
 export async function fetchChannels(
   auth: AuthData,
-  emberId: string,
+  emberId: string
 ): Promise<{ channels: Channel[]; categories: Category[] }> {
   // Fetch both channels and categories in parallel
   const [channelsResponse, categoriesResponse] = await Promise.all([
@@ -20,13 +20,13 @@ export async function fetchChannels(
       auth.hostname,
       `/api/v1/embers/${emberId}/channels`,
       { method: 'GET' },
-      auth.token,
+      auth.token
     ),
     apiRequest<{ categories?: Category[] }>(
       auth.hostname,
       `/api/v1/embers/${emberId}/categories`,
       { method: 'GET' },
-      auth.token,
+      auth.token
     ),
   ]);
 
@@ -38,14 +38,14 @@ export async function fetchChannels(
 
 export async function fetchEmberKey(
   auth: AuthData,
-  emberId: string,
+  emberId: string
 ): Promise<{ encryptedEmberKey: string } | null> {
   try {
     const data = await apiRequest<EmberKeyResponse>(
       auth.hostname,
       `/api/v1/embers/${emberId}/key`,
       { method: 'GET' },
-      auth.token,
+      auth.token
     );
     if (!data.encrypted_key) return null;
     return { encryptedEmberKey: data.encrypted_key };

@@ -36,40 +36,40 @@ import type {
   SoundDef,
   EmberCmd,
   EmberIpcResponse,
-} from "../../shared";
+} from '../../shared';
 
 declare global {
   // ─── Domain types re-exported from ember-shared ───────────────────────────
 
-  type AuthData = import("../../shared").AuthData;
-  type DeviceIdentity = import("../../shared").DeviceIdentity;
-  type RegistrationPayload = import("../../shared").RegistrationPayload;
-  type LoginPayload = import("../../shared").LoginPayload;
-  type AuthResponse = import("../../shared").AuthResponse;
-  type RecoveryData = import("../../shared").RecoveryData;
+  type AuthData = import('../../shared').AuthData;
+  type DeviceIdentity = import('../../shared').DeviceIdentity;
+  type RegistrationPayload = import('../../shared').RegistrationPayload;
+  type LoginPayload = import('../../shared').LoginPayload;
+  type AuthResponse = import('../../shared').AuthResponse;
+  type RecoveryData = import('../../shared').RecoveryData;
 
-  type Ember = import("../../shared").Ember;
-  type Channel = import("../../shared").Channel;
-  type Category = import("../../shared").Category;
-  type Member = import("../../shared").Member;
-  type UserStatus = import("../../shared").UserStatus;
-  type ChannelReorderUpdate = import("../../shared").ChannelReorderUpdate;
-  type CategoryReorderUpdate = import("../../shared").CategoryReorderUpdate;
-  type DragItem = import("../../shared").DragItem;
-  type ContextMenuTarget = import("../../shared").ContextMenuTarget;
+  type Ember = import('../../shared').Ember;
+  type Channel = import('../../shared').Channel;
+  type Category = import('../../shared').Category;
+  type Member = import('../../shared').Member;
+  type UserStatus = import('../../shared').UserStatus;
+  type ChannelReorderUpdate = import('../../shared').ChannelReorderUpdate;
+  type CategoryReorderUpdate = import('../../shared').CategoryReorderUpdate;
+  type DragItem = import('../../shared').DragItem;
+  type ContextMenuTarget = import('../../shared').ContextMenuTarget;
 
-  type Message = import("../../shared").Message;
-  type WsMessage = import("../../shared").WsMessage;
-  type PresenceUpdatePayload = import("../../shared").PresenceUpdatePayload;
-  type LogPayload = import("../../shared").LogPayload;
+  type Message = import('../../shared').Message;
+  type WsMessage = import('../../shared').WsMessage;
+  type PresenceUpdatePayload = import('../../shared').PresenceUpdatePayload;
+  type LogPayload = import('../../shared').LogPayload;
 
-  type VoiceSettings = import("../../shared").VoiceSettings;
-  type SoundType = import("../../shared").SoundType;
-  type VoiceParticipant = import("../../shared").VoiceParticipant;
-  type ICEServer = import("../../shared").ICEServer;
-  type AuthForVoice = import("../../shared").AuthForVoice;
-  type OscillatorType = import("../../shared").OscillatorType;
-  type SoundDef = import("../../shared").SoundDef;
+  type VoiceSettings = import('../../shared').VoiceSettings;
+  type SoundType = import('../../shared').SoundType;
+  type VoiceParticipant = import('../../shared').VoiceParticipant;
+  type ICEServer = import('../../shared').ICEServer;
+  type AuthForVoice = import('../../shared').AuthForVoice;
+  type OscillatorType = import('../../shared').OscillatorType;
+  type SoundDef = import('../../shared').SoundDef;
 
   // ─── Direct Messaging Types ───────────────────────────────────────────────
 
@@ -229,10 +229,7 @@ declare global {
   interface IPCRenderer {
     send(channel: string, ...args: unknown[]): void;
     invoke(channel: string, ...args: unknown[]): Promise<unknown>;
-    on(
-      channel: string,
-      listener: (event: unknown, ...args: unknown[]) => void
-    ): void;
+    on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
   }
 
   interface RefreshTokenResponse {
@@ -279,11 +276,7 @@ declare global {
       password: string,
       deviceIdentity: DeviceIdentity
     ): Promise<AuthResponse & { _recoveryCode: string }>;
-    validateLoginForm(
-      hostname: string,
-      username: string,
-      password: string
-    ): string | null;
+    validateLoginForm(hostname: string, username: string, password: string): string | null;
     validateRegisterForm(
       hostname: string,
       username: string,
@@ -299,16 +292,8 @@ declare global {
       channelId: string,
       beforeId?: string
     ): Promise<{ messages: Message[]; hasMore: boolean }>;
-    sendMessage(
-      auth: AuthData,
-      channelId: string,
-      ciphertext: string
-    ): Promise<Message>;
-    deleteMessage(
-      auth: AuthData,
-      channelId: string,
-      messageId: string,
-    ): Promise<void>;
+    sendMessage(auth: AuthData, channelId: string, ciphertext: string): Promise<Message>;
+    deleteMessage(auth: AuthData, channelId: string, messageId: string): Promise<void>;
     editMessage(
       auth: AuthData,
       channelId: string,
@@ -341,7 +326,11 @@ declare global {
 
   interface EmberServiceAPI {
     fetchEmbers(auth: AuthData): Promise<Ember[]>;
-    updateEmber(auth: AuthData, emberId: string, updates: { name?: string; icon_data?: string }): Promise<Ember>;
+    updateEmber(
+      auth: AuthData,
+      emberId: string,
+      updates: { name?: string; icon_data?: string }
+    ): Promise<Ember>;
   }
 
   interface ChannelServiceAPI {
@@ -368,13 +357,15 @@ declare global {
   }
 
   interface DesktopCapturerAPI {
-    getSources(): Promise<Array<{
-      id: string;
-      name: string;
-      display_id: string;
-      thumbnail: string;
-      pipeWireNodeId: number | null;
-    }>>;
+    getSources(): Promise<
+      Array<{
+        id: string;
+        name: string;
+        display_id: string;
+        thumbnail: string;
+        pipeWireNodeId: number | null;
+      }>
+    >;
   }
 
   interface AudioCaptureAPI {
@@ -421,7 +412,7 @@ declare global {
     videoParticipants: Set<string>;
     localCameraOn: boolean;
     videoGridVisible: boolean;
-    activeView: "text" | "voice";
+    activeView: 'text' | 'voice';
     localScreenShareOn: boolean;
     screenShareParticipants: Set<string>;
     videoPopoutOpen: boolean;
@@ -437,7 +428,7 @@ declare global {
     channelModalTargetId: string | null;
     channelModalCategoryId: string | null;
     currentIconData: string | null;
-    currentIconSource: "upload" | "url";
+    currentIconSource: 'upload' | 'url';
     pendingInvite: Record<string, unknown> | null;
     pendingAttachment: PendingAttachment | null;
     gifFavorites: GifFavorite[];
@@ -460,7 +451,10 @@ declare global {
     getValidAuth(): Promise<AuthData | null>;
     getAuthSync(): AuthData | null;
     isValidAuth(auth: unknown): auth is AuthData;
-    createAuthenticatedFetch(url: string, options?: RequestInit): Promise<{ auth: AuthData; fetchOptions: RequestInit } | null>;
+    createAuthenticatedFetch(
+      url: string,
+      options?: RequestInit
+    ): Promise<{ auth: AuthData; fetchOptions: RequestInit } | null>;
     // Globals set by websocket-service.ts
     connectWebSocket(): Promise<void>;
     disconnectWebSocket(): void;
@@ -491,9 +485,29 @@ declare global {
     escapeHtml(text: string): string;
     loadChannelMessages(channelId: string, forceRefresh?: boolean): Promise<void>;
     fetchMessages(channelId: string, before?: string, limit?: number): Promise<FetchResult>;
-    addMessage(author: string, text: string, timestamp?: number, prepend?: boolean, messageId?: string, chatColor?: string, attachment?: AttachmentData, gif?: { url: string; title?: string }): void;
+    addMessage(
+      author: string,
+      text: string,
+      timestamp?: number,
+      prepend?: boolean,
+      messageId?: string,
+      chatColor?: string,
+      attachment?: AttachmentData,
+      gif?: { url: string; title?: string }
+    ): void;
     // Globals set by messages-area.ts
-    createBasicMessageElement(author: string, text: string, timestamp?: number, messageId?: string, chatColor?: string, isOwn?: boolean, attachment?: AttachmentData, gif?: { url: string; title?: string }, channelId?: string, getEmberKey?: (channelId: string) => Promise<Uint8Array | null>): HTMLElement;
+    createBasicMessageElement(
+      author: string,
+      text: string,
+      timestamp?: number,
+      messageId?: string,
+      chatColor?: string,
+      isOwn?: boolean,
+      attachment?: AttachmentData,
+      gif?: { url: string; title?: string },
+      channelId?: string,
+      getEmberKey?: (channelId: string) => Promise<Uint8Array | null>
+    ): HTMLElement;
     createActionToolbar(messageId?: string, isOwn?: boolean): HTMLDivElement;
     formatTimestamp(timestamp?: number): string;
     formatRelativeTimestamp(timestamp?: number): string;
@@ -509,28 +523,38 @@ declare global {
       activeDistributionId: string | null;
       senderKeyEpoch: number;
     };
-    setCryptoState(emberId: string, update: Partial<{
-      cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
-      senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
-      activeDistributionId: string | null;
-      senderKeyEpoch: number;
-    }>): {
+    setCryptoState(
+      emberId: string,
+      update: Partial<{
+        cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
+        senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
+        activeDistributionId: string | null;
+        senderKeyEpoch: number;
+      }>
+    ): {
       cryptoMode: 'pairwise_bootstrap' | 'sender_key_active';
       senderKeyStatus: 'not_initialized' | 'distributing' | 'active' | 'rotation_required';
       activeDistributionId: string | null;
       senderKeyEpoch: number;
     };
     shouldUseSenderKey(emberId: string, memberCount: number): boolean;
-    syncCryptoStateFromServer(emberId: string, serverState: {
-      crypto_mode?: string;
-      sender_key_status?: string;
-      active_distribution_id?: string | null;
-      sender_key_epoch?: number;
-    }): void;
+    syncCryptoStateFromServer(
+      emberId: string,
+      serverState: {
+        crypto_mode?: string;
+        sender_key_status?: string;
+        active_distribution_id?: string | null;
+        sender_key_epoch?: number;
+      }
+    ): void;
     // Globals set by crypto-routing-service.ts
     cryptoRouting: {
       selectEncryptionMode(emberId: string, memberCount: number): 'pairwise' | 'sender_key';
-      encryptMessage(plaintext: string, emberId: string, memberCount: number): Promise<{ ciphertext: string; wireType: 'sender_key' } | null>;
+      encryptMessage(
+        plaintext: string,
+        emberId: string,
+        memberCount: number
+      ): Promise<{ ciphertext: string; wireType: 'sender_key' } | null>;
       decryptMessage(ciphertext: string, emberId: string): Promise<string | null>;
       detectWireType(ciphertext: string): 'sender_key' | 'signal';
       onMemberAdded(emberId: string, memberCount: number): void;
@@ -564,11 +588,7 @@ declare global {
       currentDescription?: string
     ): void;
     closeChannelNameModal(): void;
-    showChannelContextMenu(
-      x: number,
-      y: number,
-      target: ContextMenuTarget
-    ): void;
+    showChannelContextMenu(x: number, y: number, target: ContextMenuTarget): void;
     hideChannelContextMenu(): void;
     markChannelUnread(channelId: string): void;
     clearAllChannelUnread(): void;
@@ -585,11 +605,7 @@ declare global {
     fetchAndRenderVoicePresence(emberId: string): Promise<void>;
     joinVoiceChannel(channelId: string, channelName: string): Promise<void>;
     leaveVoiceChannel(): Promise<void>;
-    handleVoiceUserJoined(payload: {
-      channel_id: string;
-      user_id: string;
-      username: string;
-    }): void;
+    handleVoiceUserJoined(payload: { channel_id: string; user_id: string; username: string }): void;
     handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void;
     renderVoiceParticipants(channelId: string | null): void;
     updateSpeakingIndicator(userId: string, isSpeaking: boolean): void;
@@ -649,30 +665,44 @@ declare global {
     // Globals set by direct-messaging-manager.ts
     initializeDirectMessaging(): Promise<void>;
     startDmConversation(participantId: string, participantUsername: string): Promise<string | null>;
-    fetchDMRequests(): Promise<Array<{
-      id: string;
-      requesterId: string;
-      requesterUsername: string;
-      requesterAvatar: string;
-      createdAt: number;
-    }>>;
-    acceptDMRequest(requestId: string, requesterId: string, requesterUsername: string): Promise<string>;
+    fetchDMRequests(): Promise<
+      Array<{
+        id: string;
+        requesterId: string;
+        requesterUsername: string;
+        requesterAvatar: string;
+        createdAt: number;
+      }>
+    >;
+    acceptDMRequest(
+      requestId: string,
+      requesterId: string,
+      requesterUsername: string
+    ): Promise<string>;
     declineDMRequest(requestId: string): Promise<void>;
     loadAndShowDmRequests(): Promise<void>;
     /** Called when user sends a DM request; channel is now open but pending. */
-    onDmRequestSent?(payload: { requestId: string; participantId: string; participantUsername: string }): void;
-    getPendingStatusForChannel(channelId: string): { requestId: string; isRecipient: boolean } | null;
+    onDmRequestSent?(payload: {
+      requestId: string;
+      participantId: string;
+      participantUsername: string;
+    }): void;
+    getPendingStatusForChannel(
+      channelId: string
+    ): { requestId: string; isRecipient: boolean } | null;
     sendDirectMessage(conversationId: string, plaintext: string): Promise<string>;
     setActiveDmConversation(conversationId: string): void;
     sendTypingIndicator(conversationId: string, isTyping: boolean): Promise<void>;
-    fetchConversationMessages(conversationId: string): Promise<Array<{
-      id: string;
-      conversationId: string;
-      senderId: string;
-      content: string;
-      timestamp: number;
-      isOwn: boolean;
-    }>>;
+    fetchConversationMessages(conversationId: string): Promise<
+      Array<{
+        id: string;
+        conversationId: string;
+        senderId: string;
+        content: string;
+        timestamp: number;
+        isOwn: boolean;
+      }>
+    >;
     initiateKeyExchange(conversationId: string, participantId: string): Promise<void>;
     refreshAllPresenceStates(): Promise<void>;
     // UI helpers for ember key access
@@ -686,11 +716,7 @@ declare global {
       content: string;
       timestamp: number;
     }): void;
-    handleDmPresenceUpdate(payload: {
-      user_id: string;
-      username: string;
-      status: string;
-    }): void;
+    handleDmPresenceUpdate(payload: { user_id: string; username: string; status: string }): void;
     handleDmTypingIndicator(payload: {
       conversation_id: string;
       user_id: string;
@@ -727,21 +753,30 @@ declare global {
       timestamp: number;
       isOwn: boolean;
     }): void;
-    updateDmConversation(conversationId: string, updates: Partial<{
-      id: string;
-      participantId: string;
-      participantUsername: string;
-      lastMessage?: string;
-      unreadCount: number;
-      isOnline: boolean;
-    }>): void;
+    updateDmConversation(
+      conversationId: string,
+      updates: Partial<{
+        id: string;
+        participantId: string;
+        participantUsername: string;
+        lastMessage?: string;
+        unreadCount: number;
+        isOnline: boolean;
+      }>
+    ): void;
     showDmTypingIndicator(isTyping: boolean, username?: string): void;
-    addDmMessageReactions(messageId: string, reactions: Array<{
-      emoji: string;
-      count: number;
-      reacted: boolean;
-    }>): void;
-    updateDmMessageStatus(messageId: string, status: 'sending' | 'sent' | 'delivered' | 'read'): void;
+    addDmMessageReactions(
+      messageId: string,
+      reactions: Array<{
+        emoji: string;
+        count: number;
+        reacted: boolean;
+      }>
+    ): void;
+    updateDmMessageStatus(
+      messageId: string,
+      status: 'sending' | 'sent' | 'delivered' | 'read'
+    ): void;
     addDmNotificationBadge(element: HTMLElement, count: number): void;
     removeDmConversation(conversationId: string): void;
     // Performance optimization functions
@@ -749,10 +784,13 @@ declare global {
       messages: Message[];
       hasMore: boolean;
     } | null;
-    cacheMessages(channelId: string, result: {
-      messages: Message[];
-      hasMore: boolean;
-    }): void;
+    cacheMessages(
+      channelId: string,
+      result: {
+        messages: Message[];
+        hasMore: boolean;
+      }
+    ): void;
     initializeVirtualScrolling(): void;
     cleanupOldMessages(): void;
     monitorPerformance(operation: string, startTime: number): void;

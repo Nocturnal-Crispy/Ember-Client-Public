@@ -191,7 +191,14 @@ describe('handlePresenceUpdate', () => {
 
   it('handles presence update without custom_status gracefully', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member', custom_status: 'old status', status_emoji: '🎯' },
+      {
+        user_id: 'user-1',
+        username: 'Alice',
+        status: 'online',
+        role: 'member',
+        custom_status: 'old status',
+        status_emoji: '🎯',
+      },
     ];
 
     (window as any).handlePresenceUpdate({ user_id: 'user-1', username: 'Alice', status: 'idle' });
@@ -205,7 +212,11 @@ describe('handlePresenceUpdate', () => {
       { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
-    (window as any).handlePresenceUpdate({ user_id: 'user-1', username: 'Alice', status: 'offline' });
+    (window as any).handlePresenceUpdate({
+      user_id: 'user-1',
+      username: 'Alice',
+      status: 'offline',
+    });
 
     expect(mockRenderMemberList).toHaveBeenCalledTimes(1);
     expect(mockRenderMemberList).toHaveBeenCalledWith((window as any).App.currentMembers);
@@ -229,7 +240,13 @@ describe('handleIncomingMessage', () => {
 
   it('displays a message arriving on the active channel from a different user', async () => {
     mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
-    const payload = { id: 'msg-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+    const payload = {
+      id: 'msg-1',
+      channel_id: 'ch-active',
+      sender_user_id: 'user-other',
+      ciphertext: 'abc',
+      username: 'Bob',
+    };
 
     await (window as any).handleIncomingMessage(payload);
 
@@ -239,7 +256,13 @@ describe('handleIncomingMessage', () => {
 
   it('does not display a message sent by the current user (self-filter)', async () => {
     mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
-    const payload = { id: 'msg-self-1', channel_id: 'ch-active', sender_user_id: 'user-self', ciphertext: 'abc', username: 'Me' };
+    const payload = {
+      id: 'msg-self-1',
+      channel_id: 'ch-active',
+      sender_user_id: 'user-self',
+      ciphertext: 'abc',
+      username: 'Me',
+    };
 
     await (window as any).handleIncomingMessage(payload);
 
@@ -248,7 +271,13 @@ describe('handleIncomingMessage', () => {
 
   it('calls markChannelUnread for a message arriving on a background channel', async () => {
     mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
-    const payload = { id: 'msg-bg-1', channel_id: 'ch-other', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+    const payload = {
+      id: 'msg-bg-1',
+      channel_id: 'ch-other',
+      sender_user_id: 'user-other',
+      ciphertext: 'abc',
+      username: 'Bob',
+    };
 
     await (window as any).handleIncomingMessage(payload);
 
@@ -259,7 +288,13 @@ describe('handleIncomingMessage', () => {
   it('does not display a duplicate message (already in dedup set via registerSentMessageId)', async () => {
     mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
     (window as any).registerSentMessageId('msg-dup-1');
-    const payload = { id: 'msg-dup-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+    const payload = {
+      id: 'msg-dup-1',
+      channel_id: 'ch-active',
+      sender_user_id: 'user-other',
+      ciphertext: 'abc',
+      username: 'Bob',
+    };
 
     await (window as any).handleIncomingMessage(payload);
 
@@ -268,7 +303,13 @@ describe('handleIncomingMessage', () => {
 
   it('displays a message when auth is null (cannot verify sender)', async () => {
     mockIpcInvoke.mockResolvedValue(null);
-    const payload = { id: 'msg-noauth-1', channel_id: 'ch-active', sender_user_id: 'user-other', ciphertext: 'abc', username: 'Bob' };
+    const payload = {
+      id: 'msg-noauth-1',
+      channel_id: 'ch-active',
+      sender_user_id: 'user-other',
+      ciphertext: 'abc',
+      username: 'Bob',
+    };
 
     await (window as any).handleIncomingMessage(payload);
 
@@ -310,7 +351,11 @@ describe('wsUnsubscribeFromChannel', () => {
 describe('disconnectWebSocket', () => {
   it('calls close() on the WebSocket and sets wsConnection to null', () => {
     const mockClose = jest.fn();
-    (window as any).App.wsConnection = { readyState: WebSocket.OPEN, close: mockClose, send: jest.fn() };
+    (window as any).App.wsConnection = {
+      readyState: WebSocket.OPEN,
+      close: mockClose,
+      send: jest.fn(),
+    };
 
     (window as any).disconnectWebSocket();
 

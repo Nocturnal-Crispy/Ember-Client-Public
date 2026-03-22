@@ -81,9 +81,10 @@
     }
 
     // Voice channel
-    const voiceInfo = (window as any).getUserVoiceChannel?.(userId) as
-      | { channelId: string; channelName: string }
-      | null;
+    const voiceInfo = (window as any).getUserVoiceChannel?.(userId) as {
+      channelId: string;
+      channelName: string;
+    } | null;
 
     if (voiceInfo) {
       setText('user-details-voice', `In voice: ${voiceInfo.channelName}`);
@@ -130,21 +131,21 @@
   function wireEvents(): void {
     // Close button
     const closeBtn = getEl('user-details-close');
-    closeBtn?.addEventListener('click', (e) => {
+    closeBtn?.addEventListener('click', e => {
       e.stopPropagation();
       closeUserDetailsModal();
     });
 
     // Backdrop click (overlay but not inner container)
     const modal = getEl('user-details-modal');
-    modal?.addEventListener('click', (e) => {
+    modal?.addEventListener('click', e => {
       if (e.target === modal) {
         closeUserDetailsModal();
       }
     });
 
     // ESC key
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         const m = getEl('user-details-modal');
         if (m && !m.classList.contains('hidden')) {

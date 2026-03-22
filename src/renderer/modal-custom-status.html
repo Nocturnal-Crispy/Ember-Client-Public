@@ -17,16 +17,41 @@
       <div class="form-group">
         <label>CUSTOM STATUS</label>
         <div class="custom-status-input-row">
-          <button class="custom-status-emoji-btn" id="custom-status-emoji-btn" title="Choose emoji" aria-label="Choose emoji">😊</button>
-          <input type="text" id="custom-status-emoji-input" class="custom-status-emoji-input" maxlength="8" placeholder="😊" autocomplete="off" spellcheck="false">
-          <input type="text" id="custom-status-text-input" class="server-input custom-status-text-input" maxlength="100" placeholder="What are you up to?" autocomplete="off" spellcheck="false">
+          <button
+            class="custom-status-emoji-btn"
+            id="custom-status-emoji-btn"
+            title="Choose emoji"
+            aria-label="Choose emoji"
+          >
+            😊
+          </button>
+          <input
+            type="text"
+            id="custom-status-emoji-input"
+            class="custom-status-emoji-input"
+            maxlength="8"
+            placeholder="😊"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <input
+            type="text"
+            id="custom-status-text-input"
+            class="server-input custom-status-text-input"
+            maxlength="100"
+            placeholder="What are you up to?"
+            autocomplete="off"
+            spellcheck="false"
+          />
         </div>
         <div class="custom-status-char-count"><span id="custom-status-char-count">0</span>/100</div>
       </div>
       <div class="error-message hidden" id="custom-status-error"></div>
     </div>
     <div class="modal-footer">
-      <button class="modal-btn modal-btn-secondary" id="custom-status-clear-btn">CLEAR STATUS</button>
+      <button class="modal-btn modal-btn-secondary" id="custom-status-clear-btn">
+        CLEAR STATUS
+      </button>
       <button class="modal-btn modal-btn-secondary" id="custom-status-cancel-btn">Cancel</button>
       <button class="modal-btn modal-btn-primary" id="custom-status-save-btn">Save</button>
     </div>

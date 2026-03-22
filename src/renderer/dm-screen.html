@@ -6,7 +6,12 @@
     <div class="dm-header">
       <h2>Direct Messages</h2>
       <div class="dm-user-search">
-        <input type="text" class="dm-search-input" id="dm-search-input" placeholder="Search users...">
+        <input
+          type="text"
+          class="dm-search-input"
+          id="dm-search-input"
+          placeholder="Search users..."
+        />
         <span class="dm-search-icon">🔍</span>
       </div>
     </div>
@@ -45,7 +50,7 @@
         </div>
       </div>
 
-      <div id="video-grid" class="video-grid" style="display:none;"></div>
+      <div id="video-grid" class="video-grid" style="display: none"></div>
 
       <div class="messages-container" id="dm-messages">
         <!-- Welcome banner will be dynamically added here -->
@@ -58,7 +63,7 @@
 
       <!-- DM Input Area -->
       <div class="message-input-container dm-input-container">
-        <input type="file" id="dm-attachment-file-input" style="display:none">
+        <input type="file" id="dm-attachment-file-input" style="display: none" />
         <div id="dm-attachment-preview" class="attachment-preview hidden"></div>
         <div class="message-input-wrapper">
           <textarea
@@ -76,10 +81,12 @@
       </div>
 
       <!-- DM Search Prompt Empty State (shown when no conversations exist) -->
-      <div class="dm-empty-state" id="dm-search-prompt-state" style="display: none;">
+      <div class="dm-empty-state" id="dm-search-prompt-state" style="display: none">
         <div class="dm-empty-icon">🔍</div>
         <div class="dm-empty-title">Search for users to start messaging</div>
-        <div class="dm-empty-text">Use the search bar in the sidebar to find people and start direct conversations</div>
+        <div class="dm-empty-text">
+          Use the search bar in the sidebar to find people and start direct conversations
+        </div>
         <div class="dm-empty-actions">
           <button class="dm-empty-action-btn" id="dm-focus-search-btn">
             <span>🔍</span>

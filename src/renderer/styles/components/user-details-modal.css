@@ -16,8 +16,14 @@
 }
 
 @keyframes userDetailsFadeIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .user-details-container {
@@ -46,7 +52,9 @@
   padding: 2px 6px;
   line-height: 1;
   border-radius: 2px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .user-details-close:hover {
@@ -115,16 +123,16 @@
   flex-shrink: 0;
 }
 
-.user-details-status[data-status="online"] ~ .user-details-status-dot,
-.user-details-status-row:has(.user-details-status[data-status="online"]) .user-details-status-dot {
+.user-details-status[data-status='online'] ~ .user-details-status-dot,
+.user-details-status-row:has(.user-details-status[data-status='online']) .user-details-status-dot {
   background: var(--online-color, rgb(67, 181, 129));
 }
 
-.user-details-status-row:has(.user-details-status[data-status="away"]) .user-details-status-dot {
+.user-details-status-row:has(.user-details-status[data-status='away']) .user-details-status-dot {
   background: var(--afk-color, rgb(250, 179, 86));
 }
 
-.user-details-status-row:has(.user-details-status[data-status="offline"]) .user-details-status-dot {
+.user-details-status-row:has(.user-details-status[data-status='offline']) .user-details-status-dot {
   background: rgba(var(--rgb-text, 220, 220, 225), 0.3);
 }
 
@@ -197,7 +205,9 @@
   font-size: 12px;
   cursor: pointer;
   border-radius: 2px;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .user-details-dm-btn:hover {

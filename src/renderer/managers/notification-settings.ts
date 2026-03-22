@@ -4,9 +4,9 @@
  * up the Notifications settings page UI.
  */
 (function (): void {
-  const log = window.emberLog.createLogger("NotificationSettings");
+  const log = window.emberLog.createLogger('NotificationSettings');
 
-  const STORAGE_KEY = "ember_notif_settings";
+  const STORAGE_KEY = 'ember_notif_settings';
 
   const DEFAULT_SETTINGS: NotifSettings = {
     messageSound: true,
@@ -31,10 +31,9 @@
   function playNotificationSound(type: string): void {
     const settings = loadSettings();
     if (!settings.messageSound) return;
-    const gen = (
-      window as unknown as { generateNotificationSound?: (t: string) => void }
-    ).generateNotificationSound;
-    if (typeof gen === "function") {
+    const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
+      .generateNotificationSound;
+    if (typeof gen === 'function') {
       gen(type);
     }
   }
@@ -42,32 +41,31 @@
   function initNotifSettings(): void {
     const settings = loadSettings();
 
-    const messageToggle = document.getElementById("notif-message-sound") as HTMLInputElement | null;
-    const previewBtn = document.getElementById("notif-message-preview");
-    const saveBtn = document.getElementById("notif-save-btn");
-    const saveStatus = document.getElementById("notif-save-status");
+    const messageToggle = document.getElementById('notif-message-sound') as HTMLInputElement | null;
+    const previewBtn = document.getElementById('notif-message-preview');
+    const saveBtn = document.getElementById('notif-save-btn');
+    const saveStatus = document.getElementById('notif-save-status');
 
     if (messageToggle) messageToggle.checked = settings.messageSound;
 
-    previewBtn?.addEventListener("click", () => {
-      const gen = (
-        window as unknown as { generateNotificationSound?: (t: string) => void }
-      ).generateNotificationSound;
-      if (typeof gen === "function") gen("dmMessage");
+    previewBtn?.addEventListener('click', () => {
+      const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
+        .generateNotificationSound;
+      if (typeof gen === 'function') gen('dmMessage');
     });
 
-    saveBtn?.addEventListener("click", () => {
+    saveBtn?.addEventListener('click', () => {
       const newSettings: NotifSettings = {
         messageSound: messageToggle?.checked ?? true,
       };
       saveSettings(newSettings);
-      log.info("Notification settings saved", {
+      log.info('Notification settings saved', {
         messageSound: String(newSettings.messageSound),
       });
       if (saveStatus) {
-        saveStatus.textContent = "Saved!";
+        saveStatus.textContent = 'Saved!';
         setTimeout(() => {
-          saveStatus.textContent = "";
+          saveStatus.textContent = '';
         }, 2000);
       }
     });

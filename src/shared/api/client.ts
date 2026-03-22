@@ -8,7 +8,7 @@ async function sleep(ms: number): Promise<void> {
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly statusCode: number,
+    public readonly statusCode: number
   ) {
     super(message);
     this.name = 'ApiError';
@@ -19,7 +19,7 @@ export async function apiRequest<T>(
   hostname: string,
   path: string,
   options: RequestInit = {},
-  token?: string,
+  token?: string
 ): Promise<T> {
   const normalizedHostname = hostname.replace(/\/+$/, '');
   const url = `${normalizedHostname}${path}`;
@@ -47,7 +47,7 @@ export async function apiRequest<T>(
         return response.json() as Promise<T>;
       }
 
-      const errorData = await response.json().catch(() => ({})) as { error?: string };
+      const errorData = (await response.json().catch(() => ({}))) as { error?: string };
       const message = errorData.error ?? `Server returned ${response.status}`;
 
       // Non-retryable status codes
@@ -66,7 +66,10 @@ export async function apiRequest<T>(
 
       const error = err as Error;
       if (error.name === 'AbortError') {
-        if (attempt < MAX_RETRIES) { await sleep(1000 * attempt); continue; }
+        if (attempt < MAX_RETRIES) {
+          await sleep(1000 * attempt);
+          continue;
+        }
         throw new ApiError('Connection timeout. Server unreachable after 3 attempts.', 0);
       }
 

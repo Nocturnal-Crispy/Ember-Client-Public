@@ -49,7 +49,7 @@ class DMPerformanceOptimizer {
       messagePageSize: 50,
       cacheExpirationTime: 30 * 60 * 1000, // 30 minutes
       preloadThreshold: 10, // Preload when 10 messages from bottom
-      ...config
+      ...config,
     };
 
     // Start cleanup interval
@@ -59,9 +59,12 @@ class DMPerformanceOptimizer {
   /**
    * Get cached conversation or load from server
    */
-  async getConversation(conversationId: string, forceRefresh = false): Promise<DMConversationCache | null> {
+  async getConversation(
+    conversationId: string,
+    forceRefresh = false
+  ): Promise<DMConversationCache | null> {
     const cached = this.conversationCache.get(conversationId);
-    
+
     if (!forceRefresh && cached && !this.isCacheExpired(cached.lastActivity)) {
       return cached;
     }
@@ -76,7 +79,7 @@ class DMPerformanceOptimizer {
     // Load conversation
     const loadPromise = this.loadConversationFromServer(conversationId);
     this.loadingPromises.set(conversationId, loadPromise);
-    
+
     try {
       await loadPromise;
       return this.conversationCache.get(conversationId) || null;
@@ -89,8 +92,8 @@ class DMPerformanceOptimizer {
    * Get messages for a conversation with lazy loading
    */
   async getMessages(
-    conversationId: string, 
-    beforeMessageId?: string, 
+    conversationId: string,
+    beforeMessageId?: string,
     limit = this.config.messagePageSize
   ): Promise<DMMessageCache[]> {
     const conversation = this.conversationCache.get(conversationId);
@@ -135,14 +138,21 @@ class DMPerformanceOptimizer {
       }
 
       // Update newest message ID
-      if (!conversation.newestMessageId || message.timestamp > 
-          (conversation.messages.find(m => m.id === conversation.newestMessageId)?.timestamp || 0)) {
+      if (
+        !conversation.newestMessageId ||
+        message.timestamp >
+          (conversation.messages.find(m => m.id === conversation.newestMessageId)?.timestamp || 0)
+      ) {
         conversation.newestMessageId = message.id;
       }
 
       // Update oldest message ID
-      if (!conversation.oldestMessageId || message.timestamp < 
-          (conversation.messages.find(m => m.id === conversation.oldestMessageId)?.timestamp || Infinity)) {
+      if (
+        !conversation.oldestMessageId ||
+        message.timestamp <
+          (conversation.messages.find(m => m.id === conversation.oldestMessageId)?.timestamp ||
+            Infinity)
+      ) {
         conversation.oldestMessageId = message.id;
       }
     }
@@ -172,8 +182,11 @@ class DMPerformanceOptimizer {
     let readCount = 0;
     conversation.messages.forEach(message => {
       if (!message.isOwn && !message.isLoading) {
-        if (!upToMessageId || message.timestamp <= 
-            (conversation.messages.find(m => m.id === upToMessageId)?.timestamp || Infinity)) {
+        if (
+          !upToMessageId ||
+          message.timestamp <=
+            (conversation.messages.find(m => m.id === upToMessageId)?.timestamp || Infinity)
+        ) {
           // Mark as read (you might want to add a read flag to the message interface)
           readCount++;
         }
@@ -198,7 +211,7 @@ class DMPerformanceOptimizer {
       if (!conversation) continue;
 
       // Search in cached messages first
-      const cachedResults = conversation.messages.filter(message => 
+      const cachedResults = conversation.messages.filter(message =>
         message.decryptedContent?.toLowerCase().includes(query.toLowerCase())
       );
       results.push(...cachedResults);
@@ -209,7 +222,10 @@ class DMPerformanceOptimizer {
           const serverResults = await this.searchMessagesOnServer(conversationId, query);
           results.push(...serverResults);
         } catch (error) {
-          console.warn(`Failed to search messages on server for conversation ${conversationId}:`, error);
+          console.warn(
+            `Failed to search messages on server for conversation ${conversationId}:`,
+            error
+          );
         }
       }
     }
@@ -238,7 +254,7 @@ class DMPerformanceOptimizer {
       unreadCount: conversation.unreadCount,
       lastActivity: conversation.lastActivity,
       isFullyLoaded: conversation.isFullyLoaded,
-      cacheHitRate: this.calculateCacheHitRate(conversationId)
+      cacheHitRate: this.calculateCacheHitRate(conversationId),
     };
   }
 
@@ -313,7 +329,7 @@ class DMPerformanceOptimizer {
       }
 
       const conversationData = await response.json();
-      
+
       const conversation: DMConversationCache = {
         id: conversationData.id,
         participantId: conversationData.participant_id,
@@ -322,14 +338,13 @@ class DMPerformanceOptimizer {
         hasMoreMessages: true,
         unreadCount: conversationData.unread_count || 0,
         lastActivity: Date.now(),
-        isFullyLoaded: false
+        isFullyLoaded: false,
       };
 
       this.conversationCache.set(conversationId, conversation);
-      
+
       // Load initial messages
       await this.loadMessagesFromServer(conversationId);
-      
     } catch (error) {
       console.error(`Failed to load conversation ${conversationId}:`, error);
       throw error;
@@ -340,8 +355,8 @@ class DMPerformanceOptimizer {
    * Load messages from server
    */
   private async loadMessagesFromServer(
-    conversationId: string, 
-    beforeMessageId?: string, 
+    conversationId: string,
+    beforeMessageId?: string,
     limit = this.config.messagePageSize
   ): Promise<void> {
     try {
@@ -350,7 +365,10 @@ class DMPerformanceOptimizer {
         return;
       }
 
-      const url = new URL(`/api/v1/conversations/${conversationId}/messages`, window.location.origin);
+      const url = new URL(
+        `/api/v1/conversations/${conversationId}/messages`,
+        window.location.origin
+      );
       if (beforeMessageId) {
         url.searchParams.set('before', beforeMessageId);
       }
@@ -358,8 +376,8 @@ class DMPerformanceOptimizer {
 
       const response = await fetch(url.toString(), {
         headers: {
-          'Authorization': `Bearer ${await this.getAuthToken()}`
-        }
+          Authorization: `Bearer ${await this.getAuthToken()}`,
+        },
       });
 
       if (!response.ok) {
@@ -374,10 +392,10 @@ class DMPerformanceOptimizer {
         console.error('Failed to get current user ID:', error);
         throw new Error('Authentication failed');
       }
-      
+
       // Create a Set for efficient duplicate checking
       const existingMessageIds = new Set(conversation.messages.map(m => m.id));
-      
+
       const messages: DMMessageCache[] = data.messages.map((msg: any) => ({
         id: msg.id,
         conversationId: msg.conversation_id,
@@ -385,7 +403,7 @@ class DMPerformanceOptimizer {
         content: msg.ciphertext,
         timestamp: new Date(msg.created_at).getTime(),
         isOwn: msg.sender_id === currentUserId,
-        isLoading: true
+        isLoading: true,
       }));
 
       // Add messages to cache and conversation efficiently
@@ -404,7 +422,7 @@ class DMPerformanceOptimizer {
       // Update conversation state
       conversation.hasMoreMessages = data.has_more;
       conversation.lastActivity = Date.now();
-      
+
       if (!data.has_more) {
         conversation.isFullyLoaded = true;
       }
@@ -422,7 +440,6 @@ class DMPerformanceOptimizer {
       this.decryptMessagesProgressively(conversation, messages);
 
       this.emit('messagesLoaded', { conversationId, messages, hasMore: data.has_more });
-      
     } catch (error) {
       console.error(`Failed to load messages for conversation ${conversationId}:`, error);
       throw error;
@@ -433,7 +450,7 @@ class DMPerformanceOptimizer {
    * Decrypt messages progressively to avoid blocking UI
    */
   private decryptMessagesProgressively(
-    conversation: DMConversationCache, 
+    conversation: DMConversationCache,
     messages: DMMessageCache[]
   ): void {
     const decryptBatch = async (batch: DMMessageCache[]) => {
@@ -444,13 +461,13 @@ class DMPerformanceOptimizer {
             const decryptedContent = await this.decryptMessage(message.content, conversation.id);
             message.decryptedContent = decryptedContent;
             message.isLoading = false;
-            
+
             // Update in message cache too
             this.messageCache.set(message.id, message);
-            
+
             // Emit progress event
             this.emit('messageDecrypted', { conversationId: conversation.id, message });
-            
+
             // Small delay to prevent blocking
             await new Promise(resolve => setTimeout(resolve, 0));
           } catch (error) {
@@ -513,9 +530,9 @@ class DMPerformanceOptimizer {
       conversation.oldestMessageId = conversation.messages[0].id;
     }
 
-    this.emit('messagesTrimmed', { 
-      conversationId: conversation.id, 
-      removedCount: messagesToRemove 
+    this.emit('messagesTrimmed', {
+      conversationId: conversation.id,
+      removedCount: messagesToRemove,
     });
   }
 
@@ -559,7 +576,10 @@ class DMPerformanceOptimizer {
   /**
    * Search messages on server
    */
-  private async searchMessagesOnServer(conversationId: string, query: string): Promise<DMMessageCache[]> {
+  private async searchMessagesOnServer(
+    conversationId: string,
+    query: string
+  ): Promise<DMMessageCache[]> {
     // Implementation would search on server
     return [];
   }

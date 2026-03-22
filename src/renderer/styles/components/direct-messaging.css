@@ -106,8 +106,12 @@ body.dm-screen-open .user-panel .user-status-icon {
   margin: 0 0 10px 0;
 }
 
-.dm-header h2::before { content: '-- '; }
-.dm-header h2::after  { content: ' --'; }
+.dm-header h2::before {
+  content: '-- ';
+}
+.dm-header h2::after {
+  content: ' --';
+}
 
 /* ─── Search Input ─────────────────────────────────────────────────────────── */
 
@@ -220,7 +224,9 @@ body.dm-screen-open .user-panel .user-status-icon {
   margin-right: 10px;
 }
 
-.dm-loading-text { font-size: 12px; }
+.dm-loading-text {
+  font-size: 12px;
+}
 
 .dm-search-no-results {
   padding: 14px;
@@ -230,8 +236,13 @@ body.dm-screen-open .user-panel .user-status-icon {
   text-align: center;
 }
 
-.dm-no-results-icon { font-size: 20px; margin-bottom: 4px; }
-.dm-no-results-text { font-size: 12px; }
+.dm-no-results-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+.dm-no-results-text {
+  font-size: 12px;
+}
 
 /* ─── Conversation List ────────────────────────────────────────────────────── */
 
@@ -280,7 +291,10 @@ body.dm-screen-open .user-panel .user-status-icon {
   box-shadow: 0 0 6px rgba(var(--rgb-highlight), 0.3);
 }
 
-.dm-conversation-info { flex: 1; min-width: 0; }
+.dm-conversation-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .dm-conversation-name {
   font-family: 'Courier New', Courier, monospace;
@@ -326,8 +340,15 @@ body.dm-screen-open .user-panel .user-status-icon {
 }
 
 @keyframes dmUnreadPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.65; transform: scale(0.9); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.9);
+  }
 }
 
 /* ─── Main Chat Area ───────────────────────────────────────────────────────── */
@@ -393,7 +414,10 @@ body.dm-screen-open .user-panel .user-status-icon {
   margin-top: 2px;
 }
 
-.dm-chat-actions { display: flex; gap: 6px; }
+.dm-chat-actions {
+  display: flex;
+  gap: 6px;
+}
 
 .dm-chat-action-btn {
   background: transparent;
@@ -402,7 +426,9 @@ body.dm-screen-open .user-panel .user-status-icon {
   cursor: pointer;
   padding: 5px 8px;
   font-size: 12px;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .dm-chat-action-btn:hover {
@@ -427,10 +453,16 @@ body.dm-screen-open .user-panel .user-status-icon {
   margin-left: 4px;
 }
 
-.dm-message-status.sending { color: rgba(var(--rgb-highlight), 0.5); }
-.dm-message-status.sent    { color: rgba(var(--rgb-text), 0.3); }
+.dm-message-status.sending {
+  color: rgba(var(--rgb-highlight), 0.5);
+}
+.dm-message-status.sent {
+  color: rgba(var(--rgb-text), 0.3);
+}
 .dm-message-status.delivered,
-.dm-message-status.read    { color: var(--highlight); }
+.dm-message-status.read {
+  color: var(--highlight);
+}
 
 /* System / session divider line */
 .dm-session-begin,
@@ -454,15 +486,21 @@ body.dm-screen-open .user-panel .user-status-icon {
   display: none;
 }
 
-.dm-typing-indicator.active { display: block; }
+.dm-typing-indicator.active {
+  display: block;
+}
 
 .dm-typing-indicator span {
   display: inline-block;
   animation: dmTypingDots 1.4s infinite;
 }
 
-.dm-typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-.dm-typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+.dm-typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.dm-typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 /* ─── Input Area — uses shared .message-input-container component styles ─────── */
 
@@ -515,7 +553,9 @@ body.dm-screen-open .user-panel .user-status-icon {
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .dm-empty-action-btn:hover {
@@ -560,12 +600,22 @@ body.dm-screen-open .user-panel .user-status-icon {
 /* ─── Animations ───────────────────────────────────────────────────────────── */
 
 @keyframes dmSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes dmTypingDots {
-  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-  30%            { opacity: 1;   transform: translateY(-4px); }
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
 }
 
 /* ─── Reactions ────────────────────────────────────────────────────────────── */
@@ -604,8 +654,12 @@ body.dm-screen-open .user-panel .user-status-icon {
   color: var(--highlight);
 }
 
-.dm-context-menu-item.danger       { color: var(--dnd-color); }
-.dm-context-menu-item.danger:hover { background: rgba(var(--rgb-dnd-color), 0.1); }
+.dm-context-menu-item.danger {
+  color: var(--dnd-color);
+}
+.dm-context-menu-item.danger:hover {
+  background: rgba(var(--rgb-dnd-color), 0.1);
+}
 
 .dm-context-menu-separator {
   height: 1px;
@@ -642,7 +696,10 @@ body.dm-screen-open .user-panel .user-status-icon {
 
 /* ─── File attachment elements ─────────────────────────────────────────────── */
 
-.dm-file-info    { flex: 1; min-width: 0; }
+.dm-file-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .dm-file-name {
   font-family: 'Courier New', Courier, monospace;
@@ -668,4 +725,6 @@ body.dm-screen-open .user-panel .user-status-icon {
   transition: color 0.12s ease;
 }
 
-.dm-file-remove:hover { color: var(--dnd-color); }
+.dm-file-remove:hover {
+  color: var(--dnd-color);
+}

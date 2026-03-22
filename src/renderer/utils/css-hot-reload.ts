@@ -31,12 +31,12 @@ class CssHotReloader {
    */
   private injectCss(message: CssHotReloadMessage): void {
     const { path, content } = message;
-    
+
     console.log(`CSS changed, forcing page reload for: ${path}`);
-    
+
     // Show reload indicator before reload
     this.showReloadIndicator(path);
-    
+
     // Force a full page reload to ensure CSS changes are applied
     setTimeout(() => {
       console.log('Reloading page to apply CSS changes...');
@@ -55,9 +55,11 @@ class CssHotReloader {
    */
   private refreshStylesheet(cssPath: string): void {
     const cssFileName = cssPath.split('/').pop();
-    
+
     // Find the original stylesheet link
-    const stylesheets = document.querySelectorAll('link[rel="stylesheet"]') as NodeListOf<HTMLLinkElement>;
+    const stylesheets = document.querySelectorAll(
+      'link[rel="stylesheet"]'
+    ) as NodeListOf<HTMLLinkElement>;
     stylesheets.forEach(sheet => {
       const href = sheet.getAttribute('href');
       if (href && href.includes(cssFileName || '')) {
@@ -65,7 +67,7 @@ class CssHotReloader {
         const newHref = href + '?t=' + Date.now();
         sheet.setAttribute('href', newHref);
         console.log(`Refreshed stylesheet: ${newHref}`);
-        
+
         // Wait for the stylesheet to load and then force a reflow
         sheet.onload = () => {
           this.forceReflow();
@@ -79,7 +81,7 @@ class CssHotReloader {
    */
   private enhanceCssSpecificity(css: string): string {
     let enhanced = css;
-    
+
     // Add body selector to increase specificity
     enhanced = enhanced.replace(/([^{}]+)\s*\{/g, (match, selector) => {
       // Don't duplicate if it already has body
@@ -88,10 +90,10 @@ class CssHotReloader {
       }
       return `body ${selector.trim()} {`;
     });
-    
+
     // Add !important to all properties for maximum override power
     enhanced = enhanced.replace(/([^:]+):\s*([^;]+);/g, '$1: $2 !important;');
-    
+
     return enhanced;
   }
 
@@ -100,9 +102,11 @@ class CssHotReloader {
    */
   private disableOriginalStylesheets(hotReloadPath: string): void {
     const cssFileName = hotReloadPath.split('/').pop();
-    
+
     // Find and disable the original stylesheet
-    const stylesheets = document.querySelectorAll('link[rel="stylesheet"]') as NodeListOf<HTMLLinkElement>;
+    const stylesheets = document.querySelectorAll(
+      'link[rel="stylesheet"]'
+    ) as NodeListOf<HTMLLinkElement>;
     stylesheets.forEach(sheet => {
       const href = sheet.getAttribute('href');
       if (href && href.includes(cssFileName || '')) {
@@ -118,7 +122,7 @@ class CssHotReloader {
   private forceReflow(): void {
     // Force a reflow by accessing offsetHeight
     void document.body.offsetHeight;
-    
+
     // Also try to force style recalculation
     const computedStyle = getComputedStyle(document.body);
     console.log('Current background:', computedStyle.background);
@@ -150,15 +154,15 @@ class CssHotReloader {
       `;
       document.body.appendChild(indicator);
     }
-    
+
     indicator.textContent = `CSS: ${cssPath.split('/').pop()}`;
     indicator.style.opacity = '1';
-    
+
     // Fade out after 2 seconds
     setTimeout(() => {
       indicator.style.opacity = '0';
     }, 2000);
-    
+
     console.log(`CSS hot-reload triggered: ${cssPath}`);
   }
 
@@ -166,7 +170,7 @@ class CssHotReloader {
    * Remove all hot-reloaded CSS
    */
   cleanup(): void {
-    this.cssMap.forEach((element) => {
+    this.cssMap.forEach(element => {
       element.remove();
     });
     this.cssMap.clear();

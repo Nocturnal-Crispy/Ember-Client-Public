@@ -33,7 +33,11 @@ export class EpochHistoryService {
   private signalSessionManager: SignalSessionManager;
   private epochKeyCache: Map<string, Map<string, Uint8Array>> = new Map();
 
-  constructor(auth: AuthData, epochService: EpochService, signalSessionManager: SignalSessionManager) {
+  constructor(
+    auth: AuthData,
+    epochService: EpochService,
+    signalSessionManager: SignalSessionManager
+  ) {
     if (!auth) {
       throw new Error('Auth data is required');
     }
@@ -71,7 +75,10 @@ export class EpochHistoryService {
   /**
    * Decrypt a legacy v1.x message using SignalSessionManager
    */
-  private async decryptLegacyMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
+  private async decryptLegacyMessage(
+    message: MessageWithEpoch,
+    emberId: string
+  ): Promise<DecryptedMessage> {
     try {
       const ciphertextBytes = new TextEncoder().encode(message.ciphertext);
       const plaintext = await this.signalSessionManager.groupDecrypt(emberId, ciphertextBytes);
@@ -88,7 +95,10 @@ export class EpochHistoryService {
   /**
    * Decrypt a message from a specific epoch
    */
-  private async decryptEpochMessage(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
+  private async decryptEpochMessage(
+    message: MessageWithEpoch,
+    emberId: string
+  ): Promise<DecryptedMessage> {
     if (!message.epoch_id) {
       throw new Error('Epoch message missing epoch_id');
     }
@@ -114,7 +124,7 @@ export class EpochHistoryService {
     // The epoch ciphertext should be self-contained or use a different key derivation
     // For now, return the epoch ciphertext as bytes (proper decryption would be implemented here)
     const ciphertextBytes = new TextEncoder().encode(message.epoch_ciphertext);
-    
+
     return {
       id: message.id,
       plaintext: ciphertextBytes,
@@ -126,17 +136,20 @@ export class EpochHistoryService {
   /**
    * Decrypt message using epoch keys
    */
-  private async decryptWithEpochKeys(message: MessageWithEpoch, emberId: string): Promise<DecryptedMessage> {
+  private async decryptWithEpochKeys(
+    message: MessageWithEpoch,
+    emberId: string
+  ): Promise<DecryptedMessage> {
     if (!message.epoch_id) {
       throw new Error('Epoch ID required for epoch key decryption');
     }
 
     // Get epoch keys for this epoch
     const epochKeys = await this.epochService.getEpochKeys(message.epoch_id);
-    
+
     // Find the key for the current user
-    const userKey = epochKeys.find(key => 
-      key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+    const userKey = epochKeys.find(
+      key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
     );
 
     if (!userKey) {
@@ -148,7 +161,7 @@ export class EpochHistoryService {
 
     // Decrypt the message with the epoch key (simplified)
     const messageBytes = new TextEncoder().encode(message.ciphertext);
-    
+
     // For now, return the ciphertext as bytes (proper decryption would be implemented here)
     return {
       id: message.id,
@@ -158,23 +171,24 @@ export class EpochHistoryService {
     };
   }
 
-
   /**
    * Get or decrypt an epoch key for the current user
    */
   private async getEpochKey(epochId: string): Promise<Uint8Array> {
     // Check cache first
-    if (this.epochKeyCache.has(epochId) && 
-        this.epochKeyCache.get(epochId)?.has(this.auth.device_id)) {
+    if (
+      this.epochKeyCache.has(epochId) &&
+      this.epochKeyCache.get(epochId)?.has(this.auth.device_id)
+    ) {
       return this.epochKeyCache.get(epochId)!.get(this.auth.device_id)!;
     }
 
     // Fetch epoch keys from server
     const epochKeys = await this.epochService.getEpochKeys(epochId);
-    
+
     // Find the key for the current user
-    const userKey = epochKeys.find(key => 
-      key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+    const userKey = epochKeys.find(
+      key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
     );
 
     if (!userKey) {
@@ -183,7 +197,7 @@ export class EpochHistoryService {
 
     // Decrypt and cache the key
     const decryptedKey = await this.decryptEpochKey(userKey.encrypted_key);
-    
+
     // Cache the decrypted key
     if (!this.epochKeyCache.has(epochId)) {
       this.epochKeyCache.set(epochId, new Map());
@@ -205,7 +219,10 @@ export class EpochHistoryService {
   /**
    * Decrypt multiple messages, handling mixed epochs efficiently
    */
-  async decryptMessages(messages: MessageWithEpoch[], emberId: string): Promise<DecryptedMessage[]> {
+  async decryptMessages(
+    messages: MessageWithEpoch[],
+    emberId: string
+  ): Promise<DecryptedMessage[]> {
     const results: DecryptedMessage[] = [];
     const epochIdsToPrefetch = new Set<string>();
 
@@ -239,11 +256,13 @@ export class EpochHistoryService {
    * Pre-fetch epoch keys for multiple epochs to optimize batch decryption
    */
   private async prefetchEpochKeys(epochIds: string[]): Promise<void> {
-    const promises = epochIds.map(async (epochId) => {
+    const promises = epochIds.map(async epochId => {
       try {
         // Only fetch keys if we don't already have them cached
-        if (!this.epochKeyCache.has(epochId) || 
-            !this.epochKeyCache.get(epochId)?.has(this.auth.device_id)) {
+        if (
+          !this.epochKeyCache.has(epochId) ||
+          !this.epochKeyCache.get(epochId)?.has(this.auth.device_id)
+        ) {
           await this.getEpochKey(epochId);
         }
       } catch (error) {
@@ -265,21 +284,21 @@ export class EpochHistoryService {
    * Get message history for an ember with epoch-aware decryption
    */
   async getMessageHistory(
-    emberId: string, 
-    channelId: string, 
-    beforeId?: string, 
+    emberId: string,
+    channelId: string,
+    beforeId?: string,
     limit = 50
   ): Promise<DecryptedMessage[]> {
     try {
       // This would integrate with the existing message service
       // For now, we'll simulate fetching messages
-      
+
       // In a real implementation, this would call the message service
       // const messages = await window.App.messageService.fetchMessages(auth, channelId, beforeId, limit);
-      
+
       // Simulate message fetch
       const messages: MessageWithEpoch[] = [];
-      
+
       // Decrypt the messages
       return await this.decryptMessages(messages, emberId);
     } catch (error) {
@@ -301,8 +320,8 @@ export class EpochHistoryService {
       // Epoch messages require epoch keys
       if (message.epoch_id) {
         const epochKeys = await this.epochService.getEpochKeys(message.epoch_id);
-        return epochKeys.some(key => 
-          key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+        return epochKeys.some(
+          key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
         );
       }
 

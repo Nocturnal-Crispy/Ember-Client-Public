@@ -101,17 +101,21 @@ class DMAccessibilityEnhancer {
    * Update list of focusable elements
    */
   private updateFocusableElements(container: HTMLElement): void {
-    this.focusableElements = Array.from(container.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )) as HTMLElement[];
+    this.focusableElements = Array.from(
+      container.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+    ) as HTMLElement[];
 
     // Filter out elements that are not visible or disabled
     this.focusableElements = this.focusableElements.filter(el => {
       const style = window.getComputedStyle(el);
-      return style.display !== 'none' && 
-             style.visibility !== 'hidden' && 
-             !el.hasAttribute('disabled') &&
-             el.tabIndex >= 0;
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        !el.hasAttribute('disabled') &&
+        el.tabIndex >= 0
+      );
     });
   }
 
@@ -161,7 +165,9 @@ class DMAccessibilityEnhancer {
    * Navigate conversation list
    */
   private navigateConversationList(direction: number): void {
-    const conversations = Array.from(document.querySelectorAll('.dm-conversation-item')) as HTMLElement[];
+    const conversations = Array.from(
+      document.querySelectorAll('.dm-conversation-item')
+    ) as HTMLElement[];
     const current = document.activeElement as HTMLElement;
     const currentIndex = conversations.indexOf(current);
 
@@ -171,7 +177,11 @@ class DMAccessibilityEnhancer {
 
     if (conversations[nextIndex]) {
       this.focusElement(conversations[nextIndex]);
-      this.announceConversationChange(conversations[nextIndex], nextIndex + 1, conversations.length);
+      this.announceConversationChange(
+        conversations[nextIndex],
+        nextIndex + 1,
+        conversations.length
+      );
     }
   }
 
@@ -199,7 +209,7 @@ class DMAccessibilityEnhancer {
   private handleHorizontalNavigation(event: KeyboardEvent): void {
     const currentElement = document.activeElement as HTMLElement;
     const isSearchInput = currentElement.classList.contains('dm-search-input');
-    
+
     if (isSearchInput) {
       // Let default behavior handle text input navigation
       return;
@@ -211,7 +221,9 @@ class DMAccessibilityEnhancer {
 
     if (event.key === 'ArrowLeft' && chatArea?.contains(currentElement)) {
       // Move to sidebar
-      const firstFocusable = sidebar?.querySelector('.dm-conversation-item, .dm-search-input') as HTMLElement;
+      const firstFocusable = sidebar?.querySelector(
+        '.dm-conversation-item, .dm-search-input'
+      ) as HTMLElement;
       if (firstFocusable) {
         event.preventDefault();
         this.focusElement(firstFocusable);
@@ -219,7 +231,9 @@ class DMAccessibilityEnhancer {
       }
     } else if (event.key === 'ArrowRight' && sidebar?.contains(currentElement)) {
       // Move to chat area
-      const firstFocusable = chatArea?.querySelector('.dm-input-field, .dm-chat-action-btn') as HTMLElement;
+      const firstFocusable = chatArea?.querySelector(
+        '.dm-input-field, .dm-chat-action-btn'
+      ) as HTMLElement;
       if (firstFocusable) {
         event.preventDefault();
         this.focusElement(firstFocusable);
@@ -233,7 +247,7 @@ class DMAccessibilityEnhancer {
    */
   private handleActivation(event: KeyboardEvent): void {
     const currentElement = document.activeElement as HTMLElement;
-    
+
     if (currentElement.classList.contains('dm-conversation-item')) {
       event.preventDefault();
       currentElement.click();
@@ -252,7 +266,7 @@ class DMAccessibilityEnhancer {
    */
   private handleEscape(event: KeyboardEvent): void {
     const currentElement = document.activeElement as HTMLElement;
-    
+
     // Close modals, dropdowns, or return focus to main content
     const searchResults = document.querySelector('.dm-search-results') as HTMLElement;
     if (searchResults && searchResults.style.display !== 'none') {
@@ -261,7 +275,9 @@ class DMAccessibilityEnhancer {
     } else {
       // Return focus to conversation list or input
       const conversationList = document.querySelector('.dm-conversation-list');
-      const firstConversation = conversationList?.querySelector('.dm-conversation-item') as HTMLElement;
+      const firstConversation = conversationList?.querySelector(
+        '.dm-conversation-item'
+      ) as HTMLElement;
       if (firstConversation) {
         this.focusElement(firstConversation);
         this.announce('Returned to conversation list');
@@ -274,7 +290,7 @@ class DMAccessibilityEnhancer {
    */
   private handleSearchShortcut(event: KeyboardEvent): void {
     const currentElement = document.activeElement as HTMLElement;
-    
+
     // Don't trigger if already in an input field
     if (currentElement.tagName === 'INPUT' || currentElement.tagName === 'TEXTAREA') {
       return;
@@ -311,13 +327,16 @@ class DMAccessibilityEnhancer {
     document.querySelectorAll('.dm-conversation-item').forEach((item, index) => {
       const element = item as HTMLElement;
       element.setAttribute('role', 'listitem');
-      element.setAttribute('aria-setsize', document.querySelectorAll('.dm-conversation-item').length.toString());
+      element.setAttribute(
+        'aria-setsize',
+        document.querySelectorAll('.dm-conversation-item').length.toString()
+      );
       element.setAttribute('aria-posinset', (index + 1).toString());
-      
+
       const name = element.querySelector('.dm-conversation-name');
       const lastMessage = element.querySelector('.dm-conversation-last-message');
       const unreadCount = element.querySelector('.dm-unread-count');
-      
+
       let label = name?.textContent || '';
       if (lastMessage?.textContent) {
         label += `, Last message: ${lastMessage.textContent}`;
@@ -325,9 +344,9 @@ class DMAccessibilityEnhancer {
       if (unreadCount?.textContent) {
         label += `, ${unreadCount.textContent} unread messages`;
       }
-      
+
       element.setAttribute('aria-label', label);
-      
+
       if (unreadCount) {
         element.setAttribute('aria-describedby', `unread-${index}`);
         unreadCount.id = `unread-${index}`;
@@ -349,26 +368,26 @@ class DMAccessibilityEnhancer {
     document.querySelectorAll('.dm-message').forEach((message, index) => {
       const element = message as HTMLElement;
       element.setAttribute('role', 'article');
-      
+
       const sender = element.querySelector('.dm-message-name')?.textContent;
       const content = element.querySelector('.dm-message-text')?.textContent;
       const time = element.querySelector('.dm-message-time')?.textContent;
-      
+
       let label = 'Message from ';
       if (element.classList.contains('own')) {
         label += 'you';
       } else if (sender) {
         label += sender;
       }
-      
+
       if (time) {
         label += ` at ${time}`;
       }
-      
+
       if (content) {
         label += `: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`;
       }
-      
+
       element.setAttribute('aria-label', label);
     });
   }
@@ -381,7 +400,7 @@ class DMAccessibilityEnhancer {
     if (inputField) {
       inputField.setAttribute('aria-label', 'Type a message');
       inputField.setAttribute('aria-describedby', 'dm-input-help');
-      
+
       // Add help text
       const helpText = document.createElement('div');
       helpText.id = 'dm-input-help';
@@ -420,7 +439,10 @@ class DMAccessibilityEnhancer {
       const element = item as HTMLElement;
       element.setAttribute('role', 'option');
       element.setAttribute('aria-posinset', (index + 1).toString());
-      element.setAttribute('aria-setsize', document.querySelectorAll('.dm-search-result-item').length.toString());
+      element.setAttribute(
+        'aria-setsize',
+        document.querySelectorAll('.dm-search-result-item').length.toString()
+      );
     });
   }
 
@@ -499,7 +521,7 @@ class DMAccessibilityEnhancer {
   private setupScreenReaderSupport(): void {
     // Add skip links
     this.addSkipLinks();
-    
+
     // Enhance status announcements
     this.enhanceStatusAnnouncements();
   }
@@ -511,7 +533,7 @@ class DMAccessibilityEnhancer {
     const skipLinks = [
       { href: '#dm-conversation-list', text: 'Skip to conversation list' },
       { href: '#dm-messages', text: 'Skip to messages' },
-      { href: '#dm-input', text: 'Skip to message input' }
+      { href: '#dm-input', text: 'Skip to message input' },
     ];
 
     skipLinks.forEach(link => {
@@ -537,7 +559,7 @@ class DMAccessibilityEnhancer {
    * Observe message changes
    */
   private observeMessageChanges(): void {
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach(node => {
@@ -562,7 +584,7 @@ class DMAccessibilityEnhancer {
    * Observe conversation changes
    */
   private observeConversationChanges(): void {
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         if (mutation.type === 'childList') {
           this.announceConversationListChanged();
@@ -580,7 +602,7 @@ class DMAccessibilityEnhancer {
    * Observe typing indicators
    */
   private observeTypingIndicators(): void {
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         if (mutation.type === 'childList') {
           const typingIndicator = document.querySelector('.dm-typing-indicator');
@@ -602,13 +624,15 @@ class DMAccessibilityEnhancer {
    */
   private focusElement(element: HTMLElement): void {
     element.focus();
-    
+
     // Scroll into view if needed
     const rect = element.getBoundingClientRect();
-    const isInViewport = rect.top >= 0 && rect.left >= 0 && 
-                        rect.bottom <= window.innerHeight && 
-                        rect.right <= window.innerWidth;
-    
+    const isInViewport =
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= window.innerHeight &&
+      rect.right <= window.innerWidth;
+
     if (!isInViewport) {
       element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -620,7 +644,7 @@ class DMAccessibilityEnhancer {
   private announce(message: string): void {
     if (this.liveRegion) {
       this.liveRegion.textContent = message;
-      
+
       // Clear after announcement
       setTimeout(() => {
         if (this.liveRegion) {
@@ -636,7 +660,7 @@ class DMAccessibilityEnhancer {
   private announceImportant(message: string): void {
     if (this.announcer) {
       this.announcer.textContent = message;
-      
+
       // Clear after announcement
       setTimeout(() => {
         if (this.announcer) {
@@ -650,11 +674,12 @@ class DMAccessibilityEnhancer {
    * Announce element focus
    */
   private announceElementFocus(element: HTMLElement): void {
-    const label = element.getAttribute('aria-label') || 
-                  element.getAttribute('title') || 
-                  element.textContent || 
-                  'Element';
-    
+    const label =
+      element.getAttribute('aria-label') ||
+      element.getAttribute('title') ||
+      element.textContent ||
+      'Element';
+
     this.announce(`Focused on ${label}`);
   }
 
@@ -665,7 +690,7 @@ class DMAccessibilityEnhancer {
     const isOwn = messageElement.classList.contains('own');
     const sender = messageElement.querySelector('.dm-message-name')?.textContent;
     const content = messageElement.querySelector('.dm-message-text')?.textContent;
-    
+
     let announcement = 'New message';
     if (!isOwn && sender) {
       announcement += ` from ${sender}`;
@@ -673,7 +698,7 @@ class DMAccessibilityEnhancer {
     if (content) {
       announcement += `: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`;
     }
-    
+
     this.announceImportant(announcement);
   }
 

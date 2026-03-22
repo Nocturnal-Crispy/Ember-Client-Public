@@ -71,7 +71,9 @@ export class InviteEphemeralKeyService {
    * Get the base URL for API calls
    */
   private getBaseUrl(): string {
-    return this.auth.hostname.startsWith('http') ? this.auth.hostname : `https://${this.auth.hostname}`;
+    return this.auth.hostname.startsWith('http')
+      ? this.auth.hostname
+      : `https://${this.auth.hostname}`;
   }
 
   /**
@@ -79,14 +81,17 @@ export class InviteEphemeralKeyService {
    */
   async createInviteEphemeralKeys(request: CreateInviteEphemeralKeysRequest): Promise<void> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${request.invite_id}/ephemeral-keys`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${request.invite_id}/ephemeral-keys`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create invite ephemeral keys: ${response.status}`);
@@ -102,13 +107,16 @@ export class InviteEphemeralKeyService {
    */
   async getInviteEphemeralKeys(inviteId: string): Promise<InviteEphemeralKeyPackage[]> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${inviteId}/ephemeral-keys`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${inviteId}/ephemeral-keys`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch invite ephemeral keys: ${response.status}`);
@@ -125,16 +133,21 @@ export class InviteEphemeralKeyService {
   /**
    * Create sender key distribution for an invite
    */
-  async createInviteSenderKeyDistribution(request: CreateSenderKeyDistributionRequest): Promise<void> {
+  async createInviteSenderKeyDistribution(
+    request: CreateSenderKeyDistributionRequest
+  ): Promise<void> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${request.invite_id}/sender-key-distributions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${request.invite_id}/sender-key-distributions`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create invite sender key distribution: ${response.status}`);
@@ -150,13 +163,16 @@ export class InviteEphemeralKeyService {
    */
   async getInviteSenderKeyDistributions(inviteId: string): Promise<InviteSenderKeyDistribution[]> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${inviteId}/sender-key-distributions`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${inviteId}/sender-key-distributions`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch invite sender key distributions: ${response.status}`);
@@ -173,15 +189,20 @@ export class InviteEphemeralKeyService {
   /**
    * Get pending predistributions for an invite
    */
-  async getInvitePendingPredistributions(inviteId: string): Promise<InvitePendingPredistribution[]> {
+  async getInvitePendingPredistributions(
+    inviteId: string
+  ): Promise<InvitePendingPredistribution[]> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${inviteId}/pending-predistributions`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${inviteId}/pending-predistributions`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch invite pending predistributions: ${response.status}`);
@@ -200,13 +221,16 @@ export class InviteEphemeralKeyService {
    */
   async processInvitePendingPredistributions(inviteId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/invites/${inviteId}/pending-predistributions/process`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/invites/${inviteId}/pending-predistributions/process`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to process invite pending predistributions: ${response.status}`);
@@ -220,7 +244,10 @@ export class InviteEphemeralKeyService {
   /**
    * Generate ephemeral key packages for invite acceptance
    */
-  async generateInviteEphemeralKeys(inviteId: string, emberId: string): Promise<CreateInviteEphemeralKeysRequest> {
+  async generateInviteEphemeralKeys(
+    inviteId: string,
+    emberId: string
+  ): Promise<CreateInviteEphemeralKeysRequest> {
     try {
       // Get current epoch for the ember
       const currentEpoch = await this.signalSessionManager.getCurrentEpoch(emberId);
@@ -230,10 +257,10 @@ export class InviteEphemeralKeyService {
 
       // Generate ephemeral key packages for the current user's devices
       const keyPackages = [];
-      
+
       // For now, generate a simple key package (in reality, this would use proper cryptographic operations)
       const ephemeralKey = this.generateEphemeralKey();
-      
+
       keyPackages.push({
         user_id: this.auth.user_id,
         device_id: this.auth.device_id,
@@ -255,11 +282,15 @@ export class InviteEphemeralKeyService {
   /**
    * Generate sender key distribution for invite
    */
-  async generateInviteSenderKeyDistribution(inviteId: string, emberId: string): Promise<CreateSenderKeyDistributionRequest> {
+  async generateInviteSenderKeyDistribution(
+    inviteId: string,
+    emberId: string
+  ): Promise<CreateSenderKeyDistributionRequest> {
     try {
       // Create sender key distribution using SignalSessionManager
-      const distributionMessage = await this.signalSessionManager.createSenderKeyDistribution(emberId);
-      
+      const distributionMessage =
+        await this.signalSessionManager.createSenderKeyDistribution(emberId);
+
       // Convert to base64 for transport
       // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
       const distributionMessageBase64 = Buffer.from(distributionMessage).toString('base64');
@@ -282,7 +313,7 @@ export class InviteEphemeralKeyService {
     try {
       // Get all ephemeral key packages for the invite
       const ephemeralKeys = await this.getInviteEphemeralKeys(inviteId);
-      
+
       // Process each key package
       for (const keyPackage of ephemeralKeys) {
         await this.processEphemeralKeyPackage(keyPackage);
@@ -290,7 +321,7 @@ export class InviteEphemeralKeyService {
 
       // Get and process sender key distributions
       const senderKeyDistributions = await this.getInviteSenderKeyDistributions(inviteId);
-      
+
       for (const distribution of senderKeyDistributions) {
         await this.processSenderKeyDistribution(distribution);
       }
@@ -310,7 +341,7 @@ export class InviteEphemeralKeyService {
     try {
       // Decrypt the key package (simplified implementation)
       const decryptedPackage = await this.decryptEphemeralKeyPackage(keyPackage.encrypted_package);
-      
+
       // Store the ephemeral key for the current epoch
       // In reality, this would integrate with the SignalSessionManager
       console.log('Processed ephemeral key package:', {
@@ -327,7 +358,9 @@ export class InviteEphemeralKeyService {
   /**
    * Process a sender key distribution
    */
-  private async processSenderKeyDistribution(distribution: InviteSenderKeyDistribution): Promise<void> {
+  private async processSenderKeyDistribution(
+    distribution: InviteSenderKeyDistribution
+  ): Promise<void> {
     try {
       // Convert base64 back to bytes
       const distributionBytes = new Uint8Array(
@@ -375,7 +408,7 @@ export class InviteEphemeralKeyService {
       epoch_id: epochId,
       timestamp: Date.now(),
     });
-    
+
     return btoa(packageData);
   }
 

@@ -29,7 +29,7 @@ window.App = {
   videoParticipants: new Set<string>(),
   localCameraOn: false,
   videoGridVisible: false,
-  activeView: "text" as "text" | "voice",
+  activeView: 'text' as 'text' | 'voice',
 
   // ── Screen share ─────────────────────────────────────────────────────────
   localScreenShareOn: false,
@@ -53,7 +53,7 @@ window.App = {
 
   // ── Create-server modal ──────────────────────────────────────────────────
   currentIconData: null,
-  currentIconSource: "upload",
+  currentIconSource: 'upload',
 
   // ── Invite ───────────────────────────────────────────────────────────────
   pendingInvite: null,
@@ -63,7 +63,7 @@ window.App = {
   signalSessionManager: null as any,
 
   // ── Signal Session Manager Initialization ───────────────────────────────
-  initializeSignalSessionManager: async function(): Promise<void> {
+  initializeSignalSessionManager: async function (): Promise<void> {
     if (this.signalSessionManager) {
       console.warn('[App] SignalSessionManager already initialized');
       return;
@@ -82,7 +82,7 @@ window.App = {
         this.signalSessionManager = null;
         return; // Don't throw - just defer initialization
       }
-      
+
       this.signalSessionManager = new (window as any).SignalSessionManager(auth);
       console.log('[App] SignalSessionManager initialized successfully');
     } catch (error) {

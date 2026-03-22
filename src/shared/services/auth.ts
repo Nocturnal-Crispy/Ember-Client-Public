@@ -36,7 +36,7 @@ export async function login(
   hostname: string,
   username: string,
   password: string,
-  deviceId: string,
+  deviceId: string
 ): Promise<AuthResponse> {
   try {
     return await apiRequest<AuthResponse>(hostname, '/api/v1/login', {
@@ -58,7 +58,7 @@ export async function register(
   deviceId: string,
   publicKey: string,
   encryptedDeviceKey: string,
-  salt: string,
+  salt: string
 ): Promise<AuthResponse> {
   return apiRequest<AuthResponse>(hostname, '/api/v1/register', {
     method: 'POST',
@@ -80,7 +80,7 @@ export async function registerWithSignalKeys(
   signalCredentials: SignalDeviceCredentials,
   publicKey: string,
   encryptedDeviceKey: string,
-  salt: string,
+  salt: string
 ): Promise<AuthResponse> {
   return register(
     hostname,
@@ -89,7 +89,7 @@ export async function registerWithSignalKeys(
     signalCredentials.deviceId,
     publicKey,
     encryptedDeviceKey,
-    salt,
+    salt
   );
 }
 
@@ -97,7 +97,7 @@ export async function registerWithRecovery(
   _hostname: string,
   _username: string,
   _password: string,
-  _deviceIdentity: DeviceIdentity,
+  _deviceIdentity: DeviceIdentity
 ): Promise<AuthResponse & { _recoveryCode: string }> {
   throw new Error('NaCl crypto removed — use Signal Protocol registration instead');
 }
@@ -105,7 +105,7 @@ export async function registerWithRecovery(
 export function validateLoginForm(
   hostname: string,
   username: string,
-  password: string,
+  password: string
 ): string | null {
   if (!hostname) return 'Server URL is required';
   if (!hostname.startsWith('http://') && !hostname.startsWith('https://')) {
@@ -125,7 +125,7 @@ export function validateRegisterForm(
   hostname: string,
   username: string,
   password: string,
-  confirmPassword: string,
+  confirmPassword: string
 ): string | null {
   const loginError = validateLoginForm(hostname, username, password);
   if (loginError) return loginError;
@@ -143,7 +143,7 @@ export async function loginWithRecoveryCode(
   _username: string,
   _password: string,
   _recoveryCode: string,
-  _newDeviceId: string,
+  _newDeviceId: string
 ): Promise<LoginWithRecoveryResult> {
   throw new Error('NaCl crypto removed — use Signal Protocol device recovery instead');
 }

@@ -44,7 +44,10 @@ export interface ISessionStore {
  */
 export interface IIdentityKeyStore {
   /** Return the local identity key pair (Curve25519 or Ed25519). */
-  getIdentityKeyPair(): Promise<{ readonly publicKey: Uint8Array; readonly privateKey: Uint8Array }>;
+  getIdentityKeyPair(): Promise<{
+    readonly publicKey: Uint8Array;
+    readonly privateKey: Uint8Array;
+  }>;
 
   /** Return the local Signal registration ID (1–16383). */
   getLocalRegistrationId(): Promise<number>;
@@ -68,7 +71,7 @@ export interface IIdentityKeyStore {
   isTrustedIdentity(
     address: string,
     identityKey: Uint8Array,
-    direction: 'sending' | 'receiving',
+    direction: 'sending' | 'receiving'
   ): Promise<boolean>;
 
   /** Return the stored identity key for the given address, or null. */

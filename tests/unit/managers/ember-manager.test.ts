@@ -24,7 +24,7 @@ beforeAll(() => {
   require('../../../src/renderer/managers/app-state');
 
   // Set up App state before loading modules that depend on it
-  (window as any).App = { 
+  (window as any).App = {
     activeChannelId: null,
     activeEmberId: null,
     emberKeyCache: new Map(),
@@ -41,7 +41,7 @@ beforeAll(() => {
     videoParticipants: new Set(),
     localCameraOn: false,
     videoGridVisible: false,
-    activeView: "text",
+    activeView: 'text',
     localScreenShareOn: false,
     screenShareParticipants: new Set(),
     videoPopoutOpen: false,
@@ -57,14 +57,14 @@ beforeAll(() => {
     channelModalTargetId: null,
     channelModalCategoryId: null,
     currentIconData: null,
-    currentIconSource: "upload",
+    currentIconSource: 'upload',
     pendingInvite: null,
     emberMetadata: new Map(),
     signalSessionReady: new Map(),
     signalSessionManager: null,
     protocolVersion: 0,
     migrationStatus: 'idle',
-    initializeSignalSessionManager: async function(): Promise<void> {},
+    initializeSignalSessionManager: async function (): Promise<void> {},
     pendingAttachment: null,
     gifFavorites: [],
     _vvSounds: null,
@@ -127,7 +127,7 @@ beforeAll(() => {
     hostname: 'http://localhost:8085',
     user_id: 'u1',
     device_id: 'd1',
-    username: 'alice'
+    username: 'alice',
   });
 
   // 3. Load auth-loader to make getValidAuth available globally
@@ -224,11 +224,23 @@ describe('fetchEmbers', () => {
   it('returns an empty array when the service throws', async () => {
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockIpcInvoke.mockImplementationOnce((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'u1',
+          device_id: 'd1',
+          username: 'alice',
+        });
       }
       return Promise.resolve(null);
     });
@@ -244,11 +256,23 @@ describe('fetchEmbers', () => {
     ];
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockIpcInvoke.mockImplementationOnce((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'u1',
+          device_id: 'd1',
+          username: 'alice',
+        });
       }
       return Promise.resolve(null);
     });
@@ -260,11 +284,23 @@ describe('fetchEmbers', () => {
   it('returns an empty array when the service rejects', async () => {
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockIpcInvoke.mockImplementationOnce((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'u1',
+          device_id: 'd1',
+          username: 'alice',
+        });
       }
       return Promise.resolve(null);
     });
@@ -287,7 +323,13 @@ describe('fetchEmberKey', () => {
     mockIpcInvoke
       .mockImplementationOnce((channel: string) => {
         if (channel === 'get-auth') {
-          return Promise.resolve({ token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' });
+          return Promise.resolve({
+            token: 'tok',
+            hostname: 'http://localhost:8085',
+            user_id: 'u1',
+            device_id: 'd1',
+            username: 'alice',
+          });
         }
         return Promise.resolve(null);
       }) // get-auth
@@ -314,9 +356,15 @@ describe('processIncomingDistributions', () => {
     // Mock the dependencies for processIncomingSenderKeyDistributions
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       return Promise.resolve({ success: true, data: null });
@@ -325,7 +373,7 @@ describe('processIncomingDistributions', () => {
     // Mock fetch to return empty distributions
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ distributions: [] })
+      json: () => Promise.resolve({ distributions: [] }),
     });
 
     // This should call the function but will fail because window.processIncomingDistributions is undefined
@@ -340,12 +388,12 @@ describe('Self-Distribution Fix for Solo Users', () => {
     // Mock get-auth to return current user
     mockIpcInvoke.mockImplementation((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ 
-          token: 'tok', 
-          hostname: 'http://localhost:8085', 
-          user_id: 'u1', 
-          device_id: 'd1', 
-          username: 'alice' 
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'u1',
+          device_id: 'd1',
+          username: 'alice',
         });
       }
       return Promise.resolve(null);
@@ -354,9 +402,15 @@ describe('Self-Distribution Fix for Solo Users', () => {
     // Mock emberAPI for encryption
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       if (cmd === 'LoadDistributionId') {
@@ -366,7 +420,10 @@ describe('Self-Distribution Fix for Solo Users', () => {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
       }
       if (cmd === 'Encrypt') {
-        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+        return Promise.resolve({
+          success: true,
+          data: { ciphertext: 'encrypted', messageType: 1 },
+        });
       }
       return Promise.resolve({ success: true, data: null });
     });
@@ -377,7 +434,7 @@ describe('Self-Distribution Fix for Solo Users', () => {
       hostname: 'http://localhost:8085',
       user_id: 'u1',
       device_id: 'd1',
-      username: 'alice'
+      username: 'alice',
     });
   });
 
@@ -387,13 +444,13 @@ describe('Self-Distribution Fix for Solo Users', () => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ members: [] }) // Empty - solo user
+          json: () => Promise.resolve({ members: [] }), // Empty - solo user
         });
       }
       if (url.includes('/sender-key-distributions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ status: 'ok' })
+          json: () => Promise.resolve({ status: 'ok' }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -411,8 +468,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
     );
 
     // Solo user with no other members → no server POST needed
-    const distributionCall = mockFetch.mock.calls.find(call =>
-      call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
+    const distributionCall = mockFetch.mock.calls.find(
+      call => call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
     );
     expect(distributionCall).toBeUndefined();
   });
@@ -423,15 +480,16 @@ describe('Self-Distribution Fix for Solo Users', () => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            members: [{ user_id: 'u1', device_id: 'd1' }] // Current user included
-          })
+          json: () =>
+            Promise.resolve({
+              members: [{ user_id: 'u1', device_id: 'd1' }], // Current user included
+            }),
         });
       }
       if (url.includes('/sender-key-distributions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ status: 'ok' })
+          json: () => Promise.resolve({ status: 'ok' }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -448,8 +506,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
     );
 
     // No other members → no server POST
-    const distributionCall = mockFetch.mock.calls.find(call =>
-      call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
+    const distributionCall = mockFetch.mock.calls.find(
+      call => call[0].includes('/sender-key-distributions') && call[1]?.method === 'POST'
     );
     expect(distributionCall).toBeUndefined();
   });
@@ -460,18 +518,19 @@ describe('Self-Distribution Fix for Solo Users', () => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            members: [
-              { user_id: 'u1', device_id: 'd1' }, // Current user
-              { user_id: 'u2', device_id: 'd2' }, // Other user
-            ]
-          })
+          json: () =>
+            Promise.resolve({
+              members: [
+                { user_id: 'u1', device_id: 'd1' }, // Current user
+                { user_id: 'u2', device_id: 'd2' }, // Other user
+              ],
+            }),
         });
       }
       if (url.includes('/sender-key-distributions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ status: 'ok' })
+          json: () => Promise.resolve({ status: 'ok' }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -480,7 +539,7 @@ describe('Self-Distribution Fix for Solo Users', () => {
     const result = await (window as any).distributeSenderKeyToMembers?.('test-ember');
     expect(result).toBeUndefined();
 
-    const distributionCall = mockFetch.mock.calls.find(call => 
+    const distributionCall = mockFetch.mock.calls.find(call =>
       call[0].includes('/sender-key-distributions')
     );
     const requestBody = JSON.parse(distributionCall![1].body);
@@ -504,7 +563,7 @@ describe('Self-Distribution Fix for Solo Users', () => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ members: [] })
+          json: () => Promise.resolve({ members: [] }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -517,7 +576,13 @@ describe('Self-Distribution Fix for Solo Users', () => {
       if (cmd === 'GetAuth') {
         return Promise.resolve({
           success: true,
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       if (cmd === 'LoadDistributionId') {
@@ -550,12 +615,12 @@ describe('Race Condition: Messages Before Keys', () => {
     // Mock basic auth
     mockIpcInvoke.mockImplementation((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ 
-          token: 'tok', 
-          hostname: 'http://localhost:8085', 
-          user_id: 'u1', 
-          device_id: 'd1', 
-          username: 'alice' 
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'u1',
+          device_id: 'd1',
+          username: 'alice',
         });
       }
       return Promise.resolve(null);
@@ -564,9 +629,15 @@ describe('Race Condition: Messages Before Keys', () => {
     // Mock emberAPI for basic operations
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       if (cmd === 'LoadDistributionId') {
@@ -586,43 +657,43 @@ describe('Race Condition: Messages Before Keys', () => {
     (window as any).renderChannels = jest.fn();
     (window as any).electronAPI = {
       channelService: {
-        fetchChannels: jest.fn().mockResolvedValue({ channels: [], categories: [] })
-      }
+        fetchChannels: jest.fn().mockResolvedValue({ channels: [], categories: [] }),
+      },
     };
   });
 
   it('should distribute sender keys BEFORE loading channel messages', async () => {
     // Track the order of operations
     const operationOrder: string[] = [];
-    
+
     // Mock fetch to track API calls
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/device-members')) {
         operationOrder.push('fetch-device-members');
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ members: [] })
+          json: () => Promise.resolve({ members: [] }),
         });
       }
       if (url.includes('/sender-key-distributions')) {
         operationOrder.push('sender-key-distributions');
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ status: 'ok' })
+          json: () => Promise.resolve({ status: 'ok' }),
         });
       }
       if (url.includes('/channels')) {
         operationOrder.push('fetch-channels');
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ channels: [], categories: [] })
+          json: () => Promise.resolve({ channels: [], categories: [] }),
         });
       }
       if (url.includes('/messages')) {
         operationOrder.push('fetch-messages');
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ messages: [], has_more: false })
+          json: () => Promise.resolve({ messages: [], has_more: false }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -631,9 +702,15 @@ describe('Race Condition: Messages Before Keys', () => {
     // Mock emberAPI to track encryption calls
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       if (cmd === 'LoadDistributionId') {
@@ -646,7 +723,10 @@ describe('Race Condition: Messages Before Keys', () => {
       }
       if (cmd === 'Encrypt') {
         operationOrder.push('encrypt-self-distribution');
-        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+        return Promise.resolve({
+          success: true,
+          data: { ciphertext: 'encrypted', messageType: 1 },
+        });
       }
       return Promise.resolve({ success: true, data: null });
     });
@@ -655,11 +735,11 @@ describe('Race Condition: Messages Before Keys', () => {
     await (window as any).loadServerContent?.('test-ember');
 
     // Verify sender key operations happen BEFORE message loading
-    const senderKeyOps = operationOrder.filter(op => 
-      op.includes('distribution') || op.includes('encrypt')
+    const senderKeyOps = operationOrder.filter(
+      op => op.includes('distribution') || op.includes('encrypt')
     );
-    const messageOps = operationOrder.filter(op => 
-      op.includes('messages') || op.includes('channels')
+    const messageOps = operationOrder.filter(
+      op => op.includes('messages') || op.includes('channels')
     );
 
     // All sender key operations should come before message operations
@@ -672,12 +752,12 @@ describe('Race Condition: Messages Before Keys', () => {
   it('should complete sender key distribution before processing messages', async () => {
     // Mock slow sender key distribution
     let distributionCompleted = false;
-    
+
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/device-members')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ members: [] })
+          json: () => Promise.resolve({ members: [] }),
         });
       }
       if (url.includes('/sender-key-distributions')) {
@@ -686,7 +766,7 @@ describe('Race Condition: Messages Before Keys', () => {
             distributionCompleted = true;
             resolve({
               ok: true,
-              json: () => Promise.resolve({ status: 'ok' })
+              json: () => Promise.resolve({ status: 'ok' }),
             });
           }, 100); // Simulate slow network
         });
@@ -694,7 +774,7 @@ describe('Race Condition: Messages Before Keys', () => {
       if (url.includes('/channels')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ channels: [], categories: [] })
+          json: () => Promise.resolve({ channels: [], categories: [] }),
         });
       }
       if (url.includes('/messages')) {
@@ -702,7 +782,7 @@ describe('Race Condition: Messages Before Keys', () => {
         expect(distributionCompleted).toBe(true);
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ messages: [], has_more: false })
+          json: () => Promise.resolve({ messages: [], has_more: false }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -711,9 +791,15 @@ describe('Race Condition: Messages Before Keys', () => {
     // Mock emberAPI for encryption
     mockEmberApiInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       if (cmd === 'LoadDistributionId') {
@@ -723,7 +809,10 @@ describe('Race Condition: Messages Before Keys', () => {
         return Promise.resolve({ success: true, data: { distributionMessage: 'test-dist-msg' } });
       }
       if (cmd === 'Encrypt') {
-        return Promise.resolve({ success: true, data: { ciphertext: 'encrypted', messageType: 1 } });
+        return Promise.resolve({
+          success: true,
+          data: { ciphertext: 'encrypted', messageType: 1 },
+        });
       }
       return Promise.resolve({ success: true, data: null });
     });
@@ -744,16 +833,16 @@ describe('Current Error Reproduction from Logs', () => {
     mockEmberApiInvoke.mockReset();
     mockFetch.mockClear();
     mockChannelServiceFetchChannels.mockClear();
-    
+
     // Default auth implementation
     mockIpcInvoke.mockImplementation((channel: string) => {
       if (channel === 'get-auth') {
-        return Promise.resolve({ 
-          token: 'tok', 
-          hostname: 'http://localhost:8085', 
-          user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', 
-          device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818', 
-          username: 'Mike' 
+        return Promise.resolve({
+          token: 'tok',
+          hostname: 'http://localhost:8085',
+          user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+          device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+          username: 'Mike',
         });
       }
       return Promise.resolve(null);
@@ -761,14 +850,18 @@ describe('Current Error Reproduction from Logs', () => {
 
     // Mock window functions needed for loadServerContent
     (window as any).fetchAndRenderVoicePresence = jest.fn().mockResolvedValue(undefined);
-    (window as any).fetchMembers = jest.fn().mockResolvedValue([{ user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', username: 'Mike', status: 'online' }]);
+    (window as any).fetchMembers = jest
+      .fn()
+      .mockResolvedValue([
+        { user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', username: 'Mike', status: 'online' },
+      ]);
     (window as any).renderMemberList = jest.fn();
     (window as any).wsSubscribeToEmber = jest.fn();
     (window as any).renderChannels = jest.fn();
     (window as any).electronAPI = {
       channelService: {
-        fetchChannels: mockChannelServiceFetchChannels
-      }
+        fetchChannels: mockChannelServiceFetchChannels,
+      },
     };
   });
 
@@ -779,33 +872,44 @@ describe('Current Error Reproduction from Logs', () => {
         if (url.includes('/members')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ memberCount: 1, members: [{ user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', username: 'Mike', status: 'online' }] })
+            json: () =>
+              Promise.resolve({
+                memberCount: 1,
+                members: [
+                  {
+                    user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+                    username: 'Mike',
+                    status: 'online',
+                  },
+                ],
+              }),
           });
         }
         if (url.includes('/device-members')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ members: [] }) // Empty - solo user
+            json: () => Promise.resolve({ members: [] }), // Empty - solo user
           });
         }
         if (url.includes('/prekey-bundle')) {
           // Mock pre-key bundle fetch for self-session establishment
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ 
-              registration_id: 1,
-              device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
-              identity_key: 'test-identity-key',
-              signed_prekey_id: 1,
-              signed_prekey_public: 'test-signed-prekey',
-              signed_prekey_signature: 'test-signature'
-            })
+            json: () =>
+              Promise.resolve({
+                registration_id: 1,
+                device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+                identity_key: 'test-identity-key',
+                signed_prekey_id: 1,
+                signed_prekey_public: 'test-signed-prekey',
+                signed_prekey_signature: 'test-signature',
+              }),
           });
         }
         if (url.includes('/sender-key-distributions')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ status: 'ok' })
+            json: () => Promise.resolve({ status: 'ok' }),
           });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -818,19 +922,28 @@ describe('Current Error Reproduction from Logs', () => {
         if (cmd === 'GetAuth') {
           return Promise.resolve({
             success: true,
-            data: { token: 'tok', userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818', hostname: 'http://localhost:8085', username: 'Mike' }
+            data: {
+              token: 'tok',
+              userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+              deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+              hostname: 'http://localhost:8085',
+              username: 'Mike',
+            },
           });
         }
         if (cmd === 'LoadLegacyEmberKey') {
           return Promise.resolve({ success: true, data: { key: null } });
         }
         if (cmd === 'LoadDistributionId') {
-          return Promise.resolve({ success: true, data: { distributionId: '5d4e6048-c154-4220-a9b0-a538930f67fd' } });
+          return Promise.resolve({
+            success: true,
+            data: { distributionId: '5d4e6048-c154-4220-a9b0-a538930f67fd' },
+          });
         }
         if (cmd === 'CreateSenderKeyDistribution') {
           return Promise.resolve({
             success: true,
-            data: { distributionMessage: 'test-distribution-message' }
+            data: { distributionMessage: 'test-distribution-message' },
           });
         }
         if (cmd === 'ProcessSenderKeyDistribution') {
@@ -845,11 +958,13 @@ describe('Current Error Reproduction from Logs', () => {
         hostname: 'http://localhost:8085',
         user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
         device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
-        username: 'Mike'
+        username: 'Mike',
       });
 
       // This should work with local self-distribution (no pairwise self-session needed)
-      await expect((window as any).distributeSenderKeyToMembers?.('1c7c8f25-ab25-4e1e-8809-bd1e2306b6b2')).resolves.toBeUndefined();
+      await expect(
+        (window as any).distributeSenderKeyToMembers?.('1c7c8f25-ab25-4e1e-8809-bd1e2306b6b2')
+      ).resolves.toBeUndefined();
 
       // ProcessSenderKeyDistribution IS called for self (stored under self-recv:: prefix)
       expect(callSequence).toContain('ProcessSenderKeyDistribution');
@@ -863,15 +978,16 @@ describe('Current Error Reproduction from Logs', () => {
       // Mock message-service dependencies
       (window as any).processIncomingDistributions = jest.fn().mockResolvedValue(undefined);
       (window as any).addMessage = jest.fn();
-      
+
       // Create a mock message that matches the expected format
       const mockMessage = {
         id: 'cadc4ed0-24ff-4d77-be56-1c9f9e078069',
         username: 'Mike',
         created_at: new Date().toISOString(),
-        ciphertext: '{"v":2,"sa":"ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83.ab3bb081-7ca0-499b-8bb3-dfd5ae645818","ct":"encrypted"}',
+        ciphertext:
+          '{"v":2,"sa":"ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83.ab3bb081-7ca0-499b-8bb3-dfd5ae645818","ct":"encrypted"}',
         envelope_type: 'signal_group',
-        chat_color: '#000000'
+        chat_color: '#000000',
       };
 
       // Mock emberAPI for decryption - track GroupDecrypt calls
@@ -881,15 +997,15 @@ describe('Current Error Reproduction from Logs', () => {
           groupDecryptCallCount++;
           if (groupDecryptCallCount === 1) {
             // First call fails
-            return Promise.resolve({ 
-              success: false, 
-              error: 'No sender key available' 
+            return Promise.resolve({
+              success: false,
+              error: 'No sender key available',
             });
           } else {
             // Second call succeeds
-            return Promise.resolve({ 
-              success: true, 
-              data: { plaintext: 'ZGVjcnlwdGVkIG1lc3NhZ2U=' } // Base64 encoded "decrypted message"
+            return Promise.resolve({
+              success: true,
+              data: { plaintext: 'ZGVjcnlwdGVkIG1lc3NhZ2U=' }, // Base64 encoded "decrypted message"
             });
           }
         }
@@ -919,7 +1035,7 @@ describe('Current Error Reproduction from Logs', () => {
       (window as any).showInputError = jest.fn();
       (window as any).registerSentMessageId = jest.fn();
       (window as any).displayDecryptedMessage = jest.fn();
-      
+
       // Mock ipcRenderer.get-auth to return proper auth data
       mockIpcInvoke.mockImplementation((channel: string) => {
         if (channel === 'get-auth') {
@@ -928,12 +1044,12 @@ describe('Current Error Reproduction from Logs', () => {
             hostname: 'http://localhost:8085',
             user_id: 'test-user',
             device_id: 'test-device',
-            username: 'TestUser'
+            username: 'TestUser',
           });
         }
         return Promise.resolve(null);
       });
-      
+
       // Set up active channel and ember
       (window as any).App.activeChannelId = '8299f777-0460-4efa-b1f0-7e1bac2262f5';
       (window as any).App.activeEmberId = '1c7c8f25-ab25-4e1e-8809-bd1e2306b6b2';
@@ -942,28 +1058,29 @@ describe('Current Error Reproduction from Logs', () => {
       // Mock emberAPI for GroupEncrypt
       mockEmberApiInvoke.mockImplementation((cmd: string) => {
         if (cmd === 'GroupEncrypt') {
-          return Promise.resolve({ 
-            success: true, 
-            data: { ciphertext: 'encrypted-ciphertext' } 
+          return Promise.resolve({
+            success: true,
+            data: { ciphertext: 'encrypted-ciphertext' },
           });
         }
         if (cmd === 'LoadDistributionId') {
-          return Promise.resolve({ 
-            success: true, 
-            data: { distributionId: 'test-distribution-id' } 
+          return Promise.resolve({
+            success: true,
+            data: { distributionId: 'test-distribution-id' },
           });
         }
         return Promise.resolve({ success: true, data: null });
       });
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          id: 'cadc4ed0-24ff-4d77-be56-1c9f9e078069',
-          username: 'Mike',
-          created_at: new Date().toISOString(),
-          ciphertext: 'encrypted-message',
-          envelope_type: 'signal_group'
-        })
+        json: () =>
+          Promise.resolve({
+            id: 'cadc4ed0-24ff-4d77-be56-1c9f9e078069',
+            username: 'Mike',
+            created_at: new Date().toISOString(),
+            ciphertext: 'encrypted-message',
+            envelope_type: 'signal_group',
+          }),
       });
 
       // This should now succeed with the sender key fixes (no longer throws "Signal Protocol encryption not ready")

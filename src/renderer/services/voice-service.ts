@@ -2,10 +2,10 @@
  * Voice service — TypeScript conversion of public/voice.js.
  * Provides the VoiceManager class and notification sound generation.
  */
-"use strict";
+'use strict';
 
 const _voiceLog: EmberLogger = window.emberLog
-  ? window.emberLog.createLogger("Voice")
+  ? window.emberLog.createLogger('Voice')
   : {
       debug: () => {
         /* noop */
@@ -13,10 +13,8 @@ const _voiceLog: EmberLogger = window.emberLog
       info: () => {
         /* noop */
       },
-      warn: (m: string, d?: Record<string, unknown>) =>
-        console.warn("[Voice]", m, d ?? ""),
-      error: (m: string, d?: Record<string, unknown>) =>
-        console.error("[Voice]", m, d ?? ""),
+      warn: (m: string, d?: Record<string, unknown>) => console.warn('[Voice]', m, d ?? ''),
+      error: (m: string, d?: Record<string, unknown>) => console.error('[Voice]', m, d ?? ''),
     };
 
 class VoiceManager {
@@ -34,9 +32,7 @@ class VoiceManager {
   isDeafened: boolean;
   speakingStates: Map<string, boolean>;
   onSpeakingChanged: ((userId: string, isSpeaking: boolean) => void) | null;
-  onParticipantsChanged:
-    | ((participants: { user_id: string; username: string }[]) => void)
-    | null;
+  onParticipantsChanged: ((participants: { user_id: string; username: string }[]) => void) | null;
   iceServers: ICEServer[];
   _iceQueue: RTCIceCandidateInit[];
   _remoteDescSet: boolean;
@@ -79,7 +75,7 @@ class VoiceManager {
   _screenAudioCtx: AudioContext | null;
 
   constructor(wsConnection: WebSocket, authObj: AuthForVoice) {
-    _voiceLog.info("VoiceManager created");
+    _voiceLog.info('VoiceManager created');
     this.ws = wsConnection;
     this.auth = authObj;
     this.channelId = null;
@@ -111,7 +107,7 @@ class VoiceManager {
     this._localMonitorInterval = null;
     this._gainNode = null;
     this._pttEnabled = false;
-    this._pttKey = "Backquote";
+    this._pttKey = 'Backquote';
     this._pttKeydownHandler = null;
     this._pttKeyupHandler = null;
 
@@ -136,29 +132,26 @@ class VoiceManager {
   }
 
   async fetchICEServers(): Promise<void> {
-    _voiceLog.debug("Fetching ICE servers");
+    _voiceLog.debug('Fetching ICE servers');
     try {
-      const res = await fetch(
-        `${this.auth.hostname}/api/v1/voice/ice-servers`,
-        {
-          headers: { Authorization: `Bearer ${this.auth.token}` },
-        }
-      );
+      const res = await fetch(`${this.auth.hostname}/api/v1/voice/ice-servers`, {
+        headers: { Authorization: `Bearer ${this.auth.token}` },
+      });
       if (res.ok) {
         const data = (await res.json()) as { ice_servers?: ICEServer[] };
         this.iceServers = data.ice_servers ?? [];
-        _voiceLog.debug("ICE servers fetched", {
+        _voiceLog.debug('ICE servers fetched', {
           count: this.iceServers.length,
         });
       } else {
-        _voiceLog.warn("ICE server fetch returned non-OK status", {
+        _voiceLog.warn('ICE server fetch returned non-OK status', {
           status: res.status,
         });
       }
     } catch (e) {
-      _voiceLog.warn("Failed to fetch ICE servers, using STUN fallback");
-      console.warn("[Voice] Failed to fetch ICE servers, using defaults:", e);
-      this.iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
+      _voiceLog.warn('Failed to fetch ICE servers, using STUN fallback');
+      console.warn('[Voice] Failed to fetch ICE servers, using defaults:', e);
+      this.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
     }
   }
 
@@ -169,19 +162,19 @@ class VoiceManager {
     cameraDeviceId: string | null = null
   ): Promise<boolean> {
     if (this.channelId === channelId) {
-      _voiceLog.debug("joinChannel: already in this channel", {
+      _voiceLog.debug('joinChannel: already in this channel', {
         channel_id: channelId,
       });
       return false;
     }
     if (this.channelId) {
-      _voiceLog.info("Leaving current voice channel before joining new one", {
+      _voiceLog.info('Leaving current voice channel before joining new one', {
         channel_id: this.channelId,
       });
       await this.leaveChannel();
     }
 
-    _voiceLog.info("Joining voice channel", { channel_id: channelId });
+    _voiceLog.info('Joining voice channel', { channel_id: channelId });
     this.channelId = channelId;
     await this.fetchICEServers();
 
@@ -195,13 +188,13 @@ class VoiceManager {
         : 0.08;
 
     try {
-      _voiceLog.debug("Requesting microphone access");
+      _voiceLog.debug('Requesting microphone access');
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: s.echoCancellation !== false,
           noiseSuppression: s.noiseSuppression !== false,
           autoGainControl: s.autoGainControl !== false,
-          ...(s.inputDevice && s.inputDevice !== "default"
+          ...(s.inputDevice && s.inputDevice !== 'default'
             ? { deviceId: { exact: s.inputDevice } }
             : {}),
         },
@@ -211,14 +204,14 @@ class VoiceManager {
             : true
           : false,
       });
-      _voiceLog.info("Microphone access granted");
+      _voiceLog.info('Microphone access granted');
       if (withVideo) {
         this.localVideoStream = this.localStream;
         this.isCameraOn = true;
       }
     } catch (e) {
-      _voiceLog.error("Microphone access denied", { error: String(e) });
-      console.error("[Voice] Microphone access denied:", e);
+      _voiceLog.error('Microphone access denied', { error: String(e) });
+      console.error('[Voice] Microphone access denied:', e);
       this.channelId = null;
       return false;
     }
@@ -227,32 +220,36 @@ class VoiceManager {
 
     // Create peer connection before sending voice_join so we can include the
     // offer in the join message. ion-SFU requires the client to be the offerer.
-    _voiceLog.debug("Creating RTCPeerConnection");
+    _voiceLog.debug('Creating RTCPeerConnection');
     this.peerConnection = new RTCPeerConnection({
       iceServers: this.iceServers,
     });
 
     if (this.localStream) {
       const tracks = this.localStream.getTracks();
-      _voiceLog.info("Local stream created", { 
+      _voiceLog.info('Local stream created', {
         trackCount: tracks.length,
         audioTracks: this.localStream.getAudioTracks().length,
-        videoTracks: this.localStream.getVideoTracks().length
+        videoTracks: this.localStream.getVideoTracks().length,
       });
-      
-      tracks.forEach((track) => {
+
+      tracks.forEach(track => {
         // Use addTransceiver with sendonly so the SFU appends recvonly m-lines
         // for remote participants at the end rather than reordering existing ones.
         // addTrack (sendrecv) causes ion-SFU renegotiation offers to reorder
         // m-lines, which Chrome rejects with an InvalidAccessError.
         this.peerConnection!.addTransceiver(track, {
-          direction: "sendonly",
+          direction: 'sendonly',
           streams: [this.localStream!],
         });
-        _voiceLog.debug("Local track added to peer connection", { kind: track.kind, id: track.id, enabled: track.enabled });
+        _voiceLog.debug('Local track added to peer connection', {
+          kind: track.kind,
+          id: track.id,
+          enabled: track.enabled,
+        });
       });
     } else {
-      _voiceLog.error("No local stream created - microphone access may have failed");
+      _voiceLog.error('No local stream created - microphone access may have failed');
     }
 
     // ontrack lives on subscriberPC (created in handleOffer) — the publisher PC
@@ -262,7 +259,7 @@ class VoiceManager {
       if (event.candidate) {
         this.ws.send(
           JSON.stringify({
-            type: "voice_ice_candidate",
+            type: 'voice_ice_candidate',
             channel_id: this.channelId,
             candidate: event.candidate,
             target: 0, // publisher PC
@@ -273,11 +270,11 @@ class VoiceManager {
 
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
-      _voiceLog.info("Peer connection state changed", {
-        state: state ?? "unknown",
+      _voiceLog.info('Peer connection state changed', {
+        state: state ?? 'unknown',
       });
-      console.log("[Voice] Connection state:", state);
-      if (state === "connected" && this.onConnected) {
+      console.log('[Voice] Connection state:', state);
+      if (state === 'connected' && this.onConnected) {
         const cb = this.onConnected;
         this.onConnected = null;
         cb();
@@ -286,26 +283,26 @@ class VoiceManager {
 
     let offer: RTCSessionDescriptionInit;
     try {
-      _voiceLog.debug("Creating WebRTC offer");
+      _voiceLog.debug('Creating WebRTC offer');
       offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
     } catch (e) {
-      _voiceLog.error("Failed to create WebRTC offer", { error: String(e) });
-      console.error("[Voice] Failed to create offer:", e);
+      _voiceLog.error('Failed to create WebRTC offer', { error: String(e) });
+      console.error('[Voice] Failed to create offer:', e);
       this._cleanup();
       return false;
     }
 
-    _voiceLog.debug("Sending voice_join to server", { channel_id: channelId });
+    _voiceLog.debug('Sending voice_join to server', { channel_id: channelId });
     this.ws.send(
       JSON.stringify({
-        type: "voice_join",
+        type: 'voice_join',
         channel_id: channelId,
         offer: { type: offer.type, sdp: offer.sdp },
       })
     );
 
-    _voiceLog.info("Voice channel join initiated, offer sent", {
+    _voiceLog.info('Voice channel join initiated, offer sent', {
       channel_id: channelId,
     });
     return true;
@@ -313,10 +310,10 @@ class VoiceManager {
 
   async leaveChannel(): Promise<void> {
     if (!this.channelId) return;
-    _voiceLog.info("Leaving voice channel", { channel_id: this.channelId });
-    this.ws.send(JSON.stringify({ type: "voice_leave" }));
+    _voiceLog.info('Leaving voice channel', { channel_id: this.channelId });
+    this.ws.send(JSON.stringify({ type: 'voice_leave' }));
     this._cleanup();
-    _voiceLog.info("Voice channel left and resources cleaned up");
+    _voiceLog.info('Voice channel left and resources cleaned up');
   }
 
   _cleanup(): void {
@@ -336,16 +333,14 @@ class VoiceManager {
       this.subscriberPC = null;
     }
     if (this.localStream) {
-      this.localStream.getTracks().forEach((t) => t.stop());
+      this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;
     }
 
-    this.remoteStreams.forEach((stream) =>
-      stream.getTracks().forEach((t) => t.stop())
-    );
+    this.remoteStreams.forEach(stream => stream.getTracks().forEach(t => t.stop()));
     this.remoteStreams.clear();
 
-    this.audioElements.forEach((el) => {
+    this.audioElements.forEach(el => {
       el.pause();
       el.srcObject = null;
       el.remove();
@@ -354,21 +349,21 @@ class VoiceManager {
     this.speakingStates.clear();
 
     if (this.localVideoStream) {
-      this.localVideoStream.getTracks().forEach((t) => t.stop());
+      this.localVideoStream.getTracks().forEach(t => t.stop());
       this.localVideoStream = null;
     }
-    this.remoteVideoStreams.forEach((s) =>
-      s.getTracks().forEach((t) => t.stop())
-    );
+    this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
     this.remoteVideoStreams.clear();
     this.isCameraOn = false;
 
     if (this.localScreenStream) {
-      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream.getTracks().forEach(t => t.stop());
       this.localScreenStream = null;
     }
     this.isScreenSharing = false;
-    this._stopAudioCapture().catch(() => { /* ignore */ });
+    this._stopAudioCapture().catch(() => {
+      /* ignore */
+    });
 
     if (this._audioCtx) {
       this._audioCtx.close().catch(() => {
@@ -384,19 +379,15 @@ class VoiceManager {
   // join offer. Sets remote description and flushes any queued ICE candidates.
   async handleJoinAnswer(sdp: RTCSessionDescriptionInit): Promise<void> {
     if (!this.channelId || !this.peerConnection) return;
-    _voiceLog.info("Received SFU answer for initial offer");
-    await this.peerConnection.setRemoteDescription(
-      new RTCSessionDescription(sdp)
-    );
+    _voiceLog.info('Received SFU answer for initial offer');
+    await this.peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
     this._remoteDescSet = true;
     if (this._iceQueue.length > 0) {
-      _voiceLog.debug("Flushing queued ICE candidates", {
+      _voiceLog.debug('Flushing queued ICE candidates', {
         count: this._iceQueue.length,
       });
       for (const c of this._iceQueue) {
-        await this.peerConnection
-          .addIceCandidate(new RTCIceCandidate(c))
-          .catch(console.warn);
+        await this.peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(console.warn);
       }
       this._iceQueue = [];
     }
@@ -411,7 +402,7 @@ class VoiceManager {
 
     // Create the subscriber PC on first offer.
     if (!this.subscriberPC) {
-      _voiceLog.debug("Creating subscriber RTCPeerConnection");
+      _voiceLog.debug('Creating subscriber RTCPeerConnection');
       this.subscriberPC = new RTCPeerConnection({
         iceServers: this.iceServers,
       });
@@ -420,75 +411,71 @@ class VoiceManager {
         this._handleSubscriberTrack(event);
       };
 
-      this.subscriberPC.onicecandidate = (
-        event: RTCPeerConnectionIceEvent
-      ) => {
+      this.subscriberPC.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
-          _voiceLog.debug("Subscriber ICE candidate generated, sending to server", {
+          _voiceLog.debug('Subscriber ICE candidate generated, sending to server', {
             protocol: event.candidate.protocol,
             type: event.candidate.type,
           });
           this.ws.send(
             JSON.stringify({
-              type: "voice_ice_candidate",
+              type: 'voice_ice_candidate',
               channel_id: this.channelId,
               candidate: event.candidate,
               target: 1, // subscriber PC
             })
           );
         } else {
-          _voiceLog.debug("Subscriber ICE gathering complete (null candidate)");
+          _voiceLog.debug('Subscriber ICE gathering complete (null candidate)');
         }
       };
 
       this.subscriberPC.onconnectionstatechange = () => {
         const state = this.subscriberPC?.connectionState;
-        _voiceLog.info("Subscriber PC connection state changed", {
-          state: state ?? "unknown",
+        _voiceLog.info('Subscriber PC connection state changed', {
+          state: state ?? 'unknown',
         });
       };
 
       this.subscriberPC.onicegatheringstatechange = () => {
-        _voiceLog.debug("Subscriber PC ICE gathering state", {
-          state: this.subscriberPC?.iceGatheringState ?? "unknown",
+        _voiceLog.debug('Subscriber PC ICE gathering state', {
+          state: this.subscriberPC?.iceGatheringState ?? 'unknown',
         });
       };
 
       this.subscriberPC.oniceconnectionstatechange = () => {
-        _voiceLog.debug("Subscriber PC ICE connection state", {
-          state: this.subscriberPC?.iceConnectionState ?? "unknown",
+        _voiceLog.debug('Subscriber PC ICE connection state', {
+          state: this.subscriberPC?.iceConnectionState ?? 'unknown',
         });
       };
     }
 
-    _voiceLog.info("Received SFU subscriber offer", {
+    _voiceLog.info('Received SFU subscriber offer', {
       signalingState: this.subscriberPC.signalingState,
     });
     await this.subscriberPC.setRemoteDescription(new RTCSessionDescription(sdp));
     this._subscriberRemoteDescSet = true;
 
     if (this._subscriberIceQueue.length > 0) {
-      _voiceLog.debug("Flushing queued subscriber ICE candidates", {
+      _voiceLog.debug('Flushing queued subscriber ICE candidates', {
         count: this._subscriberIceQueue.length,
       });
       for (const c of this._subscriberIceQueue) {
-        await this.subscriberPC
-          .addIceCandidate(new RTCIceCandidate(c))
-          .catch(console.warn);
+        await this.subscriberPC.addIceCandidate(new RTCIceCandidate(c)).catch(console.warn);
       }
       this._subscriberIceQueue = [];
     }
 
-    _voiceLog.debug("Subscriber remote description set");
+    _voiceLog.debug('Subscriber remote description set');
     const answer = await this.subscriberPC.createAnswer();
     await this.subscriberPC.setLocalDescription(answer);
-    _voiceLog.debug("Subscriber local description set", {
+    _voiceLog.debug('Subscriber local description set', {
       iceGatheringState: this.subscriberPC.iceGatheringState,
     });
-    _voiceLog.info("Subscriber answer sent to server");
+    _voiceLog.info('Subscriber answer sent to server');
     this.ws.send(
       JSON.stringify({
-        type: "voice_answer",
+        type: 'voice_answer',
         channel_id: this.channelId,
         sdp: answer,
       })
@@ -502,19 +489,15 @@ class VoiceManager {
     if (target === 1) {
       // Subscriber ICE candidate
       if (!this.subscriberPC || !this._subscriberRemoteDescSet) {
-        _voiceLog.debug(
-          "Queuing subscriber ICE candidate (subscriber PC not ready)"
-        );
+        _voiceLog.debug('Queuing subscriber ICE candidate (subscriber PC not ready)');
         this._subscriberIceQueue.push(candidate);
         return;
       }
       try {
-        await this.subscriberPC.addIceCandidate(
-          new RTCIceCandidate(candidate)
-        );
-        _voiceLog.debug("Subscriber ICE candidate added");
+        await this.subscriberPC.addIceCandidate(new RTCIceCandidate(candidate));
+        _voiceLog.debug('Subscriber ICE candidate added');
       } catch (e) {
-        _voiceLog.warn("Failed to add subscriber ICE candidate", {
+        _voiceLog.warn('Failed to add subscriber ICE candidate', {
           error: String(e),
         });
       }
@@ -524,26 +507,22 @@ class VoiceManager {
     // Publisher ICE candidate (target === 0)
     if (!this.peerConnection) return;
     if (!this._remoteDescSet) {
-      _voiceLog.debug("Queuing ICE candidate (remote description not yet set)");
+      _voiceLog.debug('Queuing ICE candidate (remote description not yet set)');
       this._iceQueue.push(candidate);
       return;
     }
     try {
       await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-      _voiceLog.debug("Remote ICE candidate added");
+      _voiceLog.debug('Remote ICE candidate added');
     } catch (e) {
-      _voiceLog.warn("Failed to add remote ICE candidate", {
+      _voiceLog.warn('Failed to add remote ICE candidate', {
         error: String(e),
       });
-      console.warn("[Voice] Failed to add ICE candidate:", e);
+      console.warn('[Voice] Failed to add ICE candidate:', e);
     }
   }
 
-  handleSpeakingEvent(
-    userId: string,
-    _level: number,
-    isSpeaking: boolean
-  ): void {
+  handleSpeakingEvent(userId: string, _level: number, isSpeaking: boolean): void {
     const was = this.speakingStates.get(userId) ?? false;
     if (was !== isSpeaking) {
       this.speakingStates.set(userId, isSpeaking);
@@ -552,7 +531,12 @@ class VoiceManager {
   }
 
   handleParticipants(
-    participants: { user_id: string; username: string; screen_sharing?: boolean; screen_stream_id?: string }[]
+    participants: {
+      user_id: string;
+      username: string;
+      screen_sharing?: boolean;
+      screen_stream_id?: string;
+    }[]
   ): void {
     // Phase 10: reconcile stream ID maps for late joiners.
     const activeScreenSids = new Set<string>();
@@ -579,9 +563,9 @@ class VoiceManager {
 
   toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    _voiceLog.info("Microphone toggled", { muted: this.isMuted });
+    _voiceLog.info('Microphone toggled', { muted: this.isMuted });
     if (this.localStream)
-      this.localStream.getAudioTracks().forEach((t) => {
+      this.localStream.getAudioTracks().forEach(t => {
         t.enabled = !this.isMuted;
       });
     return this.isMuted;
@@ -589,8 +573,8 @@ class VoiceManager {
 
   toggleDeafen(): boolean {
     this.isDeafened = !this.isDeafened;
-    _voiceLog.info("Deafen toggled", { deafened: this.isDeafened });
-    this.audioElements.forEach((el) => {
+    _voiceLog.info('Deafen toggled', { deafened: this.isDeafened });
+    this.audioElements.forEach(el => {
       el.muted = this.isDeafened;
     });
     return this.isDeafened;
@@ -599,30 +583,30 @@ class VoiceManager {
   // Phase 10: extracted from subscriberPC.ontrack for testability.
   _handleSubscriberTrack(event: RTCTrackEvent): void {
     const stream = event.streams[0];
-    _voiceLog.debug("ontrack fired (subscriber)", {
+    _voiceLog.debug('ontrack fired (subscriber)', {
       kind: event.track.kind,
       trackId: event.track.id,
-      streamId: stream?.id ?? "none",
+      streamId: stream?.id ?? 'none',
     });
     if (!stream) return;
-    if (event.track.kind === "audio") {
+    if (event.track.kind === 'audio') {
       if (!this.remoteStreams.has(stream.id)) {
         this.remoteStreams.set(stream.id, stream);
-        _voiceLog.info("Remote audio stream added", { streamId: stream.id });
+        _voiceLog.info('Remote audio stream added', { streamId: stream.id });
         if (!this.isDeafened) this._playRemoteStream(stream.id, stream);
       } else {
-        _voiceLog.debug("Remote audio stream already tracked, skipping", {
+        _voiceLog.debug('Remote audio stream already tracked, skipping', {
           streamId: stream.id,
         });
       }
-    } else if (event.track.kind === "video") {
+    } else if (event.track.kind === 'video') {
       // Route screen streams to remoteScreenStreams, camera streams to remoteVideoStreams.
       if (this._screenStreamIdToUser.has(stream.id)) {
         this.remoteScreenStreams.set(stream.id, stream);
-        _voiceLog.info("Remote screen stream added", { streamId: stream.id });
+        _voiceLog.info('Remote screen stream added', { streamId: stream.id });
       } else {
         this.remoteVideoStreams.set(stream.id, stream);
-        _voiceLog.info("Remote video stream added", { streamId: stream.id });
+        _voiceLog.info('Remote video stream added', { streamId: stream.id });
       }
       if (this.onVideoStreamAdded) this.onVideoStreamAdded(stream.id, stream);
     }
@@ -630,33 +614,32 @@ class VoiceManager {
 
   _playRemoteStream(id: string, stream: MediaStream): void {
     if (this.audioElements.has(id)) return;
-    _voiceLog.debug("Playing remote audio stream", { stream_id: id });
+    _voiceLog.debug('Playing remote audio stream', { stream_id: id });
     const audio = new Audio();
     audio.srcObject = stream;
     audio.autoplay = true;
     audio.muted = this.isDeafened;
-    audio.play().catch((e) => {
-      _voiceLog.warn("Remote audio play failed", {
+    audio.play().catch(e => {
+      _voiceLog.warn('Remote audio play failed', {
         stream_id: id,
         error: String(e),
       });
-      console.warn("[Voice] Audio play failed:", e);
+      console.warn('[Voice] Audio play failed:', e);
     });
     this.audioElements.set(id, audio);
   }
 
   _setupLocalAudioMonitor(): void {
-    _voiceLog.debug("Setting up local audio monitor");
+    _voiceLog.debug('Setting up local audio monitor');
     if (!this.localStream) {
-      _voiceLog.error("Cannot setup audio monitor - no local stream");
+      _voiceLog.error('Cannot setup audio monitor - no local stream');
       return;
     }
-    
+
     try {
       const ctx = new (
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       )();
       const source = ctx.createMediaStreamSource(this.localStream);
       const analyser = ctx.createAnalyser();
@@ -666,11 +649,11 @@ class VoiceManager {
 
       this._audioCtx = ctx;
       this._analyser = analyser;
-      
-      _voiceLog.info("Local audio monitor setup completed", {
+
+      _voiceLog.info('Local audio monitor setup completed', {
         audioContext: ctx.state,
         streamActive: this.localStream.active,
-        audioTracks: this.localStream.getAudioTracks().length
+        audioTracks: this.localStream.getAudioTracks().length,
       });
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -681,8 +664,7 @@ class VoiceManager {
         this._analyser.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((s, v) => s + v, 0) / dataArray.length;
         const level = avg / 255;
-        const speaking =
-          level > (this._sensitivityThreshold || 0.08) && !this.isMuted;
+        const speaking = level > (this._sensitivityThreshold || 0.08) && !this.isMuted;
         if (speaking !== isSpeakingLocal) {
           isSpeakingLocal = speaking;
           if (this.onSpeakingChanged && this.auth) {
@@ -693,30 +675,25 @@ class VoiceManager {
       };
       requestAnimationFrame(check);
     } catch (e) {
-      _voiceLog.warn("Local audio monitor setup failed", { error: String(e) });
-      console.warn("[Voice] Audio monitor setup failed:", e);
+      _voiceLog.warn('Local audio monitor setup failed', { error: String(e) });
+      console.warn('[Voice] Audio monitor setup failed:', e);
     }
   }
 
   async enableCamera(cameraDeviceId: string | null): Promise<boolean> {
     if (!this.channelId) return false;
     const channelId = this.channelId;
-    _voiceLog.info("Enabling camera, rejoining channel", {
+    _voiceLog.info('Enabling camera, rejoining channel', {
       channel_id: channelId,
     });
     this._partialCleanup();
-    return this.joinChannel(
-      channelId,
-      this._lastAudioSettings,
-      true,
-      cameraDeviceId
-    );
+    return this.joinChannel(channelId, this._lastAudioSettings, true, cameraDeviceId);
   }
 
   async disableCamera(): Promise<boolean> {
     if (!this.channelId) return false;
     const channelId = this.channelId;
-    _voiceLog.info("Disabling camera, rejoining channel", {
+    _voiceLog.info('Disabling camera, rejoining channel', {
       channel_id: channelId,
     });
     this._partialCleanup();
@@ -728,7 +705,7 @@ class VoiceManager {
     // close the SFU connection cleanly rather than waiting for the next
     // voice_join to trigger an implicit voiceLeave.
     if (this.channelId && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: "voice_leave" }));
+      this.ws.send(JSON.stringify({ type: 'voice_leave' }));
     }
     if (this.peerConnection) {
       this.peerConnection.close();
@@ -739,20 +716,18 @@ class VoiceManager {
       this.subscriberPC = null;
     }
     if (this.localStream) {
-      this.localStream.getTracks().forEach((t) => t.stop());
+      this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;
     }
     if (this.localVideoStream) {
-      this.localVideoStream.getTracks().forEach((t) => t.stop());
+      this.localVideoStream.getTracks().forEach(t => t.stop());
       this.localVideoStream = null;
     }
-    this.remoteVideoStreams.forEach((s) =>
-      s.getTracks().forEach((t) => t.stop())
-    );
+    this.remoteVideoStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
     this.remoteVideoStreams.clear();
-    this.remoteStreams.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+    this.remoteStreams.forEach(s => s.getTracks().forEach(t => t.stop()));
     this.remoteStreams.clear();
-    this.audioElements.forEach((el) => {
+    this.audioElements.forEach(el => {
       el.pause();
       el.srcObject = null;
       el.remove();
@@ -764,109 +739,98 @@ class VoiceManager {
     this._subscriberIceQueue = [];
     this.isCameraOn = false;
     if (this.localScreenStream) {
-      this.localScreenStream.getTracks().forEach((t) => t.stop());
+      this.localScreenStream.getTracks().forEach(t => t.stop());
       this.localScreenStream = null;
     }
     this.isScreenSharing = false;
-    this._stopAudioCapture().catch(() => { /* ignore */ });
+    this._stopAudioCapture().catch(() => {
+      /* ignore */
+    });
     const channelId = this.channelId;
     this.channelId = null;
     return channelId;
   }
 
   handleMessage(msg: { type: string; payload: Record<string, unknown> }): void {
-    _voiceLog.debug("WebSocket voice message received", { type: msg.type });
+    _voiceLog.debug('WebSocket voice message received', { type: msg.type });
     switch (msg.type) {
-      case "voice_error": {
-        const errMsg = String(msg.payload["message"] ?? "unknown SFU error");
-        _voiceLog.error("SFU connection error — cleaning up voice session", {
+      case 'voice_error': {
+        const errMsg = String(msg.payload['message'] ?? 'unknown SFU error');
+        _voiceLog.error('SFU connection error — cleaning up voice session', {
           message: errMsg,
         });
-        console.error("[Voice] SFU error:", errMsg);
+        console.error('[Voice] SFU error:', errMsg);
         this._cleanup();
         break;
       }
-      case "voice_answer": {
+      case 'voice_answer': {
         // Answer from SFU to our initial join offer — set remote description.
-        const raw = msg.payload["sdp"] as Record<string, unknown>;
-        if (
-          raw &&
-          typeof raw["type"] === "string" &&
-          typeof raw["sdp"] === "string"
-        ) {
+        const raw = msg.payload['sdp'] as Record<string, unknown>;
+        if (raw && typeof raw['type'] === 'string' && typeof raw['sdp'] === 'string') {
           this.handleJoinAnswer({
-            type: raw["type"] as RTCSdpType,
-            sdp: raw["sdp"],
+            type: raw['type'] as RTCSdpType,
+            sdp: raw['sdp'],
           });
         } else {
-          _voiceLog.error("voice_answer received with invalid sdp payload", {
+          _voiceLog.error('voice_answer received with invalid sdp payload', {
             payload: JSON.stringify(raw),
           });
         }
         break;
       }
-      case "voice_offer": {
+      case 'voice_offer': {
         // Renegotiation offer from SFU (another participant joined/left).
-        const raw = msg.payload["sdp"] as Record<string, unknown>;
-        if (
-          raw &&
-          typeof raw["type"] === "string" &&
-          typeof raw["sdp"] === "string"
-        ) {
+        const raw = msg.payload['sdp'] as Record<string, unknown>;
+        if (raw && typeof raw['type'] === 'string' && typeof raw['sdp'] === 'string') {
           this.handleOffer({
-            type: raw["type"] as RTCSdpType,
-            sdp: raw["sdp"],
-          }).catch((err) =>
-            _voiceLog.error("Renegotiation handleOffer failed", { error: String(err) })
+            type: raw['type'] as RTCSdpType,
+            sdp: raw['sdp'],
+          }).catch(err =>
+            _voiceLog.error('Renegotiation handleOffer failed', { error: String(err) })
           );
         } else {
-          _voiceLog.error("voice_offer received with invalid sdp payload", {
+          _voiceLog.error('voice_offer received with invalid sdp payload', {
             payload: JSON.stringify(raw),
           });
         }
         break;
       }
-      case "voice_ice_candidate":
+      case 'voice_ice_candidate':
         this.handleRemoteICECandidate(
-          msg.payload["candidate"] as RTCIceCandidateInit,
-          typeof msg.payload["target"] === "number"
-            ? (msg.payload["target"] as number)
-            : 0
+          msg.payload['candidate'] as RTCIceCandidateInit,
+          typeof msg.payload['target'] === 'number' ? (msg.payload['target'] as number) : 0
         );
         break;
-      case "voice_speaking":
+      case 'voice_speaking':
         this.handleSpeakingEvent(
-          String(msg.payload["user_id"] ?? ""),
-          Number(msg.payload["level"] ?? 0),
-          Boolean(msg.payload["is_speaking"])
+          String(msg.payload['user_id'] ?? ''),
+          Number(msg.payload['level'] ?? 0),
+          Boolean(msg.payload['is_speaking'])
         );
         break;
-      case "voice_participants":
-        _voiceLog.debug("Voice participants update", {
-          count: ((msg.payload["participants"] as unknown[]) ?? []).length,
+      case 'voice_participants':
+        _voiceLog.debug('Voice participants update', {
+          count: ((msg.payload['participants'] as unknown[]) ?? []).length,
         });
         this.handleParticipants(
-          msg.payload["participants"] as { user_id: string; username: string }[]
+          msg.payload['participants'] as { user_id: string; username: string }[]
         );
         break;
-      case "voice_camera_on":
+      case 'voice_camera_on':
         if (this.onCameraStateChanged)
-          this.onCameraStateChanged(String(msg.payload["user_id"] ?? ""), true);
+          this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), true);
         break;
-      case "voice_camera_off":
+      case 'voice_camera_off':
         if (this.onCameraStateChanged)
-          this.onCameraStateChanged(
-            String(msg.payload["user_id"] ?? ""),
-            false
-          );
+          this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), false);
         break;
-      case "screen_share_start": {
-        const ssUserId = String(msg.payload["user_id"] ?? "");
-        const ssStreamId = String(msg.payload["screen_stream_id"] ?? "");
+      case 'screen_share_start': {
+        const ssUserId = String(msg.payload['user_id'] ?? '');
+        const ssStreamId = String(msg.payload['screen_stream_id'] ?? '');
         if (ssStreamId) {
           this._screenStreamIdToUser.set(ssStreamId, ssUserId);
           this._userToScreenStreamId.set(ssUserId, ssStreamId);
-          _voiceLog.info("screen_share_start received, stream ID registered", {
+          _voiceLog.info('screen_share_start received, stream ID registered', {
             userId: ssUserId,
             screen_stream_id: ssStreamId,
           });
@@ -876,7 +840,7 @@ class VoiceManager {
           if (earlyStream) {
             this.remoteVideoStreams.delete(ssStreamId);
             this.remoteScreenStreams.set(ssStreamId, earlyStream);
-            _voiceLog.info("Reclassified early video track as screen share", {
+            _voiceLog.info('Reclassified early video track as screen share', {
               screen_stream_id: ssStreamId,
             });
           }
@@ -884,8 +848,8 @@ class VoiceManager {
         if (this.onScreenShareStarted) this.onScreenShareStarted(ssUserId);
         break;
       }
-      case "screen_share_stop": {
-        const stopUserId = String(msg.payload["user_id"] ?? "");
+      case 'screen_share_stop': {
+        const stopUserId = String(msg.payload['user_id'] ?? '');
         const stopStreamId = this._userToScreenStreamId.get(stopUserId);
         if (stopStreamId) {
           this._screenStreamIdToUser.delete(stopStreamId);
@@ -895,23 +859,23 @@ class VoiceManager {
         if (this.onScreenShareStopped) this.onScreenShareStopped(stopUserId);
         break;
       }
-      case "voice_renegotiate_answer": {
-        const raw = msg.payload["sdp"] as Record<string, unknown>;
+      case 'voice_renegotiate_answer': {
+        const raw = msg.payload['sdp'] as Record<string, unknown>;
         if (
           this.peerConnection &&
           raw &&
-          typeof raw["type"] === "string" &&
-          typeof raw["sdp"] === "string"
+          typeof raw['type'] === 'string' &&
+          typeof raw['sdp'] === 'string'
         ) {
           this.peerConnection
             .setRemoteDescription(
               new RTCSessionDescription({
-                type: raw["type"] as RTCSdpType,
-                sdp: raw["sdp"],
+                type: raw['type'] as RTCSdpType,
+                sdp: raw['sdp'],
               })
             )
             .catch((err: unknown) =>
-              _voiceLog.error("voice_renegotiate_answer setRemoteDescription failed", {
+              _voiceLog.error('voice_renegotiate_answer setRemoteDescription failed', {
                 error: String(err),
               })
             );
@@ -936,9 +900,7 @@ class VoiceManager {
       return null;
     }
     const monitor = devices.find(
-      (d) =>
-        d.kind === 'audioinput' &&
-        d.label.toLowerCase().includes('ember_screen_capture')
+      d => d.kind === 'audioinput' && d.label.toLowerCase().includes('ember_screen_capture')
     );
     if (!monitor) {
       _voiceLog.warn('PulseAudio capture sink monitor device not found');
@@ -981,13 +943,17 @@ class VoiceManager {
     const poll = async () => {
       if (!this.isScreenSharing || !this._nativeAudioCaptureActive) return;
       try {
-        const frames = await (window.electronAPI as unknown as {
-          audioCapture: { frames(): Promise<{ pcm: Float32Array } | null> };
-        }).audioCapture.frames();
+        const frames = await (
+          window.electronAPI as unknown as {
+            audioCapture: { frames(): Promise<{ pcm: Float32Array } | null> };
+          }
+        ).audioCapture.frames();
         if (frames && frames.pcm && frames.pcm.length > 0) {
           worklet.port.postMessage({ pcm: frames.pcm });
         }
-      } catch { /* ignore transient frame errors */ }
+      } catch {
+        /* ignore transient frame errors */
+      }
       requestAnimationFrame(poll);
     };
     poll();
@@ -1000,9 +966,9 @@ class VoiceManager {
    * buildAudioTrackFromNativeCapture — dispatches to the correct audio
    * pipeline based on the platform reported by audio-capture-setup.
    */
-  async buildAudioTrackFromNativeCapture(
-    result: { platform?: string }
-  ): Promise<MediaStreamTrack | null> {
+  async buildAudioTrackFromNativeCapture(result: {
+    platform?: string;
+  }): Promise<MediaStreamTrack | null> {
     if (result.platform === 'linux-pulseaudio') {
       const track = await this.buildPulseAudioTrack();
       if (track) this._nativeAudioCaptureActive = true;
@@ -1020,17 +986,21 @@ class VoiceManager {
   async _startAudioCapture(): Promise<MediaStream | null> {
     let setupResult: { success: boolean; platform?: string; reason?: string };
     try {
-      setupResult = await (window.electronAPI as unknown as {
-        audioCapture: { setup(): Promise<{ success: boolean; platform?: string; reason?: string }> };
-      }).audioCapture.setup();
+      setupResult = await (
+        window.electronAPI as unknown as {
+          audioCapture: {
+            setup(): Promise<{ success: boolean; platform?: string; reason?: string }>;
+          };
+        }
+      ).audioCapture.setup();
     } catch (e) {
-      _voiceLog.warn("Audio capture setup threw", { error: String(e) });
+      _voiceLog.warn('Audio capture setup threw', { error: String(e) });
       return null;
     }
 
     if (!setupResult.success) {
-      _voiceLog.warn("Audio capture setup failed", {
-        reason: setupResult.reason ?? "unknown",
+      _voiceLog.warn('Audio capture setup failed', {
+        reason: setupResult.reason ?? 'unknown',
       });
       return null;
     }
@@ -1043,7 +1013,7 @@ class VoiceManager {
       return null;
     }
 
-    _voiceLog.info("Audio capture pipeline started", { platform: setupResult.platform });
+    _voiceLog.info('Audio capture pipeline started', { platform: setupResult.platform });
     return new MediaStream([track]);
   }
 
@@ -1079,40 +1049,39 @@ class VoiceManager {
 
     if (this._audioCaptureSetup) {
       try {
-        await (window.electronAPI as unknown as {
-          audioCapture: { teardown(): Promise<void> };
-        }).audioCapture.teardown();
+        await (
+          window.electronAPI as unknown as {
+            audioCapture: { teardown(): Promise<void> };
+          }
+        ).audioCapture.teardown();
       } catch (e) {
-        _voiceLog.warn("Audio capture teardown failed", { error: String(e) });
+        _voiceLog.warn('Audio capture teardown failed', { error: String(e) });
       }
       this._audioCaptureSetup = false;
     }
-    _voiceLog.info("Audio capture pipeline stopped");
+    _voiceLog.info('Audio capture pipeline stopped');
   }
 
   // ─── Screen share methods ──────────────────────────────────────────────────
 
-  async startScreenShare(
-    sourceId: string,
-    settings: ScreenShareSettings
-  ): Promise<boolean> {
+  async startScreenShare(sourceId: string, settings: ScreenShareSettings): Promise<boolean> {
     if (!this.channelId || !this.peerConnection) {
-      _voiceLog.warn("startScreenShare: not in a voice channel or no peerConnection");
+      _voiceLog.warn('startScreenShare: not in a voice channel or no peerConnection');
       return false;
     }
 
     const resolutionMap: Record<string, { maxWidth: number; maxHeight: number }> = {
-      "720p":  { maxWidth: 1280, maxHeight: 720  },
-      "1080p": { maxWidth: 1920, maxHeight: 1080 },
-      "1440p": { maxWidth: 2560, maxHeight: 1440 },
+      '720p': { maxWidth: 1280, maxHeight: 720 },
+      '1080p': { maxWidth: 1920, maxHeight: 1080 },
+      '1440p': { maxWidth: 2560, maxHeight: 1440 },
     };
-    const res = resolutionMap[settings.resolution] ?? resolutionMap["720p"];
+    const res = resolutionMap[settings.resolution] ?? resolutionMap['720p'];
 
     const constraints = {
       audio: false,
       video: {
         mandatory: {
-          chromeMediaSource: "desktop",
+          chromeMediaSource: 'desktop',
           chromeMediaSourceId: sourceId,
           maxWidth: res.maxWidth,
           maxHeight: res.maxHeight,
@@ -1123,10 +1092,10 @@ class VoiceManager {
 
     let stream: MediaStream;
     try {
-      _voiceLog.info("Requesting screen capture stream", { sourceId });
+      _voiceLog.info('Requesting screen capture stream', { sourceId });
       stream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (e) {
-      _voiceLog.error("Screen capture getUserMedia failed", { error: String(e) });
+      _voiceLog.error('Screen capture getUserMedia failed', { error: String(e) });
       return false;
     }
 
@@ -1141,17 +1110,17 @@ class VoiceManager {
         const audioTrack = audioStream.getAudioTracks()[0];
         if (audioTrack) {
           this.peerConnection.addTransceiver(audioTrack, {
-            direction: "sendonly",
+            direction: 'sendonly',
             streams: [audioStream],
           });
-          _voiceLog.info("Audio track added for screen share");
+          _voiceLog.info('Audio track added for screen share');
         }
       }
     }
 
     const videoTrack = stream.getVideoTracks()[0];
     this.peerConnection.addTransceiver(videoTrack, {
-      direction: "sendonly",
+      direction: 'sendonly',
       streams: [stream],
     });
 
@@ -1160,15 +1129,15 @@ class VoiceManager {
       offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
     } catch (e) {
-      _voiceLog.error("startScreenShare: createOffer failed", { error: String(e) });
-      stream.getTracks().forEach((t) => t.stop());
+      _voiceLog.error('startScreenShare: createOffer failed', { error: String(e) });
+      stream.getTracks().forEach(t => t.stop());
       this.localScreenStream = null;
       return false;
     }
 
     this.ws.send(
       JSON.stringify({
-        type: "voice_renegotiate",
+        type: 'voice_renegotiate',
         channel_id: this.channelId,
         offer: { type: offer.type, sdp: offer.sdp },
       })
@@ -1176,23 +1145,23 @@ class VoiceManager {
 
     this.ws.send(
       JSON.stringify({
-        type: "screen_share_start",
+        type: 'screen_share_start',
         channel_id: this.channelId,
         screen_stream_id: stream.id,
       })
     );
-    _voiceLog.info("screen_share_start sent to server", { screen_stream_id: stream.id });
+    _voiceLog.info('screen_share_start sent to server', { screen_stream_id: stream.id });
 
     this.isScreenSharing = true;
-    _voiceLog.info("Screen share started, renegotiation offer sent");
+    _voiceLog.info('Screen share started, renegotiation offer sent');
     return true;
   }
 
   async stopScreenShare(): Promise<void> {
     if (!this.isScreenSharing || !this.localScreenStream) return;
 
-    _voiceLog.info("Stopping screen share");
-    this.localScreenStream.getTracks().forEach((t) => t.stop());
+    _voiceLog.info('Stopping screen share');
+    this.localScreenStream.getTracks().forEach(t => t.stop());
     this.localScreenStream = null;
     this.isScreenSharing = false;
 
@@ -1204,38 +1173,38 @@ class VoiceManager {
         await this.peerConnection.setLocalDescription(offer);
         this.ws.send(
           JSON.stringify({
-            type: "voice_renegotiate",
+            type: 'voice_renegotiate',
             channel_id: this.channelId,
             offer: { type: offer.type, sdp: offer.sdp },
           })
         );
       } catch (e) {
-        _voiceLog.warn("stopScreenShare: renegotiation offer failed", { error: String(e) });
+        _voiceLog.warn('stopScreenShare: renegotiation offer failed', { error: String(e) });
       }
     }
 
     if (this.channelId) {
       this.ws.send(
         JSON.stringify({
-          type: "screen_share_stop",
+          type: 'screen_share_stop',
           channel_id: this.channelId,
         })
       );
-      _voiceLog.info("screen_share_stop sent to server");
+      _voiceLog.info('screen_share_stop sent to server');
     }
   }
 
   applySettings(settings: VoiceSettings): void {
     if (!settings) return;
 
-    if (typeof settings.outputVolume === "number") {
+    if (typeof settings.outputVolume === 'number') {
       const vol = settings.outputVolume / 100;
-      this.audioElements.forEach((el) => {
+      this.audioElements.forEach(el => {
         el.volume = vol;
       });
     }
 
-    if (this._gainNode && typeof settings.inputVolume === "number") {
+    if (this._gainNode && typeof settings.inputVolume === 'number') {
       this._gainNode.gain.value = settings.inputVolume / 100;
     }
 
@@ -1245,9 +1214,9 @@ class VoiceManager {
         noiseSuppression: settings.noiseSuppression !== false,
         autoGainControl: settings.autoGainControl !== false,
       };
-      this.localStream.getAudioTracks().forEach((t) => {
-        t.applyConstraints(constraints).catch((e) =>
-          console.warn("[Voice] applyConstraints failed:", e)
+      this.localStream.getAudioTracks().forEach(t => {
+        t.applyConstraints(constraints).catch(e =>
+          console.warn('[Voice] applyConstraints failed:', e)
         );
       });
     }
@@ -1259,43 +1228,42 @@ class VoiceManager {
           : 0.08
         : 0.08;
 
-    if (typeof settings.pushToTalk === "boolean") {
-      this.setPushToTalk(settings.pushToTalk, settings.pttKey ?? "Backquote");
+    if (typeof settings.pushToTalk === 'boolean') {
+      this.setPushToTalk(settings.pushToTalk, settings.pttKey ?? 'Backquote');
     }
   }
 
   setSpeakerDevice(deviceId: string): void {
-    if (!deviceId || deviceId === "default") return;
-    this.audioElements.forEach((el) => {
+    if (!deviceId || deviceId === 'default') return;
+    this.audioElements.forEach(el => {
       if (
-        typeof (
-          el as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
-        ).setSinkId === "function"
+        typeof (el as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> })
+          .setSinkId === 'function'
       ) {
         (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
           .setSinkId(deviceId)
-          .catch((e) => console.warn("[Voice] setSinkId failed:", e));
+          .catch(e => console.warn('[Voice] setSinkId failed:', e));
       }
     });
   }
 
   setPushToTalk(enabled: boolean, key: string): void {
     if (this._pttKeydownHandler) {
-      document.removeEventListener("keydown", this._pttKeydownHandler, true);
+      document.removeEventListener('keydown', this._pttKeydownHandler, true);
       this._pttKeydownHandler = null;
     }
     if (this._pttKeyupHandler) {
-      document.removeEventListener("keyup", this._pttKeyupHandler, true);
+      document.removeEventListener('keyup', this._pttKeyupHandler, true);
       this._pttKeyupHandler = null;
     }
 
     this._pttEnabled = enabled;
-    this._pttKey = key || "Backquote";
+    this._pttKey = key || 'Backquote';
 
     if (!enabled) return;
 
     if (this.localStream) {
-      this.localStream.getAudioTracks().forEach((t) => {
+      this.localStream.getAudioTracks().forEach(t => {
         t.enabled = false;
       });
       this.isMuted = true;
@@ -1303,7 +1271,7 @@ class VoiceManager {
 
     this._pttKeydownHandler = (e: KeyboardEvent) => {
       if (e.code === this._pttKey && this.localStream) {
-        this.localStream.getAudioTracks().forEach((t) => {
+        this.localStream.getAudioTracks().forEach(t => {
           t.enabled = true;
         });
         this.isMuted = false;
@@ -1311,15 +1279,15 @@ class VoiceManager {
     };
     this._pttKeyupHandler = (e: KeyboardEvent) => {
       if (e.code === this._pttKey && this.localStream) {
-        this.localStream.getAudioTracks().forEach((t) => {
+        this.localStream.getAudioTracks().forEach(t => {
           t.enabled = false;
         });
         this.isMuted = true;
       }
     };
 
-    document.addEventListener("keydown", this._pttKeydownHandler, true);
-    document.addEventListener("keyup", this._pttKeyupHandler, true);
+    document.addEventListener('keydown', this._pttKeydownHandler, true);
+    document.addEventListener('keyup', this._pttKeyupHandler, true);
   }
 }
 
@@ -1328,46 +1296,46 @@ class VoiceManager {
 // =====================================================
 
 const _soundDefs: Record<string, SoundDef> = {
-  mute: { type: "sine", freq: [440, 330], dur: [0.08, 0.12], vol: 0.25 },
-  unmute: { type: "sine", freq: [330, 440], dur: [0.08, 0.12], vol: 0.25 },
+  mute: { type: 'sine', freq: [440, 330], dur: [0.08, 0.12], vol: 0.25 },
+  unmute: { type: 'sine', freq: [330, 440], dur: [0.08, 0.12], vol: 0.25 },
   deafen: {
-    type: "sine",
+    type: 'sine',
     freq: [880, 660, 440],
     dur: [0.07, 0.07, 0.1],
     vol: 0.22,
   },
   undeafen: {
-    type: "sine",
+    type: 'sine',
     freq: [440, 660, 880],
     dur: [0.07, 0.07, 0.1],
     vol: 0.22,
   },
   userJoin: {
-    type: "triangle",
+    type: 'triangle',
     freq: [523, 659, 784],
     dur: [0.06, 0.06, 0.12],
     vol: 0.2,
   },
   userLeave: {
-    type: "triangle",
+    type: 'triangle',
     freq: [784, 523],
     dur: [0.07, 0.13],
     vol: 0.18,
   },
   disconnect: {
-    type: "sawtooth",
+    type: 'sawtooth',
     freq: [300, 200],
     dur: [0.1, 0.15],
     vol: 0.2,
   },
   dmMessage: {
-    type: "sine",
+    type: 'sine',
     freq: [880, 1318, 1760],
     dur: [0.04, 0.04, 0.07],
     vol: 0.2,
   },
   channelMessage: {
-    type: "sine",
+    type: 'sine',
     freq: [880, 1318, 1760],
     dur: [0.04, 0.04, 0.07],
     vol: 0.2,
@@ -1381,8 +1349,7 @@ function generateNotificationSound(type: string): void {
   try {
     const ctx = new (
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     )();
     const freqs = def.freq;
     const durs = def.dur;
@@ -1410,13 +1377,12 @@ function generateNotificationSound(type: string): void {
       (totalDur + 0.1) * 1000
     );
   } catch (e) {
-    console.warn("[Voice] generateNotificationSound failed:", e);
+    console.warn('[Voice] generateNotificationSound failed:', e);
   }
 }
 
 // Export to window for use by voice-ui-manager and renderer
-(window as unknown as { VoiceManager: typeof VoiceManager }).VoiceManager =
-  VoiceManager;
+(window as unknown as { VoiceManager: typeof VoiceManager }).VoiceManager = VoiceManager;
 (
   window as unknown as {
     generateNotificationSound: typeof generateNotificationSound;

@@ -18,7 +18,7 @@
     if (!App.currentMembers || App.currentMembers.length === 0) {
       return null;
     }
-    const found = App.currentMembers.find((m) => m.user_id === userId);
+    const found = App.currentMembers.find(m => m.user_id === userId);
     return found ?? null;
   }
 
@@ -30,7 +30,7 @@
     if (!App.currentMembers || App.currentMembers.length === 0) {
       return null;
     }
-    const found = App.currentMembers.find((m) => m.username === username);
+    const found = App.currentMembers.find(m => m.username === username);
     return found ?? null;
   }
 
@@ -38,9 +38,7 @@
    * Determine which voice channel (if any) a user is currently in.
    * Returns { channelId, channelName } or null.
    */
-  function getUserVoiceChannel(
-    userId: string
-  ): { channelId: string; channelName: string } | null {
+  function getUserVoiceChannel(userId: string): { channelId: string; channelName: string } | null {
     const presence = App.voiceChannelPresence;
     if (!presence || presence.size === 0) {
       return null;
@@ -49,9 +47,10 @@
     for (const [channelId, participants] of presence.entries()) {
       if (participants.has(userId)) {
         // Use the channel name from App channel list if available
-        const channels = (App as any).currentChannels as Array<{ id: string; name: string }> | undefined;
-        const channelName =
-          channels?.find((ch) => ch.id === channelId)?.name ?? channelId;
+        const channels = (App as any).currentChannels as
+          | Array<{ id: string; name: string }>
+          | undefined;
+        const channelName = channels?.find(ch => ch.id === channelId)?.name ?? channelId;
         log.debug('getUserVoiceChannel: user found in voice', { userId, channelId });
         return { channelId, channelName };
       }

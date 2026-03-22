@@ -28,7 +28,9 @@ function runnerSucceedsFor(...cmds: string[]): CommandRunner {
 
 /** Runner that always throws. */
 function runnerAlwaysFails(): CommandRunner {
-  return async () => { throw new Error('command not found'); };
+  return async () => {
+    throw new Error('command not found');
+  };
 }
 
 /** Runner that returns a specific Windows build number for 'reg'. */
@@ -103,10 +105,7 @@ describe('checkAudioCaptureSupportWith — Windows', () => {
 
 describe('checkAudioCaptureSupportWith — Linux PipeWire', () => {
   it('returns linux-pipewire when pw-cli is available', async () => {
-    const result = await checkAudioCaptureSupportWith(
-      'linux',
-      runnerSucceedsFor('pw-cli')
-    );
+    const result = await checkAudioCaptureSupportWith('linux', runnerSucceedsFor('pw-cli'));
 
     expect(result.supported).toBe(true);
     expect(result.platform).toBe('linux-pipewire');
@@ -114,7 +113,7 @@ describe('checkAudioCaptureSupportWith — Linux PipeWire', () => {
 
   it('does not call pactl when pw-cli succeeds', async () => {
     const calls: string[] = [];
-    const runner: CommandRunner = async (cmd) => {
+    const runner: CommandRunner = async cmd => {
       calls.push(cmd);
       if (cmd === 'pw-cli') return { stdout: '1', stderr: '' };
       throw new Error('not found');
@@ -129,10 +128,7 @@ describe('checkAudioCaptureSupportWith — Linux PipeWire', () => {
 
 describe('checkAudioCaptureSupportWith — Linux PulseAudio fallback', () => {
   it('returns linux-pulseaudio when pw-cli is absent but pactl is present', async () => {
-    const result = await checkAudioCaptureSupportWith(
-      'linux',
-      runnerSucceedsFor('pactl')
-    );
+    const result = await checkAudioCaptureSupportWith('linux', runnerSucceedsFor('pactl'));
 
     expect(result.supported).toBe(true);
     expect(result.platform).toBe('linux-pulseaudio');
@@ -174,7 +170,9 @@ describe('cleanOrphanedAudioModulesWith', () => {
 
     await cleanOrphanedAudioModulesWith('linux', runner);
 
-    expect(calls.some(([c, a]) => c === 'pactl' && a.includes('unload-module') && a.includes('42'))).toBe(true);
+    expect(
+      calls.some(([c, a]) => c === 'pactl' && a.includes('unload-module') && a.includes('42'))
+    ).toBe(true);
   });
 
   it('does nothing when no ember capture sink is found', async () => {
@@ -257,7 +255,9 @@ describe('startPulseCaptureWith', () => {
   });
 
   it('returns failure when pactl list sink-inputs fails', async () => {
-    const runner: CommandRunner = async () => { throw new Error('pactl not found'); };
+    const runner: CommandRunner = async () => {
+      throw new Error('pactl not found');
+    };
 
     const result = await startPulseCaptureWith(EMBER_PID, runner);
 

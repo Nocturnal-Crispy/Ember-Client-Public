@@ -23,9 +23,14 @@ const TEXT_CHANNEL_ID = 'ch-text-1';
 
 // ── Signal service mock ──────────────────────────────────────────────────────
 
-const mockEnsureSession = jest.fn<(userId: string, deviceId: string) => Promise<void>>().mockResolvedValue(undefined);
+const mockEnsureSession = jest
+  .fn<(userId: string, deviceId: string) => Promise<void>>()
+  .mockResolvedValue(undefined);
 const mockHasSession = jest.fn<(userId: string, deviceId: string) => Promise<boolean>>();
-const mockEncrypt = jest.fn<(addr: string, plain: Uint8Array) => Promise<{ ciphertext: Uint8Array; messageType: number }>>();
+const mockEncrypt =
+  jest.fn<
+    (addr: string, plain: Uint8Array) => Promise<{ ciphertext: Uint8Array; messageType: number }>
+  >();
 const mockDecrypt = jest.fn<(addr: string, ct: Uint8Array, type: number) => Promise<Uint8Array>>();
 
 const mockSignalService = {
@@ -37,9 +42,11 @@ const mockSignalService = {
 
 // ── NaCl crypto mocks ────────────────────────────────────────────────────────
 
-const mockDecryptNaCl = jest.fn<(ciphertext: string, key: Uint8Array) => string | null>() as jest.MockedFunction<(ciphertext: string, key: Uint8Array) => string | null>;
+const mockDecryptNaCl = jest.fn<
+  (ciphertext: string, key: Uint8Array) => string | null
+>() as jest.MockedFunction<(ciphertext: string, key: Uint8Array) => string | null>;
 const mockEncryptNaCl = jest.fn<(plaintext: string, key: Uint8Array) => string>(
-  () => 'nacl-ciphertext',
+  () => 'nacl-ciphertext'
 );
 const mockGenerateEmberKey = jest.fn<() => Uint8Array>(() => new Uint8Array([1, 2, 3]));
 
@@ -56,7 +63,7 @@ const mockAuth = {
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 function buildFetchMock(): jest.MockedFunction<typeof fetch> {
-  return jest.fn<typeof fetch>().mockImplementation((input) => {
+  return jest.fn<typeof fetch>().mockImplementation(input => {
     const url = typeof input === 'string' ? input : (input as URL).toString();
     if (url.includes(`/users/${BOB_USER_ID}/devices`)) {
       return Promise.resolve({
@@ -67,18 +74,20 @@ function buildFetchMock(): jest.MockedFunction<typeof fetch> {
           }),
       } as Response);
     }
-    if (url.includes('/api/v1/dm-requests') && !url.includes('/accept') && !url.includes('/decline')) {
+    if (
+      url.includes('/api/v1/dm-requests') &&
+      !url.includes('/accept') &&
+      !url.includes('/decline')
+    ) {
       return Promise.resolve({
         ok: true,
-        json: () =>
-          Promise.resolve({ id: 'req-1', ember_id: EMBER_ID, status: 'pending' }),
+        json: () => Promise.resolve({ id: 'req-1', ember_id: EMBER_ID, status: 'pending' }),
       } as Response);
     }
     if (url.includes(`/embers/${EMBER_ID}/channels`)) {
       return Promise.resolve({
         ok: true,
-        json: () =>
-          Promise.resolve({ channels: [{ id: TEXT_CHANNEL_ID, type: 'text' }] }),
+        json: () => Promise.resolve({ channels: [{ id: TEXT_CHANNEL_ID, type: 'text' }] }),
       } as Response);
     }
     if (url.includes(`/channels/${TEXT_CHANNEL_ID}/messages`)) {
@@ -112,9 +121,7 @@ function setupWindowGlobals(): void {
       currentEmbers: [],
       currentMembers: [],
     },
-    getValidAuth: jest
-      .fn<() => Promise<typeof mockAuth>>()
-      .mockResolvedValue(mockAuth),
+    getValidAuth: jest.fn<() => Promise<typeof mockAuth>>().mockResolvedValue(mockAuth),
     emberLog: {
       createLogger: () => ({
         info: jest.fn(),
@@ -201,16 +208,15 @@ describe('dm-signal-flow', () => {
 
       expect(mockEncrypt).toHaveBeenCalledWith(
         `${BOB_USER_ID}.${BOB_DEVICE_ID}`,
-        expect.anything(),
+        expect.anything()
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(`/channels/${TEXT_CHANNEL_ID}/messages`),
         expect.objectContaining({
           body: expect.stringContaining('"envelope_type":"signal_dm"'),
-        }),
+        })
       );
     });
-
   });
 
   // ── handleIncomingMessage ─────────────────────────────────────────────────────
@@ -235,21 +241,19 @@ describe('dm-signal-flow', () => {
             message_type: 3,
             created_at: Date.now() / 1000,
           },
-        }),
+        })
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(mockDecrypt).toHaveBeenCalledWith(
         `${BOB_USER_ID}.${BOB_DEVICE_ID}`,
         expect.any(Uint8Array),
-        3,
+        3
       );
       expect(
-        (window as unknown as { displayDmMessage: jest.Mock }).displayDmMessage,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'decrypted signal message' }),
-      );
+        (window as unknown as { displayDmMessage: jest.Mock }).displayDmMessage
+      ).toHaveBeenCalledWith(expect.objectContaining({ content: 'decrypted signal message' }));
     });
 
     it('uses legacy NaCl decrypt for messages without envelope_type', async () => {
@@ -262,18 +266,18 @@ describe('dm-signal-flow', () => {
             ciphertext: 'legacy-ciphertext-b64',
             created_at: Date.now() / 1000,
           },
-        }),
+        })
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(mockDecrypt).not.toHaveBeenCalled();
       expect(
-        (window as unknown as { displayDmMessage: jest.Mock }).displayDmMessage,
+        (window as unknown as { displayDmMessage: jest.Mock }).displayDmMessage
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           content: '[This message cannot be decrypted — unsupported envelope]',
-        }),
+        })
       );
     });
   });

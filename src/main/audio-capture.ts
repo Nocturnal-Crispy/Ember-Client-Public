@@ -103,12 +103,16 @@ export async function checkAudioCaptureSupportWith(
     try {
       await runner('pw-cli', ['--version']);
       return { supported: true, platform: 'linux-pipewire' };
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     try {
       await runner('pactl', ['--version']);
       return { supported: true, platform: 'linux-pulseaudio' };
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     return {
       supported: false,
@@ -148,9 +152,11 @@ function loadWinAddon(): NativeAddon | null {
   }
 }
 
-function startWasapiCapture(
-  mainPid: number
-): { success: boolean; platform?: string; reason?: string } {
+function startWasapiCapture(mainPid: number): {
+  success: boolean;
+  platform?: string;
+  reason?: string;
+} {
   winAddon = winAddon ?? loadWinAddon();
   if (!winAddon) return { success: false, reason: 'win-addon-unavailable' };
   const ok = winAddon.startCapture({ pid: mainPid, exclude: true });
@@ -188,9 +194,11 @@ function loadLinuxAddon(): NativeAddon | null {
   }
 }
 
-function startPipeWireCapture(
-  mainPid: number
-): { success: boolean; platform?: string; reason?: string } {
+function startPipeWireCapture(mainPid: number): {
+  success: boolean;
+  platform?: string;
+  reason?: string;
+} {
   linuxAddon = linuxAddon ?? loadLinuxAddon();
   if (!linuxAddon) return { success: false, reason: 'linux-addon-unavailable' };
   const ok = linuxAddon.startCapture({ pid: mainPid, exclude: true });
@@ -225,9 +233,7 @@ export async function startPulseCaptureWith(
   }
 
   // Only move non-Ember apps
-  const others = inputs.filter(
-    (i) => Number(i.properties?.['application.process.id']) !== emberPid
-  );
+  const others = inputs.filter(i => Number(i.properties?.['application.process.id']) !== emberPid);
   if (others.length === 0) {
     return { success: false, reason: 'no-other-audio-sources' };
   }
@@ -251,7 +257,9 @@ export async function startPulseCaptureWith(
       const originalSink = inp.sink ?? 'default';
       await runner('pactl', ['move-sink-input', String(inp.index), CAPTURE_SINK]);
       movedInputs.push({ id: String(inp.index), originalSink });
-    } catch { /* skip inputs that fail to move */ }
+    } catch {
+      /* skip inputs that fail to move */
+    }
   }
 
   pulseToken = { combineModuleId, movedInputs };
@@ -314,7 +322,9 @@ export async function cleanOrphanedAudioModulesWith(
         break;
       }
     }
-  } catch { /* pactl not available — ignore */ }
+  } catch {
+    /* pactl not available — ignore */
+  }
 }
 
 /**

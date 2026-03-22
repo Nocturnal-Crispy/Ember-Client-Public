@@ -26,7 +26,7 @@ describe('AttachmentEncryptionService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock SignalSessionManager
     mockSignalSessionManager = {
       hasSession: jest.fn(),
@@ -52,7 +52,10 @@ describe('AttachmentEncryptionService', () => {
     } as any;
 
     // Create attachment encryption service
-    attachmentEncryptionService = new AttachmentEncryptionService(mockAuth, mockSignalSessionManager);
+    attachmentEncryptionService = new AttachmentEncryptionService(
+      mockAuth,
+      mockSignalSessionManager
+    );
 
     // Mock successful fetch responses by default
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -82,7 +85,7 @@ describe('AttachmentEncryptionService', () => {
   describe('generateAttachmentKey', () => {
     it('should generate a cryptographically secure key', () => {
       const key = attachmentEncryptionService.generateAttachmentKey();
-      
+
       expect(key).toMatch(/^[a-f0-9]{64}$/); // 32 bytes = 64 hex characters
       expect(key.length).toBe(64);
     });
@@ -90,7 +93,7 @@ describe('AttachmentEncryptionService', () => {
     it('should generate different keys each time', () => {
       const key1 = attachmentEncryptionService.generateAttachmentKey();
       const key2 = attachmentEncryptionService.generateAttachmentKey();
-      
+
       expect(key1).not.toBe(key2);
     });
   });
@@ -99,30 +102,48 @@ describe('AttachmentEncryptionService', () => {
     it('should encrypt and decrypt data correctly', async () => {
       const originalData = new TextEncoder().encode('Hello, World!');
       const key = 'a'.repeat(64); // Simple key for testing
-      
-      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
-      const decryptedData = await attachmentEncryptionService.decryptAttachmentData(encryptedData, key);
-      
+
+      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(
+        originalData,
+        key
+      );
+      const decryptedData = await attachmentEncryptionService.decryptAttachmentData(
+        encryptedData,
+        key
+      );
+
       expect(decryptedData).toEqual(originalData);
     });
 
     it('should produce different encrypted data for same input (random IV)', async () => {
       const originalData = new TextEncoder().encode('Hello, World!');
       const key = 'a'.repeat(64);
-      
-      const encryptedData1 = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
-      const encryptedData2 = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
-      
+
+      const encryptedData1 = await attachmentEncryptionService.encryptAttachmentData(
+        originalData,
+        key
+      );
+      const encryptedData2 = await attachmentEncryptionService.encryptAttachmentData(
+        originalData,
+        key
+      );
+
       expect(encryptedData1).not.toBe(encryptedData2); // AES-GCM uses a random IV per encryption
     });
 
     it('should handle empty data', async () => {
       const originalData = new Uint8Array(0);
       const key = 'a'.repeat(64);
-      
-      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
-      const decryptedData = await attachmentEncryptionService.decryptAttachmentData(encryptedData, key);
-      
+
+      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(
+        originalData,
+        key
+      );
+      const decryptedData = await attachmentEncryptionService.decryptAttachmentData(
+        encryptedData,
+        key
+      );
+
       expect(decryptedData).toEqual(originalData);
     });
   });
@@ -140,7 +161,7 @@ describe('AttachmentEncryptionService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
           body: expect.stringContaining('"attachment_id":"attachment-123"'),
@@ -158,8 +179,9 @@ describe('AttachmentEncryptionService', () => {
         status: 500,
       });
 
-      await expect(attachmentEncryptionService.createChannelAttachmentKeys(attachmentId, channelId, key))
-        .rejects.toThrow('Failed to create attachment keys: 500');
+      await expect(
+        attachmentEncryptionService.createChannelAttachmentKeys(attachmentId, channelId, key)
+      ).rejects.toThrow('Failed to create attachment keys: 500');
     });
   });
 
@@ -169,14 +191,18 @@ describe('AttachmentEncryptionService', () => {
       const conversationId = 'conversation-456';
       const key = 'a'.repeat(64);
 
-      await attachmentEncryptionService.createConversationAttachmentKeys(attachmentId, conversationId, key);
+      await attachmentEncryptionService.createConversationAttachmentKeys(
+        attachmentId,
+        conversationId,
+        key
+      );
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://test.example.com/api/v1/attachments/attachment-123/keys',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
         })
@@ -209,7 +235,7 @@ describe('AttachmentEncryptionService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -247,10 +273,15 @@ describe('AttachmentEncryptionService', () => {
       };
 
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: true, json: async () => (mockMetadata) }) // Upload attachment
+        .mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }) // Upload attachment
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // Create keys
 
-      const result = await attachmentEncryptionService.uploadChannelAttachment(channelId, fileName, contentType, data);
+      const result = await attachmentEncryptionService.uploadChannelAttachment(
+        channelId,
+        fileName,
+        contentType,
+        data
+      );
 
       expect(result).toEqual(mockMetadata);
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -267,8 +298,9 @@ describe('AttachmentEncryptionService', () => {
         status: 500,
       });
 
-      await expect(attachmentEncryptionService.uploadChannelAttachment(channelId, fileName, contentType, data))
-        .rejects.toThrow('Failed to upload attachment: 500');
+      await expect(
+        attachmentEncryptionService.uploadChannelAttachment(channelId, fileName, contentType, data)
+      ).rejects.toThrow('Failed to upload attachment: 500');
     });
   });
 
@@ -291,10 +323,15 @@ describe('AttachmentEncryptionService', () => {
       };
 
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: true, json: async () => (mockMetadata) }) // Upload attachment
+        .mockResolvedValueOnce({ ok: true, json: async () => mockMetadata }) // Upload attachment
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // Create keys
 
-      const result = await attachmentEncryptionService.uploadConversationAttachment(conversationId, fileName, contentType, data);
+      const result = await attachmentEncryptionService.uploadConversationAttachment(
+        conversationId,
+        fileName,
+        contentType,
+        data
+      );
 
       expect(result).toEqual(mockMetadata);
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -306,7 +343,10 @@ describe('AttachmentEncryptionService', () => {
       const attachmentId = 'attachment-123';
       const originalData = new TextEncoder().encode('Hello, World!');
       const key = 'a'.repeat(64);
-      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(originalData, key);
+      const encryptedData = await attachmentEncryptionService.encryptAttachmentData(
+        originalData,
+        key
+      );
 
       const mockMetadata = {
         id: attachmentId,
@@ -324,19 +364,25 @@ describe('AttachmentEncryptionService', () => {
           attachment_id: attachmentId,
           user_id: 'user-123',
           device_id: 'device-456',
-          encrypted_key: btoa(JSON.stringify({
-            attachment_key: key,
-            for_user_id: 'user-123',
-            created_by: 'user-123',
-            timestamp: Date.now(),
-          })),
+          encrypted_key: btoa(
+            JSON.stringify({
+              attachment_key: key,
+              for_user_id: 'user-123',
+              created_by: 'user-123',
+              timestamp: Date.now(),
+            })
+          ),
           created_at: Date.now(),
         },
       ];
 
       // Mock the internal methods and API calls
-      jest.spyOn(attachmentEncryptionService as any, 'getAttachmentMetadata').mockResolvedValue(mockMetadata);
-      jest.spyOn(attachmentEncryptionService as any, 'downloadEncryptedAttachment').mockResolvedValue(encryptedData);
+      jest
+        .spyOn(attachmentEncryptionService as any, 'getAttachmentMetadata')
+        .mockResolvedValue(mockMetadata);
+      jest
+        .spyOn(attachmentEncryptionService as any, 'downloadEncryptedAttachment')
+        .mockResolvedValue(encryptedData);
       jest.spyOn(attachmentEncryptionService, 'getAttachmentKeys').mockResolvedValue(mockKeys);
 
       const result = await attachmentEncryptionService.downloadAttachment(attachmentId);
@@ -353,8 +399,9 @@ describe('AttachmentEncryptionService', () => {
         json: async () => ({ keys: [] }),
       });
 
-      await expect(attachmentEncryptionService.downloadAttachment(attachmentId))
-        .rejects.toThrow('No attachment key found for current user');
+      await expect(attachmentEncryptionService.downloadAttachment(attachmentId)).rejects.toThrow(
+        'No attachment key found for current user'
+      );
     });
   });
 
@@ -362,8 +409,9 @@ describe('AttachmentEncryptionService', () => {
     it('should handle network errors gracefully', async () => {
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(attachmentEncryptionService.getAttachmentKeys('attachment-123'))
-        .rejects.toThrow('Network error');
+      await expect(attachmentEncryptionService.getAttachmentKeys('attachment-123')).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should handle invalid JSON responses', async () => {
@@ -374,8 +422,9 @@ describe('AttachmentEncryptionService', () => {
         },
       });
 
-      await expect(attachmentEncryptionService.getAttachmentKeys('attachment-123'))
-        .rejects.toThrow('Invalid JSON');
+      await expect(attachmentEncryptionService.getAttachmentKeys('attachment-123')).rejects.toThrow(
+        'Invalid JSON'
+      );
     });
   });
 });

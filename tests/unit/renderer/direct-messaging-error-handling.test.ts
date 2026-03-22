@@ -22,10 +22,10 @@ describe('Direct Messaging Error Handling', () => {
       info: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
-      warn: jest.fn()
+      warn: jest.fn(),
     };
     window.emberLog = {
-      createLogger: jest.fn().mockReturnValue(mockLog)
+      createLogger: jest.fn().mockReturnValue(mockLog),
     } as any;
   });
 
@@ -38,15 +38,15 @@ describe('Direct Messaging Error Handling', () => {
     const emptyError = new Error();
     Object.defineProperty(emptyError, 'message', {
       value: 'Test error message',
-      enumerable: false  // This makes it non-enumerable, so it doesn't show up in { error }
+      enumerable: false, // This makes it non-enumerable, so it doesn't show up in { error }
     });
     Object.defineProperty(emptyError, 'stack', {
       value: 'Test stack trace',
-      enumerable: false  // This makes it non-enumerable
+      enumerable: false, // This makes it non-enumerable
     });
     Object.defineProperty(emptyError, 'name', {
       value: 'TestError',
-      enumerable: false  // This makes it non-enumerable
+      enumerable: false, // This makes it non-enumerable
     });
 
     // Simulate the old error logging (would show empty object)
@@ -55,12 +55,12 @@ describe('Direct Messaging Error Handling', () => {
 
     // Simulate the new error logging (extracts properties properly)
     const err = emptyError as Error;
-    const newLogging = { 
+    const newLogging = {
       error: {
         message: err.message || 'Unknown error',
         stack: err.stack || 'No stack trace available',
-        name: err.name || 'Error'
-      }
+        name: err.name || 'Error',
+      },
     };
 
     expect(newLogging.error.message).toBe('Test error message');
@@ -72,15 +72,15 @@ describe('Direct Messaging Error Handling', () => {
   it('should handle errors with missing properties gracefully', () => {
     // Create an error with missing properties
     const partialError = {} as Error;
-    
+
     // Simulate the new error logging with missing properties
     const err = partialError;
-    const newLogging = { 
+    const newLogging = {
       error: {
         message: err.message || 'Unknown error',
         stack: err.stack || 'No stack trace available',
-        name: err.name || 'Error'
-      }
+        name: err.name || 'Error',
+      },
     };
 
     expect(newLogging.error.message).toBe('Unknown error');
@@ -90,15 +90,15 @@ describe('Direct Messaging Error Handling', () => {
 
   it('should handle normal error objects correctly', () => {
     const normalError = new Error('Normal error message');
-    
+
     // Simulate the new error logging
     const err = normalError;
-    const newLogging = { 
+    const newLogging = {
       error: {
         message: err.message || 'Unknown error',
         stack: err.stack || 'No stack trace available',
-        name: err.name || 'Error'
-      }
+        name: err.name || 'Error',
+      },
     };
 
     expect(newLogging.error.message).toBe('Normal error message');

@@ -99,17 +99,20 @@ describe('renderVoiceParticipants', () => {
     createParticipantList(CHANNEL_ID);
 
     const App = (window as any).App;
-    App.voiceChannelPresence.set(CHANNEL_ID, new Map([
-      [USER_A, USERNAME_A],
-      [USER_B, USERNAME_B],
-    ]));
+    App.voiceChannelPresence.set(
+      CHANNEL_ID,
+      new Map([
+        [USER_A, USERNAME_A],
+        [USER_B, USERNAME_B],
+      ])
+    );
 
     (window as any).renderVoiceParticipants(CHANNEL_ID);
 
     const avatars = document.querySelectorAll<HTMLElement>('.voice-avatar');
     expect(avatars).toHaveLength(2);
 
-    const userIds = Array.from(avatars).map((el) => el.dataset['userId']);
+    const userIds = Array.from(avatars).map(el => el.dataset['userId']);
     expect(userIds).toContain(USER_A);
     expect(userIds).toContain(USER_B);
   });
@@ -157,10 +160,13 @@ describe('renderVoiceParticipants', () => {
     createParticipantList(CHANNEL_ID);
 
     const App = (window as any).App;
-    App.voiceChannelPresence.set(CHANNEL_ID, new Map([
-      [USER_A, USERNAME_A],
-      [USER_B, USERNAME_B],
-    ]));
+    App.voiceChannelPresence.set(
+      CHANNEL_ID,
+      new Map([
+        [USER_A, USERNAME_A],
+        [USER_B, USERNAME_B],
+      ])
+    );
 
     // Mock voiceManager with speakingStates indicating User B is speaking
     const speakingStates = new Map<string, boolean>();
@@ -230,9 +236,11 @@ describe('updateSpeakingIndicator', () => {
 
     (window as any).updateSpeakingIndicator(USER_A, true);
 
-    const elements = document.querySelectorAll<HTMLElement>(`.voice-avatar[data-user-id="${USER_A}"]`);
+    const elements = document.querySelectorAll<HTMLElement>(
+      `.voice-avatar[data-user-id="${USER_A}"]`
+    );
     expect(elements).toHaveLength(2);
-    elements.forEach((el) => expect(el.classList.contains('speaking')).toBe(true));
+    elements.forEach(el => expect(el.classList.contains('speaking')).toBe(true));
   });
 
   it('handles empty userId gracefully', () => {
@@ -277,12 +285,13 @@ describe('toggleScreenShare — stop path', () => {
 
   it('does NOT send screen_share_stop via wsConnection (VoiceManager owns WS sends)', async () => {
     await (window as any).toggleScreenShare();
-    const screenShareStopSent = mockWsSend.mock.calls.some(
-      (args: unknown[]) => {
-        try { return JSON.parse(args[0] as string).type === 'screen_share_stop'; }
-        catch { return false; }
+    const screenShareStopSent = mockWsSend.mock.calls.some((args: unknown[]) => {
+      try {
+        return JSON.parse(args[0] as string).type === 'screen_share_stop';
+      } catch {
+        return false;
       }
-    );
+    });
     expect(screenShareStopSent).toBe(false);
   });
 });
@@ -394,12 +403,13 @@ describe('toggleScreenShare — start path', () => {
       { fps: 15, resolution: '1080p', includeAudio: false }
     );
 
-    const screenShareStartSent = mockWsSend.mock.calls.some(
-      (args: unknown[]) => {
-        try { return JSON.parse(args[0] as string).type === 'screen_share_start'; }
-        catch { return false; }
+    const screenShareStartSent = mockWsSend.mock.calls.some((args: unknown[]) => {
+      try {
+        return JSON.parse(args[0] as string).type === 'screen_share_start';
+      } catch {
+        return false;
       }
-    );
+    });
     expect(screenShareStartSent).toBe(false);
   });
 });
@@ -647,7 +657,7 @@ describe('Phase 10: onParticipantsChanged reconciles App.screenShareParticipants
     mockIpcInvoke.mockResolvedValue(null);
 
     // Create a fresh VoiceManager spy that captures onParticipantsChanged
-    const MockVoiceManager = jest.fn().mockImplementation(function(this: any) {
+    const MockVoiceManager = jest.fn().mockImplementation(function (this: any) {
       this.onParticipantsChanged = null;
       this.onSpeakingChanged = null;
       this.onCameraStateChanged = null;
@@ -698,10 +708,13 @@ describe('speaking indicator persists through re-render', () => {
     createParticipantList(CHANNEL_ID);
 
     const App = (window as any).App;
-    App.voiceChannelPresence.set(CHANNEL_ID, new Map([
-      [USER_A, USERNAME_A],
-      [USER_B, USERNAME_B],
-    ]));
+    App.voiceChannelPresence.set(
+      CHANNEL_ID,
+      new Map([
+        [USER_A, USERNAME_A],
+        [USER_B, USERNAME_B],
+      ])
+    );
 
     // Initial render
     App.voiceManager = { speakingStates: new Map<string, boolean>() };

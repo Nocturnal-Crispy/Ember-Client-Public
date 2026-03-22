@@ -18,12 +18,12 @@ describe('Direct Messaging UI User Search', () => {
     mockAuth = {
       token: 'test-token',
       hostname: 'http://localhost:8085',
-      user_id: 'test-user-id'
+      user_id: 'test-user-id',
     };
 
     // Mock window.getValidAuth
     window.getValidAuth = jest.fn().mockResolvedValue(mockAuth);
-    
+
     // Mock window.fetch
     mockFetch = jest.fn();
     window.fetch = mockFetch;
@@ -37,19 +37,19 @@ describe('Direct Messaging UI User Search', () => {
     it('should reproduce null response.json() error', async () => {
       // This test reproduces the exact error from logs:
       // "Cannot read properties of null (reading 'length')"
-      
+
       // Mock fetch to return a response with null json()
       const mockResponse = {
         ok: true,
         status: 200,
         statusText: 'OK',
-        json: jest.fn().mockResolvedValue(null) // This causes the error
+        json: jest.fn().mockResolvedValue(null), // This causes the error
       };
       mockFetch.mockResolvedValue(mockResponse);
 
       // Test the searchUsers function directly by importing the module
       // Since DirectMessagingUI is not exported, we'll test the search functionality pattern
-      
+
       // Simulate the problematic code pattern from the source
       async function searchUsers(query: string): Promise<any[]> {
         try {
@@ -61,7 +61,7 @@ describe('Direct Messaging UI User Search', () => {
           const response = await fetch(
             `${auth.hostname}/api/v1/users/search?q=${encodeURIComponent(query)}`,
             {
-              method: "GET",
+              method: 'GET',
               headers: { Authorization: `Bearer ${auth.token}` },
             }
           );
@@ -76,7 +76,7 @@ describe('Direct Messaging UI User Search', () => {
           return [];
         }
       }
-      
+
       // This should reproduce the error when response.json() returns null
       // and the calling code tries to access .length
       await expect(searchUsers('test-query')).resolves.toEqual(null);
@@ -85,12 +85,12 @@ describe('Direct Messaging UI User Search', () => {
     it('should handle null response with length access', async () => {
       // This test specifically reproduces the error pattern
       // where code tries to access .length on a null response
-      
+
       const mockResponse = {
         ok: true,
         status: 200,
         statusText: 'OK',
-        json: jest.fn().mockResolvedValue(null)
+        json: jest.fn().mockResolvedValue(null),
       };
       mockFetch.mockResolvedValue(mockResponse);
 
@@ -98,9 +98,9 @@ describe('Direct Messaging UI User Search', () => {
       async function searchUsersWithLengthAccess(query: string): Promise<number> {
         const auth = await window.getValidAuth();
         if (!auth) return 0;
-        
+
         const response = await fetch(`${auth.hostname}/api/v1/users/search?q=${query}`, {
-          method: "GET",
+          method: 'GET',
           headers: { Authorization: `Bearer ${auth.token}` },
         });
 
@@ -111,7 +111,7 @@ describe('Direct Messaging UI User Search', () => {
         const users = await response.json(); // This returns null
         return users.length; // This throws "Cannot read properties of null (reading 'length')"
       }
-      
+
       // This should reproduce the exact error from the logs
       await expect(searchUsersWithLengthAccess('test-query')).rejects.toThrow(
         "Cannot read properties of null (reading 'length')"
@@ -124,14 +124,14 @@ describe('Direct Messaging UI User Search', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        json: jest.fn().mockResolvedValue([]) // Empty array is valid
+        json: jest.fn().mockResolvedValue([]), // Empty array is valid
       };
       mockFetch.mockResolvedValue(mockResponse);
 
       async function searchUsers(query: string): Promise<any[]> {
         const auth = await window.getValidAuth();
         const response = await fetch(`${auth.hostname}/api/v1/users/search?q=${query}`, {
-          method: "GET",
+          method: 'GET',
           headers: { Authorization: `Bearer ${auth.token}` },
         });
 
@@ -142,9 +142,9 @@ describe('Direct Messaging UI User Search', () => {
         const users = await response.json();
         return users;
       }
-      
+
       const result = await searchUsers('test-query');
-      
+
       expect(result).toEqual([]);
       expect(Array.isArray(result)).toBe(true);
     });
@@ -152,21 +152,21 @@ describe('Direct Messaging UI User Search', () => {
     it('should handle valid user array response correctly', async () => {
       const mockUsers = [
         { id: '1', username: 'user1' },
-        { id: '2', username: 'user2' }
+        { id: '2', username: 'user2' },
       ];
 
       const mockResponse = {
         ok: true,
         status: 200,
         statusText: 'OK',
-        json: jest.fn().mockResolvedValue(mockUsers)
+        json: jest.fn().mockResolvedValue(mockUsers),
       };
       mockFetch.mockResolvedValue(mockResponse);
 
       async function searchUsers(query: string): Promise<any[]> {
         const auth = await window.getValidAuth();
         const response = await fetch(`${auth.hostname}/api/v1/users/search?q=${query}`, {
-          method: "GET",
+          method: 'GET',
           headers: { Authorization: `Bearer ${auth.token}` },
         });
 
@@ -177,9 +177,9 @@ describe('Direct Messaging UI User Search', () => {
         const users = await response.json();
         return users;
       }
-      
+
       const result = await searchUsers('test-query');
-      
+
       expect(result).toEqual(mockUsers);
       expect(result.length).toBe(2);
     });
@@ -190,16 +190,16 @@ describe('Direct Messaging UI User Search', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        json: jest.fn().mockResolvedValue(undefined) // This could also cause issues
+        json: jest.fn().mockResolvedValue(undefined), // This could also cause issues
       };
       mockFetch.mockResolvedValue(mockResponse);
 
       async function searchUsers(query: string): Promise<any[]> {
         const auth = await window.getValidAuth();
         if (!auth) return [];
-        
+
         const response = await fetch(`${auth.hostname}/api/v1/users/search?q=${query}`, {
-          method: "GET",
+          method: 'GET',
           headers: { Authorization: `Bearer ${auth.token}` },
         });
 
@@ -210,9 +210,9 @@ describe('Direct Messaging UI User Search', () => {
         const users = await response.json();
         return users || []; // Safe fallback
       }
-      
+
       const result = await searchUsers('test-query');
-      
+
       // Should handle undefined gracefully
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(0);

@@ -26,7 +26,7 @@ export async function refreshToken(
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: string };
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `Token refresh failed with status ${response.status}`);
   }
 

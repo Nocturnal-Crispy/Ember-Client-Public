@@ -38,7 +38,11 @@ const mockWindow = {
 (window as any).registerSentMessageId = mockWindow.registerSentMessageId;
 (window as any).showInputError = mockWindow.showInputError;
 (window as any).getValidAuth = jest.fn().mockResolvedValue({
-  token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice',
+  token: 'tok',
+  user_id: 'u1',
+  device_id: 'd1',
+  hostname: 'http://localhost:8085',
+  username: 'alice',
 });
 
 global.fetch = jest.fn();
@@ -52,9 +56,13 @@ describe('Message Decryption Integration', () => {
 
     // Restore getValidAuth mock after clearAllMocks
     (window as any).getValidAuth = jest.fn().mockResolvedValue({
-      token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice',
+      token: 'tok',
+      user_id: 'u1',
+      device_id: 'd1',
+      hostname: 'http://localhost:8085',
+      username: 'alice',
     });
-    
+
     // Mock emberAPI to return successful responses
     mockWindow.emberAPI.invoke.mockImplementation((cmd: string) => {
       if (cmd === 'LoadDistributionId') {
@@ -67,9 +75,15 @@ describe('Message Decryption Integration', () => {
         return Promise.resolve({ success: true, data: { plaintext: 'decrypted-text' } });
       }
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       return Promise.resolve({ success: true, data: null });
@@ -105,9 +119,15 @@ describe('Message Decryption Integration', () => {
         return Promise.resolve({ success: true, data: { distributionId: 'test-dist-id' } });
       }
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       return Promise.resolve({ success: true, data: null });
@@ -115,7 +135,7 @@ describe('Message Decryption Integration', () => {
 
     // This should not throw and should process distributions
     await expect((window as any).processIncomingDistributions?.()).resolves.not.toThrow();
-    
+
     // Verify that the distribution processing was attempted
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:8085/api/v1/sender-key-distributions/pending',
@@ -127,11 +147,15 @@ describe('Message Decryption Integration', () => {
     // Load message-service to get the tryGroupDecrypt function
     // We need to mock the dependencies that message-service expects
     const mockIpcRenderer = {
-      invoke: jest.fn().mockResolvedValue({ 
-        token: 'tok', hostname: 'http://localhost:8085', user_id: 'u1', device_id: 'd1', username: 'alice' 
+      invoke: jest.fn().mockResolvedValue({
+        token: 'tok',
+        hostname: 'http://localhost:8085',
+        user_id: 'u1',
+        device_id: 'd1',
+        username: 'alice',
       }),
     };
-    
+
     Object.defineProperty(mockWindow, 'electronAPI', {
       value: {
         ...mockWindow.electronAPI,
@@ -144,7 +168,7 @@ describe('Message Decryption Integration', () => {
 
     // Verify that processIncomingDistributions is available for message-service to call
     expect((window as any).processIncomingDistributions).toBeDefined();
-    
+
     // Mock a message that fails to decrypt
     const mockMessage = {
       id: 'test-message-id',
@@ -157,23 +181,29 @@ describe('Message Decryption Integration', () => {
     // Mock the displayDecryptedMessage function to capture the distribution fetch call
     const originalDisplayDecryptedMessage = (mockWindow as any).displayDecryptedMessage;
     let distributionFetchCalled = false;
-    
+
     // Override the emberAPI invoke to track distribution processing
     mockWindow.emberAPI.invoke.mockImplementation((cmd: string) => {
       if (cmd === 'GroupDecrypt') {
         return Promise.resolve({ success: false, data: null }); // Simulate decryption failure
       }
       if (cmd === 'GetAuth') {
-        return Promise.resolve({ 
-          success: true, 
-          data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' }
+        return Promise.resolve({
+          success: true,
+          data: {
+            token: 'tok',
+            userId: 'u1',
+            deviceId: 'd1',
+            hostname: 'http://localhost:8085',
+            username: 'alice',
+          },
         });
       }
       return Promise.resolve({ success: true, data: null });
     });
 
     // Mock fetch to track distribution calls
-    (global.fetch as jest.Mock).mockImplementation((url) => {
+    (global.fetch as jest.Mock).mockImplementation(url => {
       if (url === 'http://localhost:8085/api/v1/sender-key-distributions/pending') {
         distributionFetchCalled = true;
         return Promise.resolve({
@@ -189,7 +219,7 @@ describe('Message Decryption Integration', () => {
 
     // Call processIncomingDistributions directly to verify it works
     await (window as any).processIncomingDistributions?.();
-    
+
     // Verify the distribution fetch was called
     expect(distributionFetchCalled).toBe(true);
   });

@@ -15,5 +15,4 @@ describe('LoadDistributionId IPC contract fix', () => {
     expect(testData.distributionId).toBe('dist-123');
     expect((testData as any).distribution_id).toBeUndefined();
   });
-
 });

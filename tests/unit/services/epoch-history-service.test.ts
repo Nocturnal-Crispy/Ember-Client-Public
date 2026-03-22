@@ -29,7 +29,7 @@ describe('EpochHistoryService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock EpochService
     mockEpochService = {
       getCurrentEpoch: jest.fn(),
@@ -55,7 +55,11 @@ describe('EpochHistoryService', () => {
     } as any;
 
     // Create epoch history service
-    epochHistoryService = new EpochHistoryService(mockAuth, mockEpochService, mockSignalSessionManager);
+    epochHistoryService = new EpochHistoryService(
+      mockAuth,
+      mockEpochService,
+      mockSignalSessionManager
+    );
 
     // Mock successful fetch responses by default
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -178,7 +182,9 @@ describe('EpochHistoryService', () => {
         created_at: Date.now(),
       };
 
-      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow('Epoch message missing epoch_id');
+      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow(
+        'Epoch message missing epoch_id'
+      );
     });
 
     it('should throw error when no epoch key found for user', async () => {
@@ -193,7 +199,9 @@ describe('EpochHistoryService', () => {
 
       mockEpochService.getEpochKeys.mockResolvedValue([]);
 
-      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow('No epoch key found for current user');
+      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow(
+        'No epoch key found for current user'
+      );
     });
 
     it('should throw error for legacy message decryption failure', async () => {
@@ -207,7 +215,9 @@ describe('EpochHistoryService', () => {
 
       mockSignalSessionManager.groupDecrypt.mockRejectedValue(new Error('Decryption failed'));
 
-      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow('Legacy message decryption failed');
+      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow(
+        'Legacy message decryption failed'
+      );
     });
   });
 
@@ -249,7 +259,9 @@ describe('EpochHistoryService', () => {
       ];
 
       mockEpochService.getEpochKeys.mockResolvedValue(mockEpochKeys);
-      mockSignalSessionManager.groupDecrypt.mockResolvedValue(new TextEncoder().encode('decrypted-legacy'));
+      mockSignalSessionManager.groupDecrypt.mockResolvedValue(
+        new TextEncoder().encode('decrypted-legacy')
+      );
 
       const results = await epochHistoryService.decryptMessages(messages, 'ember-123');
 
@@ -277,7 +289,9 @@ describe('EpochHistoryService', () => {
         },
       ];
 
-      mockSignalSessionManager.groupDecrypt.mockRejectedValue(new Error('Legacy decryption failed'));
+      mockSignalSessionManager.groupDecrypt.mockRejectedValue(
+        new Error('Legacy decryption failed')
+      );
       mockEpochService.getEpochKeys.mockRejectedValue(new Error('Epoch keys unavailable'));
 
       const results = await epochHistoryService.decryptMessages(messages, 'ember-123');
@@ -471,7 +485,9 @@ describe('EpochHistoryService', () => {
 
       mockEpochService.getEpochKeys.mockRejectedValue(new Error('Network error'));
 
-      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow('Network error');
+      await expect(epochHistoryService.decryptMessage(message, 'ember-789')).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should handle malformed messages', async () => {

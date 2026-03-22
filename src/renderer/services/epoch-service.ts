@@ -64,7 +64,9 @@ export class EpochService {
    * Get the base URL for API calls
    */
   private getBaseUrl(): string {
-    return this.auth.hostname.startsWith('http') ? this.auth.hostname : `https://${this.auth.hostname}`;
+    return this.auth.hostname.startsWith('http')
+      ? this.auth.hostname
+      : `https://${this.auth.hostname}`;
   }
 
   /**
@@ -75,7 +77,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/epochs?limit=1`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -107,7 +109,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/epochs`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -132,7 +134,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/pending-epoch-rotations`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -154,13 +156,16 @@ export class EpochService {
    */
   async acknowledgeRotation(rotationId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.getBaseUrl()}/api/v1/pending-epoch-rotations/${rotationId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.getBaseUrl()}/api/v1/pending-epoch-rotations/${rotationId}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.auth.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to acknowledge rotation: ${response.status}`);
@@ -179,7 +184,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/epochs/${epochId}/keys`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -206,7 +211,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/epochs/${epochId}/keys`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -229,7 +234,7 @@ export class EpochService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/epoch-keys`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -253,7 +258,7 @@ export class EpochService {
     try {
       // Get current epoch
       const currentEpoch = await this.getCurrentEpoch(emberId);
-      
+
       // Create rotation data (this would be encrypted with current epoch keys)
       let rotationData: string | undefined;
       if (currentEpoch) {
@@ -325,10 +330,10 @@ export class EpochService {
     try {
       // Get epoch keys for this epoch
       const epochKeys = await this.getEpochKeys(epochId);
-      
+
       // Find the key for the current user
-      const userKey = epochKeys.find(key => 
-        key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+      const userKey = epochKeys.find(
+        key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
       );
 
       if (!userKey) {
@@ -341,7 +346,7 @@ export class EpochService {
       // Decrypt the message with the epoch key (simplified)
       // In reality, this would use proper AEAD decryption
       const messageBytes = new TextEncoder().encode(ciphertext);
-      
+
       // For now, return the ciphertext as bytes (proper decryption would be implemented here)
       return messageBytes;
     } catch (error) {
@@ -399,7 +404,7 @@ export class EpochService {
 
       // Parse and validate rotation payload
       const rotationPayload = JSON.parse(new TextDecoder().decode(decryptedData));
-      
+
       // Validate the rotation payload
       if (!rotationPayload.previous_epoch_id || !rotationPayload.rotation_timestamp) {
         throw new Error('Invalid rotation payload');

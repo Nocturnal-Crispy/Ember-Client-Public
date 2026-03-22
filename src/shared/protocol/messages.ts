@@ -1,6 +1,6 @@
 /** Shared type definitions for messages and WebSocket payloads. */
 
-import { UserStatus } from "../types/ember";
+import { UserStatus } from '../types/ember';
 
 // Minimal WebRTC type definitions (no DOM lib required)
 export interface RTCIceCandidateInit {

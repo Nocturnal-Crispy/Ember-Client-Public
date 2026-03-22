@@ -53,7 +53,7 @@ type InstallSenderKeyFn = (senderAddress: string, distributionBytes: Uint8Array)
 export async function uploadSenderKeyDistributions(
   auth: AuthData,
   emberId: string,
-  distributions: SenderKeyDistributionUpload[],
+  distributions: SenderKeyDistributionUpload[]
 ): Promise<void> {
   await apiRequest<unknown>(
     auth.hostname,
@@ -62,7 +62,7 @@ export async function uploadSenderKeyDistributions(
       method: 'POST',
       body: JSON.stringify({ distributions }),
     },
-    auth.token,
+    auth.token
   );
 }
 
@@ -72,14 +72,12 @@ export async function uploadSenderKeyDistributions(
  * @param auth - Authenticated session data
  * @returns Array of pending distributions awaiting processing
  */
-export async function fetchPendingDistributions(
-  auth: AuthData,
-): Promise<PendingDistribution[]> {
+export async function fetchPendingDistributions(auth: AuthData): Promise<PendingDistribution[]> {
   const data = await apiRequest<{ distributions: PendingDistribution[] }>(
     auth.hostname,
     '/api/v1/sender-key-distributions/pending',
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
   return data.distributions ?? [];
 }
@@ -92,13 +90,13 @@ export async function fetchPendingDistributions(
  */
 export async function acknowledgeDistribution(
   auth: AuthData,
-  distributionId: string,
+  distributionId: string
 ): Promise<void> {
   await apiRequest<unknown>(
     auth.hostname,
     `/api/v1/sender-key-distributions/${distributionId}/ack`,
     { method: 'POST' },
-    auth.token,
+    auth.token
   );
 }
 
@@ -109,15 +107,12 @@ export async function acknowledgeDistribution(
  * @param emberId - The ember to fetch members for
  * @returns Array of DeviceTarget (server excludes the requesting device)
  */
-export async function fetchEmberMembers(
-  auth: AuthData,
-  emberId: string,
-): Promise<DeviceTarget[]> {
+export async function fetchEmberMembers(auth: AuthData, emberId: string): Promise<DeviceTarget[]> {
   const data = await apiRequest<{ members: Array<{ user_id: string; device_id: string }> }>(
     auth.hostname,
     `/api/v1/embers/${emberId}/members`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
   return (data.members ?? []).map(m => ({
     userId: m.user_id,
@@ -142,10 +137,10 @@ export async function distributeToMembers(
   emberId: string,
   members: DeviceTarget[],
   distributionBytes: Uint8Array,
-  crypto: SignalSessionCrypto,
+  crypto: SignalSessionCrypto
 ): Promise<void> {
   const distributions: SenderKeyDistributionUpload[] = await Promise.all(
-    members.map(async (member) => {
+    members.map(async member => {
       const recipientAddress = `${member.userId}.${member.deviceId}`;
       const encrypted = await crypto.encrypt(recipientAddress, distributionBytes);
       return {
@@ -153,7 +148,7 @@ export async function distributeToMembers(
         recipient_device_id: member.deviceId,
         distribution_message: toBase64(encrypted),
       };
-    }),
+    })
   );
   await uploadSenderKeyDistributions(auth, emberId, distributions);
 }
@@ -169,7 +164,7 @@ export async function distributeToMembers(
 export async function processIncomingDistributions(
   auth: AuthData,
   crypto: SignalSessionCrypto,
-  installSenderKey: InstallSenderKeyFn,
+  installSenderKey: InstallSenderKeyFn
 ): Promise<void> {
   const pending = await fetchPendingDistributions(auth);
   for (const dist of pending) {

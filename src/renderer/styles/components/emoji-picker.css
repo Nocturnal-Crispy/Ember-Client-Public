@@ -80,7 +80,9 @@
   cursor: pointer;
   line-height: 1;
   text-align: center;
-  transition: background 0.1s, transform 0.1s;
+  transition:
+    background 0.1s,
+    transform 0.1s;
   aspect-ratio: 1;
   display: flex;
   align-items: center;

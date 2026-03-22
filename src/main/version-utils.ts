@@ -3,9 +3,9 @@
  * Both must be in MAJOR.MINOR.PATCH format (leading 'v' is stripped automatically).
  */
 export function isNewerVersion(current: string, latest: string): boolean {
-  const stripVersionPrefix = (version: string) => version.replace(/^v/, "");
+  const stripVersionPrefix = (version: string) => version.replace(/^v/, '');
   const parseVersion = (version: string): [number, number, number] | null => {
-    const parts = stripVersionPrefix(version).split(".").map(Number);
+    const parts = stripVersionPrefix(version).split('.').map(Number);
     if (parts.length !== 3 || parts.some(isNaN)) return null;
     return parts as [number, number, number];
   };

@@ -1,1 +1,6 @@
-{"extends": "./tsconfig.json", "compilerOptions": {"module": "None", "outDir": "./dist", "target": "ES2020"}, "include": ["src/renderer/**/*", "src/shared/**/*"], "exclude": ["src/main/**/*", "src/preload/**/*", "node_modules", "dist"]}
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "module": "None", "outDir": "./dist", "target": "ES2020" },
+  "include": ["src/renderer/**/*", "src/shared/**/*"],
+  "exclude": ["src/main/**/*", "src/preload/**/*", "node_modules", "dist"]
+}

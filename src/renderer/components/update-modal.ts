@@ -155,7 +155,11 @@
   // ─── Download flow ────────────────────────────────────────────────────────
 
   async function startDownload(): Promise<void> {
-    if (!currentDetails?.downloadUrl || !currentDetails.assetName || currentDetails.downloadSize === null) {
+    if (
+      !currentDetails?.downloadUrl ||
+      !currentDetails.assetName ||
+      currentDetails.downloadSize === null
+    ) {
       setStatus('No download available for this platform.', true);
       return;
     }
@@ -164,13 +168,13 @@
     log.info('Starting update download', { assetName: currentDetails.assetName });
 
     try {
-      const result = await window.electronAPI.ipc.invoke(
+      const result = (await window.electronAPI.ipc.invoke(
         'download-update',
         currentDetails.downloadUrl,
         currentDetails.assetName,
         currentDetails.downloadSize,
         currentDetails.checksumUrl ?? null
-      ) as { filePath?: string; error?: string };
+      )) as { filePath?: string; error?: string };
 
       if (result.error) {
         if (result.error.includes('socket hang up') || result.error.includes('destroyed')) {
@@ -312,16 +316,16 @@
   // ─── Event wiring ─────────────────────────────────────────────────────────
 
   function wireEvents(): void {
-    getEl('update-modal-close')?.addEventListener('click', (e) => {
+    getEl('update-modal-close')?.addEventListener('click', e => {
       e.stopPropagation();
       closeUpdateModal();
     });
 
-    getEl('update-modal')?.addEventListener('click', (e) => {
+    getEl('update-modal')?.addEventListener('click', e => {
       if (e.target === getEl('update-modal')) closeUpdateModal();
     });
 
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         const modal = getEl('update-modal');
         if (modal && !modal.classList.contains('hidden')) closeUpdateModal();
@@ -329,15 +333,15 @@
     });
 
     getEl('update-modal-download-btn')?.addEventListener('click', () => {
-      handleDownloadBtnClick().catch((err) => log.warn('Download btn error', { error: String(err) }));
+      handleDownloadBtnClick().catch(err => log.warn('Download btn error', { error: String(err) }));
     });
 
     getEl('update-modal-exit-btn')?.addEventListener('click', () => {
-      installOnExit().catch((err) => log.warn('Install on exit error', { error: String(err) }));
+      installOnExit().catch(err => log.warn('Install on exit error', { error: String(err) }));
     });
 
     getEl('update-modal-skip-btn')?.addEventListener('click', () => {
-      skipVersion().catch((err) => log.warn('Skip version error', { error: String(err) }));
+      skipVersion().catch(err => log.warn('Skip version error', { error: String(err) }));
     });
   }
 

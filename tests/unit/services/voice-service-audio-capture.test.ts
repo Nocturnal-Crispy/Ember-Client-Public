@@ -26,8 +26,8 @@ function makeMockTrack(kind = 'video'): MediaStreamTrack {
 function makeMockStream(tracks: MediaStreamTrack[] = []): MediaStream {
   return {
     getTracks: () => tracks,
-    getVideoTracks: () => tracks.filter((t) => t.kind === 'video'),
-    getAudioTracks: () => tracks.filter((t) => t.kind === 'audio'),
+    getVideoTracks: () => tracks.filter(t => t.kind === 'video'),
+    getAudioTracks: () => tracks.filter(t => t.kind === 'audio'),
     active: true,
   } as unknown as MediaStream;
 }
@@ -54,7 +54,9 @@ function makeMockPC(offer = makeMockOffer()) {
 function makeMockWs(capturedMessages: string[]) {
   return {
     readyState: 1, // OPEN
-    send: jest.fn((msg: string) => { capturedMessages.push(msg); }),
+    send: jest.fn((msg: string) => {
+      capturedMessages.push(msg);
+    }),
   } as unknown as WebSocket;
 }
 
@@ -142,11 +144,15 @@ beforeEach(() => {
   Object.defineProperty(global, 'navigator', {
     configurable: true,
     writable: true,
-    value: { mediaDevices: { getUserMedia: mockGetUserMedia, enumerateDevices: mockEnumerateDevices } },
+    value: {
+      mediaDevices: { getUserMedia: mockGetUserMedia, enumerateDevices: mockEnumerateDevices },
+    },
   });
 
   // Set up audio capture IPC mocks
-  mockAudioCaptureSetup = jest.fn().mockResolvedValue({ success: false, reason: 'not-implemented' });
+  mockAudioCaptureSetup = jest
+    .fn()
+    .mockResolvedValue({ success: false, reason: 'not-implemented' });
   mockAudioCaptureFrames = jest.fn().mockResolvedValue(null);
   mockAudioCaptureTeardown = jest.fn().mockResolvedValue(undefined);
 
@@ -430,7 +436,9 @@ describe('_cleanup audio capture teardown', () => {
     // _stopAudioCapture is fire-and-forget; flush the full microtask queue
     // (close() + teardown() are both awaited inside the method).
     // Flush the full async chain: close() + teardown() are both awaited inside.
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(mockAudioCaptureTeardown).toHaveBeenCalled();
   });
@@ -447,7 +455,9 @@ describe('_partialCleanup audio capture teardown', () => {
     (vm as any)._partialCleanup();
 
     // Flush the full async chain: close() + teardown() are both awaited inside.
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(mockAudioCaptureTeardown).toHaveBeenCalled();
   });
@@ -480,7 +490,11 @@ describe('buildPulseAudioTrack', () => {
     const result = await (vm as any).buildPulseAudioTrack();
 
     expect(mockGetUserMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ audio: expect.objectContaining({ deviceId: expect.objectContaining({ exact: monitorDeviceId }) }) })
+      expect.objectContaining({
+        audio: expect.objectContaining({
+          deviceId: expect.objectContaining({ exact: monitorDeviceId }),
+        }),
+      })
     );
     expect(result).toBe(audioTrack);
   });
@@ -509,7 +523,9 @@ describe('buildAudioTrackFromNativeCapture', () => {
     const audioTrack = makeMockTrack('audio');
     mockGetUserMedia.mockResolvedValue(makeMockStream([audioTrack]));
 
-    const result = await (vm as any).buildAudioTrackFromNativeCapture({ platform: 'linux-pulseaudio' });
+    const result = await (vm as any).buildAudioTrackFromNativeCapture({
+      platform: 'linux-pulseaudio',
+    });
 
     expect(mockGetUserMedia).toHaveBeenCalled();
     expect(result).toBe(audioTrack);

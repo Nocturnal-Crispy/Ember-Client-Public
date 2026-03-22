@@ -5,51 +5,38 @@
 (function (): void {
   const App = window.App;
   const ipcRenderer = window.electronAPI.ipc;
-  const log = window.emberLog.createLogger("VoiceUI");
+  const log = window.emberLog.createLogger('VoiceUI');
 
   // ─── Voice Channel Functions ───────────────────────────────────────────────
 
-  async function joinVoiceChannel(
-    channelId: string,
-    channelName: string
-  ): Promise<void> {
+  async function joinVoiceChannel(channelId: string, channelName: string): Promise<void> {
     if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) {
-      log.warn("Cannot join voice channel: WebSocket not connected");
+      log.warn('Cannot join voice channel: WebSocket not connected');
       return;
     }
-    log.info("Joining voice channel", {
+    log.info('Joining voice channel', {
       channel_id: channelId,
       name: channelName,
     });
 
-    if (
-      App.activeVoiceChannelId &&
-      App.activeVoiceChannelId !== channelId &&
-      App.voiceManager
-    ) {
+    if (App.activeVoiceChannelId && App.activeVoiceChannelId !== channelId && App.voiceManager) {
       const leavingChannelId = App.activeVoiceChannelId;
-      if (
-        App.localCameraOn &&
-        App.wsConnection?.readyState === WebSocket.OPEN
-      ) {
-        App.wsConnection.send(JSON.stringify({ type: "voice_camera_off" }));
+      if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
+        App.wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
       }
       App.localCameraOn = false;
       App.videoParticipants.clear();
       updateVideoGridVisibility();
-      const cameraBtn = document.getElementById("voice-camera-btn");
+      const cameraBtn = document.getElementById('voice-camera-btn');
       if (cameraBtn) {
-        cameraBtn.classList.remove("active");
-        cameraBtn.title = "Start Camera";
-        cameraBtn.textContent = "📷";
+        cameraBtn.classList.remove('active');
+        cameraBtn.title = 'Start Camera';
+        cameraBtn.textContent = '📷';
       }
-      await (
-        App.voiceManager as { leaveChannel(): Promise<void> }
-      ).leaveChannel();
+      await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
 
       // Optimistically remove self from sidebar presence for the channel being left
-      const leavingSelfId = (App.voiceManager as { auth?: AuthForVoice } | null)
-        ?.auth?.user_id;
+      const leavingSelfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
       if (leavingSelfId) {
         const presence = App.voiceChannelPresence.get(leavingChannelId);
         if (presence) {
@@ -65,11 +52,11 @@
       hideVoiceControls();
       renderVoiceParticipants(null);
       document
-        .querySelectorAll(".voice-avatar.speaking")
-        .forEach((el) => el.classList.remove("speaking"));
+        .querySelectorAll('.voice-avatar.speaking')
+        .forEach(el => el.classList.remove('speaking'));
     }
 
-    const auth = (await ipcRenderer.invoke("get-auth")) as AuthForVoice | null;
+    const auth = (await ipcRenderer.invoke('get-auth')) as AuthForVoice | null;
     if (!auth) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,16 +76,16 @@
       ) => {
         // Update own-session participant list (used for video grid)
         App.voiceParticipants.clear();
-        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
-          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
+          participants.filter(p => p.screen_sharing).map(p => p.user_id)
         );
         App.screenShareParticipants = screenSids;
-        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
+        if (App.localScreenShareOn) App.screenShareParticipants.add('__self__');
         // Update cross-channel presence for this channel's sidebar using captured channelId
         const presenceMap = new Map<string, string>();
-        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
+        participants.forEach(p => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
         renderVideoGrid();
@@ -107,10 +94,8 @@
         handleRemoteCameraStateChanged(userId, isOn);
       vm.onVideoStreamAdded = (streamId: string, stream: MediaStream) =>
         handleRemoteVideoStream(streamId, stream);
-      vm.onScreenShareStarted = (userId: string) =>
-        handleVoiceScreenShareStarted(userId);
-      vm.onScreenShareStopped = (userId: string) =>
-        handleVoiceScreenShareStopped(userId);
+      vm.onScreenShareStarted = (userId: string) => handleVoiceScreenShareStarted(userId);
+      vm.onScreenShareStopped = (userId: string) => handleVoiceScreenShareStopped(userId);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
@@ -121,15 +106,15 @@
         participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
         App.voiceParticipants.clear();
-        participants.forEach((p) => App.voiceParticipants.set(p.user_id, p.username));
+        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
-          participants.filter((p) => p.screen_sharing).map((p) => p.user_id)
+          participants.filter(p => p.screen_sharing).map(p => p.user_id)
         );
         App.screenShareParticipants = screenSids;
-        if (App.localScreenShareOn) App.screenShareParticipants.add("__self__");
+        if (App.localScreenShareOn) App.screenShareParticipants.add('__self__');
         const presenceMap = new Map<string, string>();
-        participants.forEach((p) => presenceMap.set(p.user_id, p.username));
+        participants.forEach(p => presenceMap.set(p.user_id, p.username));
         App.voiceChannelPresence.set(channelId, presenceMap);
         renderVoiceParticipants(App.activeVoiceChannelId);
         renderVideoGrid();
@@ -140,10 +125,10 @@
     // once the WebRTC peer connection to the SFU is actually established.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (App.voiceManager as any).onConnected = () => {
-      log.info("SFU connection established, showing voice controls", {
+      log.info('SFU connection established, showing voice controls', {
         channel_id: channelId,
       });
-      playVoiceSound("userJoin");
+      playVoiceSound('userJoin');
       App.activeVoiceChannelId = channelId;
       App.activeVoiceChannelName = channelName;
       showVoiceControls(channelName);
@@ -151,7 +136,7 @@
     };
 
     const voiceSettings = (await ipcRenderer
-      .invoke("get-voice-video-settings")
+      .invoke('get-voice-video-settings')
       .catch(() => null)) as VoiceSettings | null;
     const joined = await (
       App.voiceManager as {
@@ -159,11 +144,11 @@
       }
     ).joinChannel(channelId, voiceSettings);
     if (!joined) {
-      log.error("Failed to join voice channel", { channel_id: channelId });
+      log.error('Failed to join voice channel', { channel_id: channelId });
       return;
     }
 
-    log.info("Voice channel join initiated, waiting for SFU connection", {
+    log.info('Voice channel join initiated, waiting for SFU connection', {
       channel_id: channelId,
     });
   }
@@ -171,43 +156,38 @@
   async function leaveVoiceChannel(): Promise<void> {
     if (!App.voiceManager) return;
     const leavingChannelId = App.activeVoiceChannelId;
-    log.info("Leaving voice channel", { channel_id: leavingChannelId ?? "" });
+    log.info('Leaving voice channel', { channel_id: leavingChannelId ?? '' });
     if (App.localCameraOn && App.wsConnection?.readyState === WebSocket.OPEN) {
-      App.wsConnection.send(JSON.stringify({ type: "voice_camera_off" }));
+      App.wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
     }
     if (App.localScreenShareOn && App.wsConnection?.readyState === WebSocket.OPEN) {
-      App.wsConnection.send(JSON.stringify({ type: "screen_share_stop" }));
+      App.wsConnection.send(JSON.stringify({ type: 'screen_share_stop' }));
     }
     App.localCameraOn = false;
     App.localScreenShareOn = false;
     App.videoParticipants.clear();
     App.screenShareParticipants.clear();
-    if (App.activeView === "voice") showTextChannelView();
+    if (App.activeView === 'voice') showTextChannelView();
     updateVideoGridVisibility();
-    const cameraBtn = document.getElementById(
-      "voice-camera-btn"
-    ) as HTMLButtonElement | null;
+    const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (cameraBtn) {
-      cameraBtn.classList.remove("active");
-      cameraBtn.title = "Start Camera";
-      cameraBtn.textContent = "📷";
+      cameraBtn.classList.remove('active');
+      cameraBtn.title = 'Start Camera';
+      cameraBtn.textContent = '📷';
       cameraBtn.disabled = false;
     }
     const screenShareBtn = document.getElementById(
-      "voice-screen-share-btn"
+      'voice-screen-share-btn'
     ) as HTMLButtonElement | null;
     if (screenShareBtn) {
-      screenShareBtn.classList.remove("active");
-      screenShareBtn.title = "Share Screen";
+      screenShareBtn.classList.remove('active');
+      screenShareBtn.title = 'Share Screen';
       screenShareBtn.disabled = false;
     }
-    await (
-      App.voiceManager as { leaveChannel(): Promise<void> }
-    ).leaveChannel();
+    await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
 
     // Optimistically remove self from sidebar presence before the server confirms
-    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth
-      ?.user_id;
+    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
     if (selfId && leavingChannelId) {
       const presence = App.voiceChannelPresence.get(leavingChannelId);
       if (presence) {
@@ -223,8 +203,8 @@
     App.voiceParticipants.clear();
     hideVoiceControls();
     document
-      .querySelectorAll(".voice-avatar.speaking")
-      .forEach((el) => el.classList.remove("speaking"));
+      .querySelectorAll('.voice-avatar.speaking')
+      .forEach(el => el.classList.remove('speaking'));
   }
 
   function handleVoiceUserJoined(payload: {
@@ -233,30 +213,23 @@
     username: string;
   }): void {
     const { channel_id, user_id, username } = payload;
-    log.info("Voice user joined", { channel_id, user_id, username });
+    log.info('Voice user joined', { channel_id, user_id, username });
 
     // Update cross-channel sidebar presence (visible to all ember members)
-    const existingJoined =
-      App.voiceChannelPresence.get(channel_id) ?? new Map<string, string>();
-    App.voiceChannelPresence.set(
-      channel_id,
-      new Map(existingJoined).set(user_id, username)
-    );
+    const existingJoined = App.voiceChannelPresence.get(channel_id) ?? new Map<string, string>();
+    App.voiceChannelPresence.set(channel_id, new Map(existingJoined).set(user_id, username));
     renderVoiceParticipants(channel_id);
 
     // Only update own-session state and play sound when it's our active channel
     if (channel_id === App.activeVoiceChannelId) {
       App.voiceParticipants.set(user_id, username);
-      playVoiceSound("userJoin");
+      playVoiceSound('userJoin');
     }
   }
 
-  function handleVoiceUserLeft(payload: {
-    channel_id: string;
-    user_id: string;
-  }): void {
+  function handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void {
     const { channel_id, user_id } = payload;
-    log.info("Voice user left", { channel_id, user_id });
+    log.info('Voice user left', { channel_id, user_id });
 
     // Update cross-channel sidebar presence
     const channelPresence = App.voiceChannelPresence.get(channel_id);
@@ -274,22 +247,19 @@
       removeVideoTile(user_id);
       updateVideoGridVisibility();
       updateSpeakingIndicator(user_id, false);
-      const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth
-        ?.user_id;
-      if (user_id !== selfId) playVoiceSound("userLeave");
+      const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+      if (user_id !== selfId) playVoiceSound('userLeave');
     }
   }
 
   function getMemberAvatar(userId: string): string {
-    const member = App.currentMembers.find((m) => m.user_id === userId);
-    return member?.avatar ?? "";
+    const member = App.currentMembers.find(m => m.user_id === userId);
+    return member?.avatar ?? '';
   }
 
   function renderVoiceParticipants(channelId: string | null): void {
     if (!channelId) {
-      document
-        .querySelectorAll(".voice-participant-list")
-        .forEach((el) => el.replaceChildren());
+      document.querySelectorAll('.voice-participant-list').forEach(el => el.replaceChildren());
       return;
     }
     const list = document.querySelector<HTMLElement>(
@@ -300,34 +270,33 @@
     const participants = App.voiceChannelPresence.get(channelId);
     if (!participants) return;
     participants.forEach((username, userId) => {
-      const item = document.createElement("div");
-      item.className = "voice-participant";
-      item.dataset["userId"] = userId;
-      const avatarEl = document.createElement("div");
-      avatarEl.className = "voice-avatar";
-      avatarEl.dataset["userId"] = userId;
+      const item = document.createElement('div');
+      item.className = 'voice-participant';
+      item.dataset['userId'] = userId;
+      const avatarEl = document.createElement('div');
+      avatarEl.className = 'voice-avatar';
+      avatarEl.dataset['userId'] = userId;
       // Re-apply speaking state so the indicator is correct after DOM re-render.
       // Without this, remote users' speaking indicators disappear whenever the
       // participant list is rebuilt (e.g. on join/leave), because the server
       // only sends voice_speaking when the state *changes* — not continuously.
-      const vmStates = (
-        App.voiceManager as { speakingStates?: Map<string, boolean> } | null
-      )?.speakingStates;
+      const vmStates = (App.voiceManager as { speakingStates?: Map<string, boolean> } | null)
+        ?.speakingStates;
       if (vmStates?.get(userId)) {
-        avatarEl.classList.add("speaking");
+        avatarEl.classList.add('speaking');
       }
       const avatarData = getMemberAvatar(userId);
       if (avatarData) {
-        const img = document.createElement("img");
+        const img = document.createElement('img');
         img.src = avatarData;
         img.alt = username;
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
         avatarEl.appendChild(img);
       } else {
         avatarEl.textContent = username.charAt(0).toUpperCase();
       }
-      const nameEl = document.createElement("span");
-      nameEl.className = "voice-username";
+      const nameEl = document.createElement('span');
+      nameEl.className = 'voice-username';
       nameEl.textContent = username;
       item.appendChild(avatarEl);
       item.appendChild(nameEl);
@@ -337,18 +306,15 @@
 
   // Fetch voice presence for all voice channels in an ember and render them in the sidebar.
   async function fetchAndRenderVoicePresence(emberId: string): Promise<void> {
-    const auth = (await ipcRenderer.invoke("get-auth")) as {
+    const auth = (await ipcRenderer.invoke('get-auth')) as {
       token?: string;
       hostname?: string;
     } | null;
     if (!auth || !auth.token || !auth.hostname) return;
     try {
-      const res = await fetch(
-        `${auth.hostname}/api/v1/embers/${emberId}/voice/participants`,
-        {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }
-      );
+      const res = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/voice/participants`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
       if (!res.ok) return;
       const data = (await res.json()) as {
         channels: Record<string, Array<{ user_id: string; username: string }>>;
@@ -360,159 +326,134 @@
         App.voiceChannelPresence.set(channelId, presenceMap);
       }
       // Re-render all voice participant lists that are currently in the DOM
-      App.voiceChannelPresence.forEach((_, channelId) =>
-        renderVoiceParticipants(channelId)
-      );
+      App.voiceChannelPresence.forEach((_, channelId) => renderVoiceParticipants(channelId));
     } catch (e) {
-      log.error("Failed to fetch voice presence", { error: String(e) });
+      log.error('Failed to fetch voice presence', { error: String(e) });
     }
   }
 
   function updateSpeakingIndicator(userId: string, isSpeaking: boolean): void {
     // Sidebar voice avatars
-    document.querySelectorAll<HTMLElement>(
-      `.voice-avatar[data-user-id="${userId}"]`
-    ).forEach((el) => el.classList.toggle("speaking", isSpeaking));
+    document
+      .querySelectorAll<HTMLElement>(`.voice-avatar[data-user-id="${userId}"]`)
+      .forEach(el => el.classList.toggle('speaking', isSpeaking));
     // Video grid tiles
-    (["camera", "screen", "audio-only"] as const).forEach((type) => {
+    (['camera', 'screen', 'audio-only'] as const).forEach(type => {
       document
         .querySelector<HTMLElement>(`[data-tile-id="${userId}:${type}"]`)
-        ?.classList.toggle("speaking", isSpeaking);
+        ?.classList.toggle('speaking', isSpeaking);
     });
   }
 
   function showVoiceControls(channelName: string): void {
-    const panel = document.getElementById("voice-controls");
+    const panel = document.getElementById('voice-controls');
     if (panel) {
-      panel.classList.remove("hidden");
-      const nameEl = panel.querySelector(".voice-channel-name");
-      if (nameEl) nameEl.textContent = "\uD83D\uDD0A " + channelName;
+      panel.classList.remove('hidden');
+      const nameEl = panel.querySelector('.voice-channel-name');
+      if (nameEl) nameEl.textContent = '\uD83D\uDD0A ' + channelName;
     }
   }
 
   function hideVoiceControls(): void {
-    document.getElementById("voice-controls")?.classList.add("hidden");
+    document.getElementById('voice-controls')?.classList.add('hidden');
   }
 
   function openVideoPopout(): void {
-    window.electronAPI.ipc.invoke("open-video-popout", {
-      channelName: App.activeVoiceChannelName ?? "",
+    window.electronAPI.ipc.invoke('open-video-popout', {
+      channelName: App.activeVoiceChannelName ?? '',
     });
   }
 
-  document.getElementById("voice-mute-btn")?.addEventListener("click", () => {
+  document.getElementById('voice-mute-btn')?.addEventListener('click', () => {
     if (!App.voiceManager) return;
     const muted = (App.voiceManager as { toggleMute(): boolean }).toggleMute();
-    const btn = document.getElementById("voice-mute-btn");
+    const btn = document.getElementById('voice-mute-btn');
     if (!btn) return;
-    btn.classList.toggle("active", muted);
-    btn.title = muted ? "Unmute" : "Mute";
-    btn.textContent = muted ? "\uD83D\uDD07" : "\uD83C\uDFA4";
-    playVoiceSound(muted ? "mute" : "unmute");
+    btn.classList.toggle('active', muted);
+    btn.title = muted ? 'Unmute' : 'Mute';
+    btn.textContent = muted ? '\uD83D\uDD07' : '\uD83C\uDFA4';
+    playVoiceSound(muted ? 'mute' : 'unmute');
   });
 
-  document.getElementById("voice-deafen-btn")?.addEventListener("click", () => {
+  document.getElementById('voice-deafen-btn')?.addEventListener('click', () => {
     if (!App.voiceManager) return;
-    const deafened = (
-      App.voiceManager as { toggleDeafen(): boolean }
-    ).toggleDeafen();
-    const btn = document.getElementById("voice-deafen-btn");
+    const deafened = (App.voiceManager as { toggleDeafen(): boolean }).toggleDeafen();
+    const btn = document.getElementById('voice-deafen-btn');
     if (!btn) return;
-    btn.classList.toggle("active", deafened);
-    btn.title = deafened ? "Undeafen" : "Deafen";
-    btn.textContent = deafened ? "\uD83D\uDD15" : "\uD83C\uDFA7";
-    playVoiceSound(deafened ? "deafen" : "undeafen");
+    btn.classList.toggle('active', deafened);
+    btn.title = deafened ? 'Undeafen' : 'Deafen';
+    btn.textContent = deafened ? '\uD83D\uDD15' : '\uD83C\uDFA7';
+    playVoiceSound(deafened ? 'deafen' : 'undeafen');
   });
 
-  document
-    .getElementById("voice-disconnect-btn")
-    ?.addEventListener("click", () => {
-      playVoiceSound("disconnect");
-      leaveVoiceChannel();
-      document
-        .querySelectorAll(".channel")
-        .forEach((el) => el.classList.remove("active"));
-    });
+  document.getElementById('voice-disconnect-btn')?.addEventListener('click', () => {
+    playVoiceSound('disconnect');
+    leaveVoiceChannel();
+    document.querySelectorAll('.channel').forEach(el => el.classList.remove('active'));
+  });
+
+  document.getElementById('voice-camera-btn')?.addEventListener('click', () => toggleCamera());
 
   document
-    .getElementById("voice-camera-btn")
-    ?.addEventListener("click", () => toggleCamera());
+    .getElementById('voice-screen-share-btn')
+    ?.addEventListener('click', () => toggleScreenShare());
 
-  document
-    .getElementById("voice-screen-share-btn")
-    ?.addEventListener("click", () => toggleScreenShare());
-
-  document
-    .getElementById("voice-popout-btn")
-    ?.addEventListener("click", () => openVideoPopout());
+  document.getElementById('voice-popout-btn')?.addEventListener('click', () => openVideoPopout());
 
   // ─── View Switching Functions ──────────────────────────────────────────────
 
   function showVoiceChannelView(): void {
-    const grid = document.getElementById("video-grid");
-    const messages = document.getElementById("messages");
-    const inputContainer = document.querySelector<HTMLElement>(
-      ".message-input-container"
-    );
+    const grid = document.getElementById('video-grid');
+    const messages = document.getElementById('messages');
+    const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
     if (!grid || !messages) return;
-    App.activeView = "voice";
+    App.activeView = 'voice';
     App.videoGridVisible = true;
-    grid.style.display = "";
-    messages.style.display = "none";
-    if (inputContainer) inputContainer.style.display = "none";
-    const headerIcon = document.querySelector<HTMLElement>(
-      ".chat-header .channel-icon"
-    );
-    if (headerIcon) headerIcon.textContent = "🔊";
+    grid.style.display = '';
+    messages.style.display = 'none';
+    if (inputContainer) inputContainer.style.display = 'none';
+    const headerIcon = document.querySelector<HTMLElement>('.chat-header .channel-icon');
+    if (headerIcon) headerIcon.textContent = '🔊';
     renderVideoGrid();
   }
 
   function showTextChannelView(): void {
-    const grid = document.getElementById("video-grid");
-    const messages = document.getElementById("messages");
-    const inputContainer = document.querySelector<HTMLElement>(
-      ".message-input-container"
-    );
+    const grid = document.getElementById('video-grid');
+    const messages = document.getElementById('messages');
+    const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
     if (!grid || !messages) return;
-    App.activeView = "text";
+    App.activeView = 'text';
     App.videoGridVisible = false;
-    grid.style.display = "none";
-    messages.style.display = "";
-    if (inputContainer) inputContainer.style.display = "";
-    const headerIcon = document.querySelector<HTMLElement>(
-      ".chat-header .channel-icon"
-    );
-    if (headerIcon) headerIcon.textContent = "#";
+    grid.style.display = 'none';
+    messages.style.display = '';
+    if (inputContainer) inputContainer.style.display = '';
+    const headerIcon = document.querySelector<HTMLElement>('.chat-header .channel-icon');
+    if (headerIcon) headerIcon.textContent = '#';
   }
 
   // ─── Camera / Video Functions ──────────────────────────────────────────────
 
   async function toggleCamera(): Promise<void> {
     if (!App.voiceManager || !App.activeVoiceChannelId) return;
-    const btn = document.getElementById(
-      "voice-camera-btn"
-    ) as HTMLButtonElement | null;
+    const btn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (btn) btn.disabled = true;
     try {
       if (!App.localCameraOn) {
         const voiceSettings = (await ipcRenderer
-          .invoke("get-voice-video-settings")
+          .invoke('get-voice-video-settings')
           .catch(() => null)) as VoiceSettings | null;
         const cameraDeviceId =
-          voiceSettings?.cameraDevice &&
-          voiceSettings.cameraDevice !== "default"
+          voiceSettings?.cameraDevice && voiceSettings.cameraDevice !== 'default'
             ? voiceSettings.cameraDevice
             : null;
         let testStream: MediaStream | undefined;
         try {
           testStream = await navigator.mediaDevices.getUserMedia({
-            video: cameraDeviceId
-              ? { deviceId: { exact: cameraDeviceId } }
-              : true,
+            video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true,
           });
-          testStream.getTracks().forEach((t) => t.stop());
+          testStream.getTracks().forEach(t => t.stop());
         } catch (e) {
-          log.warn("Camera permission denied or no device found", {
+          log.warn('Camera permission denied or no device found', {
             error: String(e),
           });
           return;
@@ -524,26 +465,24 @@
         ).enableCamera(cameraDeviceId);
         if (!joined) return;
         App.localCameraOn = true;
-        App.videoParticipants.add("__self__");
+        App.videoParticipants.add('__self__');
         if (App.wsConnection?.readyState === WebSocket.OPEN)
-          App.wsConnection.send(JSON.stringify({ type: "voice_camera_on" }));
+          App.wsConnection.send(JSON.stringify({ type: 'voice_camera_on' }));
         if (btn) {
-          btn.classList.add("active");
-          btn.title = "Stop Camera";
-          btn.textContent = "\u{1F3A5}";
+          btn.classList.add('active');
+          btn.title = 'Stop Camera';
+          btn.textContent = '\u{1F3A5}';
         }
       } else {
-        await (
-          App.voiceManager as { disableCamera(): Promise<boolean> }
-        ).disableCamera();
+        await (App.voiceManager as { disableCamera(): Promise<boolean> }).disableCamera();
         App.localCameraOn = false;
-        App.videoParticipants.delete("__self__");
+        App.videoParticipants.delete('__self__');
         if (App.wsConnection?.readyState === WebSocket.OPEN)
-          App.wsConnection.send(JSON.stringify({ type: "voice_camera_off" }));
+          App.wsConnection.send(JSON.stringify({ type: 'voice_camera_off' }));
         if (btn) {
-          btn.classList.remove("active");
-          btn.title = "Start Camera";
-          btn.textContent = "\u{1F4F7}";
+          btn.classList.remove('active');
+          btn.title = 'Start Camera';
+          btn.textContent = '\u{1F4F7}';
         }
       }
       updateVideoGridVisibility();
@@ -557,9 +496,7 @@
 
   async function toggleScreenShare(): Promise<void> {
     if (!App.voiceManager || !App.activeVoiceChannelId) return;
-    const btn = document.getElementById(
-      "voice-screen-share-btn"
-    ) as HTMLButtonElement | null;
+    const btn = document.getElementById('voice-screen-share-btn') as HTMLButtonElement | null;
     if (btn) btn.disabled = true;
     try {
       if (!App.localScreenShareOn) {
@@ -567,11 +504,11 @@
       } else {
         await (App.voiceManager as { stopScreenShare(): Promise<void> }).stopScreenShare();
         App.localScreenShareOn = false;
-        App.screenShareParticipants.delete("__self__");
-        if (App.focusedTileId === "__self__:screen") App.focusedTileId = null;
+        App.screenShareParticipants.delete('__self__');
+        if (App.focusedTileId === '__self__:screen') App.focusedTileId = null;
         if (btn) {
-          btn.classList.remove("active");
-          btn.title = "Share Screen";
+          btn.classList.remove('active');
+          btn.title = 'Share Screen';
         }
         updateVideoGridVisibility();
         renderVideoGrid();
@@ -592,15 +529,15 @@
     try {
       rawSources = await window.electronAPI.desktopCapturer.getSources();
     } catch (e) {
-      log.error("Failed to get screen sources", { error: String(e) });
+      log.error('Failed to get screen sources', { error: String(e) });
       return;
     }
 
-    const sources: ScreenSource[] = rawSources.map((s) => ({
+    const sources: ScreenSource[] = rawSources.map(s => ({
       id: s.id,
       name: s.name,
       thumbnailDataUrl: s.thumbnail,
-      type: s.display_id ? "screen" : "window",
+      type: s.display_id ? 'screen' : 'window',
     }));
 
     let audioAvailable = false;
@@ -608,13 +545,13 @@
       const support = await window.electronAPI.audioCapture.checkSupport();
       audioAvailable = support.supported;
     } catch (e) {
-      log.warn("Audio capture check failed", { error: String(e) });
+      log.warn('Audio capture check failed', { error: String(e) });
     }
 
-    if (typeof window.openScreenShareModal === "function") {
+    if (typeof window.openScreenShareModal === 'function') {
       window.openScreenShareModal(sources, audioAvailable, handleScreenShareConfirmed);
     } else {
-      log.error("openScreenShareModal not available — modal script not loaded");
+      log.error('openScreenShareModal not available — modal script not loaded');
     }
   }
 
@@ -623,7 +560,7 @@
     settings: ScreenShareSettings
   ): Promise<void> {
     if (!App.voiceManager || !App.activeVoiceChannelId) return;
-    log.info("Screen share source confirmed", { sourceId: source.id });
+    log.info('Screen share source confirmed', { sourceId: source.id });
 
     const started = await (
       App.voiceManager as {
@@ -632,20 +569,18 @@
     ).startScreenShare(source.id, settings);
 
     if (!started) {
-      log.error("startScreenShare returned false — aborting");
+      log.error('startScreenShare returned false — aborting');
       return;
     }
 
     App.localScreenShareOn = true;
-    App.screenShareParticipants.add("__self__");
-    if (App.focusedTileId === null) App.focusedTileId = "__self__:screen";
+    App.screenShareParticipants.add('__self__');
+    if (App.focusedTileId === null) App.focusedTileId = '__self__:screen';
 
-    const btn = document.getElementById(
-      "voice-screen-share-btn"
-    ) as HTMLButtonElement | null;
+    const btn = document.getElementById('voice-screen-share-btn') as HTMLButtonElement | null;
     if (btn) {
-      btn.classList.add("active");
-      btn.title = "Stop Sharing";
+      btn.classList.add('active');
+      btn.title = 'Stop Sharing';
       btn.disabled = false;
     }
 
@@ -654,7 +589,7 @@
   }
 
   function handleVoiceScreenShareStarted(userId: string): void {
-    log.info("Remote screen share started", { user_id: userId });
+    log.info('Remote screen share started', { user_id: userId });
     App.screenShareParticipants.add(userId);
     App.lastScreenShareUserId = userId;
     // Phase 10: auto-spotlight the first screen share when none is focused.
@@ -663,7 +598,7 @@
   }
 
   function handleVoiceScreenShareStopped(userId: string): void {
-    log.info("Remote screen share stopped", { user_id: userId });
+    log.info('Remote screen share stopped', { user_id: userId });
     App.screenShareParticipants.delete(userId);
     if (App.focusedTileId === `${userId}:screen`) App.focusedTileId = null;
     if (App.lastScreenShareUserId === userId) App.lastScreenShareUserId = null;
@@ -673,45 +608,40 @@
   function updateVideoGridVisibility(): void {
     // When viewing the voice channel, keep the grid visible regardless of camera state.
     // When viewing a text channel, keep the grid hidden regardless of camera state.
-    if (App.activeView === "voice") {
-      const grid = document.getElementById("video-grid");
-      const messages = document.getElementById("messages");
-      const inputContainer = document.querySelector<HTMLElement>(
-        ".message-input-container"
-      );
-      if (grid) grid.style.display = "";
-      if (messages) messages.style.display = "none";
-      if (inputContainer) inputContainer.style.display = "none";
+    if (App.activeView === 'voice') {
+      const grid = document.getElementById('video-grid');
+      const messages = document.getElementById('messages');
+      const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+      if (grid) grid.style.display = '';
+      if (messages) messages.style.display = 'none';
+      if (inputContainer) inputContainer.style.display = 'none';
       App.videoGridVisible = true;
     } else {
-      const grid = document.getElementById("video-grid");
-      const messages = document.getElementById("messages");
-      const inputContainer = document.querySelector<HTMLElement>(
-        ".message-input-container"
-      );
-      if (grid) grid.style.display = "none";
-      if (messages) messages.style.display = "";
-      if (inputContainer) inputContainer.style.display = "";
+      const grid = document.getElementById('video-grid');
+      const messages = document.getElementById('messages');
+      const inputContainer = document.querySelector<HTMLElement>('.message-input-container');
+      if (grid) grid.style.display = 'none';
+      if (messages) messages.style.display = '';
+      if (inputContainer) inputContainer.style.display = '';
       App.videoGridVisible = false;
     }
   }
 
   function resolveSpotlight(desiredTiles: Set<string>): string | null {
-    if (App.focusedTileId && desiredTiles.has(App.focusedTileId))
-      return App.focusedTileId;
+    if (App.focusedTileId && desiredTiles.has(App.focusedTileId)) return App.focusedTileId;
     if (App.lastScreenShareUserId) {
-      const t = App.lastScreenShareUserId + ":screen";
+      const t = App.lastScreenShareUserId + ':screen';
       if (desiredTiles.has(t)) return t;
     }
-    for (const t of desiredTiles) if (t.endsWith(":screen")) return t;
-    for (const t of desiredTiles) if (t.endsWith(":camera")) return t;
+    for (const t of desiredTiles) if (t.endsWith(':screen')) return t;
+    for (const t of desiredTiles) if (t.endsWith(':camera')) return t;
     return null;
   }
 
   async function renderVideoGrid(): Promise<void> {
-    const focusArea = document.getElementById("video-focus-area");
-    const strip = document.getElementById("video-strip");
-    const audioBar = document.getElementById("video-audio-only-bar");
+    const focusArea = document.getElementById('video-focus-area');
+    const strip = document.getElementById('video-strip');
+    const audioBar = document.getElementById('video-audio-only-bar');
     if (!focusArea || !strip || !audioBar) return;
 
     const vm = App.voiceManager as {
@@ -725,26 +655,25 @@
     } | null;
     const selfId = vm?.auth?.user_id;
     let selfUsername = vm?.auth?.username;
-    let selfAvatar = "";
+    let selfAvatar = '';
     if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke("get-auth")) as
+      const auth = (await ipcRenderer.invoke('get-auth')) as
         | (AuthForVoice & { avatar?: string })
         | null;
       selfUsername = auth?.username;
-      selfAvatar = auth?.avatar ?? "";
+      selfAvatar = auth?.avatar ?? '';
     } else {
-      const auth = (await ipcRenderer.invoke("get-auth")) as {
+      const auth = (await ipcRenderer.invoke('get-auth')) as {
         avatar?: string;
       } | null;
-      selfAvatar = auth?.avatar ?? "";
+      selfAvatar = auth?.avatar ?? '';
     }
 
     // ── Build desired tile set ────────────────────────────────────────────────
     const desiredTiles = new Set<string>();
-    if (App.localCameraOn) desiredTiles.add("__self__:camera");
-    if (App.localScreenShareOn) desiredTiles.add("__self__:screen");
-    if (!App.localCameraOn && !App.localScreenShareOn)
-      desiredTiles.add("__self__:audio-only");
+    if (App.localCameraOn) desiredTiles.add('__self__:camera');
+    if (App.localScreenShareOn) desiredTiles.add('__self__:screen');
+    if (!App.localCameraOn && !App.localScreenShareOn) desiredTiles.add('__self__:audio-only');
 
     App.voiceParticipants.forEach((_username, userId) => {
       if (userId === selfId) return;
@@ -757,16 +686,14 @@
 
     // ── Collect existing tile IDs from all sub-containers ────────────────────
     const existingTileIds = new Set<string>();
-    [focusArea, strip, audioBar].forEach((container) => {
-      container
-        .querySelectorAll<HTMLElement>("[data-tile-id]")
-        .forEach((el) => {
-          if (el.dataset["tileId"]) existingTileIds.add(el.dataset["tileId"]);
-        });
+    [focusArea, strip, audioBar].forEach(container => {
+      container.querySelectorAll<HTMLElement>('[data-tile-id]').forEach(el => {
+        if (el.dataset['tileId']) existingTileIds.add(el.dataset['tileId']);
+      });
     });
 
     // ── Remove stale tiles ───────────────────────────────────────────────────
-    existingTileIds.forEach((tileId) => {
+    existingTileIds.forEach(tileId => {
       if (!desiredTiles.has(tileId)) {
         document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)?.remove();
       }
@@ -776,35 +703,32 @@
     const spotlight = resolveSpotlight(desiredTiles);
 
     // ── Add or move tiles ────────────────────────────────────────────────────
-    desiredTiles.forEach((tileId) => {
-      const colonIdx = tileId.lastIndexOf(":");
+    desiredTiles.forEach(tileId => {
+      const colonIdx = tileId.lastIndexOf(':');
       const userId = tileId.substring(0, colonIdx);
-      const type = tileId.substring(colonIdx + 1) as
-        | "camera"
-        | "screen"
-        | "audio-only";
+      const type = tileId.substring(colonIdx + 1) as 'camera' | 'screen' | 'audio-only';
 
       const targetContainer =
-        tileId === spotlight ? focusArea : type === "audio-only" ? audioBar : strip;
+        tileId === spotlight ? focusArea : type === 'audio-only' ? audioBar : strip;
 
       if (!existingTileIds.has(tileId)) {
         // ── Create new tile ────────────────────────────────────────────────
         let stream: MediaStream | null = null;
-        if (type === "camera") {
-          if (userId === "__self__") {
+        if (type === 'camera') {
+          if (userId === '__self__') {
             stream = vm?.localVideoStream ?? null;
           } else if (vm?.remoteVideoStreams) {
             const streamId = vm._userToVideoStreamId?.get(userId);
             if (streamId) {
               stream = vm.remoteVideoStreams.get(streamId) ?? null;
             } else {
-              vm.remoteVideoStreams.forEach((s) => {
+              vm.remoteVideoStreams.forEach(s => {
                 if (!stream) stream = s;
               });
             }
           }
-        } else if (type === "screen") {
-          if (userId === "__self__") {
+        } else if (type === 'screen') {
+          if (userId === '__self__') {
             stream = vm?.localScreenStream ?? null;
           } else if (vm?.remoteScreenStreams) {
             const streamId = vm._userToScreenStreamId?.get(userId);
@@ -815,17 +739,15 @@
         }
 
         const username =
-          userId === "__self__"
-            ? (selfUsername ?? selfId ?? "?")
+          userId === '__self__'
+            ? (selfUsername ?? selfId ?? '?')
             : (App.voiceParticipants.get(userId) ?? userId);
-        const avatar = userId === "__self__" ? selfAvatar : getMemberAvatar(userId);
-        const tile = createVideoTile(userId, type, username, stream, userId === "__self__", avatar);
+        const avatar = userId === '__self__' ? selfAvatar : getMemberAvatar(userId);
+        const tile = createVideoTile(userId, type, username, stream, userId === '__self__', avatar);
         targetContainer.appendChild(tile);
       } else {
         // ── Move existing tile if spotlight changed ─────────────────────────
-        const existingTile = document.querySelector<HTMLElement>(
-          `[data-tile-id="${tileId}"]`
-        );
+        const existingTile = document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`);
         if (existingTile && existingTile.parentElement !== targetContainer) {
           targetContainer.appendChild(existingTile);
         }
@@ -835,32 +757,31 @@
 
   function createVideoTile(
     userId: string,
-    tileType: "camera" | "screen" | "audio-only",
+    tileType: 'camera' | 'screen' | 'audio-only',
     username: string,
     stream: MediaStream | null,
     isSelf: boolean,
     avatar?: string
   ): HTMLElement {
-    const tile = document.createElement("div");
-    tile.dataset["tileId"] = `${userId}:${tileType}`;
+    const tile = document.createElement('div');
+    tile.dataset['tileId'] = `${userId}:${tileType}`;
 
-    if (tileType === "audio-only") {
+    if (tileType === 'audio-only') {
       // Compact row: avatar + username
-      tile.className = "video-tile audio-only-tile";
-      const avatarEl = document.createElement("div");
-      avatarEl.className = "video-tile-avatar";
+      tile.className = 'video-tile audio-only-tile';
+      const avatarEl = document.createElement('div');
+      avatarEl.className = 'video-tile-avatar';
       if (avatar) {
-        const img = document.createElement("img");
+        const img = document.createElement('img');
         img.src = avatar;
         img.alt = username;
-        img.style.cssText =
-          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
         avatarEl.appendChild(img);
       } else {
-        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+        avatarEl.textContent = (username ?? '?').charAt(0).toUpperCase();
       }
-      const label = document.createElement("span");
-      label.className = "video-tile-label";
+      const label = document.createElement('span');
+      label.className = 'video-tile-label';
       label.textContent = username ?? userId;
       tile.appendChild(avatarEl);
       tile.appendChild(label);
@@ -868,45 +789,44 @@
     }
 
     // camera or screen tile
-    tile.className = "video-tile";
-    if (tileType === "screen") tile.classList.add("screen-tile");
+    tile.className = 'video-tile';
+    if (tileType === 'screen') tile.classList.add('screen-tile');
 
     if (stream) {
-      const video = document.createElement("video") as HTMLVideoElement;
+      const video = document.createElement('video') as HTMLVideoElement;
       video.autoplay = true;
       video.playsInline = true;
       if (isSelf) video.muted = true;
       video.srcObject = stream;
       tile.appendChild(video);
     } else {
-      const avatarEl = document.createElement("div");
-      avatarEl.className = "video-tile-avatar";
+      const avatarEl = document.createElement('div');
+      avatarEl.className = 'video-tile-avatar';
       if (avatar) {
-        const img = document.createElement("img");
+        const img = document.createElement('img');
         img.src = avatar;
         img.alt = username;
-        img.style.cssText =
-          "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
         avatarEl.appendChild(img);
       } else {
-        avatarEl.textContent = (username ?? "?").charAt(0).toUpperCase();
+        avatarEl.textContent = (username ?? '?').charAt(0).toUpperCase();
       }
       tile.appendChild(avatarEl);
     }
 
-    if (tileType === "screen") {
-      const badge = document.createElement("span");
-      badge.className = "screen-badge";
-      badge.textContent = "🖥️";
+    if (tileType === 'screen') {
+      const badge = document.createElement('span');
+      badge.className = 'screen-badge';
+      badge.textContent = '🖥️';
       tile.appendChild(badge);
     }
 
-    const label = document.createElement("div");
-    label.className = "video-tile-label";
+    const label = document.createElement('div');
+    label.className = 'video-tile-label';
     label.textContent = username ?? userId;
     tile.appendChild(label);
 
-    tile.addEventListener("click", () => window.setSpotlight(`${userId}:${tileType}`));
+    tile.addEventListener('click', () => window.setSpotlight(`${userId}:${tileType}`));
 
     return tile;
   }
@@ -914,11 +834,11 @@
   function removeVideoTile(userId: string): void {
     document
       .querySelectorAll<HTMLElement>(`[data-tile-id^="${userId}:"]`)
-      .forEach((el) => el.remove());
+      .forEach(el => el.remove());
   }
 
   function handleRemoteCameraStateChanged(userId: string, isOn: boolean): void {
-    log.info("Remote camera state changed", {
+    log.info('Remote camera state changed', {
       user_id: userId,
       camera_on: isOn,
     });
@@ -932,19 +852,14 @@
     if (isOn || App.videoGridVisible) renderVideoGrid();
   }
 
-  function handleRemoteVideoStream(
-    streamId: string,
-    stream: MediaStream
-  ): void {
-    log.debug("Remote video stream added", { stream_id: streamId });
+  function handleRemoteVideoStream(streamId: string, stream: MediaStream): void {
+    log.debug('Remote video stream added', { stream_id: streamId });
     for (const userId of App.videoParticipants) {
-      if (userId === "__self__") continue;
-      const tile = document.querySelector<HTMLElement>(
-        `[data-tile-id="${userId}:camera"]`
-      );
-      if (tile && !tile.querySelector("video")) {
-        tile.querySelector(".video-tile-avatar")?.remove();
-        const video = document.createElement("video") as HTMLVideoElement;
+      if (userId === '__self__') continue;
+      const tile = document.querySelector<HTMLElement>(`[data-tile-id="${userId}:camera"]`);
+      if (tile && !tile.querySelector('video')) {
+        tile.querySelector('.video-tile-avatar')?.remove();
+        const video = document.createElement('video') as HTMLVideoElement;
         video.autoplay = true;
         video.playsInline = true;
         video.srcObject = stream;
@@ -956,53 +871,49 @@
 
   // ─── User Settings Modal ───────────────────────────────────────────────────
 
-  const settingsModal = document.getElementById("settings-modal");
-  const settingsCloseBtn = document.getElementById("settings-close-btn");
-  const settingsLogoutBtn = document.getElementById("settings-logout-btn");
-  const settingsNavItems = document.querySelectorAll<HTMLElement>(
-    ".settings-nav-item[data-page]"
-  );
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsCloseBtn = document.getElementById('settings-close-btn');
+  const settingsLogoutBtn = document.getElementById('settings-logout-btn');
+  const settingsNavItems = document.querySelectorAll<HTMLElement>('.settings-nav-item[data-page]');
 
   function openSettingsModal(page?: string): void {
     if (!settingsModal) return;
-    settingsModal.classList.remove("hidden");
-    switchSettingsPage(page ?? "my-account");
+    settingsModal.classList.remove('hidden');
+    switchSettingsPage(page ?? 'my-account');
     populateSettingsAccount();
   }
 
   function closeSettingsModal(): void {
-    settingsModal?.classList.add("hidden");
+    settingsModal?.classList.add('hidden');
   }
 
   function switchSettingsPage(page: string): void {
-    settingsNavItems.forEach((item) =>
-      item.classList.toggle("active", item.dataset["page"] === page)
+    settingsNavItems.forEach(item =>
+      item.classList.toggle('active', item.dataset['page'] === page)
     );
-    document
-      .querySelectorAll(".settings-page")
-      .forEach((el) => el.classList.add("hidden"));
-    document
-      .getElementById("settings-page-" + page)
-      ?.classList.remove("hidden");
-    if (page === "voice-video") {
+    document.querySelectorAll('.settings-page').forEach(el => el.classList.add('hidden'));
+    document.getElementById('settings-page-' + page)?.classList.remove('hidden');
+    if (page === 'voice-video') {
       stopMicTest();
       stopCameraPreview();
       populateVoiceVideoSettings();
     }
-    if (page === "themes") {
+    if (page === 'themes') {
       window.initThemeSettings();
     }
   }
 
   async function populateSettingsAccount(): Promise<void> {
-    log.debug("Populating settings account panel");
+    log.debug('Populating settings account panel');
     try {
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData & { avatar?: string } | null;
+      const auth = (await ipcRenderer.invoke('get-auth')) as
+        | (AuthData & { avatar?: string })
+        | null;
       if (!auth) return;
-      const username = auth.username ?? "";
+      const username = auth.username ?? '';
 
       // Use stored avatar or fetch from server
-      let avatarData = auth.avatar ?? "";
+      let avatarData = auth.avatar ?? '';
       if (!avatarData) {
         try {
           const resp = await fetch(`${auth.hostname}/api/v1/me`, {
@@ -1012,27 +923,27 @@
             const profile = (await resp.json()) as { avatar?: string };
             if (profile.avatar) {
               avatarData = profile.avatar;
-              await ipcRenderer.invoke("save-auth", { ...auth, avatar: avatarData });
-              log.info("Avatar fetched from server for settings panel");
+              await ipcRenderer.invoke('save-auth', { ...auth, avatar: avatarData });
+              log.info('Avatar fetched from server for settings panel');
             }
           }
         } catch (e) {
-          log.warn("Could not fetch profile for settings panel", { error: String(e) });
+          log.warn('Could not fetch profile for settings panel', { error: String(e) });
         }
       }
 
       // Avatar: show image if available, else show letter fallback
-      const avatarImg = document.getElementById("settings-avatar-img") as HTMLImageElement | null;
-      const avatarLetter = document.getElementById("settings-avatar-display");
+      const avatarImg = document.getElementById('settings-avatar-img') as HTMLImageElement | null;
+      const avatarLetter = document.getElementById('settings-avatar-display');
       if (avatarImg && avatarLetter) {
         if (avatarData) {
           avatarImg.src = avatarData;
-          avatarImg.classList.remove("hidden");
-          avatarLetter.classList.add("hidden");
+          avatarImg.classList.remove('hidden');
+          avatarLetter.classList.add('hidden');
         } else {
-          avatarLetter.textContent = username.charAt(0).toUpperCase() || "U";
-          avatarImg.classList.add("hidden");
-          avatarLetter.classList.remove("hidden");
+          avatarLetter.textContent = username.charAt(0).toUpperCase() || 'U';
+          avatarImg.classList.add('hidden');
+          avatarLetter.classList.remove('hidden');
         }
       }
 
@@ -1040,104 +951,116 @@
         const el = document.getElementById(id);
         if (el) el.textContent = val;
       };
-      setText("settings-username-display", username);
-      setText("settings-user-tag-display", username);
-      setText("settings-display-name", username);
+      setText('settings-username-display', username);
+      setText('settings-user-tag-display', username);
+      setText('settings-display-name', username);
 
       // Populate username input
-      const usernameInput = document.getElementById("settings-username-input") as HTMLInputElement | null;
+      const usernameInput = document.getElementById(
+        'settings-username-input'
+      ) as HTMLInputElement | null;
       if (usernameInput) usernameInput.value = username;
-
     } catch (e) {
-      log.error("Failed to populate settings account", { error: String(e) });
+      log.error('Failed to populate settings account', { error: String(e) });
     }
   }
 
-  function showAccountStatus(elementId: string, message: string, type: "success" | "error"): void {
+  function showAccountStatus(elementId: string, message: string, type: 'success' | 'error'): void {
     const el = document.getElementById(elementId);
     if (!el) return;
     el.textContent = message;
     el.className = `settings-save-status ${type}`;
     setTimeout(() => {
-      el.textContent = "";
-      el.className = "settings-save-status";
+      el.textContent = '';
+      el.className = 'settings-save-status';
     }, 3000);
   }
 
   async function handleSaveUsername(): Promise<void> {
-    const input = document.getElementById("settings-username-input") as HTMLInputElement | null;
+    const input = document.getElementById('settings-username-input') as HTMLInputElement | null;
     if (!input) return;
     const newUsername = input.value.trim();
 
     if (newUsername.length < 3 || newUsername.length > 32) {
-      showAccountStatus("settings-username-status", "Username must be 3–32 characters.", "error");
+      showAccountStatus('settings-username-status', 'Username must be 3–32 characters.', 'error');
       return;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
-      showAccountStatus("settings-username-status", "Only letters, numbers, and underscores allowed.", "error");
+      showAccountStatus(
+        'settings-username-status',
+        'Only letters, numbers, and underscores allowed.',
+        'error'
+      );
       return;
     }
 
-    const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
+    const auth = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
     if (!auth) {
-      showAccountStatus("settings-username-status", "Not authenticated.", "error");
+      showAccountStatus('settings-username-status', 'Not authenticated.', 'error');
       return;
     }
 
     try {
       const response = await fetch(`${auth.hostname}/api/v1/me/username`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${auth.token}`,
         },
         body: JSON.stringify({ username: newUsername }),
       });
 
       if (response.status === 409) {
-        showAccountStatus("settings-username-status", "Username already taken.", "error");
+        showAccountStatus('settings-username-status', 'Username already taken.', 'error');
         return;
       }
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        showAccountStatus("settings-username-status", body.error ?? "Failed to update username.", "error");
+        showAccountStatus(
+          'settings-username-status',
+          body.error ?? 'Failed to update username.',
+          'error'
+        );
         return;
       }
 
       // Update local auth store
       const updatedAuth = { ...auth, username: newUsername };
-      await ipcRenderer.invoke("save-auth", updatedAuth);
+      await ipcRenderer.invoke('save-auth', updatedAuth);
 
       // Update header displays
       const setText = (id: string, val: string) => {
         const el = document.getElementById(id);
         if (el) el.textContent = val;
       };
-      setText("settings-username-display", newUsername);
-      setText("settings-user-tag-display", newUsername);
-      setText("settings-display-name", newUsername);
+      setText('settings-username-display', newUsername);
+      setText('settings-user-tag-display', newUsername);
+      setText('settings-display-name', newUsername);
 
       // Update user panel in sidebar
-      const panelUsername = document.querySelector(".user-panel .username");
+      const panelUsername = document.querySelector('.user-panel .username');
       if (panelUsername) panelUsername.textContent = newUsername;
 
-      showAccountStatus("settings-username-status", "Username updated!", "success");
-      log.info("Username updated", { username: newUsername });
+      showAccountStatus('settings-username-status', 'Username updated!', 'success');
+      log.info('Username updated', { username: newUsername });
 
       // Refresh member list so the users section shows the new username
       if (App.activeEmberId) {
-        window.fetchMembers(App.activeEmberId)
-          .then((members) => window.renderMemberList(members))
-          .catch(() => { /* non-critical */ });
+        window
+          .fetchMembers(App.activeEmberId)
+          .then(members => window.renderMemberList(members))
+          .catch(() => {
+            /* non-critical */
+          });
       }
 
       // Sync the DM module's cached own-username
-      if (typeof window.refreshDmUsername === "function") {
+      if (typeof window.refreshDmUsername === 'function') {
         window.refreshDmUsername(newUsername);
       }
     } catch (e) {
-      showAccountStatus("settings-username-status", "Network error. Try again.", "error");
-      log.error("Failed to save username", { error: String(e) });
+      showAccountStatus('settings-username-status', 'Network error. Try again.', 'error');
+      log.error('Failed to save username', { error: String(e) });
     }
   }
 
@@ -1147,39 +1070,48 @@
       new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement("canvas");
+          const canvas = document.createElement('canvas');
           canvas.width = 128;
           canvas.height = 128;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) { reject(new Error("no canvas context")); return; }
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('no canvas context'));
+            return;
+          }
           ctx.drawImage(img, 0, 0, 128, 128);
-          resolve(canvas.toDataURL("image/png"));
+          resolve(canvas.toDataURL('image/png'));
         };
-        img.onerror = () => reject(new Error("failed to load image"));
+        img.onerror = () => reject(new Error('failed to load image'));
         img.src = src;
       });
 
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = async ev => {
       const raw = ev.target?.result as string | null;
-      if (!raw) { showAccountStatus("settings-avatar-status", "Failed to read file.", "error"); return; }
+      if (!raw) {
+        showAccountStatus('settings-avatar-status', 'Failed to read file.', 'error');
+        return;
+      }
 
       let dataUrl: string;
       try {
         dataUrl = await resizeImage(raw);
       } catch {
-        showAccountStatus("settings-avatar-status", "Invalid image file.", "error");
+        showAccountStatus('settings-avatar-status', 'Invalid image file.', 'error');
         return;
       }
 
-      const auth = (await ipcRenderer.invoke("get-auth")) as AuthData | null;
-      if (!auth) { showAccountStatus("settings-avatar-status", "Not authenticated.", "error"); return; }
+      const auth = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
+      if (!auth) {
+        showAccountStatus('settings-avatar-status', 'Not authenticated.', 'error');
+        return;
+      }
 
       try {
         const response = await fetch(`${auth.hostname}/api/v1/me/avatar`, {
-          method: "PATCH",
+          method: 'PATCH',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.token}`,
           },
           body: JSON.stringify({ avatar: dataUrl }),
@@ -1187,34 +1119,38 @@
 
         if (!response.ok) {
           const body = (await response.json().catch(() => ({}))) as { error?: string };
-          showAccountStatus("settings-avatar-status", body.error ?? "Failed to upload avatar.", "error");
+          showAccountStatus(
+            'settings-avatar-status',
+            body.error ?? 'Failed to upload avatar.',
+            'error'
+          );
           return;
         }
 
         // Update local auth store
         const updatedAuth = { ...auth, avatar: dataUrl } as AuthData & { avatar: string };
-        await ipcRenderer.invoke("save-auth", updatedAuth);
+        await ipcRenderer.invoke('save-auth', updatedAuth);
 
         // Update avatar display in settings
-        const avatarImg = document.getElementById("settings-avatar-img") as HTMLImageElement | null;
-        const avatarLetter = document.getElementById("settings-avatar-display");
+        const avatarImg = document.getElementById('settings-avatar-img') as HTMLImageElement | null;
+        const avatarLetter = document.getElementById('settings-avatar-display');
         if (avatarImg && avatarLetter) {
           avatarImg.src = dataUrl;
-          avatarImg.classList.remove("hidden");
-          avatarLetter.classList.add("hidden");
+          avatarImg.classList.remove('hidden');
+          avatarLetter.classList.add('hidden');
         }
 
         // Update user panel avatar in sidebar
-        updateUserPanelAvatar(dataUrl, auth.username ?? "");
+        updateUserPanelAvatar(dataUrl, auth.username ?? '');
 
         // Update the current user's entry in the member list
-        updateMemberListAvatar(auth.user_id ?? "", dataUrl);
+        updateMemberListAvatar(auth.user_id ?? '', dataUrl);
 
-        showAccountStatus("settings-avatar-status", "Avatar updated!", "success");
-        log.info("Avatar updated");
+        showAccountStatus('settings-avatar-status', 'Avatar updated!', 'success');
+        log.info('Avatar updated');
       } catch (e) {
-        showAccountStatus("settings-avatar-status", "Network error. Try again.", "error");
-        log.error("Failed to upload avatar", { error: String(e) });
+        showAccountStatus('settings-avatar-status', 'Network error. Try again.', 'error');
+        log.error('Failed to upload avatar', { error: String(e) });
       }
     };
     reader.readAsDataURL(file);
@@ -1226,72 +1162,68 @@
     ) as HTMLElement | null;
     if (!memberEl) return;
     // Remove existing letter text, keep the status-icon bubble
-    const statusIcon = memberEl.querySelector("span.status-icon") as HTMLElement | null;
-    memberEl.textContent = "";
+    const statusIcon = memberEl.querySelector('span.status-icon') as HTMLElement | null;
+    memberEl.textContent = '';
     if (avatarData) {
-      const img = document.createElement("img");
+      const img = document.createElement('img');
       img.src = avatarData;
-      img.alt = "avatar";
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+      img.alt = 'avatar';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
       memberEl.appendChild(img);
     }
     if (statusIcon) memberEl.appendChild(statusIcon);
   }
 
   function updateUserPanelAvatar(avatarData: string, username: string): void {
-    const panelAvatar = document.querySelector(".user-panel .user-avatar") as HTMLElement | null;
+    const panelAvatar = document.querySelector('.user-panel .user-avatar') as HTMLElement | null;
     if (!panelAvatar) return;
     if (avatarData) {
-      const img = panelAvatar.querySelector("img.user-avatar-img") as HTMLImageElement | null
-        ?? document.createElement("img");
+      const img =
+        (panelAvatar.querySelector('img.user-avatar-img') as HTMLImageElement | null) ??
+        document.createElement('img');
       img.src = avatarData;
-      img.className = "user-avatar-img";
-      img.alt = "avatar";
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:0;";
-      panelAvatar.textContent = "";
+      img.className = 'user-avatar-img';
+      img.alt = 'avatar';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:0;';
+      panelAvatar.textContent = '';
       panelAvatar.appendChild(img);
     } else {
-      panelAvatar.textContent = username.charAt(0).toUpperCase() || "U";
+      panelAvatar.textContent = username.charAt(0).toUpperCase() || 'U';
     }
   }
 
   // Wire up account settings event listeners
-  const avatarWrapper = document.getElementById("settings-avatar-wrapper");
-  const avatarInput = document.getElementById("settings-avatar-input") as HTMLInputElement | null;
-  const usernameSaveBtn = document.getElementById("settings-username-save-btn");
-  const usernameInput = document.getElementById("settings-username-input") as HTMLInputElement | null;
+  const avatarWrapper = document.getElementById('settings-avatar-wrapper');
+  const avatarInput = document.getElementById('settings-avatar-input') as HTMLInputElement | null;
+  const usernameSaveBtn = document.getElementById('settings-username-save-btn');
+  const usernameInput = document.getElementById(
+    'settings-username-input'
+  ) as HTMLInputElement | null;
 
-  avatarWrapper?.addEventListener("click", () => avatarInput?.click());
+  avatarWrapper?.addEventListener('click', () => avatarInput?.click());
 
-  avatarInput?.addEventListener("change", () => {
+  avatarInput?.addEventListener('change', () => {
     const file = avatarInput.files?.[0];
     if (file) handleAvatarUpload(file);
-    avatarInput.value = ""; // reset so same file can be re-selected
+    avatarInput.value = ''; // reset so same file can be re-selected
   });
 
-  usernameSaveBtn?.addEventListener("click", () => handleSaveUsername());
+  usernameSaveBtn?.addEventListener('click', () => handleSaveUsername());
 
-  usernameInput?.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleSaveUsername();
+  usernameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter') handleSaveUsername();
   });
 
-
-  settingsNavItems.forEach((item) =>
-    item.addEventListener("click", () =>
-      switchSettingsPage(item.dataset["page"] ?? "")
-    )
+  settingsNavItems.forEach(item =>
+    item.addEventListener('click', () => switchSettingsPage(item.dataset['page'] ?? ''))
   );
-  settingsCloseBtn?.addEventListener("click", closeSettingsModal);
-  settingsLogoutBtn?.addEventListener("click", () => {
+  settingsCloseBtn?.addEventListener('click', closeSettingsModal);
+  settingsLogoutBtn?.addEventListener('click', () => {
     closeSettingsModal();
-    document.getElementById("logout-modal")?.classList.remove("hidden");
+    document.getElementById('logout-modal')?.classList.remove('hidden');
   });
-  document.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (
-      e.key === "Escape" &&
-      settingsModal &&
-      !settingsModal.classList.contains("hidden")
-    )
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && settingsModal && !settingsModal.classList.contains('hidden'))
       closeSettingsModal();
   });
 
@@ -1299,11 +1231,8 @@
 
   async function _loadVVSounds(): Promise<void> {
     try {
-      const s = (await ipcRenderer.invoke(
-        "get-voice-video-settings"
-      )) as VoiceSettings | null;
-      App._vvSounds =
-        (s?.sounds as Partial<Record<string, boolean>> | null) ?? null;
+      const s = (await ipcRenderer.invoke('get-voice-video-settings')) as VoiceSettings | null;
+      App._vvSounds = (s?.sounds as Partial<Record<string, boolean>> | null) ?? null;
     } catch (_) {
       App._vvSounds = null;
     }
@@ -1312,108 +1241,86 @@
 
   function playVoiceSound(type: string): void {
     if (App._vvSounds && App._vvSounds[type] === false) return;
-    const gen = (
-      window as unknown as { generateNotificationSound?: (t: string) => void }
-    ).generateNotificationSound;
-    if (typeof gen === "function") gen(type);
+    const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
+      .generateNotificationSound;
+    if (typeof gen === 'function') gen(type);
   }
 
   function _clearSelect(sel: HTMLSelectElement): void {
     while (sel.options.length > 0) sel.remove(0);
   }
 
-  function _addOption(
-    sel: HTMLSelectElement,
-    value: string,
-    label: string
-  ): void {
-    const opt = document.createElement("option");
+  function _addOption(sel: HTMLSelectElement, value: string, label: string): void {
+    const opt = document.createElement('option');
     opt.value = value;
     opt.textContent = label;
     sel.appendChild(opt);
   }
 
   async function enumerateAudioDevices(): Promise<void> {
-    const inputSel = document.getElementById(
-      "vv-input-device"
-    ) as HTMLSelectElement | null;
-    const outputSel = document.getElementById(
-      "vv-output-device"
-    ) as HTMLSelectElement | null;
+    const inputSel = document.getElementById('vv-input-device') as HTMLSelectElement | null;
+    const outputSel = document.getElementById('vv-output-device') as HTMLSelectElement | null;
     if (!inputSel || !outputSel) return;
     try {
       const tempStream = await navigator.mediaDevices
         .getUserMedia({ audio: true })
         .catch(() => null);
       const devices = await navigator.mediaDevices.enumerateDevices();
-      if (tempStream) tempStream.getTracks().forEach((t) => t.stop());
+      if (tempStream) tempStream.getTracks().forEach(t => t.stop());
       _clearSelect(inputSel);
       _clearSelect(outputSel);
-      _addOption(inputSel, "default", "Default Microphone");
-      _addOption(outputSel, "default", "Default Speaker");
-      devices.forEach((d) => {
-        const label = d.label || d.kind + " (" + d.deviceId.slice(0, 8) + ")";
-        if (d.kind === "audioinput") _addOption(inputSel, d.deviceId, label);
-        if (d.kind === "audiooutput") _addOption(outputSel, d.deviceId, label);
+      _addOption(inputSel, 'default', 'Default Microphone');
+      _addOption(outputSel, 'default', 'Default Speaker');
+      devices.forEach(d => {
+        const label = d.label || d.kind + ' (' + d.deviceId.slice(0, 8) + ')';
+        if (d.kind === 'audioinput') _addOption(inputSel, d.deviceId, label);
+        if (d.kind === 'audiooutput') _addOption(outputSel, d.deviceId, label);
       });
     } catch (e) {
-      console.warn("[VV] enumerateAudioDevices failed:", e);
+      console.warn('[VV] enumerateAudioDevices failed:', e);
     }
   }
 
   async function enumerateCameras(): Promise<void> {
-    const cameraSel = document.getElementById(
-      "vv-camera-device"
-    ) as HTMLSelectElement | null;
+    const cameraSel = document.getElementById('vv-camera-device') as HTMLSelectElement | null;
     if (!cameraSel) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       _clearSelect(cameraSel);
-      _addOption(cameraSel, "default", "Default Camera");
+      _addOption(cameraSel, 'default', 'Default Camera');
       devices
-        .filter((d) => d.kind === "videoinput")
-        .forEach((d) => {
-          _addOption(
-            cameraSel,
-            d.deviceId,
-            d.label || "Camera (" + d.deviceId.slice(0, 8) + ")"
-          );
+        .filter(d => d.kind === 'videoinput')
+        .forEach(d => {
+          _addOption(cameraSel, d.deviceId, d.label || 'Camera (' + d.deviceId.slice(0, 8) + ')');
         });
     } catch (e) {
-      console.warn("[VV] enumerateCameras failed:", e);
+      console.warn('[VV] enumerateCameras failed:', e);
     }
   }
 
   function startMicTest(): void {
-    const btn = document.getElementById(
-      "vv-mic-test-btn"
-    ) as HTMLButtonElement | null;
-    const canvas = document.getElementById(
-      "mic-visualizer"
-    ) as HTMLCanvasElement | null;
+    const btn = document.getElementById('vv-mic-test-btn') as HTMLButtonElement | null;
+    const canvas = document.getElementById('mic-visualizer') as HTMLCanvasElement | null;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext('2d')!;
     if (App._micTestStream) {
       stopMicTest();
       return;
     }
 
-    const inputSel = document.getElementById(
-      "vv-input-device"
-    ) as HTMLSelectElement | null;
-    const deviceId = inputSel ? inputSel.value : "default";
-    const audioConstraints: MediaStreamConstraints["audio"] =
-      deviceId === "default" ? true : { deviceId: { exact: deviceId } };
+    const inputSel = document.getElementById('vv-input-device') as HTMLSelectElement | null;
+    const deviceId = inputSel ? inputSel.value : 'default';
+    const audioConstraints: MediaStreamConstraints['audio'] =
+      deviceId === 'default' ? true : { deviceId: { exact: deviceId } };
 
     navigator.mediaDevices
       .getUserMedia({ audio: audioConstraints })
-      .then((stream) => {
+      .then(stream => {
         App._micTestStream = stream;
-        if (btn) btn.textContent = "Stop Test";
+        if (btn) btn.textContent = 'Stop Test';
         const audioCtx = new (
           window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
         )();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
@@ -1421,9 +1328,8 @@
         source.connect(analyser);
         const data = new Uint8Array(analyser.frequencyBinCount);
         const highlightRgb =
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--rgb-highlight")
-            .trim() || "255,80,40";
+          getComputedStyle(document.documentElement).getPropertyValue('--rgb-highlight').trim() ||
+          '255,80,40';
 
         const draw = () => {
           if (!App._micTestStream) {
@@ -1445,122 +1351,103 @@
         };
         draw();
       })
-      .catch((e) => {
-        console.warn("[VV] Mic test failed:", e);
+      .catch(e => {
+        console.warn('[VV] Mic test failed:', e);
       });
   }
 
   function stopMicTest(): void {
-    const btn = document.getElementById(
-      "vv-mic-test-btn"
-    ) as HTMLButtonElement | null;
-    const canvas = document.getElementById(
-      "mic-visualizer"
-    ) as HTMLCanvasElement | null;
+    const btn = document.getElementById('vv-mic-test-btn') as HTMLButtonElement | null;
+    const canvas = document.getElementById('mic-visualizer') as HTMLCanvasElement | null;
     if (App._micTestAnimFrame) {
       cancelAnimationFrame(App._micTestAnimFrame);
       App._micTestAnimFrame = null;
     }
     if (App._micTestStream) {
-      App._micTestStream.getTracks().forEach((t) => t.stop());
+      App._micTestStream.getTracks().forEach(t => t.stop());
       App._micTestStream = null;
     }
-    if (btn) btn.textContent = "Test Microphone";
-    if (canvas)
-      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    if (btn) btn.textContent = 'Test Microphone';
+    if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
   }
 
   function startCameraPreview(): void {
-    const video = document.getElementById(
-      "camera-preview"
-    ) as HTMLVideoElement | null;
-    const placeholder = document.getElementById("camera-preview-placeholder");
-    const btn = document.getElementById(
-      "vv-camera-test-btn"
-    ) as HTMLButtonElement | null;
+    const video = document.getElementById('camera-preview') as HTMLVideoElement | null;
+    const placeholder = document.getElementById('camera-preview-placeholder');
+    const btn = document.getElementById('vv-camera-test-btn') as HTMLButtonElement | null;
     if (!video) return;
     if (App._cameraPreviewStream) {
       stopCameraPreview();
       return;
     }
 
-    const cameraSel = document.getElementById(
-      "vv-camera-device"
-    ) as HTMLSelectElement | null;
-    const deviceId = cameraSel ? cameraSel.value : "default";
-    const videoConstraints: MediaStreamConstraints["video"] =
-      deviceId === "default" ? true : { deviceId: { exact: deviceId } };
+    const cameraSel = document.getElementById('vv-camera-device') as HTMLSelectElement | null;
+    const deviceId = cameraSel ? cameraSel.value : 'default';
+    const videoConstraints: MediaStreamConstraints['video'] =
+      deviceId === 'default' ? true : { deviceId: { exact: deviceId } };
 
     navigator.mediaDevices
       .getUserMedia({ video: videoConstraints })
-      .then((stream) => {
+      .then(stream => {
         App._cameraPreviewStream = stream;
         video.srcObject = stream;
-        video.style.display = "block";
-        if (placeholder) placeholder.style.display = "none";
-        if (btn) btn.textContent = "Stop Preview";
+        video.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+        if (btn) btn.textContent = 'Stop Preview';
       })
-      .catch((e) => {
-        console.warn("[VV] Camera preview failed:", e);
+      .catch(e => {
+        console.warn('[VV] Camera preview failed:', e);
       });
   }
 
   function stopCameraPreview(): void {
-    const video = document.getElementById(
-      "camera-preview"
-    ) as HTMLVideoElement | null;
-    const placeholder = document.getElementById("camera-preview-placeholder");
-    const btn = document.getElementById(
-      "vv-camera-test-btn"
-    ) as HTMLButtonElement | null;
+    const video = document.getElementById('camera-preview') as HTMLVideoElement | null;
+    const placeholder = document.getElementById('camera-preview-placeholder');
+    const btn = document.getElementById('vv-camera-test-btn') as HTMLButtonElement | null;
     if (App._cameraPreviewStream) {
-      App._cameraPreviewStream.getTracks().forEach((t) => t.stop());
+      App._cameraPreviewStream.getTracks().forEach(t => t.stop());
       App._cameraPreviewStream = null;
     }
     if (video) {
       video.srcObject = null;
-      video.style.display = "none";
+      video.style.display = 'none';
     }
-    if (placeholder) placeholder.style.display = "";
-    if (btn) btn.textContent = "Test Video";
+    if (placeholder) placeholder.style.display = '';
+    if (btn) btn.textContent = 'Test Video';
   }
 
   function updatePttKeyRowVisibility(enabled: boolean): void {
-    const row = document.getElementById("vv-ptt-key-row");
-    if (row) row.style.display = enabled ? "flex" : "none";
+    const row = document.getElementById('vv-ptt-key-row');
+    if (row) row.style.display = enabled ? 'flex' : 'none';
   }
 
   function updateSensitivityRowVisibility(autoEnabled: boolean): void {
-    const row = document.getElementById("vv-sensitivity-row");
-    if (row) row.style.display = autoEnabled ? "none" : "flex";
+    const row = document.getElementById('vv-sensitivity-row');
+    if (row) row.style.display = autoEnabled ? 'none' : 'flex';
   }
 
   function startPttKeyCapture(): void {
-    const btn = document.getElementById(
-      "vv-ptt-key-btn"
-    ) as HTMLButtonElement | null;
+    const btn = document.getElementById('vv-ptt-key-btn') as HTMLButtonElement | null;
     if (!btn || App._pttListening) return;
     App._pttListening = true;
-    btn.textContent = "Press any key...";
-    btn.classList.add("listening");
+    btn.textContent = 'Press any key...';
+    btn.classList.add('listening');
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
       App._pttListening = false;
-      btn.classList.remove("listening");
+      btn.classList.remove('listening');
       btn.textContent = e.code;
-      (btn as HTMLButtonElement & { dataset: DOMStringMap }).dataset[
-        "keyCode"
-      ] = e.code;
-      document.removeEventListener("keydown", onKey, true);
+      (btn as HTMLButtonElement & { dataset: DOMStringMap }).dataset['keyCode'] = e.code;
+      document.removeEventListener('keydown', onKey, true);
     };
-    document.addEventListener("keydown", onKey, true);
+    document.addEventListener('keydown', onKey, true);
   }
 
   async function populateVoiceVideoSettings(): Promise<void> {
     try {
       const settings = (await ipcRenderer.invoke(
-        "get-voice-video-settings"
+        'get-voice-video-settings'
       )) as VoiceSettings | null;
       if (!settings) return;
 
@@ -1568,75 +1455,69 @@
       await enumerateCameras();
 
       const setVal = (id: string, val: unknown) => {
-        const el = document.getElementById(id) as
-          | HTMLInputElement
-          | HTMLSelectElement
-          | null;
-        if (el) el.value = String(val ?? "");
+        const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+        if (el) el.value = String(val ?? '');
       };
       const setChecked = (id: string, val: boolean) => {
         const el = document.getElementById(id) as HTMLInputElement | null;
         if (el) el.checked = val;
       };
 
-      setVal("vv-input-device", settings.inputDevice);
-      setVal("vv-output-device", settings.outputDevice);
-      setVal("vv-input-volume", settings.inputVolume);
-      setVal("vv-output-volume", settings.outputVolume);
-      setVal("vv-sensitivity", settings.sensitivityThreshold);
+      setVal('vv-input-device', settings.inputDevice);
+      setVal('vv-output-device', settings.outputDevice);
+      setVal('vv-input-volume', settings.inputVolume);
+      setVal('vv-output-volume', settings.outputVolume);
+      setVal('vv-sensitivity', settings.sensitivityThreshold);
 
-      const ivv = document.getElementById("vv-input-volume-val");
-      const ovv = document.getElementById("vv-output-volume-val");
-      const svv = document.getElementById("vv-sensitivity-val");
-      if (ivv) ivv.textContent = (settings.inputVolume ?? 0) + "%";
-      if (ovv) ovv.textContent = (settings.outputVolume ?? 0) + "%";
+      const ivv = document.getElementById('vv-input-volume-val');
+      const ovv = document.getElementById('vv-output-volume-val');
+      const svv = document.getElementById('vv-sensitivity-val');
+      if (ivv) ivv.textContent = (settings.inputVolume ?? 0) + '%';
+      if (ovv) ovv.textContent = (settings.outputVolume ?? 0) + '%';
       if (svv) svv.textContent = String(settings.sensitivityThreshold ?? 0);
 
-      setChecked("vv-echo-cancellation", settings.echoCancellation ?? true);
-      setChecked("vv-noise-suppression", settings.noiseSuppression ?? true);
-      setChecked("vv-auto-gain", settings.autoGainControl ?? true);
-      setChecked("vv-auto-sensitivity", settings.autoSensitivity ?? true);
-      setChecked("vv-ptt-enabled", settings.pushToTalk ?? false);
-      setChecked("vv-always-preview", settings.alwaysPreviewVideo ?? false);
+      setChecked('vv-echo-cancellation', settings.echoCancellation ?? true);
+      setChecked('vv-noise-suppression', settings.noiseSuppression ?? true);
+      setChecked('vv-auto-gain', settings.autoGainControl ?? true);
+      setChecked('vv-auto-sensitivity', settings.autoSensitivity ?? true);
+      setChecked('vv-ptt-enabled', settings.pushToTalk ?? false);
+      setChecked('vv-always-preview', settings.alwaysPreviewVideo ?? false);
 
-      const pttBtn = document.getElementById("vv-ptt-key-btn") as
+      const pttBtn = document.getElementById('vv-ptt-key-btn') as
         | (HTMLButtonElement & { dataset: DOMStringMap })
         | null;
       if (pttBtn) {
-        pttBtn.textContent = settings.pttKey ?? "Backquote";
-        pttBtn.dataset["keyCode"] = settings.pttKey ?? "Backquote";
+        pttBtn.textContent = settings.pttKey ?? 'Backquote';
+        pttBtn.dataset['keyCode'] = settings.pttKey ?? 'Backquote';
       }
 
       updatePttKeyRowVisibility(settings.pushToTalk ?? false);
       updateSensitivityRowVisibility(settings.autoSensitivity ?? true);
-      setVal("vv-camera-device", settings.cameraDevice);
+      setVal('vv-camera-device', settings.cameraDevice);
 
       const sounds = settings.sounds ?? {};
       (
         [
-          "mute",
-          "unmute",
-          "deafen",
-          "undeafen",
-          "userJoin",
-          "userLeave",
-          "disconnect",
+          'mute',
+          'unmute',
+          'deafen',
+          'undeafen',
+          'userJoin',
+          'userLeave',
+          'disconnect',
         ] as SoundType[]
-      ).forEach((k) => {
-        setChecked("vv-sound-" + k, sounds[k] !== false);
+      ).forEach(k => {
+        setChecked('vv-sound-' + k, sounds[k] !== false);
       });
     } catch (e) {
-      console.error("[VV] populateVoiceVideoSettings failed:", e);
+      console.error('[VV] populateVoiceVideoSettings failed:', e);
     }
   }
 
   async function saveVoiceVideoSettings(): Promise<void> {
-    log.info("Saving voice/video settings");
+    log.info('Saving voice/video settings');
     const getVal = (id: string) => {
-      const el = document.getElementById(id) as
-        | HTMLInputElement
-        | HTMLSelectElement
-        | null;
+      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
       return el ? el.value : null;
     };
     const getChecked = (id: string) => {
@@ -1644,62 +1525,56 @@
       return el ? el.checked : false;
     };
     const getInt = (id: string) => {
-      const v = parseInt(getVal(id) ?? "", 10);
+      const v = parseInt(getVal(id) ?? '', 10);
       return isNaN(v) ? 0 : v;
     };
 
-    const pttBtn = document.getElementById("vv-ptt-key-btn") as
+    const pttBtn = document.getElementById('vv-ptt-key-btn') as
       | (HTMLButtonElement & { dataset: DOMStringMap })
       | null;
 
     const settings: VoiceSettings = {
-      inputDevice: getVal("vv-input-device") ?? "default",
-      outputDevice: getVal("vv-output-device") ?? "default",
-      inputVolume: getInt("vv-input-volume"),
-      outputVolume: getInt("vv-output-volume"),
-      echoCancellation: getChecked("vv-echo-cancellation"),
-      noiseSuppression: getChecked("vv-noise-suppression"),
-      autoGainControl: getChecked("vv-auto-gain"),
-      autoSensitivity: getChecked("vv-auto-sensitivity"),
-      sensitivityThreshold: getInt("vv-sensitivity"),
-      pushToTalk: getChecked("vv-ptt-enabled"),
-      pttKey: pttBtn
-        ? pttBtn.dataset["keyCode"] || pttBtn.textContent || "Backquote"
-        : "Backquote",
-      cameraDevice: getVal("vv-camera-device") ?? "default",
-      alwaysPreviewVideo: getChecked("vv-always-preview"),
+      inputDevice: getVal('vv-input-device') ?? 'default',
+      outputDevice: getVal('vv-output-device') ?? 'default',
+      inputVolume: getInt('vv-input-volume'),
+      outputVolume: getInt('vv-output-volume'),
+      echoCancellation: getChecked('vv-echo-cancellation'),
+      noiseSuppression: getChecked('vv-noise-suppression'),
+      autoGainControl: getChecked('vv-auto-gain'),
+      autoSensitivity: getChecked('vv-auto-sensitivity'),
+      sensitivityThreshold: getInt('vv-sensitivity'),
+      pushToTalk: getChecked('vv-ptt-enabled'),
+      pttKey: pttBtn ? pttBtn.dataset['keyCode'] || pttBtn.textContent || 'Backquote' : 'Backquote',
+      cameraDevice: getVal('vv-camera-device') ?? 'default',
+      alwaysPreviewVideo: getChecked('vv-always-preview'),
       sounds: {
-        mute: getChecked("vv-sound-mute"),
-        unmute: getChecked("vv-sound-unmute"),
-        deafen: getChecked("vv-sound-deafen"),
-        undeafen: getChecked("vv-sound-undeafen"),
-        userJoin: getChecked("vv-sound-userJoin"),
-        userLeave: getChecked("vv-sound-userLeave"),
-        disconnect: getChecked("vv-sound-disconnect"),
+        mute: getChecked('vv-sound-mute'),
+        unmute: getChecked('vv-sound-unmute'),
+        deafen: getChecked('vv-sound-deafen'),
+        undeafen: getChecked('vv-sound-undeafen'),
+        userJoin: getChecked('vv-sound-userJoin'),
+        userLeave: getChecked('vv-sound-userLeave'),
+        disconnect: getChecked('vv-sound-disconnect'),
       },
     };
 
     try {
-      await ipcRenderer.invoke("save-voice-video-settings", settings);
-      App._vvSounds = settings.sounds as Partial<
-        Record<string, boolean>
-      > | null;
-      log.info("Voice/video settings saved successfully");
+      await ipcRenderer.invoke('save-voice-video-settings', settings);
+      App._vvSounds = settings.sounds as Partial<Record<string, boolean>> | null;
+      log.info('Voice/video settings saved successfully');
       if (App.voiceManager) {
-        log.debug("Applying new voice/video settings to active voice session");
-        (
-          App.voiceManager as { applySettings(s: VoiceSettings): void }
-        ).applySettings(settings);
+        log.debug('Applying new voice/video settings to active voice session');
+        (App.voiceManager as { applySettings(s: VoiceSettings): void }).applySettings(settings);
       }
-      const statusEl = document.getElementById("vv-save-status");
+      const statusEl = document.getElementById('vv-save-status');
       if (statusEl) {
-        statusEl.textContent = "Saved!";
+        statusEl.textContent = 'Saved!';
         setTimeout(() => {
-          if (statusEl) statusEl.textContent = "";
+          if (statusEl) statusEl.textContent = '';
         }, 2000);
       }
     } catch (e) {
-      log.error("Failed to save voice/video settings", { error: String(e) });
+      log.error('Failed to save voice/video settings', { error: String(e) });
     }
   }
 
@@ -1707,90 +1582,72 @@
   (function initVoiceVideoControls() {
     type SliderEntry = [string, string, (v: string) => string];
     const sliderMap: SliderEntry[] = [
-      ["vv-input-volume", "vv-input-volume-val", (v) => v + "%"],
-      ["vv-output-volume", "vv-output-volume-val", (v) => v + "%"],
-      ["vv-sensitivity", "vv-sensitivity-val", (v) => v],
+      ['vv-input-volume', 'vv-input-volume-val', v => v + '%'],
+      ['vv-output-volume', 'vv-output-volume-val', v => v + '%'],
+      ['vv-sensitivity', 'vv-sensitivity-val', v => v],
     ];
     sliderMap.forEach(([sliderId, valId, fmt]) => {
-      const slider = document.getElementById(
-        sliderId
-      ) as HTMLInputElement | null;
+      const slider = document.getElementById(sliderId) as HTMLInputElement | null;
       const valEl = document.getElementById(valId);
       if (slider && valEl)
-        slider.addEventListener("input", () => {
+        slider.addEventListener('input', () => {
           valEl.textContent = fmt(slider.value);
         });
     });
 
-    const pttToggle = document.getElementById(
-      "vv-ptt-enabled"
-    ) as HTMLInputElement | null;
-    pttToggle?.addEventListener("change", () =>
-      updatePttKeyRowVisibility(pttToggle.checked)
-    );
+    const pttToggle = document.getElementById('vv-ptt-enabled') as HTMLInputElement | null;
+    pttToggle?.addEventListener('change', () => updatePttKeyRowVisibility(pttToggle.checked));
 
     const autoSensToggle = document.getElementById(
-      "vv-auto-sensitivity"
+      'vv-auto-sensitivity'
     ) as HTMLInputElement | null;
-    autoSensToggle?.addEventListener("change", () =>
+    autoSensToggle?.addEventListener('change', () =>
       updateSensitivityRowVisibility(autoSensToggle.checked)
     );
 
-    document
-      .getElementById("vv-ptt-key-btn")
-      ?.addEventListener("click", startPttKeyCapture);
-    document
-      .getElementById("vv-mic-test-btn")
-      ?.addEventListener("click", startMicTest);
-    document
-      .getElementById("vv-camera-test-btn")
-      ?.addEventListener("click", startCameraPreview);
+    document.getElementById('vv-ptt-key-btn')?.addEventListener('click', startPttKeyCapture);
+    document.getElementById('vv-mic-test-btn')?.addEventListener('click', startMicTest);
+    document.getElementById('vv-camera-test-btn')?.addEventListener('click', startCameraPreview);
 
-    document
-      .querySelectorAll<HTMLElement>(".sound-preview-btn")
-      .forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const type = btn.dataset["sound"];
-          if (type) playVoiceSound(type);
-        });
+    document.querySelectorAll<HTMLElement>('.sound-preview-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset['sound'];
+        if (type) playVoiceSound(type);
       });
+    });
 
-    document
-      .getElementById("vv-save-btn")
-      ?.addEventListener("click", saveVoiceVideoSettings);
+    document.getElementById('vv-save-btn')?.addEventListener('click', saveVoiceVideoSettings);
   })();
 
   function cleanupVoiceOnDisconnect(): void {
-    log.warn("WebSocket disconnected, cleaning up voice state");
+    log.warn('WebSocket disconnected, cleaning up voice state');
     // Clear all sidebar voice presence — data is stale until reconnected
     App.voiceChannelPresence.clear();
     renderVoiceParticipants(null);
 
     if (!App.voiceManager || !App.activeVoiceChannelId) return;
-    log.warn("Cleaning up active voice session", {
+    log.warn('Cleaning up active voice session', {
       channel_id: App.activeVoiceChannelId,
     });
     App.localCameraOn = false;
     App.localScreenShareOn = false;
     App.videoParticipants.clear();
     App.screenShareParticipants.clear();
-    if (App.activeView === "voice") showTextChannelView();
+    if (App.activeView === 'voice') showTextChannelView();
     updateVideoGridVisibility();
-    const cameraBtn = document.getElementById(
-      "voice-camera-btn"
-    ) as HTMLButtonElement | null;
+    const cameraBtn = document.getElementById('voice-camera-btn') as HTMLButtonElement | null;
     if (cameraBtn) {
-      cameraBtn.classList.remove("active");
-      cameraBtn.title = "Start Camera";
-      cameraBtn.textContent = "\u{1F4F7}";
+      cameraBtn.classList.remove('active');
+      cameraBtn.title = 'Start Camera';
+      cameraBtn.textContent = '\u{1F4F7}';
       cameraBtn.disabled = false;
     }
     const screenShareBtn = document.getElementById(
-      "voice-screen-share-btn"
+      'voice-screen-share-btn'
     ) as HTMLButtonElement | null;
     if (screenShareBtn) {
-      screenShareBtn.classList.remove("active");
-      screenShareBtn.title = "Share Screen";
+      screenShareBtn.classList.remove('active');
+      screenShareBtn.title = 'Share Screen';
       screenShareBtn.disabled = false;
     }
     (App.voiceManager as { _cleanup(): void })._cleanup();
@@ -1799,12 +1656,16 @@
     App.voiceParticipants.clear();
     hideVoiceControls();
     document
-      .querySelectorAll(".voice-avatar.speaking")
-      .forEach((el) => el.classList.remove("speaking"));
-    playVoiceSound("disconnect");
+      .querySelectorAll('.voice-avatar.speaking')
+      .forEach(el => el.classList.remove('speaking'));
+    playVoiceSound('disconnect');
   }
 
-  function handleMemberUpdate(payload: { user_id: string; avatar?: string; username?: string }): void {
+  function handleMemberUpdate(payload: {
+    user_id: string;
+    avatar?: string;
+    username?: string;
+  }): void {
     if (payload.avatar !== undefined) {
       updateMemberListAvatar(payload.user_id, payload.avatar);
     }

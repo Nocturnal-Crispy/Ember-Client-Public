@@ -38,8 +38,12 @@
   letter-spacing: 1px;
 }
 
-.server-header h3::before { content: '-- '; }
-.server-header h3::after  { content: ' --'; }
+.server-header h3::before {
+  content: '-- ';
+}
+.server-header h3::after {
+  content: ' --';
+}
 
 .dropdown-icon {
   font-size: 10px;
@@ -54,9 +58,16 @@
   padding: 4px 0;
 }
 
-.channels::-webkit-scrollbar { width: 6px; background: transparent; }
-.channels::-webkit-scrollbar-thumb { background: rgba(var(--rgb-highlight), 0.2); }
-.channels::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-highlight), 0.5); }
+.channels::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+.channels::-webkit-scrollbar-thumb {
+  background: rgba(var(--rgb-highlight), 0.2);
+}
+.channels::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--rgb-highlight), 0.5);
+}
 
 /* ─── Channel Category ─────────────────────────────────────────────────────── */
 
@@ -149,8 +160,15 @@
 }
 
 @keyframes channelUnreadPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.55; transform: scale(0.75); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.75);
+  }
 }
 
 /* ─── Drag-and-drop ────────────────────────────────────────────────────────── */

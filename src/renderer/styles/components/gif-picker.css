@@ -167,7 +167,9 @@
   cursor: pointer;
   font-size: 11px;
   padding: 3px 10px;
-  transition: border-color 0.1s, color 0.1s;
+  transition:
+    border-color 0.1s,
+    color 0.1s;
 }
 
 .gif-picker-suggestion-chip:hover {
@@ -198,7 +200,9 @@
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
-  transition: color 0.1s, border-color 0.1s;
+  transition:
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .gif-picker-tab:hover {
@@ -247,7 +251,9 @@
   cursor: pointer;
   background: var(--background-primary, #131320);
   border: 2px solid transparent;
-  transition: border-color 0.1s, transform 0.1s;
+  transition:
+    border-color 0.1s,
+    transform 0.1s;
   height: 120px;
 }
 
@@ -283,7 +289,9 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
   z-index: 1;
   padding: 0;
 }

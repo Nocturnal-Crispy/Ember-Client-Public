@@ -22,12 +22,15 @@ const mockIpcRenderer = {
 };
 
 // Crypto state storage for tests
-const cryptoStates = new Map<string, {
-  cryptoMode: string;
-  senderKeyStatus: string;
-  activeDistributionId: string | null;
-  senderKeyEpoch: number;
-}>();
+const cryptoStates = new Map<
+  string,
+  {
+    cryptoMode: string;
+    senderKeyStatus: string;
+    activeDistributionId: string | null;
+    senderKeyEpoch: number;
+  }
+>();
 
 const DEFAULT_STATE = {
   cryptoMode: 'pairwise_bootstrap',
@@ -153,7 +156,10 @@ describe('CryptoRoutingService', () => {
     it('should fail validation when sender key not active', () => {
       cryptoStates.set('ember-4', { ...DEFAULT_STATE });
 
-      const error = (window as any).cryptoRouting.validateSenderKeyMessage('ember-4', 'user.device');
+      const error = (window as any).cryptoRouting.validateSenderKeyMessage(
+        'ember-4',
+        'user.device'
+      );
       expect(error).not.toBeNull();
       expect(error).toContain('not active');
     });
@@ -166,7 +172,10 @@ describe('CryptoRoutingService', () => {
         senderKeyEpoch: 0,
       });
 
-      const error = (window as any).cryptoRouting.validateSenderKeyMessage('ember-4', 'user.device');
+      const error = (window as any).cryptoRouting.validateSenderKeyMessage(
+        'ember-4',
+        'user.device'
+      );
       expect(error).not.toBeNull();
       expect(error).toContain('no active distribution');
     });
@@ -258,7 +267,10 @@ describe('CryptoRoutingService', () => {
       });
 
       // GroupDecrypt should be attempted but may fail
-      mockEmberAPI.invoke.mockResolvedValueOnce({ success: false, error: 'no sender key installed' });
+      mockEmberAPI.invoke.mockResolvedValueOnce({
+        success: false,
+        error: 'no sender key installed',
+      });
 
       const result = await (window as any).cryptoRouting.decryptMessage(senderKeyMsg, 'ember-7');
       expect(result).toBeNull();
@@ -285,7 +297,11 @@ describe('CryptoRoutingService', () => {
         device_id: 'device-456',
       });
 
-      const result = await (window as any).cryptoRouting.encryptMessage('hello world', 'ember-8', 5);
+      const result = await (window as any).cryptoRouting.encryptMessage(
+        'hello world',
+        'ember-8',
+        5
+      );
 
       expect(result).not.toBeNull();
       expect(result!.wireType).toBe('sender_key');

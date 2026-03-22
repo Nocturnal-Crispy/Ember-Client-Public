@@ -71,15 +71,10 @@ export async function initiateSession(
   localDevice: LocalDevice,
   peerBundle: LibSignalPreKeyBundle,
   peerAddress: ProtocolAddress,
-  stores: SignalStores,
+  stores: SignalStores
 ): Promise<void> {
   // Use libsignal's processPreKeyBundle directly with real stores
-  await processPreKeyBundle(
-    peerBundle,
-    peerAddress,
-    stores.sessionStore,
-    stores.identityStore,
-  );
+  await processPreKeyBundle(peerBundle, peerAddress, stores.sessionStore, stores.identityStore);
 }
 
 /**
@@ -93,24 +88,27 @@ export async function initiateSession(
 export async function encryptMessage(
   plaintext: Uint8Array,
   recipientAddress: ProtocolAddress,
-  stores: SignalStores,
+  stores: SignalStores
 ): Promise<EncryptedSignalMessage> {
   // Check if session exists using libsignal's getSession method
   const sessionRecord = await stores.sessionStore.getSession(recipientAddress);
-  
+
   if (!sessionRecord) {
     throw new Error('No session exists with the recipient');
   }
 
   // Encrypt the message using libsignal
   // Convert Uint8Array to proper ArrayBuffer type for libsignal
-  const arrayBuffer = plaintext.buffer.slice(plaintext.byteOffset, plaintext.byteOffset + plaintext.byteLength) as ArrayBuffer;
+  const arrayBuffer = plaintext.buffer.slice(
+    plaintext.byteOffset,
+    plaintext.byteOffset + plaintext.byteLength
+  ) as ArrayBuffer;
   const plaintextBuffer = new Uint8Array(arrayBuffer);
   const ciphertextMessage = await signalEncrypt(
     plaintextBuffer,
     recipientAddress,
     stores.sessionStore,
-    stores.identityStore,
+    stores.identityStore
   );
 
   return {
@@ -132,13 +130,13 @@ export async function encryptMessage(
 export async function decryptMessage(
   msg: EncryptedSignalMessage,
   senderAddress: ProtocolAddress,
-  stores: SignalStores,
+  stores: SignalStores
 ): Promise<Uint8Array> {
   // Security: callers may pass malformed ciphertext. We must not crash and must
   // avoid error-message differences that could act as a decryption oracle.
   try {
     if (!msg?.ciphertext || msg.ciphertext.byteLength === 0) {
-      throw new Error("Decryption failed");
+      throw new Error('Decryption failed');
     }
 
     // For Whisper (Double Ratchet) messages, a session must already exist.
@@ -146,14 +144,14 @@ export async function decryptMessage(
     if (msg.type !== CiphertextMessageType.PreKey) {
       const sessionRecord = await stores.sessionStore.getSession(senderAddress);
       if (!sessionRecord) {
-        throw new Error("Decryption failed");
+        throw new Error('Decryption failed');
       }
     }
 
     // Deserialize the ciphertext message
     const arrayBuffer = msg.ciphertext.buffer.slice(
       msg.ciphertext.byteOffset,
-      msg.ciphertext.byteOffset + msg.ciphertext.byteLength,
+      msg.ciphertext.byteOffset + msg.ciphertext.byteLength
     ) as ArrayBuffer;
     const ciphertextBuffer = new Uint8Array(arrayBuffer);
 
@@ -172,19 +170,19 @@ export async function decryptMessage(
             stores.identityStore,
             stores.preKeyStore,
             stores.signedPreKeyStore,
-            stores.kyberPreKeyStore,
+            stores.kyberPreKeyStore
           )
         : await signalDecrypt(
             ciphertextMessage as SignalMessage,
             senderAddress,
             stores.sessionStore,
-            stores.identityStore,
+            stores.identityStore
           );
 
     return new Uint8Array(plaintext);
   } catch {
     // Keep error details identical for all failures.
-    throw new Error("Decryption failed");
+    throw new Error('Decryption failed');
   }
 }
 
@@ -197,7 +195,7 @@ export async function decryptMessage(
  */
 export async function hasSession(
   address: ProtocolAddress,
-  sessionStore: SessionStore,
+  sessionStore: SessionStore
 ): Promise<boolean> {
   // Use libsignal's getSession method directly
   const sessionRecord = await sessionStore.getSession(address);
@@ -220,12 +218,12 @@ export type SenderKeyDistributionBytes = Uint8Array;
 export async function createSenderKeyDistribution(
   senderAddress: ProtocolAddress,
   distributionId: Uuid,
-  senderKeyStore: SenderKeyStore,
+  senderKeyStore: SenderKeyStore
 ): Promise<SenderKeyDistributionBytes> {
   const skdm = await SenderKeyDistributionMessage.create(
     senderAddress,
     distributionId,
-    senderKeyStore,
+    senderKeyStore
   );
   return new Uint8Array(skdm.serialize());
 }
@@ -240,16 +238,12 @@ export async function createSenderKeyDistribution(
 export async function processSenderKeyDistribution(
   senderAddress: ProtocolAddress,
   distributionBytes: Uint8Array,
-  recipientSenderKeyStore: SenderKeyStore,
+  recipientSenderKeyStore: SenderKeyStore
 ): Promise<void> {
   const skdm = SenderKeyDistributionMessage.deserialize(
-    distributionBytes as Uint8Array<ArrayBuffer>,
+    distributionBytes as Uint8Array<ArrayBuffer>
   );
-  await processSenderKeyDistributionMessage(
-    senderAddress,
-    skdm,
-    recipientSenderKeyStore,
-  );
+  await processSenderKeyDistributionMessage(senderAddress, skdm, recipientSenderKeyStore);
 }
 
 /**
@@ -265,15 +259,18 @@ export async function groupEncryptMessage(
   senderAddress: ProtocolAddress,
   distributionId: Uuid,
   plaintext: Uint8Array,
-  senderKeyStore: SenderKeyStore,
+  senderKeyStore: SenderKeyStore
 ): Promise<Uint8Array> {
-  const arrayBuffer = plaintext.buffer.slice(plaintext.byteOffset, plaintext.byteOffset + plaintext.byteLength) as ArrayBuffer;
+  const arrayBuffer = plaintext.buffer.slice(
+    plaintext.byteOffset,
+    plaintext.byteOffset + plaintext.byteLength
+  ) as ArrayBuffer;
   const plaintextBuffer = new Uint8Array(arrayBuffer);
   const ciphertext = await groupEncrypt(
     senderAddress,
     distributionId,
     senderKeyStore,
-    plaintextBuffer,
+    plaintextBuffer
   );
   return new Uint8Array(ciphertext.serialize());
 }
@@ -289,12 +286,12 @@ export async function groupEncryptMessage(
 export async function groupDecryptMessage(
   senderAddress: ProtocolAddress,
   ciphertextBytes: Uint8Array,
-  recipientSenderKeyStore: SenderKeyStore,
+  recipientSenderKeyStore: SenderKeyStore
 ): Promise<Uint8Array> {
   const plaintext = await groupDecrypt(
     senderAddress,
     recipientSenderKeyStore,
-    ciphertextBytes as Uint8Array<ArrayBuffer>,
+    ciphertextBytes as Uint8Array<ArrayBuffer>
   );
   return new Uint8Array(plaintext);
 }

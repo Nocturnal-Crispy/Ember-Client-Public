@@ -9,7 +9,7 @@ describe('app lock PIN validation', () => {
     const fs = require('fs');
     const jsPath = `${__dirname}/../../../src/renderer/managers/plugin-settings.ts`;
     const jsContent = fs.readFileSync(jsPath, 'utf8');
-    
+
     expect(jsContent).toContain('has-pin');
     expect(jsContent).toContain('app-lock-pin-warning');
     // Note: PIN validation on enable was removed to allow enabling without PIN first
@@ -20,7 +20,7 @@ describe('app lock PIN validation', () => {
     const fs = require('fs');
     const jsPath = `${__dirname}/../../../src/renderer/managers/app-lock-manager.ts`;
     const jsContent = fs.readFileSync(jsPath, 'utf8');
-    
+
     expect(jsContent).toContain('has-pin');
     expect(jsContent).toContain('SECURITY ALERT: No PIN set');
     expect(jsContent).toContain('async function lockApp');
@@ -31,7 +31,7 @@ describe('app lock PIN validation', () => {
     const fs = require('fs');
     const htmlPath = `${__dirname}/../../../src/renderer/modal-settings.html`;
     const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-    
+
     expect(htmlContent).toContain('app-lock-pin-warning');
     expect(htmlContent).toContain('No PIN set - App Lock disabled');
   });
@@ -41,7 +41,7 @@ describe('app lock PIN validation', () => {
     const fs = require('fs');
     const cssPath = `${__dirname}/../../../src/renderer/styles/components/settings.css`;
     const cssContent = fs.readFileSync(cssPath, 'utf8');
-    
+
     expect(cssContent).toContain('.app-lock-pin-warning');
     expect(cssContent).toContain('#ed4245'); // Red color for warning
     expect(cssContent).toContain('font-weight: 600'); // Bold text

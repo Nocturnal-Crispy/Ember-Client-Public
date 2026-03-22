@@ -32,8 +32,12 @@
   letter-spacing: 2px;
 }
 
-.login-header h1::before { content: '-- '; }
-.login-header h1::after  { content: '--'; }
+.login-header h1::before {
+  content: '-- ';
+}
+.login-header h1::after {
+  content: '--';
+}
 
 .login-header p {
   font-family: 'Courier New', Courier, monospace;

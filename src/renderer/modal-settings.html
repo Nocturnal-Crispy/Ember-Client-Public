@@ -54,13 +54,22 @@
         <h2 class="settings-page-title">My Account</h2>
         <div class="settings-card">
           <div class="settings-avatar-row">
-            <div class="settings-avatar-wrapper" id="settings-avatar-wrapper" title="Click to change avatar">
+            <div
+              class="settings-avatar-wrapper"
+              id="settings-avatar-wrapper"
+              title="Click to change avatar"
+            >
               <div class="settings-avatar" id="settings-avatar-display">U</div>
-              <img class="settings-avatar-img hidden" id="settings-avatar-img" alt="avatar">
+              <img class="settings-avatar-img hidden" id="settings-avatar-img" alt="avatar" />
               <div class="settings-avatar-overlay">
                 <span class="settings-avatar-overlay-text">CHANGE</span>
               </div>
-              <input type="file" id="settings-avatar-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
+              <input
+                type="file"
+                id="settings-avatar-input"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                style="display: none"
+              />
             </div>
             <div class="settings-user-info">
               <div class="settings-username" id="settings-username-display">Username</div>
@@ -78,8 +87,21 @@
         <div class="settings-field">
           <label class="settings-field-label">Username</label>
           <div class="settings-field-edit-row">
-            <input class="settings-field-input" type="text" id="settings-username-input" maxlength="32" placeholder="Username" autocomplete="off" spellcheck="false">
-            <button class="modal-btn modal-btn-primary settings-field-save-btn" id="settings-username-save-btn">SAVE</button>
+            <input
+              class="settings-field-input"
+              type="text"
+              id="settings-username-input"
+              maxlength="32"
+              placeholder="Username"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button
+              class="modal-btn modal-btn-primary settings-field-save-btn"
+              id="settings-username-save-btn"
+            >
+              SAVE
+            </button>
           </div>
           <span class="settings-save-status" id="settings-username-status"></span>
         </div>
@@ -88,7 +110,9 @@
       <!-- Devices -->
       <div class="settings-page hidden" id="settings-page-devices">
         <h2 class="settings-page-title">Devices</h2>
-        <p class="settings-placeholder-text">Your logged-in devices and sessions will appear here.</p>
+        <p class="settings-placeholder-text">
+          Your logged-in devices and sessions will appear here.
+        </p>
         <div class="settings-card settings-placeholder-card">
           <span class="settings-placeholder-icon">💻</span>
           <span>No additional devices found.</span>
@@ -101,7 +125,7 @@
         <div class="settings-card">
           <div class="creator-info-row">
             <div class="creator-profile-image">
-              <img src="assets/Luffy.jpg" alt="Creator Profile" class="creator-avatar">
+              <img src="assets/Luffy.jpg" alt="Creator Profile" class="creator-avatar" />
             </div>
             <div class="creator-details">
               <h4 class="creator-name">Mike</h4>
@@ -111,8 +135,13 @@
           </div>
           <div class="creator-support-section">
             <p class="creator-support-text">Enjoying Ember? Support the development!</p>
-            <a href="https://www.buymeacoffee.com/TheCrispy" target="_blank" rel="noopener noreferrer" class="creator-support-btn">
-              <span style="font-size: 16px; margin-right: 8px;">☕</span>
+            <a
+              href="https://www.buymeacoffee.com/TheCrispy"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="creator-support-btn"
+            >
+              <span style="font-size: 16px; margin-right: 8px">☕</span>
               <span>Buy me a coffee</span>
             </a>
           </div>
@@ -130,7 +159,7 @@
           <span class="sound-label">Message</span>
           <button class="sound-preview-btn" id="notif-message-preview">&#9654;</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="notif-message-sound" checked>
+            <input type="checkbox" id="notif-message-sound" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -156,7 +185,7 @@
         <div class="theme-color-row">
           <label class="vv-label">Accent Color</label>
           <div class="theme-color-picker-group">
-            <input type="color" id="theme-accent-picker" class="theme-color-input">
+            <input type="color" id="theme-accent-picker" class="theme-color-input" />
             <span class="theme-color-value" id="theme-accent-value">rgb(255, 120, 80)</span>
           </div>
         </div>
@@ -167,7 +196,7 @@
         <div class="theme-color-row">
           <label class="vv-label">My Message Color</label>
           <div class="theme-color-picker-group">
-            <input type="color" id="theme-chat-color-picker" class="theme-color-input">
+            <input type="color" id="theme-chat-color-picker" class="theme-color-input" />
             <button class="modal-btn" id="theme-chat-color-reset">Reset to Accent</button>
           </div>
         </div>
@@ -208,10 +237,12 @@
         <div class="vv-toggle-row">
           <div class="vv-toggle-info">
             <span class="vv-toggle-label">Read All Button</span>
-            <span class="vv-toggle-desc">Show a button in the server list to mark all messages as read</span>
+            <span class="vv-toggle-desc"
+              >Show a button in the server list to mark all messages as read</span
+            >
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="plugin-read-all-btn">
+            <input type="checkbox" id="plugin-read-all-btn" />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -221,10 +252,12 @@
           <div class="vv-toggle-row">
             <div class="vv-toggle-info">
               <span class="vv-toggle-label">Enable App Lock</span>
-              <span class="vv-toggle-desc">Master switch — must be on for any automatic locking to work</span>
+              <span class="vv-toggle-desc"
+                >Master switch — must be on for any automatic locking to work</span
+              >
             </div>
             <label class="settings-toggle">
-              <input type="checkbox" id="plugin-app-lock-enable">
+              <input type="checkbox" id="plugin-app-lock-enable" />
               <span class="toggle-slider"></span>
             </label>
           </div>
@@ -232,7 +265,14 @@
           <div class="vv-row app-lock-dependent">
             <label class="vv-label">Idle Timeout</label>
             <div class="timeout-row">
-              <input type="range" id="plugin-app-lock-timeout" min="1" max="60" value="5" step="1">
+              <input
+                type="range"
+                id="plugin-app-lock-timeout"
+                min="1"
+                max="60"
+                value="5"
+                step="1"
+              />
               <span id="plugin-app-lock-timeout-display" class="timeout-display">5 min</span>
             </div>
           </div>
@@ -240,18 +280,29 @@
           <div class="vv-toggle-row app-lock-dependent">
             <div class="vv-toggle-info">
               <span class="vv-toggle-label">Lock on Focus Loss</span>
-              <span class="vv-toggle-desc">Lock when Ember loses focus (alt-tab). Requires Enable App Lock to be on.</span>
+              <span class="vv-toggle-desc"
+                >Lock when Ember loses focus (alt-tab). Requires Enable App Lock to be on.</span
+              >
             </div>
             <label class="settings-toggle">
-              <input type="checkbox" id="plugin-app-lock-focus-loss">
+              <input type="checkbox" id="plugin-app-lock-focus-loss" />
               <span class="toggle-slider"></span>
             </label>
           </div>
 
           <div class="vv-row app-lock-dependent">
             <label class="vv-label">Focus Loss Delay (seconds)</label>
-            <input type="number" class="settings-input-small" id="plugin-app-lock-focus-delay" min="1" max="300" value="5">
-            <span class="vv-toggle-desc" style="margin-left: 0.5rem;">Ember locks this many seconds after losing focus.</span>
+            <input
+              type="number"
+              class="settings-input-small"
+              id="plugin-app-lock-focus-delay"
+              min="1"
+              max="300"
+              value="5"
+            />
+            <span class="vv-toggle-desc" style="margin-left: 0.5rem"
+              >Ember locks this many seconds after losing focus.</span
+            >
           </div>
 
           <div class="vv-row app-lock-dependent">
@@ -264,14 +315,32 @@
                 </div>
               </div>
               <div class="app-lock-pin-actions">
-                <button class="app-lock-btn-small" id="plugin-app-lock-set-pin-btn">Set / Change PIN</button>
-                <button class="app-lock-btn-small" id="plugin-app-lock-clear-pin-btn">Clear PIN</button>
+                <button class="app-lock-btn-small" id="plugin-app-lock-set-pin-btn">
+                  Set / Change PIN
+                </button>
+                <button class="app-lock-btn-small" id="plugin-app-lock-clear-pin-btn">
+                  Clear PIN
+                </button>
               </div>
               <div id="plugin-app-lock-pin-setup" class="app-lock-pin-setup-form hidden">
-                <input type="password" id="plugin-app-lock-new-pin" placeholder="New PIN (min 4 digits)" autocomplete="new-password" maxlength="16">
-                <input type="password" id="plugin-app-lock-confirm-pin" placeholder="Confirm PIN" autocomplete="new-password" maxlength="16">
+                <input
+                  type="password"
+                  id="plugin-app-lock-new-pin"
+                  placeholder="New PIN (min 4 digits)"
+                  autocomplete="new-password"
+                  maxlength="16"
+                />
+                <input
+                  type="password"
+                  id="plugin-app-lock-confirm-pin"
+                  placeholder="Confirm PIN"
+                  autocomplete="new-password"
+                  maxlength="16"
+                />
                 <p id="plugin-app-lock-pin-error" class="app-lock-pin-error hidden"></p>
-                <button class="app-lock-btn-small" id="plugin-app-lock-save-pin-btn">Save PIN</button>
+                <button class="app-lock-btn-small" id="plugin-app-lock-save-pin-btn">
+                  Save PIN
+                </button>
               </div>
             </div>
           </div>
@@ -298,7 +367,14 @@
         <div class="vv-row">
           <label class="vv-label">Input Volume</label>
           <div class="vv-slider-row">
-            <input type="range" class="settings-range" id="vv-input-volume" min="0" max="100" value="100">
+            <input
+              type="range"
+              class="settings-range"
+              id="vv-input-volume"
+              min="0"
+              max="100"
+              value="100"
+            />
             <span class="vv-slider-val" id="vv-input-volume-val">100%</span>
           </div>
         </div>
@@ -306,7 +382,14 @@
         <div class="vv-row">
           <label class="vv-label">Output Volume</label>
           <div class="vv-slider-row">
-            <input type="range" class="settings-range" id="vv-output-volume" min="0" max="100" value="100">
+            <input
+              type="range"
+              class="settings-range"
+              id="vv-output-volume"
+              min="0"
+              max="100"
+              value="100"
+            />
             <span class="vv-slider-val" id="vv-output-volume-val">100%</span>
           </div>
         </div>
@@ -322,7 +405,7 @@
             <span class="vv-toggle-desc">Reduce echo during calls</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-echo-cancellation" checked>
+            <input type="checkbox" id="vv-echo-cancellation" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -333,7 +416,7 @@
             <span class="vv-toggle-desc">Filter background noise</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-noise-suppression" checked>
+            <input type="checkbox" id="vv-noise-suppression" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -344,7 +427,7 @@
             <span class="vv-toggle-desc">Automatically adjust input volume</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-auto-gain" checked>
+            <input type="checkbox" id="vv-auto-gain" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -355,7 +438,7 @@
             <span class="vv-toggle-desc">Auto-detect when you start speaking</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-auto-sensitivity" checked>
+            <input type="checkbox" id="vv-auto-sensitivity" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -363,7 +446,14 @@
         <div class="vv-row" id="vv-sensitivity-row">
           <label class="vv-label">Input Sensitivity</label>
           <div class="vv-slider-row">
-            <input type="range" class="settings-range" id="vv-sensitivity" min="0" max="100" value="50">
+            <input
+              type="range"
+              class="settings-range"
+              id="vv-sensitivity"
+              min="0"
+              max="100"
+              value="50"
+            />
             <span class="vv-slider-val" id="vv-sensitivity-val">50</span>
           </div>
         </div>
@@ -379,7 +469,7 @@
             <span class="vv-toggle-desc">Hold a key to transmit audio</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-ptt-enabled">
+            <input type="checkbox" id="vv-ptt-enabled" />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -406,13 +496,13 @@
 
         <button class="vv-test-btn" id="vv-camera-test-btn">Test Video</button>
 
-        <div class="vv-toggle-row" style="margin-top: 12px;">
+        <div class="vv-toggle-row" style="margin-top: 12px">
           <div class="vv-toggle-info">
             <span class="vv-toggle-label">Always Preview Video</span>
             <span class="vv-toggle-desc">Show camera preview when joining a channel</span>
           </div>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-always-preview">
+            <input type="checkbox" id="vv-always-preview" />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -426,7 +516,7 @@
           <span class="sound-label">Mute</span>
           <button class="sound-preview-btn" data-sound="mute">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-mute" checked>
+            <input type="checkbox" id="vv-sound-mute" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -434,7 +524,7 @@
           <span class="sound-label">Unmute</span>
           <button class="sound-preview-btn" data-sound="unmute">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-unmute" checked>
+            <input type="checkbox" id="vv-sound-unmute" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -442,7 +532,7 @@
           <span class="sound-label">Deafen</span>
           <button class="sound-preview-btn" data-sound="deafen">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-deafen" checked>
+            <input type="checkbox" id="vv-sound-deafen" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -450,7 +540,7 @@
           <span class="sound-label">Undeafen</span>
           <button class="sound-preview-btn" data-sound="undeafen">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-undeafen" checked>
+            <input type="checkbox" id="vv-sound-undeafen" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -458,7 +548,7 @@
           <span class="sound-label">User Join</span>
           <button class="sound-preview-btn" data-sound="userJoin">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-userJoin" checked>
+            <input type="checkbox" id="vv-sound-userJoin" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -466,7 +556,7 @@
           <span class="sound-label">User Leave</span>
           <button class="sound-preview-btn" data-sound="userLeave">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-userLeave" checked>
+            <input type="checkbox" id="vv-sound-userLeave" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -474,7 +564,7 @@
           <span class="sound-label">Disconnect</span>
           <button class="sound-preview-btn" data-sound="disconnect">▶</button>
           <label class="settings-toggle">
-            <input type="checkbox" id="vv-sound-disconnect" checked>
+            <input type="checkbox" id="vv-sound-disconnect" checked />
             <span class="toggle-slider"></span>
           </label>
         </div>

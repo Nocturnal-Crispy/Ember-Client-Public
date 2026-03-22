@@ -24,7 +24,8 @@ import type {
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface SignalDatabase
-  extends ISessionStore,
+  extends
+    ISessionStore,
     IIdentityKeyStore,
     IPreKeyStore,
     ISignedPreKeyStore,
@@ -42,7 +43,7 @@ export interface SignalDatabase
   initializeLocalIdentity(
     identityKeyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array },
     registrationId: number,
-    localIdentityAddress?: string,
+    localIdentityAddress?: string
   ): void;
   closeDatabase(): void;
 }
@@ -104,13 +105,9 @@ const DDL_STATEMENTS = [
 // ─── Encryption helpers ───────────────────────────────────────────────────────
 
 function deriveEncryptionKey(identityPrivateKey: Uint8Array): Buffer {
-  return Buffer.from(nodeCrypto.hkdfSync(
-    'sha256',
-    identityPrivateKey,
-    HKDF_SALT,
-    HKDF_INFO,
-    DERIVED_KEY_LENGTH,
-  ));
+  return Buffer.from(
+    nodeCrypto.hkdfSync('sha256', identityPrivateKey, HKDF_SALT, HKDF_INFO, DERIVED_KEY_LENGTH)
+  );
 }
 
 function validateIdentityKeyConsistency(storedKey: Uint8Array, providedKey: Uint8Array): boolean {
@@ -140,7 +137,7 @@ function decryptBlob(derivedKey: Buffer, envelope: Buffer, aad: Buffer): Uint8Ar
     if (envelope.length < IV_LENGTH + AUTH_TAG_LENGTH) {
       throw new Error('Invalid envelope: too short');
     }
-    
+
     const iv = envelope.subarray(0, IV_LENGTH);
     const authTag = envelope.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
     const ciphertext = envelope.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
@@ -148,7 +145,7 @@ function decryptBlob(derivedKey: Buffer, envelope: Buffer, aad: Buffer): Uint8Ar
     if (iv.length !== IV_LENGTH) {
       throw new Error('Invalid IV length');
     }
-    
+
     if (authTag.length !== AUTH_TAG_LENGTH) {
       throw new Error('Invalid auth tag length');
     }
@@ -162,7 +159,9 @@ function decryptBlob(derivedKey: Buffer, envelope: Buffer, aad: Buffer): Uint8Ar
     if (error instanceof Error && error.message.includes('auth')) {
       throw new Error('Authentication failed: data may be corrupted or tampered');
     }
-    throw new Error(`Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -222,7 +221,7 @@ export function openSignalDatabase(
     readonly localIdentityPublicKey?: Uint8Array;
     readonly localRegistrationId?: number;
     readonly localIdentityAddress?: string;
-  },
+  }
 ): SignalDatabase {
   const dbPath = path.join(userDataPath, DB_FILENAME);
   let db: Database.Database | undefined;
@@ -266,48 +265,42 @@ export function openSignalDatabase(
   const stmts = {
     loadSession: db.prepare('SELECT record FROM sessions WHERE address = ?'),
     storeSession: db.prepare(
-      'INSERT OR REPLACE INTO sessions (address, record, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO sessions (address, record, created_at, updated_at) VALUES (?, ?, ?, ?)'
     ),
-    getSubDeviceSessions: db.prepare(
-      "SELECT address FROM sessions WHERE address LIKE ? || '.%'",
-    ),
+    getSubDeviceSessions: db.prepare("SELECT address FROM sessions WHERE address LIKE ? || '.%'"),
     removeSession: db.prepare('DELETE FROM sessions WHERE address = ?'),
-    removeAllSessions: db.prepare(
-      "DELETE FROM sessions WHERE address LIKE ? || '.%'",
-    ),
+    removeAllSessions: db.prepare("DELETE FROM sessions WHERE address LIKE ? || '.%'"),
     loadIdentityKeyRow: db.prepare(
-      'SELECT key_pair_public, key_pair_private FROM identity_keys WHERE name = ?',
+      'SELECT key_pair_public, key_pair_private FROM identity_keys WHERE name = ?'
     ),
-    loadPublicKey: db.prepare(
-      'SELECT key_pair_public FROM identity_keys WHERE name = ?',
-    ),
+    loadPublicKey: db.prepare('SELECT key_pair_public FROM identity_keys WHERE name = ?'),
     storeIdentityKey: db.prepare(
-      'INSERT OR REPLACE INTO identity_keys (name, key_pair_public, key_pair_private, trust_level) VALUES (?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO identity_keys (name, key_pair_public, key_pair_private, trust_level) VALUES (?, ?, ?, ?)'
     ),
     loadPreKey: db.prepare('SELECT record FROM pre_keys WHERE id = ?'),
     storePreKey: db.prepare('INSERT OR REPLACE INTO pre_keys (id, record) VALUES (?, ?)'),
     removePreKey: db.prepare('DELETE FROM pre_keys WHERE id = ?'),
     loadSignedPreKey: db.prepare('SELECT record FROM signed_pre_keys WHERE id = ?'),
     storeSignedPreKey: db.prepare(
-      'INSERT OR REPLACE INTO signed_pre_keys (id, record, created_at) VALUES (?, ?, ?)',
+      'INSERT OR REPLACE INTO signed_pre_keys (id, record, created_at) VALUES (?, ?, ?)'
     ),
     removeSignedPreKey: db.prepare('DELETE FROM signed_pre_keys WHERE id = ?'),
     saveSenderKey: db.prepare(
-      'INSERT OR REPLACE INTO sender_keys (address, distribution_id, record) VALUES (?, ?, ?)',
+      'INSERT OR REPLACE INTO sender_keys (address, distribution_id, record) VALUES (?, ?, ?)'
     ),
     getSenderKey: db.prepare(
-      'SELECT record FROM sender_keys WHERE address = ? AND distribution_id = ?',
+      'SELECT record FROM sender_keys WHERE address = ? AND distribution_id = ?'
     ),
     loadKyberPreKey: db.prepare('SELECT record FROM kyber_pre_keys WHERE id = ?'),
     storeKyberPreKey: db.prepare(
-      'INSERT OR REPLACE INTO kyber_pre_keys (id, record) VALUES (?, ?)',
+      'INSERT OR REPLACE INTO kyber_pre_keys (id, record) VALUES (?, ?)'
     ),
     removeKyberPreKey: db.prepare('DELETE FROM kyber_pre_keys WHERE id = ?'),
     storeDistributionIdStmt: db.prepare(
-      'INSERT OR REPLACE INTO distribution_ids (address, distribution_id) VALUES (?, ?)',
+      'INSERT OR REPLACE INTO distribution_ids (address, distribution_id) VALUES (?, ?)'
     ),
     loadDistributionIdStmt: db.prepare(
-      'SELECT distribution_id FROM distribution_ids WHERE address = ?',
+      'SELECT distribution_id FROM distribution_ids WHERE address = ?'
     ),
   };
 
@@ -321,12 +314,12 @@ export function openSignalDatabase(
     const decryptedPublic = decryptBlob(
       encryptionKey,
       existingLocalRow.key_pair_public,
-      Buffer.from('identity_keys:__local__:public'),
+      Buffer.from('identity_keys:__local__:public')
     );
     const decryptedPrivate = decryptBlob(
       encryptionKey,
       existingLocalRow.key_pair_private,
-      Buffer.from('identity_keys:__local__:private'),
+      Buffer.from('identity_keys:__local__:private')
     );
 
     // Validate decrypted key material so libsignal doesn't later fail on empty/corrupt rows.
@@ -342,7 +335,7 @@ export function openSignalDatabase(
     if (!validateIdentityKeyConsistency(decryptedPrivate, identityPrivateKey)) {
       throw new Error(
         'Identity key mismatch: Signal database was opened with a different identity private key. ' +
-        'This causes "Authentication failed" errors. Please restart the application with the correct identity key.'
+          'This causes "Authentication failed" errors. Please restart the application with the correct identity key.'
       );
     }
 
@@ -372,7 +365,9 @@ export function openSignalDatabase(
       throw new Error('signal-db: localRegistrationId out of range [1, 16383]');
     }
     if (localIdentityPrivateKey.length !== 32 || localIdentityPublicKey.length === 0) {
-      throw new Error('signal-db: local identity key material must have 32-byte private key and non-empty public key');
+      throw new Error(
+        'signal-db: local identity key material must have 32-byte private key and non-empty public key'
+      );
     }
 
     stmts.storeIdentityKey.run(
@@ -380,14 +375,14 @@ export function openSignalDatabase(
       encryptBlob(
         encryptionKey,
         localIdentityPublicKey,
-        Buffer.from('identity_keys:__local__:public'),
+        Buffer.from('identity_keys:__local__:public')
       ),
       encryptBlob(
         encryptionKey,
         localIdentityPrivateKey,
-        Buffer.from('identity_keys:__local__:private'),
+        Buffer.from('identity_keys:__local__:private')
       ),
-      0,
+      0
     );
 
     const registrationBytes = new Uint8Array(4);
@@ -397,14 +392,14 @@ export function openSignalDatabase(
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:public'),
+        Buffer.from('identity_keys:__registration_id__:public')
       ),
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:private'),
+        Buffer.from('identity_keys:__registration_id__:private')
       ),
-      0,
+      0
     );
   }
 
@@ -425,14 +420,14 @@ export function openSignalDatabase(
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:public'),
+        Buffer.from('identity_keys:__registration_id__:public')
       ),
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:private'),
+        Buffer.from('identity_keys:__registration_id__:private')
       ),
-      0,
+      0
     );
   }
 
@@ -452,7 +447,7 @@ export function openSignalDatabase(
 
   async function getSubDeviceSessions(name: string): Promise<number[]> {
     const rows = stmts.getSubDeviceSessions.all(name) as { address: string }[];
-    return rows.map((r) => {
+    return rows.map(r => {
       const dotIndex = r.address.lastIndexOf('.');
       return parseInt(r.address.slice(dotIndex + 1), 10);
     });
@@ -478,8 +473,16 @@ export function openSignalDatabase(
     if (!row) {
       throw new Error('signal-db: local identity key pair not initialised');
     }
-    const publicKey = decryptBlob(encryptionKey, row.key_pair_public, Buffer.from('identity_keys:__local__:public'));
-    const privateKey = decryptBlob(encryptionKey, row.key_pair_private, Buffer.from('identity_keys:__local__:private'));
+    const publicKey = decryptBlob(
+      encryptionKey,
+      row.key_pair_public,
+      Buffer.from('identity_keys:__local__:public')
+    );
+    const privateKey = decryptBlob(
+      encryptionKey,
+      row.key_pair_private,
+      Buffer.from('identity_keys:__local__:private')
+    );
     if (publicKey.length === 0 || privateKey.length !== 32) {
       throw new Error('signal-db: corrupted __local__ key material');
     }
@@ -493,30 +496,25 @@ export function openSignalDatabase(
     if (!row) {
       throw new Error('signal-db: local registration ID not initialised');
     }
-    const decrypted = decryptBlob(encryptionKey, row.key_pair_public, Buffer.from('identity_keys:__registration_id__:public'));
+    const decrypted = decryptBlob(
+      encryptionKey,
+      row.key_pair_public,
+      Buffer.from('identity_keys:__registration_id__:public')
+    );
     if (decrypted.length !== 4) {
       throw new Error('signal-db: corrupted __registration_id__ value');
     }
-    const view = new DataView(
-      decrypted.buffer,
-      decrypted.byteOffset,
-      decrypted.byteLength,
-    );
+    const view = new DataView(decrypted.buffer, decrypted.byteOffset, decrypted.byteLength);
     return view.getUint32(0, false);
   }
 
-  async function saveIdentity(
-    address: string,
-    identityKey: Uint8Array,
-  ): Promise<boolean> {
-    const existing = stmts.loadPublicKey.get(address) as
-      | { key_pair_public: Buffer }
-      | undefined;
+  async function saveIdentity(address: string, identityKey: Uint8Array): Promise<boolean> {
+    const existing = stmts.loadPublicKey.get(address) as { key_pair_public: Buffer } | undefined;
 
     const encryptedPublic = encryptBlob(
       encryptionKey,
       identityKey,
-      Buffer.from(`identity_keys:${address}:public`),
+      Buffer.from(`identity_keys:${address}:public`)
     );
     const needsLocalPrivate =
       address === '__local__' ||
@@ -528,35 +526,43 @@ export function openSignalDatabase(
     const encryptedPrivate = encryptBlob(
       encryptionKey,
       privatePlaintext,
-      Buffer.from(`identity_keys:${address}:private`),
+      Buffer.from(`identity_keys:${address}:private`)
     );
     stmts.storeIdentityKey.run(address, encryptedPublic, encryptedPrivate, 0);
 
     if (!existing) return false;
-    const stored = decryptBlob(encryptionKey, existing.key_pair_public, Buffer.from(`identity_keys:${address}:public`));
+    const stored = decryptBlob(
+      encryptionKey,
+      existing.key_pair_public,
+      Buffer.from(`identity_keys:${address}:public`)
+    );
     return !bufferEquals(stored, identityKey);
   }
 
   async function isTrustedIdentity(
     address: string,
     identityKey: Uint8Array,
-    _direction: 'sending' | 'receiving',
+    _direction: 'sending' | 'receiving'
   ): Promise<boolean> {
-    const row = stmts.loadPublicKey.get(address) as
-      | { key_pair_public: Buffer }
-      | undefined;
+    const row = stmts.loadPublicKey.get(address) as { key_pair_public: Buffer } | undefined;
     if (!row) return true; // TOFU
 
-    const stored = decryptBlob(encryptionKey, row.key_pair_public, Buffer.from(`identity_keys:${address}:public`));
+    const stored = decryptBlob(
+      encryptionKey,
+      row.key_pair_public,
+      Buffer.from(`identity_keys:${address}:public`)
+    );
     return bufferEquals(stored, identityKey);
   }
 
   async function getIdentity(address: string): Promise<Uint8Array | null> {
-    const row = stmts.loadPublicKey.get(address) as
-      | { key_pair_public: Buffer }
-      | undefined;
+    const row = stmts.loadPublicKey.get(address) as { key_pair_public: Buffer } | undefined;
     if (!row) return null;
-    return decryptBlob(encryptionKey, row.key_pair_public, Buffer.from(`identity_keys:${address}:public`));
+    return decryptBlob(
+      encryptionKey,
+      row.key_pair_public,
+      Buffer.from(`identity_keys:${address}:public`)
+    );
   }
 
   // ── IPreKeyStore ─────────────────────────────────────────────────────────
@@ -584,7 +590,11 @@ export function openSignalDatabase(
   }
 
   async function storeSignedPreKey(id: number, record: Uint8Array): Promise<void> {
-    stmts.storeSignedPreKey.run(id, encryptBlob(encryptionKey, record, Buffer.from(`signed_pre_keys:${id}`)), Date.now());
+    stmts.storeSignedPreKey.run(
+      id,
+      encryptBlob(encryptionKey, record, Buffer.from(`signed_pre_keys:${id}`)),
+      Date.now()
+    );
   }
 
   async function removeSignedPreKey(id: number): Promise<void> {
@@ -596,24 +606,23 @@ export function openSignalDatabase(
   async function saveSenderKey(
     address: string,
     distributionId: string,
-    record: Uint8Array,
+    record: Uint8Array
   ): Promise<void> {
     stmts.saveSenderKey.run(
       address,
       distributionId,
-      encryptBlob(encryptionKey, record, Buffer.from(`sender_keys:${address}:${distributionId}`)),
+      encryptBlob(encryptionKey, record, Buffer.from(`sender_keys:${address}:${distributionId}`))
     );
   }
 
-  async function getSenderKey(
-    address: string,
-    distributionId: string,
-  ): Promise<Uint8Array | null> {
-    const row = stmts.getSenderKey.get(address, distributionId) as
-      | { record: Buffer }
-      | undefined;
+  async function getSenderKey(address: string, distributionId: string): Promise<Uint8Array | null> {
+    const row = stmts.getSenderKey.get(address, distributionId) as { record: Buffer } | undefined;
     if (!row) return null;
-    return decryptBlob(encryptionKey, row.record, Buffer.from(`sender_keys:${address}:${distributionId}`));
+    return decryptBlob(
+      encryptionKey,
+      row.record,
+      Buffer.from(`sender_keys:${address}:${distributionId}`)
+    );
   }
 
   // ── IKyberPreKeyStore ────────────────────────────────────────────────────
@@ -625,7 +634,10 @@ export function openSignalDatabase(
   }
 
   async function storeKyberPreKey(id: number, record: Uint8Array): Promise<void> {
-    stmts.storeKyberPreKey.run(id, encryptBlob(encryptionKey, record, Buffer.from(`kyber_pre_keys:${id}`)));
+    stmts.storeKyberPreKey.run(
+      id,
+      encryptBlob(encryptionKey, record, Buffer.from(`kyber_pre_keys:${id}`))
+    );
   }
 
   async function markKyberPreKeyUsed(_id: number): Promise<void> {
@@ -654,7 +666,7 @@ export function openSignalDatabase(
   function initializeLocalIdentity(
     identityKeyPair: { readonly publicKey: Uint8Array; readonly privateKey: Uint8Array },
     registrationId: number,
-    localIdentityAddressArg?: string,
+    localIdentityAddressArg?: string
   ): void {
     if (identityKeyPair.privateKey.length !== 32) {
       throw new Error('signal-db: expected 32-byte Ed25519 identity private key');
@@ -679,14 +691,14 @@ export function openSignalDatabase(
       encryptBlob(
         encryptionKey,
         identityKeyPair.publicKey,
-        Buffer.from('identity_keys:__local__:public'),
+        Buffer.from('identity_keys:__local__:public')
       ),
       encryptBlob(
         encryptionKey,
         identityKeyPair.privateKey,
-        Buffer.from('identity_keys:__local__:private'),
+        Buffer.from('identity_keys:__local__:private')
       ),
-      0,
+      0
     );
 
     // __registration_id__ row: value stored in `key_pair_public`.
@@ -698,14 +710,14 @@ export function openSignalDatabase(
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:public'),
+        Buffer.from('identity_keys:__registration_id__:public')
       ),
       encryptBlob(
         encryptionKey,
         registrationBytes,
-        Buffer.from('identity_keys:__registration_id__:private'),
+        Buffer.from('identity_keys:__registration_id__:private')
       ),
-      0,
+      0
     );
   }
 

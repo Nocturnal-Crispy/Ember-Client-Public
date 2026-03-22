@@ -6,7 +6,7 @@ export async function fetchEmbers(auth: AuthData): Promise<Ember[]> {
     auth.hostname,
     '/api/v1/embers',
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
   return data.embers ?? [];
 }
@@ -22,7 +22,7 @@ export async function createEmber(
   _name: string,
   _devicePublicKey: string,
   _devicePrivateKey: string,
-  _iconData?: string,
+  _iconData?: string
 ): Promise<Ember> {
   throw new Error('NaCl crypto removed — use Signal Protocol ember creation instead');
 }
@@ -35,7 +35,7 @@ export interface UpdateEmberRequest {
 export async function updateEmber(
   auth: AuthData,
   emberId: string,
-  updates: UpdateEmberRequest,
+  updates: UpdateEmberRequest
 ): Promise<Ember> {
   // Validate that at least one field is provided
   if (updates.name === undefined && updates.icon_data === undefined) {
@@ -59,7 +59,7 @@ export async function updateEmber(
       method: 'PATCH',
       body: JSON.stringify(updates),
     },
-    auth.token,
+    auth.token
   );
 
   return updatedEmber;
@@ -89,7 +89,7 @@ export async function createInvite(
     code?: string;
     maxUses?: number;
     expiresIn?: number;
-  },
+  }
 ): Promise<CreateInviteResponse> {
   const requestBody: CreateInviteRequest = {
     encrypted_ember_key: encryptedEmberKey,
@@ -115,7 +115,7 @@ export async function createInvite(
       method: 'POST',
       body: JSON.stringify(requestBody),
     },
-    auth.token,
+    auth.token
   );
 
   return response;
@@ -134,15 +134,15 @@ export interface InviteInfo {
 export async function fetchInviteInfo(
   auth: AuthData,
   code: string,
-  hostname?: string,
+  hostname?: string
 ): Promise<InviteInfo> {
   const targetHostname = hostname ?? auth.hostname;
-  
+
   const inviteInfo = await apiRequest<InviteInfo>(
     targetHostname,
     `/api/v1/invites/${code}`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
 
   return { ...inviteInfo, hostname: targetHostname };
@@ -162,10 +162,10 @@ export async function acceptInvite(
   auth: AuthData,
   code: string,
   encryptedEmberKey: string,
-  hostname?: string,
+  hostname?: string
 ): Promise<AcceptInviteResponse> {
   const targetHostname = hostname ?? auth.hostname;
-  
+
   const requestBody: AcceptInviteRequest = {
     encrypted_ember_key: encryptedEmberKey,
   };
@@ -177,7 +177,7 @@ export async function acceptInvite(
       method: 'POST',
       body: JSON.stringify(requestBody),
     },
-    auth.token,
+    auth.token
   );
 
   return response;
@@ -201,17 +201,12 @@ export async function listInvites(auth: AuthData, emberId: string): Promise<Invi
     auth.hostname,
     `/api/v1/embers/${emberId}/invites`,
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
 
   return response.invites;
 }
 
 export async function revokeInvite(auth: AuthData, code: string): Promise<void> {
-  await apiRequest(
-    auth.hostname,
-    `/api/v1/invites/${code}`,
-    { method: 'DELETE' },
-    auth.token,
-  );
+  await apiRequest(auth.hostname, `/api/v1/invites/${code}`, { method: 'DELETE' }, auth.token);
 }

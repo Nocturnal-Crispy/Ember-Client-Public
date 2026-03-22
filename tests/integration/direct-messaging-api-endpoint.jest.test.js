@@ -8,7 +8,7 @@ const TEST_CONFIG = {
   conversationId: 'dm_test-conversation-id',
   messageContent: 'Test message',
   expectedEndpoint: '/api/v1/conversations/',
-  oldIncorrectEndpoint: '/api/v1/direct-messages/conversations/'
+  oldIncorrectEndpoint: '/api/v1/direct-messages/conversations/',
 };
 
 // Mock fetch for testing
@@ -18,7 +18,7 @@ let originalFetch;
 // Mock fetch function
 const mockFetch = jest.fn(async (url, options) => {
   mockFetchCalls.push({ url, options });
-  
+
   // Mock successful response for the correct endpoint
   if (url.includes(TEST_CONFIG.expectedEndpoint)) {
     return {
@@ -28,16 +28,16 @@ const mockFetch = jest.fn(async (url, options) => {
         conversation_id: TEST_CONFIG.conversationId,
         sender_id: 'test-user-id',
         ciphertext: 'encrypted-content',
-        created_at: Date.now()
-      })
+        created_at: Date.now(),
+      }),
     };
   }
-  
+
   // Mock 404 for incorrect endpoint
   return {
     ok: false,
     status: 404,
-    statusText: 'Not Found'
+    statusText: 'Not Found',
   };
 });
 
@@ -47,12 +47,12 @@ async function sendDirectMessage(conversationId, content, hostname, token) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       ciphertext: 'encrypted-content',
-      timestamp: Date.now()
-    })
+      timestamp: Date.now(),
+    }),
   });
 
   if (!response.ok) {
@@ -83,7 +83,7 @@ describe('Direct Messaging API Endpoint Fix', () => {
       'https://test.ember.com',
       'test-token'
     );
-    
+
     expect(mockFetchCalls.length).toBeGreaterThan(0);
     expect(mockFetchCalls[0].url).toBe(
       'https://test.ember.com/api/v1/conversations/dm_test-conversation-id/messages'
@@ -97,10 +97,10 @@ describe('Direct Messaging API Endpoint Fix', () => {
       'https://test.ember.com',
       'test-token'
     );
-    
+
     const call = mockFetchCalls[0];
     const body = JSON.parse(call.options.body);
-    
+
     expect(body).toHaveProperty('ciphertext');
     expect(body).toHaveProperty('timestamp');
     expect(body).not.toHaveProperty('content');
@@ -114,10 +114,10 @@ describe('Direct Messaging API Endpoint Fix', () => {
       'https://test.ember.com',
       'test-token'
     );
-    
+
     const calls = mockFetchCalls.map(call => call.url);
     const hasOldEndpoint = calls.some(url => url.includes(TEST_CONFIG.oldIncorrectEndpoint));
-    
+
     expect(hasOldEndpoint).toBe(false);
   });
 
@@ -128,7 +128,7 @@ describe('Direct Messaging API Endpoint Fix', () => {
       'https://test.ember.com',
       'test-token'
     );
-    
+
     expect(result.id).toBe('message-id');
     expect(result.conversation_id).toBe(TEST_CONFIG.conversationId);
     expect(result.ciphertext).toBe('encrypted-content');
@@ -137,22 +137,25 @@ describe('Direct Messaging API Endpoint Fix', () => {
   test('Should fail with old endpoint', async () => {
     // Create a function that uses the old incorrect endpoint
     async function sendDirectMessageOldEndpoint(conversationId, content, hostname, token) {
-      const response = await mockFetch(`${hostname}/api/v1/direct-messages/conversations/${conversationId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          content: 'encrypted-content',
-          timestamp: Date.now()
-        })
-      });
+      const response = await mockFetch(
+        `${hostname}/api/v1/direct-messages/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            content: 'encrypted-content',
+            timestamp: Date.now(),
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to send message: ${response.statusText}`);
       }
-      
+
       return await response.json();
     }
 

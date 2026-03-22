@@ -86,7 +86,11 @@ export class SignalDbIdentityKeyStore extends IdentityKeyStore {
     return changed ? IdentityChange.ReplacedExisting : IdentityChange.NewOrUnchanged;
   }
 
-  async isTrustedIdentity(addr: ProtocolAddress, key: PublicKey, direction: Direction): Promise<boolean> {
+  async isTrustedIdentity(
+    addr: ProtocolAddress,
+    key: PublicKey,
+    direction: Direction
+  ): Promise<boolean> {
     const dirStr = direction === Direction.Sending ? 'sending' : 'receiving';
     return this.db.isTrustedIdentity(addrKey(addr), new Uint8Array(key.serialize()), dirStr);
   }
@@ -155,7 +159,11 @@ export class SignalDbKyberPreKeyStore extends KyberPreKeyStore {
     return KyberPreKeyRecord.deserialize(Buffer.from(bytes));
   }
 
-  async markKyberPreKeyUsed(_kyberPreKeyId: number, _signedPreKeyId: number, _baseKey: PublicKey): Promise<void> {
+  async markKyberPreKeyUsed(
+    _kyberPreKeyId: number,
+    _signedPreKeyId: number,
+    _baseKey: PublicKey
+  ): Promise<void> {
     // Consumption tracking delegated to the caller; no-op at store level.
   }
 }
@@ -167,11 +175,22 @@ export class SignalDbSenderKeyStore extends SenderKeyStore {
     super();
   }
 
-  async saveSenderKey(sender: ProtocolAddress, distributionId: Uuid, record: SenderKeyRecord): Promise<void> {
-    await this.db.saveSenderKey(addrKey(sender), String(distributionId), new Uint8Array(record.serialize()));
+  async saveSenderKey(
+    sender: ProtocolAddress,
+    distributionId: Uuid,
+    record: SenderKeyRecord
+  ): Promise<void> {
+    await this.db.saveSenderKey(
+      addrKey(sender),
+      String(distributionId),
+      new Uint8Array(record.serialize())
+    );
   }
 
-  async getSenderKey(sender: ProtocolAddress, distributionId: Uuid): Promise<SenderKeyRecord | null> {
+  async getSenderKey(
+    sender: ProtocolAddress,
+    distributionId: Uuid
+  ): Promise<SenderKeyRecord | null> {
     const bytes = await this.db.getSenderKey(addrKey(sender), String(distributionId));
     if (!bytes) return null;
     return SenderKeyRecord.deserialize(Buffer.from(bytes));

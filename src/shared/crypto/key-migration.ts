@@ -13,16 +13,9 @@
  *   Ed25519 signature    — 64 bytes
  */
 
-import {
-  IdentityKeyPair as LibSignalIKP,
-  PrivateKey,
-} from '@signalapp/libsignal-client';
+import { IdentityKeyPair as LibSignalIKP, PrivateKey } from '@signalapp/libsignal-client';
 
-import type {
-  IdentityKeyPair,
-  SignedPreKey,
-  OneTimePreKey,
-} from './signal-types.js';
+import type { IdentityKeyPair, SignedPreKey, OneTimePreKey } from './signal-types.js';
 
 // ------------------------------------------------------------------ //
 // MigrationResult
@@ -96,7 +89,7 @@ export function generateRegistrationId(): number {
  */
 export async function generateSignedPreKey(
   identityKeyPair: IdentityKeyPair,
-  id: number,
+  id: number
 ): Promise<SignedPreKey> {
   // Generate a fresh Curve25519 key pair for the signed prekey
   const spkPriv = PrivateKey.generate();
@@ -104,9 +97,7 @@ export async function generateSignedPreKey(
   const spkPubBytes = spkPub.serialize();
 
   // Reconstruct the libsignal PrivateKey from our Uint8Array so we can sign
-  const libPrivKey = PrivateKey.deserialize(
-    identityKeyPair.privateKey as Uint8Array<ArrayBuffer>,
-  );
+  const libPrivKey = PrivateKey.deserialize(identityKeyPair.privateKey as Uint8Array<ArrayBuffer>);
   const signature = libPrivKey.sign(spkPubBytes);
 
   return {
@@ -133,7 +124,7 @@ export async function generateSignedPreKey(
  */
 export async function generateOneTimePreKeys(
   startId: number,
-  count: number,
+  count: number
 ): Promise<OneTimePreKey[]> {
   const keys: OneTimePreKey[] = [];
   for (let i = 0; i < count; i++) {
@@ -167,12 +158,10 @@ export async function generateOneTimePreKeys(
  *         private key (e.g. wrong length or invalid bytes).
  */
 export async function migrateDeviceIdentity(
-  legacyPrivateKey: Uint8Array,
+  legacyPrivateKey: Uint8Array
 ): Promise<MigrationResult> {
   // Derive the legacy public key — will throw for invalid input (e.g. empty)
-  const legacyLibPriv = PrivateKey.deserialize(
-    legacyPrivateKey as Uint8Array<ArrayBuffer>,
-  );
+  const legacyLibPriv = PrivateKey.deserialize(legacyPrivateKey as Uint8Array<ArrayBuffer>);
   const legacyPublicKey = legacyLibPriv.getPublicKey().serialize();
 
   // Generate fresh Signal Protocol credentials

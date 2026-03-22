@@ -65,9 +65,7 @@ export type EmberCmd =
  *
  * @template A - Shape of the command-specific arguments object.
  */
-export interface EmberIpcMessage<
-  A extends object = Record<string, unknown>
-> {
+export interface EmberIpcMessage<A extends object = Record<string, unknown>> {
   readonly cmd: EmberCmd;
   readonly args: A;
 }

@@ -53,8 +53,12 @@
   letter-spacing: 2px;
 }
 
-.loading-text::before { content: '-- '; }
-.loading-text::after  { content: '--'; }
+.loading-text::before {
+  content: '-- ';
+}
+.loading-text::after {
+  content: '--';
+}
 
 .loading-subtext {
   font-family: 'Courier New', Courier, monospace;

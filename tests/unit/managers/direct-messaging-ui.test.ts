@@ -59,7 +59,12 @@ beforeAll(() => {
     ipc: {
       invoke: jest.fn().mockImplementation((channel: string) => {
         if (channel === 'get-auth') {
-          return Promise.resolve({ token: 'tok', hostname: 'http://localhost', user_id: 'me', username: 'Me' });
+          return Promise.resolve({
+            token: 'tok',
+            hostname: 'http://localhost',
+            user_id: 'me',
+            username: 'Me',
+          });
         }
         return Promise.resolve(null);
       }),
@@ -84,7 +89,13 @@ beforeAll(() => {
       if (cmd === 'GetAuth') {
         return Promise.resolve({
           success: true,
-          data: { token: 'tok', userId: 'me', deviceId: 'dev-1', hostname: 'http://localhost', username: 'Me' },
+          data: {
+            token: 'tok',
+            userId: 'me',
+            deviceId: 'dev-1',
+            hostname: 'http://localhost',
+            username: 'Me',
+          },
         });
       }
       return Promise.resolve({ success: true, data: null });
@@ -106,7 +117,10 @@ beforeAll(() => {
 
   // 5. Stub globals the module may call
   (window as any).getValidAuth = jest.fn().mockResolvedValue({
-    token: 'tok', hostname: 'http://localhost', user_id: 'me', username: 'Me',
+    token: 'tok',
+    hostname: 'http://localhost',
+    user_id: 'me',
+    username: 'Me',
   });
   (window as any).announceToScreenReader = jest.fn();
 
@@ -119,7 +133,12 @@ beforeAll(() => {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function addTestConversation(id: string, participantId: string, username: string, isOnline = false): void {
+function addTestConversation(
+  id: string,
+  participantId: string,
+  username: string,
+  isOnline = false
+): void {
   (window as any).addDmConversationToList({
     id,
     participantId,
@@ -142,9 +161,15 @@ describe('handleDmPresenceUpdate', () => {
   it('sets avatar to online class when status is "online"', () => {
     addTestConversation('ch-online-1', 'user-alice', 'Alice');
 
-    (window as any).handleDmPresenceUpdate({ user_id: 'user-alice', username: 'Alice', status: 'online' });
+    (window as any).handleDmPresenceUpdate({
+      user_id: 'user-alice',
+      username: 'Alice',
+      status: 'online',
+    });
 
-    const avatar = document.querySelector('[data-conversation-id="ch-online-1"] .dm-avatar') as HTMLElement;
+    const avatar = document.querySelector(
+      '[data-conversation-id="ch-online-1"] .dm-avatar'
+    ) as HTMLElement;
     expect(avatar).not.toBeNull();
     expect(avatar.classList.contains('online')).toBe(true);
     expect(avatar.classList.contains('offline')).toBe(false);
@@ -153,9 +178,15 @@ describe('handleDmPresenceUpdate', () => {
   it('sets avatar to offline class when status is "offline"', () => {
     addTestConversation('ch-offline-1', 'user-bob', 'Bob', true /* starts online */);
 
-    (window as any).handleDmPresenceUpdate({ user_id: 'user-bob', username: 'Bob', status: 'offline' });
+    (window as any).handleDmPresenceUpdate({
+      user_id: 'user-bob',
+      username: 'Bob',
+      status: 'offline',
+    });
 
-    const avatar = document.querySelector('[data-conversation-id="ch-offline-1"] .dm-avatar') as HTMLElement;
+    const avatar = document.querySelector(
+      '[data-conversation-id="ch-offline-1"] .dm-avatar'
+    ) as HTMLElement;
     expect(avatar).not.toBeNull();
     expect(avatar.classList.contains('offline')).toBe(true);
     expect(avatar.classList.contains('online')).toBe(false);
@@ -163,7 +194,11 @@ describe('handleDmPresenceUpdate', () => {
 
   it('does not throw for unknown user IDs', () => {
     expect(() => {
-      (window as any).handleDmPresenceUpdate({ user_id: 'nobody-xyz', username: 'Nobody', status: 'online' });
+      (window as any).handleDmPresenceUpdate({
+        user_id: 'nobody-xyz',
+        username: 'Nobody',
+        status: 'online',
+      });
     }).not.toThrow();
   });
 });
@@ -215,7 +250,9 @@ describe('clearAllDmUnread', () => {
 
     (window as any).clearAllDmUnread();
 
-    const unreadBadges = document.querySelectorAll('[data-conversation-id="conv-ra-2"] .dm-unread-count');
+    const unreadBadges = document.querySelectorAll(
+      '[data-conversation-id="conv-ra-2"] .dm-unread-count'
+    );
     expect(unreadBadges.length).toBe(0);
   });
 

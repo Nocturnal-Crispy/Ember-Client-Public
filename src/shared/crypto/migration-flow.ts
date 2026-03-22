@@ -47,7 +47,7 @@ export function needsMigration(deviceProtocolVersion: number): boolean {
 async function generateProofOfPossession(
   identityPrivateKey: Uint8Array,
   deviceId: string,
-  identityKeyBase64: string,
+  identityKeyBase64: string
 ): Promise<string> {
   const message = new TextEncoder().encode(`${deviceId}${identityKeyBase64}`);
   const privKey = PrivateKey.deserialize(identityPrivateKey as Uint8Array<ArrayBuffer>);
@@ -72,7 +72,7 @@ async function generateProofOfPossession(
 export async function performMigration(
   auth: AuthData,
   deviceId: string,
-  legacyPrivateKey: Uint8Array,
+  legacyPrivateKey: Uint8Array
 ): Promise<MigrationOutcome> {
   let migrationResult: MigrationResult;
   try {
@@ -84,7 +84,9 @@ export async function performMigration(
     };
   }
 
-  const identityKeyBase64 = Buffer.from(migrationResult.identityKeyPair.publicKey).toString('base64');
+  const identityKeyBase64 = Buffer.from(migrationResult.identityKeyPair.publicKey).toString(
+    'base64'
+  );
 
   try {
     await uploadSignedPreKey(auth, migrationResult.signedPreKey);
@@ -111,7 +113,7 @@ export async function performMigration(
     proofOfPossession = await generateProofOfPossession(
       migrationResult.identityKeyPair.privateKey,
       deviceId,
-      identityKeyBase64,
+      identityKeyBase64
     );
   } catch (err) {
     return {
@@ -133,7 +135,7 @@ export async function performMigration(
           proof_of_possession: proofOfPossession,
         } satisfies DeviceUpdateRequest),
       },
-      auth.token,
+      auth.token
     );
   } catch (err) {
     return {

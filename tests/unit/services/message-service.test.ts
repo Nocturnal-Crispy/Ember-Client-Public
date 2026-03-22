@@ -68,13 +68,13 @@ let mockProcessIncomingDistributions: jest.Mock;
 beforeEach(() => {
   mockEmberApiInvokeForSenderKeys = jest.fn();
   mockProcessIncomingDistributions = jest.fn().mockResolvedValue(undefined);
-  
+
   (window as any).emberAPI = {
     invoke: mockEmberApiInvokeForSenderKeys,
   };
-  
+
   (window as any).processIncomingDistributions = mockProcessIncomingDistributions;
-  
+
   // Reset logger mock
   const mockLogger = (window as any)._mockLogger;
   mockLogger.warn.mockClear();
@@ -193,7 +193,7 @@ describe('Sender Key Decryption', () => {
   beforeEach(() => {
     // Set up active ember for message display
     (window as any).App.activeEmberId = 'test-ember-id';
-    
+
     // Mock GroupDecrypt to fail (simulating missing sender key)
     mockEmberApiInvokeForSenderKeys.mockImplementation((cmd: string) => {
       if (cmd === 'GroupDecrypt') {
@@ -209,7 +209,7 @@ describe('Sender Key Decryption', () => {
 
   it('should log warning and trigger distribution fetch when sender key decrypt fails', async () => {
     const mockLogger = (window as any)._mockLogger;
-    
+
     // Create a message with signal_group envelope type
     const message = {
       id: 'test-message-id',
@@ -217,7 +217,7 @@ describe('Sender Key Decryption', () => {
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
       envelope_type: 'signal_group',
       created_at: 1700000000,
-      chat_color: '#ff0000'
+      chat_color: '#ff0000',
     };
 
     // Call displayDecryptedMessage which should trigger the failure path
@@ -225,7 +225,7 @@ describe('Sender Key Decryption', () => {
 
     // Verify warning was logged with the specific message
     expect(mockLogger.warn).toHaveBeenCalledWith(
-      "Sender key decrypt failed, triggering distribution fetch",
+      'Sender key decrypt failed, triggering distribution fetch',
       { message_id: 'test-message-id' }
     );
 
@@ -245,7 +245,7 @@ describe('Sender Key Decryption', () => {
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
       envelope_type: 'signal_group',
       created_at: 1700000000,
-      chat_color: '#ff0000'
+      chat_color: '#ff0000',
     };
 
     // Call displayDecryptedMessage which should trigger the failure path
@@ -283,7 +283,7 @@ describe('Sender Key Decryption', () => {
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
       envelope_type: 'signal_group',
       created_at: 1700000000,
-      chat_color: '#ff0000'
+      chat_color: '#ff0000',
     };
 
     // Call displayDecryptedMessage - should fail initially, fetch distribution, then retry and succeed
@@ -292,13 +292,13 @@ describe('Sender Key Decryption', () => {
     // Verify the message was successfully decrypted (not waiting message)
     const decryptedMessage = container.querySelector('.message-content');
     expect(decryptedMessage?.textContent).toContain('Hello World');
-    
+
     // Verify no waiting message is shown
     expect(decryptedMessage?.textContent).not.toContain('Waiting for sender key');
-    
+
     // Verify processIncomingDistributions was called
     expect(mockProcessIncomingDistributions).toHaveBeenCalled();
-    
+
     // Verify GroupDecrypt was called twice (initial fail + retry)
     expect(decryptAttempts).toBe(2);
   });

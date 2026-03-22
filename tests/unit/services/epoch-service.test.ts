@@ -27,7 +27,7 @@ describe('EpochService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock SignalSessionManager
     mockSignalSessionManager = {
       hasSession: jest.fn(),
@@ -89,7 +89,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -103,7 +103,9 @@ describe('EpochService', () => {
         status: 500,
       });
 
-      await expect(epochService.getCurrentEpoch('ember-456')).rejects.toThrow('Failed to fetch current epoch');
+      await expect(epochService.getCurrentEpoch('ember-456')).rejects.toThrow(
+        'Failed to fetch current epoch'
+      );
     });
 
     it('should return null if no epochs exist', async () => {
@@ -130,7 +132,7 @@ describe('EpochService', () => {
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => (mockEpoch),
+        json: async () => mockEpoch,
       });
 
       const result = await epochService.createEpoch('ember-456', rotationData);
@@ -140,7 +142,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify({ rotation_data: rotationData }),
@@ -160,7 +162,7 @@ describe('EpochService', () => {
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => (mockEpoch),
+        json: async () => mockEpoch,
       });
 
       const result = await epochService.createEpoch('ember-456');
@@ -207,7 +209,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -230,7 +232,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -266,7 +268,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -295,7 +297,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify({ keys }),
@@ -335,7 +337,7 @@ describe('EpochService', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -363,12 +365,17 @@ describe('EpochService', () => {
       };
 
       // Mock SignalSessionManager methods
-      mockSignalSessionManager.groupEncrypt.mockResolvedValue(new TextEncoder().encode('encrypted-rotation-data'));
+      mockSignalSessionManager.groupEncrypt.mockResolvedValue(
+        new TextEncoder().encode('encrypted-rotation-data')
+      );
 
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({ ok: true, json: async () => ({ epochs: [currentEpoch] }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => (newEpoch) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ message: 'stored 1 epoch keys' }) });
+        .mockResolvedValueOnce({ ok: true, json: async () => newEpoch })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ message: 'stored 1 epoch keys' }),
+        });
 
       const result = await epochService.rotateEpoch('ember-456');
 

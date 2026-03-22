@@ -215,7 +215,7 @@
   gap: 0.75rem;
 }
 
-.timeout-row input[type="range"] {
+.timeout-row input[type='range'] {
   flex: 1;
   accent-color: rgb(var(--rgb-highlight, 255, 120, 80));
 }

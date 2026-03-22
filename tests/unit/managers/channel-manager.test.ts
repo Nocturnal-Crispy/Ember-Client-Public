@@ -120,7 +120,13 @@ describe('fetchChannels', () => {
   it('returns an empty array when the service throws', async () => {
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('forbidden'));
     const result = await (window as any).fetchChannels('e-1');
@@ -135,7 +141,13 @@ describe('fetchChannels', () => {
 
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
 
     mockChannelServiceFetchChannels.mockImplementationOnce((_auth: any, _emberId: any) => {
@@ -149,7 +161,13 @@ describe('fetchChannels', () => {
   it('returns an empty array when the service rejects', async () => {
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockChannelServiceFetchChannels.mockRejectedValueOnce(new Error('network error'));
     const result = await (window as any).fetchChannels('e-1');
@@ -157,9 +175,21 @@ describe('fetchChannels', () => {
   });
 
   it('calls channelService.fetchChannels with auth and emberId', async () => {
-    const authData = { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' };
+    const authData = {
+      token: 'tok',
+      userId: 'u1',
+      deviceId: 'd1',
+      hostname: 'http://localhost:8085',
+      username: 'alice',
+    };
     // The auth passed to channelService will be in AuthData format (user_id/device_id)
-    const expectedAuth = { token: 'tok', user_id: 'u1', device_id: 'd1', hostname: 'http://localhost:8085', username: 'alice' };
+    const expectedAuth = {
+      token: 'tok',
+      user_id: 'u1',
+      device_id: 'd1',
+      hostname: 'http://localhost:8085',
+      username: 'alice',
+    };
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
       data: authData,
@@ -183,7 +213,13 @@ describe('fetchCategories', () => {
     const mockCats = [{ id: 'cat-1', ember_id: 'e-1', name: 'Text Channels' }];
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
-      data: { token: 'tok', userId: 'u1', deviceId: 'd1', hostname: 'http://localhost:8085', username: 'alice' },
+      data: {
+        token: 'tok',
+        userId: 'u1',
+        deviceId: 'd1',
+        hostname: 'http://localhost:8085',
+        username: 'alice',
+      },
     });
     mockChannelServiceFetchChannels.mockResolvedValueOnce({ channels: [], categories: mockCats });
     const result = await (window as any).fetchCategories('e-1');
@@ -266,9 +302,7 @@ describe('renderChannels', () => {
   });
 
   it('sets data-channel-id attribute on each channel element', () => {
-    const channels = [
-      { id: 'ch-abc', ember_id: 'e-1', name: 'test', type: 'text' as const },
-    ];
+    const channels = [{ id: 'ch-abc', ember_id: 'e-1', name: 'test', type: 'text' as const }];
 
     (window as any).renderChannels(channels, []);
 
@@ -355,7 +389,9 @@ describe('markChannelUnread', () => {
     );
     (window as any).markChannelUnread('ch-click');
 
-    const el = channelsContainer.querySelector<HTMLElement>('.channel[data-channel-id="ch-click"]')!;
+    const el = channelsContainer.querySelector<HTMLElement>(
+      '.channel[data-channel-id="ch-click"]'
+    )!;
     expect(el.classList.contains('has-unread')).toBe(true);
 
     el.click();

@@ -62,7 +62,9 @@ export class EnhancedRecoveryService {
    * Get the base URL for API calls
    */
   private getBaseUrl(): string {
-    return this.auth.hostname.startsWith('http') ? this.auth.hostname : `https://${this.auth.hostname}`;
+    return this.auth.hostname.startsWith('http')
+      ? this.auth.hostname
+      : `https://${this.auth.hostname}`;
   }
 
   /**
@@ -76,18 +78,18 @@ export class EnhancedRecoveryService {
       const language = navigator.language;
       const screenResolution = `${screen.width}x${screen.height}`;
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
+
       // Combine device characteristics
       const deviceData = `${userAgent}|${platform}|${language}|${screenResolution}|${timezone}|${this.auth.device_id}`;
-      
+
       // Create hash (simplified - would use proper cryptographic hash in production)
       let hash = 0;
       for (let i = 0; i < deviceData.length; i++) {
         const char = deviceData.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
+        hash = (hash << 5) - hash + char;
         hash = hash & hash; // Convert to 32-bit integer
       }
-      
+
       return Math.abs(hash).toString(16).padStart(8, '0');
     } catch (error) {
       console.error('Failed to generate device fingerprint:', error);
@@ -99,26 +101,31 @@ export class EnhancedRecoveryService {
   /**
    * Create an enhanced recovery code for Signal Protocol v2.3
    */
-  async createEnhancedRecoveryCode(): Promise<{ recoveryCode: string; recoveryData: RecoveryCodeData }> {
+  async createEnhancedRecoveryCode(): Promise<{
+    recoveryCode: string;
+    recoveryData: RecoveryCodeData;
+  }> {
     try {
       // Get current epoch for enhanced recovery
       const currentEpoch = await this.getCurrentEmberEpoch();
-      
+
       // Get identity key from safe storage
       const identityKey = await this.getIdentityKeyFromSafeStorage();
-      
+
       // Generate recovery code
       const recoveryCode = this.generateRecoveryCode(24);
-      
+
       // Encrypt device key with recovery code (existing method)
-      const { encrypted: encryptedDeviceKey, salt } = await this.encryptDeviceKeyWithRecoveryCode(recoveryCode);
-      
+      const { encrypted: encryptedDeviceKey, salt } =
+        await this.encryptDeviceKeyWithRecoveryCode(recoveryCode);
+
       // Encrypt identity key with recovery code (enhanced method)
-      const { encrypted: encryptedIdentityKey, salt: identityKeySalt } = await this.encryptIdentityKeyWithRecoveryCode(identityKey, recoveryCode);
-      
+      const { encrypted: encryptedIdentityKey, salt: identityKeySalt } =
+        await this.encryptIdentityKeyWithRecoveryCode(identityKey, recoveryCode);
+
       // Generate device fingerprint
       const deviceFingerprint = this.generateDeviceFingerprint();
-      
+
       // Create recovery data
       const recoveryData: RecoveryCodeData = {
         user_id: this.auth.user_id,
@@ -133,10 +140,10 @@ export class EnhancedRecoveryService {
         last_rotated_at: Date.now(),
         created_at: Date.now(),
       };
-      
+
       // Store recovery data on server
       await this.storeEnhancedRecoveryCode(recoveryData);
-      
+
       return { recoveryCode, recoveryData };
     } catch (error) {
       console.error('Failed to create enhanced recovery code:', error);
@@ -147,26 +154,31 @@ export class EnhancedRecoveryService {
   /**
    * Update existing recovery code with enhanced features
    */
-  async updateToEnhancedRecoveryCode(): Promise<{ recoveryCode: string; recoveryData: RecoveryCodeData }> {
+  async updateToEnhancedRecoveryCode(): Promise<{
+    recoveryCode: string;
+    recoveryData: RecoveryCodeData;
+  }> {
     try {
       // Get existing recovery code data
       const existingData = await this.getRecoveryCodeData();
-      
+
       if (!existingData) {
         throw new Error('No existing recovery code found');
       }
-      
+
       // Generate new recovery code
       const newRecoveryCode = this.generateRecoveryCode(24);
-      
+
       // Get identity key and epoch
       const identityKey = await this.getIdentityKeyFromSafeStorage();
       const currentEpoch = await this.getCurrentEmberEpoch();
-      
+
       // Encrypt keys with new recovery code
-      const { encrypted: encryptedDeviceKey, salt } = await this.encryptDeviceKeyWithRecoveryCode(newRecoveryCode);
-      const { encrypted: encryptedIdentityKey, salt: identityKeySalt } = await this.encryptIdentityKeyWithRecoveryCode(identityKey, newRecoveryCode);
-      
+      const { encrypted: encryptedDeviceKey, salt } =
+        await this.encryptDeviceKeyWithRecoveryCode(newRecoveryCode);
+      const { encrypted: encryptedIdentityKey, salt: identityKeySalt } =
+        await this.encryptIdentityKeyWithRecoveryCode(identityKey, newRecoveryCode);
+
       // Update recovery data
       const updatedData: RecoveryCodeData = {
         ...existingData,
@@ -180,10 +192,10 @@ export class EnhancedRecoveryService {
         device_fingerprint: this.generateDeviceFingerprint(),
         last_rotated_at: Date.now(),
       };
-      
+
       // Update on server
       await this.updateRecoveryCodeData(updatedData);
-      
+
       return { recoveryCode: newRecoveryCode, recoveryData: updatedData };
     } catch (error) {
       console.error('Failed to update to enhanced recovery code:', error);
@@ -194,18 +206,24 @@ export class EnhancedRecoveryService {
   /**
    * Verify recovery code and decrypt keys
    */
-  async verifyRecoveryCode(recoveryCode: string): Promise<{ deviceKey: Uint8Array; identityKey: Uint8Array; valid: boolean }> {
+  async verifyRecoveryCode(
+    recoveryCode: string
+  ): Promise<{ deviceKey: Uint8Array; identityKey: Uint8Array; valid: boolean }> {
     try {
       // Get recovery code data
       const recoveryData = await this.getRecoveryCodeData();
-      
+
       if (!recoveryData) {
         return { deviceKey: new Uint8Array(0), identityKey: new Uint8Array(0), valid: false };
       }
-      
+
       // Decrypt device key
-      const deviceKey = await this.decryptDeviceKeyWithRecoveryCode(recoveryData.encrypted_device_key, recoveryData.salt, recoveryCode);
-      
+      const deviceKey = await this.decryptDeviceKeyWithRecoveryCode(
+        recoveryData.encrypted_device_key,
+        recoveryData.salt,
+        recoveryCode
+      );
+
       // Decrypt identity key if available
       let identityKey: Uint8Array = new Uint8Array();
       if (recoveryData.encrypted_identity_key && recoveryData.identity_key_salt) {
@@ -216,7 +234,7 @@ export class EnhancedRecoveryService {
         );
         identityKey = new Uint8Array(decryptedKey);
       }
-      
+
       return { deviceKey, identityKey, valid: true };
     } catch (error) {
       console.error('Failed to verify recovery code:', error);
@@ -232,7 +250,7 @@ export class EnhancedRecoveryService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/recovery-codes`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -271,7 +289,7 @@ export class EnhancedRecoveryService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/recovery-codes`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
@@ -303,7 +321,7 @@ export class EnhancedRecoveryService {
       const response = await fetch(`${this.getBaseUrl()}/api/v1/recovery-codes`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${this.auth.token}`,
+          Authorization: `Bearer ${this.auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
@@ -339,15 +357,15 @@ export class EnhancedRecoveryService {
     try {
       const safeStorageResult = await window.emberAPI.invoke<{ value: string | null }>(
         'GetSafeStorage',
-        { key: `identity_key_${this.auth.user_id}_${this.auth.device_id}` },
+        { key: `identity_key_${this.auth.user_id}_${this.auth.device_id}` }
       );
       const identityKeyB64 = safeStorageResult.data?.value ?? null;
-      
+
       if (!identityKeyB64) {
         throw new Error('Identity key not found in safe storage');
       }
-      
-      return Uint8Array.from(atob(identityKeyB64), (c) => c.charCodeAt(0));
+
+      return Uint8Array.from(atob(identityKeyB64), c => c.charCodeAt(0));
     } catch (error) {
       console.error('Failed to get identity key from safe storage:', error);
       throw error;
@@ -364,7 +382,9 @@ export class EnhancedRecoveryService {
   /**
    * Encrypt device key with recovery code
    */
-  private async encryptDeviceKeyWithRecoveryCode(recoveryCode: string): Promise<{ encrypted: string; salt: string }> {
+  private async encryptDeviceKeyWithRecoveryCode(
+    recoveryCode: string
+  ): Promise<{ encrypted: string; salt: string }> {
     // This would use the existing encryption method
     // For now, return a placeholder
     return {
@@ -376,7 +396,11 @@ export class EnhancedRecoveryService {
   /**
    * Decrypt device key with recovery code
    */
-  private async decryptDeviceKeyWithRecoveryCode(encryptedKey: string, salt: string, recoveryCode: string): Promise<Uint8Array> {
+  private async decryptDeviceKeyWithRecoveryCode(
+    encryptedKey: string,
+    salt: string,
+    recoveryCode: string
+  ): Promise<Uint8Array> {
     // This would use the existing decryption method
     // For now, return a placeholder
     return new TextEncoder().encode('decrypted-device-key-placeholder');
@@ -385,14 +409,17 @@ export class EnhancedRecoveryService {
   /**
    * Encrypt identity key with recovery code (enhanced method)
    */
-  private async encryptIdentityKeyWithRecoveryCode(identityKey: Uint8Array, recoveryCode: string): Promise<{ encrypted: string; salt: string }> {
+  private async encryptIdentityKeyWithRecoveryCode(
+    identityKey: Uint8Array,
+    recoveryCode: string
+  ): Promise<{ encrypted: string; salt: string }> {
     try {
       // Enhanced encryption for identity keys with better security
       // In reality, this would use proper cryptographic operations
       // P1-3 FIX: Use Buffer-based encoding to prevent stack overflow for large payloads
       const encrypted = Buffer.from(identityKey).toString('base64');
       const salt = crypto.randomUUID();
-      
+
       return { encrypted, salt };
     } catch (error) {
       console.error('Failed to encrypt identity key with recovery code:', error);
@@ -403,7 +430,11 @@ export class EnhancedRecoveryService {
   /**
    * Decrypt identity key with recovery code (enhanced method)
    */
-  private async decryptIdentityKeyWithRecoveryCode(encryptedKey: string, salt: string, recoveryCode: string): Promise<Uint8Array> {
+  private async decryptIdentityKeyWithRecoveryCode(
+    encryptedKey: string,
+    salt: string,
+    recoveryCode: string
+  ): Promise<Uint8Array> {
     try {
       // Enhanced decryption for identity keys
       // In reality, this would use proper cryptographic operations
@@ -422,17 +453,17 @@ export class EnhancedRecoveryService {
   async needsRotation(): Promise<boolean> {
     try {
       const recoveryData = await this.getRecoveryCodeData();
-      
+
       if (!recoveryData) {
         return true; // No recovery code exists, needs creation
       }
-      
+
       // Check if last rotation was more than 90 days ago
-      const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+      const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
       if (recoveryData.last_rotated_at && recoveryData.last_rotated_at < ninetyDaysAgo) {
         return true;
       }
-      
+
       return false;
     } catch (error) {
       console.error('Failed to check if recovery code needs rotation:', error);
@@ -452,7 +483,7 @@ export class EnhancedRecoveryService {
     try {
       const recoveryData = await this.getRecoveryCodeData();
       const needsRotation = await this.needsRotation();
-      
+
       const recommendations: string[] = [];
       const isEnhanced = !!recoveryData && recoveryData.protocol_version >= 2;
 

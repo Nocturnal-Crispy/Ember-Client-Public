@@ -123,7 +123,9 @@
   font-size: 12px;
   padding: 3px 7px;
   line-height: 1;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
   white-space: nowrap;
 }
 

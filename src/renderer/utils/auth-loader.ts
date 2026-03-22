@@ -12,18 +12,27 @@ let cachedAuth: AuthData | null = null;
  * Returns null if authentication is missing or invalid.
  */
 async function getValidAuth(): Promise<AuthData | null> {
-  const resp = await window.emberAPI.invoke<{ token: string; userId: string; deviceId: string; hostname: string; username: string }>('GetAuth', {});
-  const auth: AuthData | null = (resp.success && resp.data) ? {
-    token: resp.data.token,
-    user_id: (resp.data as any).userId ?? (resp.data as any).user_id,
-    device_id: (resp.data as any).deviceId ?? (resp.data as any).device_id,
-    hostname: resp.data.hostname,
-    username: resp.data.username,
-  } : null;
+  const resp = await window.emberAPI.invoke<{
+    token: string;
+    userId: string;
+    deviceId: string;
+    hostname: string;
+    username: string;
+  }>('GetAuth', {});
+  const auth: AuthData | null =
+    resp.success && resp.data
+      ? {
+          token: resp.data.token,
+          user_id: (resp.data as any).userId ?? (resp.data as any).user_id,
+          device_id: (resp.data as any).deviceId ?? (resp.data as any).device_id,
+          hostname: resp.data.hostname,
+          username: resp.data.username,
+        }
+      : null;
   if (!auth || !auth.token || !auth.hostname) {
     return null;
   }
-  
+
   // Update cache
   cachedAuth = auth;
   return auth;
@@ -45,13 +54,13 @@ function getAuthSync(): AuthData | null {
 function isValidAuth(auth: unknown): auth is AuthData {
   return !!(
     auth &&
-    typeof auth === "object" &&
-    "token" in auth &&
-    "hostname" in auth &&
-    "user_id" in auth &&
-    "device_id" in auth &&
-    typeof (auth as AuthData).token === "string" &&
-    typeof (auth as AuthData).hostname === "string"
+    typeof auth === 'object' &&
+    'token' in auth &&
+    'hostname' in auth &&
+    'user_id' in auth &&
+    'device_id' in auth &&
+    typeof (auth as AuthData).token === 'string' &&
+    typeof (auth as AuthData).hostname === 'string'
   );
 }
 
@@ -71,7 +80,7 @@ async function createAuthenticatedFetch(
   const fetchOptions: RequestInit = {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${auth.token}`,
       ...options.headers,
     },

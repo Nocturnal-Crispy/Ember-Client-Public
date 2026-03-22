@@ -9,9 +9,16 @@
   font-family: 'Courier New', Courier, monospace;
 }
 
-.member-list::-webkit-scrollbar { width: 6px; background: transparent; }
-.member-list::-webkit-scrollbar-thumb { background: rgba(var(--rgb-highlight), 0.2); }
-.member-list::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-highlight), 0.5); }
+.member-list::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+.member-list::-webkit-scrollbar-thumb {
+  background: rgba(var(--rgb-highlight), 0.2);
+}
+.member-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--rgb-highlight), 0.5);
+}
 
 /* ─── Category Label ───────────────────────────────────────────────────────── */
 
@@ -91,10 +98,18 @@
   background: rgba(var(--rgb-text), 0.3);
 }
 
-.status-icon.status-online  { background: var(--online-color); }
-.status-icon.status-idle    { background: var(--afk-color); }
-.status-icon.status-dnd     { background: var(--dnd-color); }
-.status-icon.status-offline { background: rgba(var(--rgb-text), 0.3); }
+.status-icon.status-online {
+  background: var(--online-color);
+}
+.status-icon.status-idle {
+  background: var(--afk-color);
+}
+.status-icon.status-dnd {
+  background: var(--dnd-color);
+}
+.status-icon.status-offline {
+  background: rgba(var(--rgb-text), 0.3);
+}
 
 /* ─── Member Name ──────────────────────────────────────────────────────────── */
 

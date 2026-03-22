@@ -85,13 +85,10 @@
       }
 
       const plaintextB64 = textToBase64(plaintext);
-      const encResp = await window.emberAPI.invoke<{ ciphertext: string }>(
-        'GroupEncrypt',
-        {
-          distributionId: distResp.data!.distributionId!,
-          plaintext: plaintextB64,
-        }
-      );
+      const encResp = await window.emberAPI.invoke<{ ciphertext: string }>('GroupEncrypt', {
+        distributionId: distResp.data!.distributionId!,
+        plaintext: plaintextB64,
+      });
 
       if (!encResp.success || !encResp.data?.ciphertext) {
         log.warn('GroupEncrypt failed', {
@@ -140,10 +137,7 @@
    * Route decryption based on wire type detected from the message.
    * ALWAYS routes by message content, NEVER by conversation type.
    */
-  async function decryptMessage(
-    ciphertext: string,
-    emberId: string
-  ): Promise<string | null> {
+  async function decryptMessage(ciphertext: string, emberId: string): Promise<string | null> {
     const wireType = detectWireType(ciphertext);
 
     log.debug('Decryption routing', {
@@ -182,10 +176,10 @@
         return null;
       }
 
-      const decResp = await window.emberAPI.invoke<{ plaintext: string }>(
-        'GroupDecrypt',
-        { senderAddress: envelope.sa, ciphertext: envelope.ct }
-      );
+      const decResp = await window.emberAPI.invoke<{ plaintext: string }>('GroupDecrypt', {
+        senderAddress: envelope.sa,
+        ciphertext: envelope.ct,
+      });
 
       if (!decResp.success || !decResp.data?.plaintext) {
         log.warn('GroupDecrypt failed', {

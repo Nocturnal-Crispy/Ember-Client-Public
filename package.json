@@ -24,6 +24,8 @@
     "test:e2e:install": "playwright install",
     "test:e2e:report": "playwright show-report test-results-report",
     "test:all": "npm run test && npm run test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "release": "npm run build && ./scripts/release.sh",
     "rebuild-native": "electron-rebuild -f -w better-sqlite3,windows-audio-capture,linux-audio-capture",
     "postinstall": "electron-rebuild -f -w better-sqlite3"
@@ -46,6 +48,7 @@
     "electron-builder": "^26.8.1",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
+    "prettier": "^3.8.1",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"

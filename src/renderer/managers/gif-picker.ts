@@ -7,7 +7,7 @@
  * Favorites persist across sessions via IPC storage (max 30).
  */
 (function (): void {
-  const log = window.emberLog.createLogger("GifPicker");
+  const log = window.emberLog.createLogger('GifPicker');
 
   // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@
   // ── Configuration ─────────────────────────────────────────────────────────
 
   let KLIPY_APP_KEY: string | null = null;
-  const KLIPY_BASE_URL = "https://api.klipy.com/api/v1";
+  const KLIPY_BASE_URL = 'https://api.klipy.com/api/v1';
   const GIF_PER_PAGE = 20;
   const SEARCH_DEBOUNCE_MS = 400;
   const AUTOCOMPLETE_DEBOUNCE_MS = 150;
@@ -56,7 +56,7 @@
   const AD_MAX_WIDTH = 344;
   const AD_MAX_HEIGHT = 250;
   const MOBILE_USER_AGENT =
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
   const MAX_FAVORITES = 30;
 
   // ── Session customer ID ───────────────────────────────────────────────────
@@ -82,31 +82,31 @@
   let isLoading = false;
   let hasMore = true;
   let activeSuggestionIndex = -1;
-  let currentTab: "search" | "favorites" = "search";
+  let currentTab: 'search' | 'favorites' = 'search';
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function getLocale(): string {
-    const lang = navigator.language || "en-US";
-    const parts = lang.split("-");
-    return (parts[1] || parts[0] || "us").toLowerCase();
+    const lang = navigator.language || 'en-US';
+    const parts = lang.split('-');
+    return (parts[1] || parts[0] || 'us').toLowerCase();
   }
 
   function buildAdParams(): Record<string, string> {
     return {
-      "ad-min-width": "50",
-      "ad-max-width": String(AD_MAX_WIDTH),
-      "ad-min-height": "50",
-      "ad-max-height": String(AD_MAX_HEIGHT),
-      "ad-pxratio": String(window.devicePixelRatio ?? 1),
-      "ad-iframe": "0",
+      'ad-min-width': '50',
+      'ad-max-width': String(AD_MAX_WIDTH),
+      'ad-min-height': '50',
+      'ad-max-height': String(AD_MAX_HEIGHT),
+      'ad-pxratio': String(window.devicePixelRatio ?? 1),
+      'ad-iframe': '0',
     };
   }
 
   function toQueryString(params: Record<string, string>): string {
     return Object.entries(params)
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join("&");
+      .join('&');
   }
 
   function extractStringList(response: AutocompleteResponse): string[] {
@@ -118,7 +118,7 @@
   }
 
   function isAdItem(item: GifResult): boolean {
-    return item.type === "ad";
+    return item.type === 'ad';
   }
 
   function isApiKeyConfigured(): boolean {
@@ -129,20 +129,20 @@
 
   async function loadFavoritesFromStorage(): Promise<void> {
     try {
-      const result = (await window.electronAPI.ipc.invoke(
-        "get-gif-favorites"
-      )) as GifFavorite[] | null;
+      const result = (await window.electronAPI.ipc.invoke('get-gif-favorites')) as
+        | GifFavorite[]
+        | null;
       window.App.gifFavorites = Array.isArray(result) ? result : [];
-      log.debug("GIF favorites loaded", { count: window.App.gifFavorites.length });
+      log.debug('GIF favorites loaded', { count: window.App.gifFavorites.length });
     } catch (err) {
-      log.error("Failed to load GIF favorites", { error: String(err) });
+      log.error('Failed to load GIF favorites', { error: String(err) });
       window.App.gifFavorites = [];
     }
   }
 
   function saveFavoritesToStorage(favorites: GifFavorite[]): void {
-    window.electronAPI.ipc.invoke("save-gif-favorites", favorites).catch((err) => {
-      log.error("Failed to save GIF favorites", { error: String(err) });
+    window.electronAPI.ipc.invoke('save-gif-favorites', favorites).catch(err => {
+      log.error('Failed to save GIF favorites', { error: String(err) });
     });
   }
 
@@ -153,7 +153,7 @@
   }
 
   function isFavorited(url: string): boolean {
-    return getFavorites().some((f) => f.url === url);
+    return getFavorites().some(f => f.url === url);
   }
 
   function addFavorite(favorite: GifFavorite): void {
@@ -162,47 +162,41 @@
     window.App.gifFavorites = updated;
     saveFavoritesToStorage(updated);
     updateHeartButtonsForUrl(favorite.url, true);
-    if (currentTab === "favorites") renderFavoritesGrid();
+    if (currentTab === 'favorites') renderFavoritesGrid();
   }
 
   function removeFavorite(url: string): void {
-    const updated = getFavorites().filter((f) => f.url !== url);
+    const updated = getFavorites().filter(f => f.url !== url);
     window.App.gifFavorites = updated;
     saveFavoritesToStorage(updated);
     updateHeartButtonsForUrl(url, false);
-    if (currentTab === "favorites") renderFavoritesGrid();
+    if (currentTab === 'favorites') renderFavoritesGrid();
   }
 
   function updateHeartButtonsForUrl(url: string, favorited: boolean): void {
     if (!gridEl) return;
-    const items = gridEl.querySelectorAll<HTMLElement>("[data-gif-url]");
-    items.forEach((item) => {
-      if (item.dataset["gifUrl"] === url) {
-        const btn = item.querySelector<HTMLButtonElement>(".gif-picker-heart-btn");
+    const items = gridEl.querySelectorAll<HTMLElement>('[data-gif-url]');
+    items.forEach(item => {
+      if (item.dataset['gifUrl'] === url) {
+        const btn = item.querySelector<HTMLButtonElement>('.gif-picker-heart-btn');
         if (!btn) return;
-        btn.classList.toggle("gif-picker-heart-btn--active", favorited);
-        btn.title = favorited ? "Remove from favorites" : "Add to favorites";
-        btn.textContent = favorited ? "\u2665" : "\u2661";
+        btn.classList.toggle('gif-picker-heart-btn--active', favorited);
+        btn.title = favorited ? 'Remove from favorites' : 'Add to favorites';
+        btn.textContent = favorited ? '\u2665' : '\u2661';
       }
     });
   }
 
   // ── Heart button ──────────────────────────────────────────────────────────
 
-  function createHeartButton(
-    url: string,
-    title: string,
-    thumbnailUrl: string
-  ): HTMLButtonElement {
+  function createHeartButton(url: string, title: string, thumbnailUrl: string): HTMLButtonElement {
     const favorited = isFavorited(url);
-    const btn = document.createElement("button");
-    btn.className =
-      "gif-picker-heart-btn" +
-      (favorited ? " gif-picker-heart-btn--active" : "");
-    btn.title = favorited ? "Remove from favorites" : "Add to favorites";
-    btn.textContent = favorited ? "\u2665" : "\u2661";
-    btn.type = "button";
-    btn.addEventListener("click", (e) => {
+    const btn = document.createElement('button');
+    btn.className = 'gif-picker-heart-btn' + (favorited ? ' gif-picker-heart-btn--active' : '');
+    btn.title = favorited ? 'Remove from favorites' : 'Add to favorites';
+    btn.textContent = favorited ? '\u2665' : '\u2661';
+    btn.type = 'button';
+    btn.addEventListener('click', e => {
       e.stopPropagation();
       if (isFavorited(url)) {
         removeFavorite(url);
@@ -220,107 +214,109 @@
     favoritesGridEl.replaceChildren();
     const favorites = getFavorites();
     if (favorites.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "gif-picker-empty";
-      empty.textContent = "No favorites yet. Hover a GIF and click \u2661 to save it.";
+      const empty = document.createElement('div');
+      empty.className = 'gif-picker-empty';
+      empty.textContent = 'No favorites yet. Hover a GIF and click \u2661 to save it.';
       favoritesGridEl.appendChild(empty);
       return;
     }
-    favorites.forEach((fav) => {
+    favorites.forEach(fav => {
       const item = renderFavoriteItem(fav);
       if (item) favoritesGridEl!.appendChild(item);
     });
   }
 
   function renderFavoriteItem(fav: GifFavorite): HTMLElement {
-    const item = document.createElement("div");
-    item.className = "gif-picker-item";
-    item.title = fav.title || "GIF";
-    item.dataset["gifUrl"] = fav.url;
+    const item = document.createElement('div');
+    item.className = 'gif-picker-item';
+    item.title = fav.title || 'GIF';
+    item.dataset['gifUrl'] = fav.url;
 
-    const img = document.createElement("img");
+    const img = document.createElement('img');
     img.src = fav.thumbnailUrl || fav.url;
-    img.alt = fav.title || "GIF";
-    img.loading = "lazy";
+    img.alt = fav.title || 'GIF';
+    img.loading = 'lazy';
     item.appendChild(img);
 
     // Remove button always visible in favorites grid
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "gif-picker-heart-btn gif-picker-heart-btn--active";
-    removeBtn.title = "Remove from favorites";
-    removeBtn.textContent = "\u2665";
-    removeBtn.type = "button";
-    removeBtn.addEventListener("click", (e) => {
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'gif-picker-heart-btn gif-picker-heart-btn--active';
+    removeBtn.title = 'Remove from favorites';
+    removeBtn.textContent = '\u2665';
+    removeBtn.type = 'button';
+    removeBtn.addEventListener('click', e => {
       e.stopPropagation();
       removeFavorite(fav.url);
     });
     item.appendChild(removeBtn);
 
-    item.addEventListener("click", () => {
-      selectGif(fav.url, fav.title || "GIF");
+    item.addEventListener('click', () => {
+      selectGif(fav.url, fav.title || 'GIF');
     });
     return item;
   }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
 
-  function switchToTab(tab: "search" | "favorites"): void {
+  function switchToTab(tab: 'search' | 'favorites'): void {
     currentTab = tab;
-    const isSearch = tab === "search";
-    if (gridEl) gridEl.classList.toggle("hidden", !isSearch);
-    if (favoritesGridEl) favoritesGridEl.classList.toggle("hidden", isSearch);
-    tabSearchBtn?.classList.toggle("gif-picker-tab--active", isSearch);
-    tabFavoritesBtn?.classList.toggle("gif-picker-tab--active", !isSearch);
-    if (tabSearchBtn) tabSearchBtn.setAttribute("aria-selected", isSearch ? "true" : "false");
-    if (tabFavoritesBtn) tabFavoritesBtn.setAttribute("aria-selected", isSearch ? "false" : "true");
+    const isSearch = tab === 'search';
+    if (gridEl) gridEl.classList.toggle('hidden', !isSearch);
+    if (favoritesGridEl) favoritesGridEl.classList.toggle('hidden', isSearch);
+    tabSearchBtn?.classList.toggle('gif-picker-tab--active', isSearch);
+    tabFavoritesBtn?.classList.toggle('gif-picker-tab--active', !isSearch);
+    if (tabSearchBtn) tabSearchBtn.setAttribute('aria-selected', isSearch ? 'true' : 'false');
+    if (tabFavoritesBtn) tabFavoritesBtn.setAttribute('aria-selected', isSearch ? 'false' : 'true');
     if (!isSearch) renderFavoritesGrid();
   }
 
   // ── DOM initialisation ─────────────────────────────────────────────────────
 
   async function init(): Promise<void> {
-    panel = document.getElementById("gif-picker-panel");
-    searchInput = document.getElementById("gif-picker-search-input") as HTMLInputElement | null;
-    gridEl = document.getElementById("gif-picker-grid");
-    favoritesGridEl = document.getElementById("gif-picker-favorites-grid");
-    autocompleteEl = document.getElementById("gif-picker-autocomplete");
-    tabSearchBtn = document.getElementById("gif-picker-tab-search") as HTMLButtonElement | null;
-    tabFavoritesBtn = document.getElementById("gif-picker-tab-favorites") as HTMLButtonElement | null;
+    panel = document.getElementById('gif-picker-panel');
+    searchInput = document.getElementById('gif-picker-search-input') as HTMLInputElement | null;
+    gridEl = document.getElementById('gif-picker-grid');
+    favoritesGridEl = document.getElementById('gif-picker-favorites-grid');
+    autocompleteEl = document.getElementById('gif-picker-autocomplete');
+    tabSearchBtn = document.getElementById('gif-picker-tab-search') as HTMLButtonElement | null;
+    tabFavoritesBtn = document.getElementById(
+      'gif-picker-tab-favorites'
+    ) as HTMLButtonElement | null;
 
     if (!panel || !searchInput || !gridEl || !autocompleteEl) {
-      log.error("GIF picker elements not found in DOM");
+      log.error('GIF picker elements not found in DOM');
       return;
     }
 
     try {
-      KLIPY_APP_KEY = (await window.electronAPI.ipc.invoke("get-klipy-api-key")) as string | null;
-      log.debug("Klipy API key loaded successfully");
+      KLIPY_APP_KEY = (await window.electronAPI.ipc.invoke('get-klipy-api-key')) as string | null;
+      log.debug('Klipy API key loaded successfully');
     } catch (error) {
-      log.error("Failed to load Klipy API key", { error });
+      log.error('Failed to load Klipy API key', { error });
     }
 
     await loadFavoritesFromStorage();
 
-    searchInput.addEventListener("input", handleSearchInput);
-    searchInput.addEventListener("keydown", handleSearchKeydown);
-    gridEl.addEventListener("scroll", handleGridScroll, { passive: true });
+    searchInput.addEventListener('input', handleSearchInput);
+    searchInput.addEventListener('keydown', handleSearchKeydown);
+    gridEl.addEventListener('scroll', handleGridScroll, { passive: true });
 
-    tabSearchBtn?.addEventListener("click", () => switchToTab("search"));
-    tabFavoritesBtn?.addEventListener("click", () => switchToTab("favorites"));
+    tabSearchBtn?.addEventListener('click', () => switchToTab('search'));
+    tabFavoritesBtn?.addEventListener('click', () => switchToTab('favorites'));
 
     if (!isApiKeyConfigured()) {
-      log.warn("Klipy app key not configured. Register at https://partner.klipy.com/");
+      log.warn('Klipy app key not configured. Register at https://partner.klipy.com/');
     }
-    log.debug("GIF picker initialised");
+    log.debug('GIF picker initialised');
   }
 
   // ── Search handling ───────────────────────────────────────────────────────
 
   function handleSearchInput(): void {
     // Typing always switches to search tab
-    if (currentTab === "favorites") switchToTab("search");
+    if (currentTab === 'favorites') switchToTab('search');
 
-    const query = searchInput?.value.trim() ?? "";
+    const query = searchInput?.value.trim() ?? '';
 
     if (autocompleteTimer !== null) clearTimeout(autocompleteTimer);
     if (query.length >= AUTOCOMPLETE_MIN_CHARS) {
@@ -340,9 +336,9 @@
   }
 
   function handleSearchKeydown(e: KeyboardEvent): void {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      const query = searchInput?.value.trim() ?? "";
+      const query = searchInput?.value.trim() ?? '';
       if (query.length === 0) {
         startTrending();
       } else {
@@ -351,25 +347,25 @@
       hideAutocomplete();
       return;
     }
-    if (!autocompleteEl || autocompleteEl.classList.contains("hidden")) return;
-    const items = autocompleteEl.querySelectorAll("li");
+    if (!autocompleteEl || autocompleteEl.classList.contains('hidden')) return;
+    const items = autocompleteEl.querySelectorAll('li');
     if (items.length === 0) return;
-    if (e.key === "ArrowDown") {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, items.length - 1);
       updateActiveItem(items);
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, -1);
       updateActiveItem(items);
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       hideAutocomplete();
     }
   }
 
   function updateActiveItem(items: NodeListOf<HTMLLIElement>): void {
     items.forEach((item, i) => {
-      item.classList.toggle("active", i === activeSuggestionIndex);
+      item.classList.toggle('active', i === activeSuggestionIndex);
     });
   }
 
@@ -379,7 +375,7 @@
     if (!isApiKeyConfigured()) return;
     try {
       const url = `${KLIPY_BASE_URL}/${KLIPY_APP_KEY}/autocomplete/${encodeURIComponent(query)}?limit=${AUTOCOMPLETE_LIMIT}`;
-      const response = await fetch(url, { headers: { "User-Agent": MOBILE_USER_AGENT } });
+      const response = await fetch(url, { headers: { 'User-Agent': MOBILE_USER_AGENT } });
       if (!response.ok) return;
       const data = (await response.json()) as AutocompleteResponse;
       renderAutocomplete(extractStringList(data));
@@ -395,22 +391,22 @@
     }
     activeSuggestionIndex = -1;
     autocompleteEl.replaceChildren();
-    terms.forEach((term) => {
-      const li = document.createElement("li");
+    terms.forEach(term => {
+      const li = document.createElement('li');
       li.textContent = term;
-      li.dataset["term"] = term;
-      li.role = "option";
-      li.addEventListener("mousedown", (e) => {
+      li.dataset['term'] = term;
+      li.role = 'option';
+      li.addEventListener('mousedown', e => {
         e.preventDefault();
         selectSuggestion(term);
       });
       autocompleteEl!.appendChild(li);
     });
-    autocompleteEl.classList.remove("hidden");
+    autocompleteEl.classList.remove('hidden');
   }
 
   function hideAutocomplete(): void {
-    autocompleteEl?.classList.add("hidden");
+    autocompleteEl?.classList.add('hidden');
     activeSuggestionIndex = -1;
   }
 
@@ -429,7 +425,7 @@
     if (!isApiKeyConfigured() || !gridEl) return;
     try {
       const url = `${KLIPY_BASE_URL}/${KLIPY_APP_KEY}/search-suggestions/${encodeURIComponent(query)}?limit=${SUGGESTION_LIMIT}`;
-      const response = await fetch(url, { headers: { "User-Agent": MOBILE_USER_AGENT } });
+      const response = await fetch(url, { headers: { 'User-Agent': MOBILE_USER_AGENT } });
       if (!response.ok) return;
       const data = (await response.json()) as AutocompleteResponse;
       const terms = extractStringList(data);
@@ -441,14 +437,14 @@
 
   function renderSuggestionChips(terms: string[]): void {
     if (!gridEl) return;
-    const row = document.createElement("div");
-    row.className = "gif-picker-suggestions-row";
-    terms.forEach((term) => {
-      const chip = document.createElement("button");
-      chip.className = "gif-picker-suggestion-chip";
+    const row = document.createElement('div');
+    row.className = 'gif-picker-suggestions-row';
+    terms.forEach(term => {
+      const chip = document.createElement('button');
+      chip.className = 'gif-picker-suggestion-chip';
       chip.textContent = term;
-      chip.type = "button";
-      chip.addEventListener("click", () => selectSuggestion(term));
+      chip.type = 'button';
+      chip.addEventListener('click', () => selectSuggestion(term));
       row.appendChild(chip);
     });
     gridEl.prepend(row);
@@ -477,7 +473,7 @@
 
   async function loadPage(): Promise<void> {
     if (!isApiKeyConfigured()) {
-      showEmptyMessage("GIF search requires a Klipy app key. See docs/GIF_SETUP.md");
+      showEmptyMessage('GIF search requires a Klipy app key. See docs/GIF_SETUP.md');
       return;
     }
     if (isLoading || !hasMore) return;
@@ -505,18 +501,18 @@
           `&customer_id=${customerId}&locale=${locale}&content_filter=medium` +
           `&${toQueryString(adParams)}`;
       }
-      const response = await fetch(url, { headers: { "User-Agent": MOBILE_USER_AGENT } });
+      const response = await fetch(url, { headers: { 'User-Agent': MOBILE_USER_AGENT } });
       if (!response.ok) throw new Error(`Klipy API error: ${response.status}`);
       const data = (await response.json()) as KlipyResponse;
       const results = data.data.data;
-      const gifCount = results.filter((item) => !isAdItem(item)).length;
+      const gifCount = results.filter(item => !isAdItem(item)).length;
       hasMore = gifCount > 0;
       appendResults(results, isFirstPage);
       if (isFirstPage && currentQuery !== null && gifCount > 0) {
         fetchSearchSuggestions(currentQuery);
       }
     } catch (err) {
-      log.error("GIF load failed", { error: String(err) });
+      log.error('GIF load failed', { error: String(err) });
       if (isFirstPage) showError();
     } finally {
       isLoading = false;
@@ -530,14 +526,14 @@
     if (replace) {
       gridEl.replaceChildren();
     } else {
-      gridEl.querySelector(".gif-picker-page-loading")?.remove();
+      gridEl.querySelector('.gif-picker-page-loading')?.remove();
     }
-    const gifResults = results.filter((item) => !isAdItem(item));
+    const gifResults = results.filter(item => !isAdItem(item));
     if (replace && gifResults.length === 0) {
-      showEmptyMessage("No GIFs found");
+      showEmptyMessage('No GIFs found');
       return;
     }
-    results.forEach((result) => {
+    results.forEach(result => {
       if (isAdItem(result)) {
         const adEl = renderAdItem(result);
         if (adEl) gridEl!.appendChild(adEl);
@@ -553,44 +549,44 @@
     const full = result.file?.hd?.gif ?? result.file?.hd?.webp;
     if (!preview?.url || !full?.url) return null;
 
-    const item = document.createElement("div");
-    item.className = "gif-picker-item";
-    item.title = result.title || "GIF";
-    item.dataset["gifUrl"] = full.url;
+    const item = document.createElement('div');
+    item.className = 'gif-picker-item';
+    item.title = result.title || 'GIF';
+    item.dataset['gifUrl'] = full.url;
 
-    const img = document.createElement("img");
+    const img = document.createElement('img');
     img.src = preview.url;
-    img.alt = result.title || "GIF";
-    img.loading = "lazy";
+    img.alt = result.title || 'GIF';
+    img.loading = 'lazy';
     item.appendChild(img);
 
-    const heartBtn = createHeartButton(full.url, result.title || "GIF", preview.url);
+    const heartBtn = createHeartButton(full.url, result.title || 'GIF', preview.url);
     item.appendChild(heartBtn);
 
-    item.addEventListener("click", () => {
-      selectGif(full.url, result.title || "GIF");
+    item.addEventListener('click', () => {
+      selectGif(full.url, result.title || 'GIF');
     });
     return item;
   }
 
   function renderAdItem(ad: GifResult): HTMLElement | null {
     if (!ad.content) return null;
-    const wrapper = document.createElement("div");
-    wrapper.className = "gif-picker-ad";
+    const wrapper = document.createElement('div');
+    wrapper.className = 'gif-picker-ad';
     const w = Math.min(ad.width || AD_MAX_WIDTH, AD_MAX_WIDTH);
     const h = Math.min(ad.height || AD_MAX_HEIGHT, AD_MAX_HEIGHT);
     const iframeUrlMatch = ad.content.match(/<iframe[^>]+src="([^"]+)"/);
     const adIframeUrl = iframeUrlMatch ? iframeUrlMatch[1] : null;
     if (!adIframeUrl) return null;
-    const iframe = document.createElement("iframe");
+    const iframe = document.createElement('iframe');
     iframe.src = adIframeUrl;
-    iframe.setAttribute("sandbox", "allow-scripts allow-popups allow-top-navigation");
-    iframe.scrolling = "no";
+    iframe.setAttribute('sandbox', 'allow-scripts allow-popups allow-top-navigation');
+    iframe.scrolling = 'no';
     iframe.style.width = `${w}px`;
     iframe.style.height = `${h}px`;
-    iframe.style.border = "none";
-    iframe.style.display = "block";
-    wrapper.style.setProperty("--ad-height", `${h}px`);
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+    wrapper.style.setProperty('--ad-height', `${h}px`);
     wrapper.appendChild(iframe);
     return wrapper;
   }
@@ -611,31 +607,31 @@
   function showLoading(): void {
     if (!gridEl) return;
     gridEl.replaceChildren();
-    const loading = document.createElement("div");
-    loading.className = "gif-picker-loading";
-    loading.textContent = "Loading\u2026";
+    const loading = document.createElement('div');
+    loading.className = 'gif-picker-loading';
+    loading.textContent = 'Loading\u2026';
     gridEl.appendChild(loading);
   }
 
   function showPageLoading(): void {
     if (!gridEl) return;
-    const loading = document.createElement("div");
-    loading.className = "gif-picker-page-loading";
-    loading.textContent = "Loading\u2026";
+    const loading = document.createElement('div');
+    loading.className = 'gif-picker-page-loading';
+    loading.textContent = 'Loading\u2026';
     gridEl.appendChild(loading);
   }
 
   function showEmptyMessage(message: string): void {
     if (!gridEl) return;
     gridEl.replaceChildren();
-    const empty = document.createElement("div");
-    empty.className = "gif-picker-empty";
+    const empty = document.createElement('div');
+    empty.className = 'gif-picker-empty';
     empty.textContent = message;
     gridEl.appendChild(empty);
   }
 
   function showError(): void {
-    showEmptyMessage("Failed to load GIFs.");
+    showEmptyMessage('Failed to load GIFs.');
   }
 
   // ── Select and send GIF ───────────────────────────────────────────────────
@@ -672,17 +668,17 @@
       });
       return;
     }
-    if (!panel.classList.contains("hidden") && triggerEl === trigger) {
+    if (!panel.classList.contains('hidden') && triggerEl === trigger) {
       closePanel();
       return;
     }
     triggerEl = trigger;
     positionPanel(trigger);
-    panel.classList.remove("hidden");
+    panel.classList.remove('hidden');
     // Always open on search tab
-    switchToTab("search");
+    switchToTab('search');
     if (searchInput) {
-      searchInput.value = "";
+      searchInput.value = '';
       searchInput.focus();
     }
     startTrending();
@@ -691,16 +687,16 @@
         closePanel();
       }
     };
-    setTimeout(() => document.addEventListener("click", outsideClickHandler!), 0);
+    setTimeout(() => document.addEventListener('click', outsideClickHandler!), 0);
     escKeyHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closePanel();
+      if (e.key === 'Escape') closePanel();
     };
-    document.addEventListener("keydown", escKeyHandler);
+    document.addEventListener('keydown', escKeyHandler);
   }
 
   function closePanel(): void {
     if (!panel) return;
-    panel.classList.add("hidden");
+    panel.classList.add('hidden');
     triggerEl = null;
     hideAutocomplete();
     if (debounceTimer !== null) {
@@ -712,11 +708,11 @@
       autocompleteTimer = null;
     }
     if (outsideClickHandler) {
-      document.removeEventListener("click", outsideClickHandler);
+      document.removeEventListener('click', outsideClickHandler);
       outsideClickHandler = null;
     }
     if (escKeyHandler) {
-      document.removeEventListener("keydown", escKeyHandler);
+      document.removeEventListener('keydown', escKeyHandler);
       escKeyHandler = null;
     }
   }

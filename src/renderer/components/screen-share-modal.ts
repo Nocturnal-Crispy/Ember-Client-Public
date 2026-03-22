@@ -54,7 +54,7 @@
     // Clear previous selection
     const grid = getEl('screen-share-source-grid');
     if (grid) {
-      grid.querySelectorAll('[data-source-id]').forEach((el) => el.classList.remove('selected'));
+      grid.querySelectorAll('[data-source-id]').forEach(el => el.classList.remove('selected'));
     }
     card.classList.add('selected');
 
@@ -98,8 +98,8 @@
   // ─── Settings helpers ─────────────────────────────────────────────────────
 
   function currentSettings(): ScreenShareSettings {
-    const resolution = (getEl<HTMLSelectElement>('screen-share-resolution')?.value ?? '720p') as
-      ScreenShareSettings['resolution'];
+    const resolution = (getEl<HTMLSelectElement>('screen-share-resolution')?.value ??
+      '720p') as ScreenShareSettings['resolution'];
     const frameRateRaw = parseInt(
       getEl<HTMLSelectElement>('screen-share-framerate')?.value ?? '15',
       10
@@ -108,8 +108,7 @@
       frameRateRaw === 30 ? 30 : frameRateRaw === 60 ? 60 : 15
     ) as ScreenShareSettings['frameRate'];
     const includeAudio =
-      _audioAvailable &&
-      (getEl<HTMLInputElement>('screen-share-audio-checkbox')?.checked ?? false);
+      _audioAvailable && (getEl<HTMLInputElement>('screen-share-audio-checkbox')?.checked ?? false);
 
     return {
       sourceId: _selectedSource?.id ?? '',
@@ -183,21 +182,21 @@
 
   function wireEvents(): void {
     // Close button
-    getEl('screen-share-close')?.addEventListener('click', (e) => {
+    getEl('screen-share-close')?.addEventListener('click', e => {
       e.stopPropagation();
       hideScreenShareModal();
     });
 
     // Backdrop click
     const modal = getEl('screen-share-modal');
-    modal?.addEventListener('click', (e) => {
+    modal?.addEventListener('click', e => {
       if (e.target === modal) {
         hideScreenShareModal();
       }
     });
 
     // ESC key
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         const m = getEl('screen-share-modal');
         if (m && !m.classList.contains('hidden')) {

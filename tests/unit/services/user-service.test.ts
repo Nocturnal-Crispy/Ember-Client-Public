@@ -139,9 +139,7 @@ describe('getUserVoiceChannel', () => {
   it('returns channel name when user is in a voice channel', () => {
     const presenceMap = new Map<string, string>();
     presenceMap.set('u1', 'Alice');
-    (window as any).App.voiceChannelPresence = new Map([
-      ['ch-lobby', presenceMap],
-    ]);
+    (window as any).App.voiceChannelPresence = new Map([['ch-lobby', presenceMap]]);
     // Voice channel names are tracked separately
     (window as any).App.activeVoiceChannelName = null;
 
@@ -162,9 +160,7 @@ describe('getUserVoiceChannel', () => {
   it('returns null when voice channels exist but user is not in them', () => {
     const presenceMap = new Map<string, string>();
     presenceMap.set('u2', 'Bob');
-    (window as any).App.voiceChannelPresence = new Map([
-      ['ch-lobby', presenceMap],
-    ]);
+    (window as any).App.voiceChannelPresence = new Map([['ch-lobby', presenceMap]]);
 
     const result = window.getUserVoiceChannel('u1');
 

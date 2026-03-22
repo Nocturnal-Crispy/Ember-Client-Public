@@ -24,7 +24,11 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 function fromBase64(s: string): Uint8Array {
-  return new Uint8Array(atob(s).split('').map((c) => c.charCodeAt(0)));
+  return new Uint8Array(
+    atob(s)
+      .split('')
+      .map(c => c.charCodeAt(0))
+  );
 }
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -46,9 +50,7 @@ describe('signal-service', () => {
   let savedFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
-    mockInvoke = jest.fn<
-      (cmd: string, args: object) => Promise<EmberIpcResponse<unknown>>
-    >();
+    mockInvoke = jest.fn<(cmd: string, args: object) => Promise<EmberIpcResponse<unknown>>>();
     (window as unknown as { emberAPI: { invoke: typeof mockInvoke } }).emberAPI = {
       invoke: mockInvoke,
     };
@@ -357,16 +359,26 @@ describe('signal-service', () => {
       it('throws error when identity key is not found', async () => {
         mockInvoke.mockResolvedValueOnce({ success: true, data: { value: null } });
 
-        await expect(service.getLocalDevice()).rejects.toThrow('Identity private key not found in secure storage');
+        await expect(service.getLocalDevice()).rejects.toThrow(
+          'Identity private key not found in secure storage'
+        );
       });
 
       it('throws error when registration ID is not found', async () => {
         mockInvoke
-          .mockResolvedValueOnce({ success: true, data: { value: toBase64(new Uint8Array([1, 2, 3])) } })
-          .mockResolvedValueOnce({ success: true, data: { value: toBase64(new Uint8Array([4, 5, 6])) } })
+          .mockResolvedValueOnce({
+            success: true,
+            data: { value: toBase64(new Uint8Array([1, 2, 3])) },
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            data: { value: toBase64(new Uint8Array([4, 5, 6])) },
+          })
           .mockResolvedValueOnce({ success: true, data: { value: null } });
 
-        await expect(service.getLocalDevice()).rejects.toThrow('Registration ID not found in secure storage');
+        await expect(service.getLocalDevice()).rejects.toThrow(
+          'Registration ID not found in secure storage'
+        );
       });
     });
 
@@ -404,7 +416,7 @@ describe('signal-service', () => {
           expect.objectContaining({
             recipientAddress: 'user-456.device-2',
             registrationId: mockBundle.registration_id,
-          }),
+          })
         );
       });
 
@@ -582,9 +594,7 @@ describe('signal-service', () => {
         mockInvoke.mockResolvedValueOnce({ success: false, error: 'Encryption failed' });
 
         const plaintext = new Uint8Array([1, 2, 3]);
-        await expect(service.encrypt('alice.1', plaintext)).rejects.toBeInstanceOf(
-          EmberIpcError,
-        );
+        await expect(service.encrypt('alice.1', plaintext)).rejects.toBeInstanceOf(EmberIpcError);
       });
 
       it('EmberIpcError carries the cmd name and error message', async () => {
@@ -624,17 +634,16 @@ describe('signal-service', () => {
     });
 
     describe('getIdentityKeyPair', () => {
-      
       it('should read both private and public keys correctly when fixed', async () => {
         // This test demonstrates the EXPECTED behavior after the fix
         mockInvoke
           .mockResolvedValueOnce({
             success: true,
-            data: { value: toBase64(new Uint8Array([5, 6, 7, 8])) } // Private key
+            data: { value: toBase64(new Uint8Array([5, 6, 7, 8])) }, // Private key
           })
           .mockResolvedValueOnce({
             success: true,
-            data: { value: toBase64(new Uint8Array([1, 2, 3, 4])) } // Public key
+            data: { value: toBase64(new Uint8Array([1, 2, 3, 4])) }, // Public key
           });
 
         // After the fix, this should work correctly

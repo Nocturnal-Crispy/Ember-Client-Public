@@ -56,10 +56,18 @@
   background: rgba(var(--rgb-text), 0.3);
 }
 
-.user-status-bubble.status-online { background: var(--online-color); }
-.user-status-bubble.status-idle   { background: var(--afk-color); }
-.user-status-bubble.status-dnd    { background: var(--dnd-color); }
-.user-status-bubble.status-offline { background: rgba(var(--rgb-text), 0.3); }
+.user-status-bubble.status-online {
+  background: var(--online-color);
+}
+.user-status-bubble.status-idle {
+  background: var(--afk-color);
+}
+.user-status-bubble.status-dnd {
+  background: var(--dnd-color);
+}
+.user-status-bubble.status-offline {
+  background: rgba(var(--rgb-text), 0.3);
+}
 
 .user-details {
   display: flex;
@@ -83,10 +91,18 @@
   color: var(--online-color);
 }
 
-.user-status.status-online  { color: var(--online-color); }
-.user-status.status-idle    { color: var(--afk-color); }
-.user-status.status-dnd     { color: var(--dnd-color); }
-.user-status.status-offline { color: rgba(var(--rgb-text), 0.4); }
+.user-status.status-online {
+  color: var(--online-color);
+}
+.user-status.status-idle {
+  color: var(--afk-color);
+}
+.user-status.status-dnd {
+  color: var(--dnd-color);
+}
+.user-status.status-offline {
+  color: rgba(var(--rgb-text), 0.4);
+}
 
 .user-controls {
   display: flex;
@@ -103,9 +119,13 @@
   padding: 6px;
 }
 
-.user-control-btn:hover { opacity: 1; }
+.user-control-btn:hover {
+  opacity: 1;
+}
 
-.user-control-btn.logout-btn { color: var(--dnd-color); }
+.user-control-btn.logout-btn {
+  color: var(--dnd-color);
+}
 
 .user-control-btn.logout-btn:hover {
   opacity: 1;
@@ -144,14 +164,18 @@
   position: relative;
 }
 
-.user-menu-item:last-child { border-bottom: none; }
+.user-menu-item:last-child {
+  border-bottom: none;
+}
 
 .user-menu-item:hover {
   background-color: rgba(var(--rgb-highlight), 0.1);
   color: var(--highlight);
 }
 
-.user-menu-item.danger { color: var(--dnd-color); }
+.user-menu-item.danger {
+  color: var(--dnd-color);
+}
 
 .user-menu-item.danger:hover {
   background-color: rgba(var(--rgb-dnd-color), 0.1);
@@ -167,7 +191,9 @@
   flex-shrink: 0;
 }
 
-.user-menu-item span:nth-child(2) { flex: 1; }
+.user-menu-item span:nth-child(2) {
+  flex: 1;
+}
 
 .menu-arrow {
   margin-left: auto;
@@ -213,7 +239,9 @@
   transition: background-color 0.1s ease;
 }
 
-.status-option:last-child { border-bottom: none; }
+.status-option:last-child {
+  border-bottom: none;
+}
 
 .status-option:hover {
   background-color: rgba(var(--rgb-highlight), 0.1);
@@ -228,7 +256,15 @@
   background: rgba(var(--rgb-text), 0.3);
 }
 
-.status-bubble.status-online  { background: var(--online-color); }
-.status-bubble.status-idle    { background: var(--afk-color); }
-.status-bubble.status-dnd     { background: var(--dnd-color); }
-.status-bubble.status-offline { background: rgba(var(--rgb-text), 0.3); }
+.status-bubble.status-online {
+  background: var(--online-color);
+}
+.status-bubble.status-idle {
+  background: var(--afk-color);
+}
+.status-bubble.status-dnd {
+  background: var(--dnd-color);
+}
+.status-bubble.status-offline {
+  background: rgba(var(--rgb-text), 0.3);
+}

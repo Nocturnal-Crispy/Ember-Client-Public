@@ -15,7 +15,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { uploadSignedPreKey } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -36,7 +36,7 @@ describe('Prekey endpoint path corrections', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -47,7 +47,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { uploadSignedPreKey } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -76,7 +76,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { uploadOneTimePreKeys } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -89,7 +89,10 @@ describe('Prekey endpoint path corrections', () => {
         },
         {
           id: 2,
-          keyPair: { publicKey: new Uint8Array([7, 8, 9]), privateKey: new Uint8Array([10, 11, 12]) },
+          keyPair: {
+            publicKey: new Uint8Array([7, 8, 9]),
+            privateKey: new Uint8Array([10, 11, 12]),
+          },
         },
       ];
 
@@ -101,7 +104,7 @@ describe('Prekey endpoint path corrections', () => {
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -112,7 +115,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { uploadOneTimePreKeys } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -144,7 +147,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { getOneTimePreKeyCount } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -157,7 +160,7 @@ describe('Prekey endpoint path corrections', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );
@@ -172,7 +175,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { getOneTimePreKeyCount } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -206,7 +209,7 @@ describe('Prekey endpoint path corrections', () => {
       global.fetch = mockFetch;
 
       const { fetchPreKeyBundle } = require('ember-shared');
-      
+
       const mockAuth = {
         token: 'test-token',
         hostname: 'https://test.example.com',
@@ -219,7 +222,7 @@ describe('Prekey endpoint path corrections', () => {
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
         })
       );

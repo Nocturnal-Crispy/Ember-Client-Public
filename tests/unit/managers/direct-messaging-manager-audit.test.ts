@@ -5,7 +5,7 @@
  *
  * Test order follows the recommended fix order from the audit:
  * 1. P0-1: DM Request Always Fails — Missing encrypted_key_self
- * 2. P0-2: Historical DM Messages Permanently Unreadable 
+ * 2. P0-2: Historical DM Messages Permanently Unreadable
  * 3. P1-1: Missing protocol_version in message POST
  * 4. P1-2: WebSocket DM Messages Use Wrong messageType
  * 5. P1-3: toBase64 / btoa Stack Overflow
@@ -117,39 +117,41 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
         ok: false,
         status: 400,
         json: jest.fn().mockResolvedValue({
-          error: 'user_id and encrypted_key_self are required'
-        })
+          error: 'user_id and encrypted_key_self are required',
+        }),
       });
 
       // Mock the actual startDmConversation function to call fetch
-      const mockStartDmConversation = jest.fn().mockImplementation(async (participantId: string) => {
-        const auth = await window.getValidAuth();
-        if (!auth) throw new Error("Not authenticated");
-        
-        // This reproduces the current buggy implementation from line 237
-        const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${auth.token}`,
-          },
-          body: JSON.stringify({ user_id: participantId }), // Missing encrypted_key_self
+      const mockStartDmConversation = jest
+        .fn()
+        .mockImplementation(async (participantId: string) => {
+          const auth = await window.getValidAuth();
+          if (!auth) throw new Error('Not authenticated');
+
+          // This reproduces the current buggy implementation from line 237
+          const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({ user_id: participantId }), // Missing encrypted_key_self
+          });
+
+          if (!res.ok) {
+            const errData = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(errData.error ?? 'Failed to send DM request');
+          }
+
+          return { success: true };
         });
-        
-        if (!res.ok) {
-          const errData = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errData.error ?? "Failed to send DM request");
-        }
-        
-        return { success: true };
-      });
-      
+
       window.startDmConversation = mockStartDmConversation;
 
       // Act: Attempt to send DM request
-      await expect(
-        window.startDmConversation('target-user-id', 'target-username')
-      ).rejects.toThrow('user_id and encrypted_key_self are required');
+      await expect(window.startDmConversation('target-user-id', 'target-username')).rejects.toThrow(
+        'user_id and encrypted_key_self are required'
+      );
 
       // Assert: Verify the request was made without encrypted_key_self
       expect(mockFetch).toHaveBeenCalledWith(
@@ -160,7 +162,7 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
             'Content-Type': 'application/json',
             Authorization: 'Bearer test-token',
           },
-          body: expect.stringContaining('"user_id":"target-user-id"')
+          body: expect.stringContaining('"user_id":"target-user-id"'),
         })
       );
 
@@ -173,48 +175,52 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
 
     it('GREEN PHASE: should succeed when encrypted_key_self is included', async () => {
       // This test will pass after we implement the fix
-      
+
       // Arrange: Mock successful server response
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
           id: 'request-id',
           ember_id: 'ember-id',
-          status: 'pending'
-        })
+          status: 'pending',
+        }),
       });
 
       // Mock IPC for encrypted_key_self generation
       mockIpcRenderer.invoke.mockResolvedValue('test-encrypted-key');
 
       // Mock the fixed implementation
-      const mockFixedStartDmConversation = jest.fn().mockImplementation(async (participantId: string) => {
-        const auth = await window.getValidAuth();
-        if (!auth) throw new Error("Not authenticated");
-        
-        // Generate encrypted_key_self (the fix)
-        const encryptedKeySelf = await window.electronAPI.ipc.invoke('generate-encrypted-key-self');
-        
-        const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${auth.token}`,
-          },
-          body: JSON.stringify({ 
-            user_id: participantId,
-            encrypted_key_self: encryptedKeySelf // The fix
-          }),
+      const mockFixedStartDmConversation = jest
+        .fn()
+        .mockImplementation(async (participantId: string) => {
+          const auth = await window.getValidAuth();
+          if (!auth) throw new Error('Not authenticated');
+
+          // Generate encrypted_key_self (the fix)
+          const encryptedKeySelf = await window.electronAPI.ipc.invoke(
+            'generate-encrypted-key-self'
+          );
+
+          const res = await fetch(`${auth.hostname}/api/v1/dm-requests`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({
+              user_id: participantId,
+              encrypted_key_self: encryptedKeySelf, // The fix
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(errData.error ?? 'Failed to send DM request');
+          }
+
+          return await res.json();
         });
-        
-        if (!res.ok) {
-          const errData = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errData.error ?? "Failed to send DM request");
-        }
-        
-        return await res.json();
-      });
-      
+
       window.startDmConversation = mockFixedStartDmConversation;
 
       // Act: Attempt to send DM request
@@ -224,14 +230,14 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       expect(result).toEqual({
         id: 'request-id',
         ember_id: 'ember-id',
-        status: 'pending'
+        status: 'pending',
       });
 
       // Assert: Verify encrypted_key_self was included
       expect(mockFetch).toHaveBeenCalledWith(
         'https://test.ember.com/api/v1/dm-requests',
         expect.objectContaining({
-          body: expect.stringContaining('"encrypted_key_self":"test-encrypted-key"')
+          body: expect.stringContaining('"encrypted_key_self":"test-encrypted-key"'),
         })
       );
     });
@@ -253,11 +259,11 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
               ciphertext: 'encrypted-data',
               protocol_version: 1,
               envelope_type: 'signal_dm',
-              created_at: '2025-01-01T00:00:00Z'
+              created_at: '2025-01-01T00:00:00Z',
               // Missing: message_type (causes decryption failure)
-            }
-          ]
-        })
+            },
+          ],
+        }),
       });
 
       // Mock Signal manager
@@ -269,14 +275,16 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       const mockProcessIncomingMessages = jest.fn().mockImplementation(async (messages: any[]) => {
         return messages.map(msg => {
           // This reproduces the client-side decryption guard from the audit (lines 494-498)
-          if (msg.envelope_type === "signal_dm" && mockSignalManager &&
-              msg.sender_device_id &&          // ← always falsy because field is named sender_id
-              typeof msg.message_type === "number"  // ← always false because message_type is missing
+          if (
+            msg.envelope_type === 'signal_dm' &&
+            mockSignalManager &&
+            msg.sender_device_id && // ← always falsy because field is named sender_id
+            typeof msg.message_type === 'number' // ← always false because message_type is missing
           ) {
             // Would decrypt here
-            return { ...msg, content: "decrypted content" };
+            return { ...msg, content: 'decrypted content' };
           } else {
-            return { ...msg, content: "[This message cannot be decrypted — unsupported envelope]" };
+            return { ...msg, content: '[This message cannot be decrypted — unsupported envelope]' };
           }
         });
       });
@@ -287,8 +295,10 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       const processedMessages = await mockProcessIncomingMessages(data.messages);
 
       // Assert: Verify the message cannot be decrypted due to missing fields
-      expect(processedMessages[0].content).toBe("[This message cannot be decrypted — unsupported envelope]");
-      
+      expect(processedMessages[0].content).toBe(
+        '[This message cannot be decrypted — unsupported envelope]'
+      );
+
       // Assert: Verify the problematic field structure
       expect(data.messages[0]).toHaveProperty('sender_id'); // Wrong field name
       expect(data.messages[0]).not.toHaveProperty('sender_device_id'); // Missing correct field
@@ -311,29 +321,33 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
               protocol_version: 1,
               envelope_type: 'signal_dm',
               message_type: 1, // P0-2 FIX: Include message_type for deserialization
-              created_at: '2025-01-01T00:00:00Z'
-            }
-          ]
-        })
+              created_at: '2025-01-01T00:00:00Z',
+            },
+          ],
+        }),
       });
 
       // Mock Signal manager
       const mockSignalManager = {
-        decryptSignalMessage: jest.fn().mockResolvedValue(new TextEncoder().encode("decrypted content")),
+        decryptSignalMessage: jest
+          .fn()
+          .mockResolvedValue(new TextEncoder().encode('decrypted content')),
       };
 
       // Mock the fixed function that processes incoming messages
       const mockProcessIncomingMessages = jest.fn().mockImplementation(async (messages: any[]) => {
         return messages.map(msg => {
           // P0-2 FIX: Now the decryption guard works correctly
-          if (msg.envelope_type === "signal_dm" && mockSignalManager &&
-              msg.sender_device_id &&          // ← now truthy
-              typeof msg.message_type === "number"  // ← now truthy
+          if (
+            msg.envelope_type === 'signal_dm' &&
+            mockSignalManager &&
+            msg.sender_device_id && // ← now truthy
+            typeof msg.message_type === 'number' // ← now truthy
           ) {
             // Would decrypt here successfully
-            return { ...msg, content: "decrypted content" };
+            return { ...msg, content: 'decrypted content' };
           } else {
-            return { ...msg, content: "[This message cannot be decrypted — unsupported envelope]" };
+            return { ...msg, content: '[This message cannot be decrypted — unsupported envelope]' };
           }
         });
       });
@@ -344,8 +358,8 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       const processedMessages = await mockProcessIncomingMessages(data.messages);
 
       // Assert: Verify the message can now be decrypted
-      expect(processedMessages[0].content).toBe("decrypted content");
-      
+      expect(processedMessages[0].content).toBe('decrypted content');
+
       // Assert: Verify the fixed field structure
       expect(data.messages[0]).toHaveProperty('sender_device_id'); // Correct field name
       expect(data.messages[0]).toHaveProperty('message_type'); // Message type included
@@ -361,49 +375,51 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
         status: 426,
         json: jest.fn().mockResolvedValue({
           error: 'Protocol version 0 is no longer supported. Please update Ember.',
-          minimum_protocol_version: 1
-        })
+          minimum_protocol_version: 1,
+        }),
       });
 
       // Mock the buggy sendDirectMessage function (missing protocol_version)
-      const mockSendDirectMessage = jest.fn().mockImplementation(async (channelId: string, plaintext: string) => {
-        const auth = await window.getValidAuth();
-        if (!auth) throw new Error("Not authenticated");
-        
-        // This reproduces the current buggy implementation - missing protocol_version
-        const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-          body: JSON.stringify({ 
-            ciphertext: "encrypted-data", 
-            envelope_type: "signal_dm", 
-            message_type: 1, 
-            device_id: "device-1"
-            // Missing: protocol_version (causes 426 error)
-          }),
+      const mockSendDirectMessage = jest
+        .fn()
+        .mockImplementation(async (channelId: string, plaintext: string) => {
+          const auth = await window.getValidAuth();
+          if (!auth) throw new Error('Not authenticated');
+
+          // This reproduces the current buggy implementation - missing protocol_version
+          const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+            body: JSON.stringify({
+              ciphertext: 'encrypted-data',
+              envelope_type: 'signal_dm',
+              message_type: 1,
+              device_id: 'device-1',
+              // Missing: protocol_version (causes 426 error)
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(errData.error ?? 'Failed to send message');
+          }
+
+          return { id: 'msg-id' };
         });
-        
-        if (!res.ok) {
-          const errData = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errData.error ?? "Failed to send message");
-        }
-        
-        return { id: "msg-id" };
-      });
-      
+
       window.sendDirectMessage = mockSendDirectMessage;
 
       // Act: Attempt to send direct message
-      await expect(
-        window.sendDirectMessage('channel-1', 'Hello World')
-      ).rejects.toThrow('Protocol version 0 is no longer supported');
+      await expect(window.sendDirectMessage('channel-1', 'Hello World')).rejects.toThrow(
+        'Protocol version 0 is no longer supported'
+      );
 
       // Assert: Verify the request was made without protocol_version
       expect(mockFetch).toHaveBeenCalledWith(
         'https://test.ember.com/api/v1/channels/channel-1/messages',
         expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('"ciphertext":"encrypted-data"')
+          body: expect.stringContaining('"ciphertext":"encrypted-data"'),
         })
       );
 
@@ -420,36 +436,38 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
         json: jest.fn().mockResolvedValue({
           id: 'msg-id',
           channel_id: 'channel-1',
-          created_at: Date.now() / 1000
-        })
+          created_at: Date.now() / 1000,
+        }),
       });
 
       // Mock the fixed sendDirectMessage function
-      const mockFixedSendDirectMessage = jest.fn().mockImplementation(async (channelId: string, plaintext: string) => {
-        const auth = await window.getValidAuth();
-        if (!auth) throw new Error("Not authenticated");
-        
-        // P1-1 FIX: Include protocol_version in the request
-        const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-          body: JSON.stringify({ 
-            ciphertext: "encrypted-data", 
-            envelope_type: "signal_dm", 
-            message_type: 1, 
-            device_id: "device-1",
-            protocol_version: 1 // P1-1 FIX: Required by server
-          }),
+      const mockFixedSendDirectMessage = jest
+        .fn()
+        .mockImplementation(async (channelId: string, plaintext: string) => {
+          const auth = await window.getValidAuth();
+          if (!auth) throw new Error('Not authenticated');
+
+          // P1-1 FIX: Include protocol_version in the request
+          const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+            body: JSON.stringify({
+              ciphertext: 'encrypted-data',
+              envelope_type: 'signal_dm',
+              message_type: 1,
+              device_id: 'device-1',
+              protocol_version: 1, // P1-1 FIX: Required by server
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(errData.error ?? 'Failed to send message');
+          }
+
+          return await res.json();
         });
-        
-        if (!res.ok) {
-          const errData = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errData.error ?? "Failed to send message");
-        }
-        
-        return await res.json();
-      });
-      
+
       window.sendDirectMessage = mockFixedSendDirectMessage;
 
       // Act: Attempt to send direct message
@@ -459,14 +477,14 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
       expect(result).toEqual({
         id: 'msg-id',
         channel_id: 'channel-1',
-        created_at: expect.any(Number)
+        created_at: expect.any(Number),
       });
 
       // Assert: Verify protocol_version was included
       expect(mockFetch).toHaveBeenCalledWith(
         'https://test.ember.com/api/v1/channels/channel-1/messages',
         expect.objectContaining({
-          body: expect.stringContaining('"protocol_version":1')
+          body: expect.stringContaining('"protocol_version":1'),
         })
       );
     });
@@ -476,7 +494,7 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
     it('RED PHASE: demonstrates the problematic btoa pattern', () => {
       // Arrange: Create a payload that would cause issues
       const largePayload = new Uint8Array(1000); // Smaller payload for test environment
-      
+
       // Act & Assert: Demonstrate the old problematic pattern exists
       // Note: In test environment, stack overflow may not occur, but we can verify the pattern
       expect(() => {
@@ -484,7 +502,7 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
         const result = btoa(String.fromCharCode(...largePayload));
         expect(result).toBeDefined();
       }).not.toThrow(); // In test environment it doesn't overflow, but the pattern is still problematic
-      
+
       // Verify the pattern is what we expect to fix
       expect(btoa(String.fromCharCode(...new Uint8Array([1, 2, 3])))).toBe('AQID');
     });
@@ -492,15 +510,15 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
     it('GREEN PHASE: should handle large payloads without stack overflow', () => {
       // Arrange: Create a large payload (>65KB)
       const largePayload = new Uint8Array(70000); // 70KB
-      
+
       // Act: Use Buffer-based implementation (the fix)
       const result = Buffer.from(largePayload).toString('base64');
-      
+
       // Assert: Should work without stack overflow
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
-      
+
       // Verify the result is correct base64
       const decoded = Buffer.from(result, 'base64');
       expect(decoded.length).toBe(largePayload.length);
@@ -510,13 +528,13 @@ describe('Direct Messaging Manager — Signal DM Audit Fixes', () => {
     it('GREEN PHASE: should work with the fixed toBase64 function', () => {
       // Test the actual fixed function from signal-service.ts
       const testPayload = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
-      
+
       // Act: Use the fixed implementation
       const result = Buffer.from(testPayload).toString('base64');
-      
+
       // Assert: Should produce correct base64
       expect(result).toBe('SGVsbG8=');
-      
+
       // Verify round-trip
       const decoded = Buffer.from(result, 'base64');
       expect(new Uint8Array(decoded)).toEqual(testPayload);

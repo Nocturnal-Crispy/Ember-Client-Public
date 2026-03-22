@@ -6,15 +6,12 @@ export async function fetchDMs(auth: AuthData): Promise<DmEmber[]> {
     auth.hostname,
     '/api/v1/dms',
     { method: 'GET' },
-    auth.token,
+    auth.token
   );
   return data.dms ?? [];
 }
 
-export async function createDM(
-  auth: AuthData,
-  request: CreateDmRequest,
-): Promise<{ id: string }> {
+export async function createDM(auth: AuthData, request: CreateDmRequest): Promise<{ id: string }> {
   return apiRequest<{ id: string }>(
     auth.hostname,
     '/api/v1/dms',
@@ -22,6 +19,6 @@ export async function createDM(
       method: 'POST',
       body: JSON.stringify(request),
     },
-    auth.token,
+    auth.token
   );
 }
