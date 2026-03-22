@@ -111,7 +111,7 @@
 
   function rgbStrToHex(rgb: string): string {
     const parts = rgb.split(',').map(s => parseInt(s.trim(), 10));
-    return '#' + parts.map(n => n.toString(16).padStart(2, '0')).join('');
+    return `#${parts.map(n => n.toString(16).padStart(2, '0')).join('')}`;
   }
 
   function computeSurfaceHover(surfaceRgb: string): string {

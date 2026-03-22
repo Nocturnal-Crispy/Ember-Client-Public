@@ -638,7 +638,7 @@
           window.electronAPI.messageService
             .downloadAttachment(auth, channelId, attachment.id)
             .then(resp => {
-              const bytes = emberCrypto.decryptFileBytes(resp.encrypted_data, emberKey);
+              const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
               if (!bytes) {
                 statusEl.textContent = '[failed to decrypt image]';
                 wrapper.className = 'image-card-wrapper image-card-state-error';
@@ -713,18 +713,18 @@
           window.electronAPI.messageService
             .downloadAttachment(auth, channelId, attachment.id)
             .then(resp => {
-              const bytes = emberCrypto.decryptFileBytes(resp.encrypted_data, emberKey);
+              const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
               if (!bytes) {
                 log.error('Failed to decrypt attachment', { id: attachment.id });
                 return;
               }
               const blob = new Blob([new Uint8Array(bytes)], {
-                type: resp.content_type || 'application/octet-stream',
+                type: resp.contentType || 'application/octet-stream',
               });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = resp.original_name;
+              a.download = resp.originalName;
               a.click();
               URL.revokeObjectURL(url);
             })
@@ -953,7 +953,7 @@
     // loaded yet. openUserDetailsModal resolves the userId lazily at click time.
     const chumhandleEl = document.createElement('span');
     chumhandleEl.className = 'message-chumhandle';
-    chumhandleEl.textContent = '[' + toChumhandle(author) + ']: ';
+    chumhandleEl.textContent = `[${toChumhandle(author)}]: `;
     (window as any).makeUsernameClickable?.(chumhandleEl, '', author);
 
     const contentEl = document.createElement('div');

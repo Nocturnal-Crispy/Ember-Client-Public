@@ -63,7 +63,7 @@ window.App = {
   signalSessionManager: null as any,
 
   // ── Signal Session Manager Initialization ───────────────────────────────
-  initializeSignalSessionManager: async function (): Promise<void> {
+  async initializeSignalSessionManager(): Promise<void> {
     if (this.signalSessionManager) {
       console.warn('[App] SignalSessionManager already initialized');
       return;
@@ -71,7 +71,7 @@ window.App = {
 
     try {
       const auth = await window.getValidAuth?.();
-      if (!auth || !auth.token || !auth.hostname || !auth.user_id || !auth.device_id) {
+      if (!auth || !auth.token || !auth.hostname || !auth.userId || !auth.deviceId) {
         throw new Error('Not authenticated - cannot initialize SignalSessionManager');
       }
 

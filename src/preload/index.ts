@@ -288,9 +288,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
           preloadLog('debug', `Calling listener with ${args.length} arguments`);
           try {
             listener(...args);
-            preloadLog('debug', `Listener called successfully`);
+            preloadLog('debug', 'Listener called successfully');
           } catch (error) {
-            preloadLog('error', `Error calling listener:`, { error: String(error) });
+            preloadLog('error', 'Error calling listener:', { error: String(error) });
           }
         });
       } else {

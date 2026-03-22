@@ -10,7 +10,7 @@
   let dmSidebarElement: HTMLElement | null = null;
   let dmChatContainer: HTMLElement | null = null;
   let activeConversationId: string | null = null;
-  let conversations = new Map<string, DMConversationUI>();
+  const conversations = new Map<string, DMConversationUI>();
   let searchTimeout: NodeJS.Timeout | null = null;
   let ownUsername: string = 'Me';
   let dmPendingAttachment: { file: File; name: string } | null = null;
@@ -177,7 +177,7 @@
       // Auto-resize textarea
       messageInput.addEventListener('input', () => {
         messageInput.style.height = 'auto';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
       });
 
       // Ensure the textarea is interactive
@@ -301,7 +301,7 @@
 
       log.debug('Making API request', {
         hostname: auth.hostname,
-        query: query,
+        query,
         hasToken: !!auth.token,
       });
 
@@ -323,7 +323,7 @@
         log.error('Failed to search users', {
           status: response.status,
           statusText: response.statusText,
-          query: query,
+          query,
         });
         return [];
       }
@@ -340,7 +340,7 @@
         log.warn('Users API returned invalid format', {
           query,
           type: typeof users,
-          users: users,
+          users,
         });
         return [];
       }
@@ -959,8 +959,8 @@
           _authResp.success && _authResp.data
             ? {
                 token: _authResp.data.token,
-                user_id: (_authResp.data as any).userId ?? (_authResp.data as any).user_id,
-                device_id: (_authResp.data as any).deviceId ?? (_authResp.data as any).device_id,
+                userId: (_authResp.data as any).userId ?? (_authResp.data as any).user_id,
+                deviceId: (_authResp.data as any).deviceId ?? (_authResp.data as any).device_id,
                 hostname: _authResp.data.hostname,
                 username: _authResp.data.username,
               }
@@ -1092,7 +1092,7 @@
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   /**
@@ -1899,13 +1899,13 @@
    * conversation is currently open, the header status text.
    */
   function handleDmPresenceUpdate(payload: {
-    user_id: string;
+    userId: string;
     username: string;
     status: string;
   }): void {
     const isOnline = payload.status === 'online';
     conversations.forEach((conversation, conversationId) => {
-      if (conversation.participantId !== payload.user_id) return;
+      if (conversation.participantId !== payload.userId) return;
       updateConversation(conversationId, { isOnline });
       if (conversationId === activeConversationId) {
         const headerStatus = dmChatContainer?.querySelector(

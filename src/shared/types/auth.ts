@@ -2,36 +2,36 @@
 
 export interface AuthData {
   token: string;
-  user_id: string;
-  device_id: string;
+  userId: string;
+  deviceId: string;
   hostname: string;
   username: string;
 }
 
 export interface DeviceIdentity {
-  device_id: string;
-  public_key: string;
-  private_key: string;
+  deviceId: string;
+  publicKey: string;
+  privateKey: string;
 }
 
 export interface RegistrationPayload {
   username: string;
   password: string;
-  device_id: string;
-  public_key: string;
-  encrypted_device_key: string;
+  deviceId: string;
+  publicKey: string;
+  encryptedDeviceKey: string;
   salt: string;
 }
 
 export interface LoginPayload {
   username: string;
   password: string;
-  device_id: string;
+  deviceId: string;
 }
 
 export interface AuthResponse extends AuthData {
   _recoveryCode?: string;
-  minimum_client_version?: string;
+  minimumClientVersion?: string;
 }
 
 export interface RecoveryData {

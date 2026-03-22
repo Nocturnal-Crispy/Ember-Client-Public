@@ -215,9 +215,9 @@ describe('Sender Key Decryption', () => {
       id: 'test-message-id',
       username: 'Alice',
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
-      envelope_type: 'signal_group',
-      created_at: 1700000000,
-      chat_color: '#ff0000',
+      envelopeType: 'signal_group',
+      createdAt: 1700000000,
+      chatColor: '#ff0000',
     };
 
     // Call displayDecryptedMessage which should trigger the failure path
@@ -243,9 +243,9 @@ describe('Sender Key Decryption', () => {
       id: 'test-message-id',
       username: 'Alice',
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
-      envelope_type: 'signal_group',
-      created_at: 1700000000,
-      chat_color: '#ff0000',
+      envelopeType: 'signal_group',
+      createdAt: 1700000000,
+      chatColor: '#ff0000',
     };
 
     // Call displayDecryptedMessage which should trigger the failure path
@@ -281,9 +281,9 @@ describe('Sender Key Decryption', () => {
       id: 'test-message-id',
       username: 'Alice',
       ciphertext: '{"v":2,"sa":"user.device","ct":"encrypted"}',
-      envelope_type: 'signal_group',
-      created_at: 1700000000,
-      chat_color: '#ff0000',
+      envelopeType: 'signal_group',
+      createdAt: 1700000000,
+      chatColor: '#ff0000',
     };
 
     // Call displayDecryptedMessage - should fail initially, fetch distribution, then retry and succeed

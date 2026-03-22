@@ -65,7 +65,7 @@ function initializeFileLogging() {
 function writeToFile(content: string) {
   if (logFileStream) {
     try {
-      logFileStream.write(content + '\n');
+      logFileStream.write(`${content}\n`);
     } catch (error) {
       console.warn('Failed to write to log file:', error);
     }
@@ -131,9 +131,9 @@ export function write(
 
   // Write to console
   if (level >= LogLevel.ERROR) {
-    process.stderr.write(logLine + '\n');
+    process.stderr.write(`${logLine}\n`);
   } else {
-    process.stdout.write(logLine + '\n');
+    process.stdout.write(`${logLine}\n`);
   }
 
   // Write to file in development

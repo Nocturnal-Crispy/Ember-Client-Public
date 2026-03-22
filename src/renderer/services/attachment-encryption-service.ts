@@ -10,42 +10,42 @@ import { SignalSessionManager } from '../managers/signal-session-manager';
 
 export interface AttachmentKey {
   id: string;
-  attachment_id: string;
-  user_id: string;
-  device_id: string;
+  attachmentId: string;
+  userId: string;
+  deviceId: string;
   encrypted_key: string;
-  created_at: number;
+  createdAt: number;
 }
 
 export interface CreateAttachmentKeyRequest {
-  attachment_id: string;
+  attachmentId: string;
   keys: {
-    user_id: string;
-    device_id: string;
+    userId: string;
+    deviceId: string;
     encrypted_key: string;
   }[];
 }
 
 export interface UploadAttachmentRequest {
-  channel_id?: string;
-  conversation_id?: string;
-  original_name: string;
-  content_type: string;
-  size_bytes: number;
-  encrypted_data: string;
-  attachment_key: string;
+  channelId?: string;
+  conversationId?: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  encryptedData: string;
+  attachmentKey: string;
 }
 
 export interface AttachmentMetadata {
   id: string;
-  channel_id?: string;
-  conversation_id?: string;
-  uploader_id: string;
-  original_name: string;
-  content_type: string;
-  size_bytes: number;
-  created_at: number;
-  attachment_key_id: string;
+  channelId?: string;
+  conversationId?: string;
+  uploaderId: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: number;
+  attachmentKeyId: string;
 }
 
 export class AttachmentEncryptionService {
@@ -163,17 +163,17 @@ export class AttachmentEncryptionService {
       const keyRequests = [];
       for (const member of members) {
         // For now, assume one device per user (in reality, would handle multiple devices)
-        const encryptedKey = await this.encryptAttachmentKeyForUser(key, member.user_id);
+        const encryptedKey = await this.encryptAttachmentKeyForUser(key, member.userId);
         keyRequests.push({
-          user_id: member.user_id,
-          device_id: member.device_id || 'default',
+          userId: member.userId,
+          deviceId: member.deviceId || 'default',
           encrypted_key: encryptedKey,
         });
       }
 
       // Store the attachment keys
       const request: CreateAttachmentKeyRequest = {
-        attachment_id: attachmentId,
+        attachmentId,
         keys: keyRequests,
       };
 
@@ -210,17 +210,17 @@ export class AttachmentEncryptionService {
       // Create encrypted keys for each participant's devices
       const keyRequests = [];
       for (const participant of participants) {
-        const encryptedKey = await this.encryptAttachmentKeyForUser(key, participant.user_id);
+        const encryptedKey = await this.encryptAttachmentKeyForUser(key, participant.userId);
         keyRequests.push({
-          user_id: participant.user_id,
-          device_id: participant.device_id || 'default',
+          userId: participant.userId,
+          deviceId: participant.deviceId || 'default',
           encrypted_key: encryptedKey,
         });
       }
 
       // Store the attachment keys
       const request: CreateAttachmentKeyRequest = {
-        attachment_id: attachmentId,
+        attachmentId,
         keys: keyRequests,
       };
 
@@ -285,12 +285,12 @@ export class AttachmentEncryptionService {
 
       // Upload the attachment
       const uploadRequest: UploadAttachmentRequest = {
-        channel_id: channelId,
-        original_name: fileName,
-        content_type: contentType,
-        size_bytes: data.length,
-        encrypted_data: encryptedData,
-        attachment_key: attachmentKey,
+        channelId,
+        originalName: fileName,
+        contentType,
+        sizeBytes: data.length,
+        encryptedData,
+        attachmentKey,
       };
 
       const response = await fetch(
@@ -339,12 +339,12 @@ export class AttachmentEncryptionService {
 
       // Upload the attachment
       const uploadRequest: UploadAttachmentRequest = {
-        conversation_id: conversationId,
-        original_name: fileName,
-        content_type: contentType,
-        size_bytes: data.length,
-        encrypted_data: encryptedData,
-        attachment_key: attachmentKey,
+        conversationId,
+        originalName: fileName,
+        contentType,
+        sizeBytes: data.length,
+        encryptedData,
+        attachmentKey,
       };
 
       const response = await fetch(
@@ -390,7 +390,7 @@ export class AttachmentEncryptionService {
 
       // Find the key for the current user/device
       const userKey = keys.find(
-        key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+        key => key.userId === this.auth.userId && key.deviceId === this.auth.deviceId
       );
 
       if (!userKey) {
@@ -421,12 +421,12 @@ export class AttachmentEncryptionService {
     // For now, return a placeholder
     return {
       id: attachmentId,
-      original_name: 'unknown',
-      content_type: 'application/octet-stream',
-      size_bytes: 0,
-      created_at: Date.now(),
-      uploader_id: 'unknown',
-      attachment_key_id: 'unknown',
+      originalName: 'unknown',
+      contentType: 'application/octet-stream',
+      sizeBytes: 0,
+      createdAt: Date.now(),
+      uploaderId: 'unknown',
+      attachmentKeyId: 'unknown',
     };
   }
 
@@ -444,13 +444,13 @@ export class AttachmentEncryptionService {
    */
   private async getChannelMembers(
     channelId: string
-  ): Promise<{ user_id: string; device_id?: string }[]> {
+  ): Promise<{ userId: string; deviceId?: string }[]> {
     // This would fetch channel members from the server
     // For now, return the current user as a member
     return [
       {
-        user_id: this.auth.user_id,
-        device_id: this.auth.device_id,
+        userId: this.auth.userId,
+        deviceId: this.auth.deviceId,
       },
     ];
   }
@@ -460,13 +460,13 @@ export class AttachmentEncryptionService {
    */
   private async getConversationParticipants(
     conversationId: string
-  ): Promise<{ user_id: string; device_id?: string }[]> {
+  ): Promise<{ userId: string; deviceId?: string }[]> {
     // This would fetch conversation participants from the server
     // For now, return the current user as a participant
     return [
       {
-        user_id: this.auth.user_id,
-        device_id: this.auth.device_id,
+        userId: this.auth.userId,
+        deviceId: this.auth.deviceId,
       },
     ];
   }
@@ -479,9 +479,9 @@ export class AttachmentEncryptionService {
       // In reality, this would use the Signal Protocol to encrypt the key for the specific user
       // For now, return a base64-encoded placeholder
       const keyData = JSON.stringify({
-        attachment_key: key,
-        for_user_id: userId,
-        created_by: this.auth.user_id,
+        attachmentKey: key,
+        forUserId: userId,
+        createdBy: this.auth.userId,
         timestamp: Date.now(),
       });
 
@@ -501,7 +501,7 @@ export class AttachmentEncryptionService {
       // For now, decode the base64 and parse JSON
       const keyData = atob(encryptedKey);
       const parsed = JSON.parse(keyData);
-      return parsed.attachment_key;
+      return parsed.attachmentKey;
     } catch (error) {
       console.error('Failed to decrypt attachment key for user:', error);
       throw error;

@@ -328,7 +328,7 @@ describe('HIGH-07: DM placeholder key cryptographic correctness', () => {
       return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
     });
 
-    await (window as any).startDmConversation(UNIQUE_PARTNER_ID + '-2', 'Partner');
+    await (window as any).startDmConversation(`${UNIQUE_PARTNER_ID}-2`, 'Partner');
 
     // Get the POST request that was made
     const postCall = fetchMock.mock.calls.find(call => call[1]?.method === 'POST');

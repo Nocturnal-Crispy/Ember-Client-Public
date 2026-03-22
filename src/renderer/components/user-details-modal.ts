@@ -71,9 +71,9 @@
     }
 
     // Custom status
-    const customStatus = member?.custom_status ?? '';
+    const customStatus = member?.customStatus ?? '';
     if (customStatus) {
-      const emoji = member?.status_emoji ?? '';
+      const emoji = member?.statusEmoji ?? '';
       setText('user-details-custom-status', emoji ? `${emoji} ${customStatus}` : customStatus);
       setHidden('user-details-custom-status', false);
     } else {
@@ -102,7 +102,7 @@
     // currentMembers loaded), resolve it now via username lookup.
     const resolvedId =
       userId ||
-      ((window as any).getUserDetailsByUsername?.(username) as Member | null)?.user_id ||
+      ((window as any).getUserDetailsByUsername?.(username) as Member | null)?.userId ||
       '';
     log.debug('Opening user details modal', { userId: resolvedId, username });
     currentUserId = resolvedId;

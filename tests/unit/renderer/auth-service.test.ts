@@ -146,7 +146,7 @@ describe('decodeBase64ToBytes function', () => {
   describe('edge cases', () => {
     it('should throw for very long Base64 strings with invalid content', () => {
       // Create a long Base64 string without padding that will fail validation
-      const longInput = 'SGVsbG8gV29ybGQ'.repeat(100) + 'invalid@';
+      const longInput = `${'SGVsbG8gV29ybGQ'.repeat(100)}invalid@`;
 
       expect(() => {
         decodeBase64ToBytes(longInput);

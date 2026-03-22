@@ -35,8 +35,8 @@ function fromBase64(s: string): Uint8Array {
 
 const mockAuth = {
   token: 'test-token',
-  user_id: 'user-123',
-  device_id: 'device-1',
+  userId: 'user-123',
+  deviceId: 'device-1',
   hostname: 'api.test.com',
   username: 'testuser',
 };
@@ -385,14 +385,18 @@ describe('signal-service', () => {
     describe('ensureSession', () => {
       it('calls ProcessPreKeyBundle when no session exists', async () => {
         const mockBundle = {
-          registration_id: 1234,
-          device_id: 1,
-          prekey_id: 42,
-          prekey_public: [1, 2, 3],
-          signed_prekey_id: 1,
-          signed_prekey_public: [4, 5, 6],
-          signed_prekey_signature: [7, 8, 9],
-          identity_key: [10, 11, 12],
+          registrationId: 1234,
+          identityKey: [10, 11, 12],
+          signedPreKey: {
+            id: 1,
+            deviceId: 1,
+            publicKey: [4, 5, 6],
+            signature: [7, 8, 9],
+          },
+          oneTimePreKey: {
+            id: 42,
+            publicKey: [1, 2, 3],
+          },
         };
 
         mockInvoke
@@ -415,7 +419,7 @@ describe('signal-service', () => {
           'ProcessPreKeyBundle',
           expect.objectContaining({
             recipientAddress: 'user-456.device-2',
-            registrationId: mockBundle.registration_id,
+            registrationId: mockBundle.registrationId,
           })
         );
       });

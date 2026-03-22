@@ -18,7 +18,7 @@
     if (!App.currentMembers || App.currentMembers.length === 0) {
       return null;
     }
-    const found = App.currentMembers.find(m => m.user_id === userId);
+    const found = App.currentMembers.find(m => m.userId === userId);
     return found ?? null;
   }
 

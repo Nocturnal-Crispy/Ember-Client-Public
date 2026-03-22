@@ -638,7 +638,7 @@
       const autoResize = (): void => {
         if (!messageInput) return;
         messageInput.style.height = 'auto';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
       };
 
       messageInput.addEventListener('input', autoResize);
@@ -832,7 +832,7 @@
         const auth = (await ipcRenderer.invoke('get-auth')) as {
           token?: string;
           hostname?: string;
-          user_id?: string;
+          userId?: string;
           username?: string;
         } | null;
         if (!auth || !auth.token || !auth.hostname) return;
@@ -847,17 +847,17 @@
         if (response.ok) {
           currentCustomStatus = cs;
           currentStatusEmoji = se;
-          log.info('User status updated', { status: apiStatus, user_id: auth.user_id });
+          log.info('User status updated', { status: apiStatus, user_id: auth.userId });
           if (userStatusText) {
-            userStatusText.textContent = cs ? `${se ? se + ' ' : ''}${cs}` : displayStatus;
+            userStatusText.textContent = cs ? `${se ? `${se} ` : ''}${cs}` : displayStatus;
           }
           updateUserPanelStatusColor(apiStatus);
           window.handlePresenceUpdate({
-            user_id: auth.user_id ?? '',
+            userId: auth.userId ?? '',
             username: auth.username ?? '',
             status: apiStatus,
-            custom_status: cs,
-            status_emoji: se,
+            customStatus: cs,
+            statusEmoji: se,
           });
         } else {
           log.warn('Failed to update user status', {
@@ -1099,7 +1099,7 @@
         const auth = (await ipcRenderer.invoke('get-auth')) as {
           token?: string;
           hostname?: string;
-          user_id?: string;
+          userId?: string;
           avatar?: string;
         } | null;
 
@@ -1144,9 +1144,9 @@
         const members: Member[] = data.members || [];
         // Inject the locally-stored avatar for the current user so it shows
         // even when the server DB hasn't been updated yet.
-        if (auth.user_id && auth.avatar) {
+        if (auth.userId && auth.avatar) {
           for (const m of members) {
-            if (m.user_id === auth.user_id && !m.avatar) {
+            if (m.userId === auth.userId && !m.avatar) {
               m.avatar = auth.avatar;
             }
           }
@@ -1188,7 +1188,7 @@
         group.members.forEach(member => {
           const memberEl = document.createElement('div');
           memberEl.className = 'member';
-          memberEl.dataset['userId'] = member.user_id;
+          memberEl.dataset['userId'] = member.userId;
           if (key === 'offline') memberEl.classList.add('offline');
           const statusClass = key === 'dnd' ? 'dnd' : key;
 
@@ -1215,14 +1215,14 @@
           nameEl.textContent = member.username ?? 'Unknown';
           nameWrapEl.appendChild(nameEl);
           // Make the entire member div clickable to open the user details modal.
-          (window as any).makeUsernameClickable?.(memberEl, member.user_id, member.username ?? '');
+          (window as any).makeUsernameClickable?.(memberEl, member.userId, member.username ?? '');
 
-          if (member.custom_status) {
+          if (member.customStatus) {
             const customStatusEl = document.createElement('span');
             customStatusEl.className = 'member-custom-status';
-            const text = member.status_emoji
-              ? `${member.status_emoji} ${member.custom_status}`
-              : member.custom_status;
+            const text = member.statusEmoji
+              ? `${member.statusEmoji} ${member.customStatus}`
+              : member.customStatus;
             customStatusEl.textContent = text;
             nameWrapEl.appendChild(customStatusEl);
           }
@@ -1238,7 +1238,7 @@
         members.forEach(member => {
           const status = member.status === 'invisible' ? 'offline' : (member.status ?? 'offline');
           window.handleDmPresenceUpdate({
-            user_id: member.user_id,
+            userId: member.userId,
             username: member.username ?? '',
             status,
           });
@@ -1289,7 +1289,7 @@
         const auth = (await ipcRenderer.invoke('get-auth')) as {
           token?: string;
           hostname?: string;
-          user_id?: string;
+          userId?: string;
           username?: string;
         } | null;
         if (!auth || !auth.token || !auth.hostname) {
@@ -1313,7 +1313,7 @@
           return false;
         }
         log.info('Session verified', {
-          user_id: auth.user_id,
+          user_id: auth.userId,
           username: auth.username,
         });
         return true;

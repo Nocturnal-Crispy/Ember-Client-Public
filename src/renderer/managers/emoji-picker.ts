@@ -484,7 +484,7 @@
 
     CATEGORIES.forEach((cat, idx) => {
       const btn = document.createElement('button');
-      btn.className = 'emoji-picker-category-btn' + (idx === 0 ? ' active' : '');
+      btn.className = `emoji-picker-category-btn${idx === 0 ? ' active' : ''}`;
       btn.textContent = cat.icon;
       btn.title = cat.label;
       btn.setAttribute('aria-label', cat.label);
@@ -570,8 +570,8 @@
       top = rect.bottom + 8;
     }
 
-    panel.style.left = left + 'px';
-    panel.style.top = top + 'px';
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
   }
 
   // ── Open / close ──────────────────────────────────────────────────────────

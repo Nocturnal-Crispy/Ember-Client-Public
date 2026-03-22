@@ -196,11 +196,11 @@ declare global {
 
   interface AttachmentDownloadResult {
     id: string;
-    encrypted_data: string;
-    original_name: string;
-    content_type: string;
-    size_bytes: number;
-    created_at: number;
+    encryptedData: string;
+    originalName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt: number;
   }
 
   interface PendingAttachment {
@@ -234,8 +234,8 @@ declare global {
 
   interface RefreshTokenResponse {
     readonly token: string;
-    readonly user_id: string;
-    readonly device_id: string;
+    readonly userId: string;
+    readonly deviceId: string;
     readonly username: string;
   }
 
@@ -305,7 +305,7 @@ declare global {
       channelId: string,
       encryptedData: string,
       meta: { name: string; size: number; mime: string }
-    ): Promise<{ id: string; created_at: number }>;
+    ): Promise<{ id: string; createdAt: number }>;
     downloadAttachment(
       auth: AuthData,
       channelId: string,
@@ -316,7 +316,7 @@ declare global {
       conversationId: string,
       encryptedData: string,
       meta: { name: string; size: number; mime: string }
-    ): Promise<{ id: string; created_at: number }>;
+    ): Promise<{ id: string; createdAt: number }>;
     downloadDMAttachment(
       auth: AuthData,
       conversationId: string,
@@ -329,7 +329,7 @@ declare global {
     updateEmber(
       auth: AuthData,
       emberId: string,
-      updates: { name?: string; icon_data?: string }
+      updates: { name?: string; iconData?: string }
     ): Promise<Ember>;
   }
 
@@ -361,7 +361,7 @@ declare global {
       Array<{
         id: string;
         name: string;
-        display_id: string;
+        displayId: string;
         thumbnail: string;
         pipeWireNodeId: number | null;
       }>
@@ -466,13 +466,13 @@ declare global {
     handleEmberUpdated(payload: {
       id: string;
       name: string;
-      icon_data?: string;
-      created_at: number;
-      is_owner: boolean;
+      iconData?: string;
+      createdAt: number;
+      isOwner: boolean;
     }): void;
     handleMembershipUpdated(payload: {
-      ember_id: string;
-      user_id: string;
+      emberId: string;
+      userId: string;
       username: string;
       action: string;
     }): Promise<void>;
@@ -541,10 +541,10 @@ declare global {
     syncCryptoStateFromServer(
       emberId: string,
       serverState: {
-        crypto_mode?: string;
-        sender_key_status?: string;
-        active_distribution_id?: string | null;
-        sender_key_epoch?: number;
+        cryptoMode?: string;
+        senderKeyStatus?: string;
+        activeDistributionId?: string | null;
+        senderKeyEpoch?: number;
       }
     ): void;
     // Globals set by crypto-routing-service.ts
@@ -601,12 +601,12 @@ declare global {
     closeAcceptInviteModal(): void;
     processInviteLink(code: string, hostname: string | null): Promise<void>;
     // Globals set by voice-ui-manager.ts
-    handleMemberUpdate(payload: { user_id: string; avatar?: string; username?: string }): void;
+    handleMemberUpdate(payload: { userId: string; avatar?: string; username?: string }): void;
     fetchAndRenderVoicePresence(emberId: string): Promise<void>;
     joinVoiceChannel(channelId: string, channelName: string): Promise<void>;
     leaveVoiceChannel(): Promise<void>;
-    handleVoiceUserJoined(payload: { channel_id: string; user_id: string; username: string }): void;
-    handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void;
+    handleVoiceUserJoined(payload: { channelId: string; userId: string; username: string }): void;
+    handleVoiceUserLeft(payload: { channelId: string; userId: string }): void;
     renderVoiceParticipants(channelId: string | null): void;
     updateSpeakingIndicator(userId: string, isSpeaking: boolean): void;
     showVoiceControls(channelName: string): void;
@@ -711,15 +711,15 @@ declare global {
     resubscribeDmChannels(): void;
     handleDmMessage(payload: {
       id: string;
-      conversation_id: string;
-      sender_user_id: string;
+      conversationId: string;
+      senderUserId: string;
       content: string;
       timestamp: number;
     }): void;
-    handleDmPresenceUpdate(payload: { user_id: string; username: string; status: string }): void;
+    handleDmPresenceUpdate(payload: { userId: string; username: string; status: string }): void;
     handleDmTypingIndicator(payload: {
-      conversation_id: string;
-      user_id: string;
+      conversationId: string;
+      userId: string;
       typing: boolean;
     }): void;
     // Globals set by direct-messaging-ui.ts

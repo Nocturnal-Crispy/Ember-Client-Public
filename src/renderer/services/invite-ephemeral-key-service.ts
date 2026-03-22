@@ -262,8 +262,8 @@ export class InviteEphemeralKeyService {
       const ephemeralKey = this.generateEphemeralKey();
 
       keyPackages.push({
-        user_id: this.auth.user_id,
-        device_id: this.auth.device_id,
+        user_id: this.auth.userId,
+        device_id: this.auth.deviceId,
         encrypted_key_package: await this.encryptEphemeralKeyPackage(ephemeralKey, currentEpoch.id),
       });
 

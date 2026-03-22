@@ -80,7 +80,7 @@ export class EnhancedRecoveryService {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       // Combine device characteristics
-      const deviceData = `${userAgent}|${platform}|${language}|${screenResolution}|${timezone}|${this.auth.device_id}`;
+      const deviceData = `${userAgent}|${platform}|${language}|${screenResolution}|${timezone}|${this.auth.deviceId}`;
 
       // Create hash (simplified - would use proper cryptographic hash in production)
       let hash = 0;
@@ -128,7 +128,7 @@ export class EnhancedRecoveryService {
 
       // Create recovery data
       const recoveryData: RecoveryCodeData = {
-        user_id: this.auth.user_id,
+        user_id: this.auth.userId,
         encrypted_device_key: encryptedDeviceKey,
         salt,
         protocol_version: 2, // Signal Protocol v2.3
@@ -357,7 +357,7 @@ export class EnhancedRecoveryService {
     try {
       const safeStorageResult = await window.emberAPI.invoke<{ value: string | null }>(
         'GetSafeStorage',
-        { key: `identity_key_${this.auth.user_id}_${this.auth.device_id}` }
+        { key: `identity_key_${this.auth.userId}_${this.auth.deviceId}` }
       );
       const identityKeyB64 = safeStorageResult.data?.value ?? null;
 

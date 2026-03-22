@@ -18,7 +18,7 @@ export interface GifFavorite {
 }
 
 export interface AppSettings {
-  last_hostname?: string;
+  lastHostname?: string;
 }
 
 /** electron-store schema for the main process store. */

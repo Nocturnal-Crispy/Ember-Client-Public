@@ -87,14 +87,18 @@ describe('Prekey endpoint path corrections', () => {
     const mockFetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        registration_id: 1,
-        device_id: 1,
-        prekey_id: 1,
-        prekey_public: new Uint8Array([1, 2, 3]),
-        signed_prekey_id: 1,
-        signed_prekey_public: new Uint8Array([4, 5, 6]),
-        signed_prekey_signature: new Uint8Array([7, 8, 9]),
-        identity_key: new Uint8Array([10, 11, 12]),
+        registrationId: 1,
+        identityKey: new Uint8Array([10, 11, 12]),
+        signedPreKey: {
+          id: 1,
+          deviceId: 1,
+          publicKey: new Uint8Array([4, 5, 6]),
+          signature: new Uint8Array([7, 8, 9]),
+        },
+        oneTimePreKey: {
+          id: 1,
+          publicKey: new Uint8Array([1, 2, 3]),
+        },
       }),
     });
     global.fetch = mockFetch;

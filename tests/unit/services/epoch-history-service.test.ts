@@ -16,8 +16,8 @@ global.fetch = jest.fn();
 const mockAuth = {
   token: 'test-token',
   hostname: 'https://test.example.com',
-  user_id: 'user-123',
-  device_id: 'device-456',
+  userId: 'user-123',
+  deviceId: 'device-456',
   username: 'testuser',
 };
 

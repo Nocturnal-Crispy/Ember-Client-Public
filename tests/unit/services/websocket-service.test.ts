@@ -119,23 +119,23 @@ describe('handlePresenceUpdate', () => {
 
   it('updates the status of an existing member in App.currentMembers', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'user-1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
-    (window as any).handlePresenceUpdate({ user_id: 'user-1', username: 'Alice', status: 'idle' });
+    (window as any).handlePresenceUpdate({ userId: 'user-1', username: 'Alice', status: 'idle' });
 
     expect((window as any).App.currentMembers[0].status).toBe('idle');
     expect(mockRenderMemberList).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ user_id: 'user-1', status: 'idle' })])
+      expect.arrayContaining([expect.objectContaining({ userId: 'user-1', status: 'idle' })])
     );
   });
 
   it('appends a new member entry when user_id is not found', () => {
-    (window as any).handlePresenceUpdate({ user_id: 'user-2', username: 'Bob', status: 'online' });
+    (window as any).handlePresenceUpdate({ userId: 'user-2', username: 'Bob', status: 'online' });
 
     expect((window as any).App.currentMembers).toHaveLength(1);
     expect((window as any).App.currentMembers[0]).toEqual({
-      user_id: 'user-2',
+      userId: 'user-2',
       username: 'Bob',
       status: 'online',
       role: 'member',
@@ -145,11 +145,11 @@ describe('handlePresenceUpdate', () => {
 
   it('does not modify other members when updating one', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
-      { user_id: 'user-2', username: 'Bob', status: 'online', role: 'member' },
+      { userId: 'user-1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'user-2', username: 'Bob', status: 'online', role: 'member' },
     ];
 
-    (window as any).handlePresenceUpdate({ user_id: 'user-2', username: 'Bob', status: 'dnd' });
+    (window as any).handlePresenceUpdate({ userId: 'user-2', username: 'Bob', status: 'dnd' });
 
     expect((window as any).App.currentMembers[0].status).toBe('online');
     expect((window as any).App.currentMembers[1].status).toBe('dnd');
@@ -157,19 +157,19 @@ describe('handlePresenceUpdate', () => {
 
   it('updates custom_status and status_emoji for an existing member', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'user-1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
     (window as any).handlePresenceUpdate({
-      user_id: 'user-1',
+      userId: 'user-1',
       username: 'Alice',
       status: 'online',
-      custom_status: 'Working on Ember',
-      status_emoji: '💻',
+      customStatus: 'Working on Ember',
+      statusEmoji: '💻',
     });
 
-    expect((window as any).App.currentMembers[0].custom_status).toBe('Working on Ember');
-    expect((window as any).App.currentMembers[0].status_emoji).toBe('💻');
+    expect((window as any).App.currentMembers[0].customStatus).toBe('Working on Ember');
+    expect((window as any).App.currentMembers[0].statusEmoji).toBe('💻');
     expect(mockRenderMemberList).toHaveBeenCalled();
   });
 
@@ -177,31 +177,31 @@ describe('handlePresenceUpdate', () => {
     (window as any).App.currentMembers = [];
 
     (window as any).handlePresenceUpdate({
-      user_id: 'user-3',
+      userId: 'user-3',
       username: 'Carol',
       status: 'idle',
-      custom_status: 'On a break',
-      status_emoji: '☕',
+      customStatus: 'On a break',
+      statusEmoji: '☕',
     });
 
     expect((window as any).App.currentMembers).toHaveLength(1);
-    expect((window as any).App.currentMembers[0].custom_status).toBe('On a break');
-    expect((window as any).App.currentMembers[0].status_emoji).toBe('☕');
+    expect((window as any).App.currentMembers[0].customStatus).toBe('On a break');
+    expect((window as any).App.currentMembers[0].statusEmoji).toBe('☕');
   });
 
   it('handles presence update without custom_status gracefully', () => {
     (window as any).App.currentMembers = [
       {
-        user_id: 'user-1',
+        userId: 'user-1',
         username: 'Alice',
         status: 'online',
         role: 'member',
-        custom_status: 'old status',
-        status_emoji: '🎯',
+        customStatus: 'old status',
+        statusEmoji: '🎯',
       },
     ];
 
-    (window as any).handlePresenceUpdate({ user_id: 'user-1', username: 'Alice', status: 'idle' });
+    (window as any).handlePresenceUpdate({ userId: 'user-1', username: 'Alice', status: 'idle' });
 
     // Status updates, custom_status preserved (not cleared unless explicitly sent)
     expect((window as any).App.currentMembers[0].status).toBe('idle');
@@ -209,11 +209,11 @@ describe('handlePresenceUpdate', () => {
 
   it('calls renderMemberList with the updated members array', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'user-1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'user-1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
     (window as any).handlePresenceUpdate({
-      user_id: 'user-1',
+      userId: 'user-1',
       username: 'Alice',
       status: 'offline',
     });
@@ -239,11 +239,11 @@ describe('handleIncomingMessage', () => {
   });
 
   it('displays a message arriving on the active channel from a different user', async () => {
-    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    mockIpcInvoke.mockResolvedValue({ userId: 'user-self' });
     const payload = {
       id: 'msg-1',
-      channel_id: 'ch-active',
-      sender_user_id: 'user-other',
+      channelId: 'ch-active',
+      senderUserId: 'user-other',
       ciphertext: 'abc',
       username: 'Bob',
     };
@@ -255,11 +255,11 @@ describe('handleIncomingMessage', () => {
   });
 
   it('does not display a message sent by the current user (self-filter)', async () => {
-    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    mockIpcInvoke.mockResolvedValue({ userId: 'user-self' });
     const payload = {
       id: 'msg-self-1',
-      channel_id: 'ch-active',
-      sender_user_id: 'user-self',
+      channelId: 'ch-active',
+      senderUserId: 'user-self',
       ciphertext: 'abc',
       username: 'Me',
     };
@@ -270,11 +270,11 @@ describe('handleIncomingMessage', () => {
   });
 
   it('calls markChannelUnread for a message arriving on a background channel', async () => {
-    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    mockIpcInvoke.mockResolvedValue({ userId: 'user-self' });
     const payload = {
       id: 'msg-bg-1',
-      channel_id: 'ch-other',
-      sender_user_id: 'user-other',
+      channelId: 'ch-other',
+      senderUserId: 'user-other',
       ciphertext: 'abc',
       username: 'Bob',
     };
@@ -286,12 +286,12 @@ describe('handleIncomingMessage', () => {
   });
 
   it('does not display a duplicate message (already in dedup set via registerSentMessageId)', async () => {
-    mockIpcInvoke.mockResolvedValue({ user_id: 'user-self' });
+    mockIpcInvoke.mockResolvedValue({ userId: 'user-self' });
     (window as any).registerSentMessageId('msg-dup-1');
     const payload = {
       id: 'msg-dup-1',
-      channel_id: 'ch-active',
-      sender_user_id: 'user-other',
+      channelId: 'ch-active',
+      senderUserId: 'user-other',
       ciphertext: 'abc',
       username: 'Bob',
     };
@@ -305,8 +305,8 @@ describe('handleIncomingMessage', () => {
     mockIpcInvoke.mockResolvedValue(null);
     const payload = {
       id: 'msg-noauth-1',
-      channel_id: 'ch-active',
-      sender_user_id: 'user-other',
+      channelId: 'ch-active',
+      senderUserId: 'user-other',
       ciphertext: 'abc',
       username: 'Bob',
     };

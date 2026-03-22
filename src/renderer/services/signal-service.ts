@@ -98,7 +98,7 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
     readonly privateKey: Uint8Array;
   }> {
     // Read private key from identity_key_${user_id}_${device_id}
-    const privKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
+    const privKey = `identity_key_${this.auth.userId}_${this.auth.deviceId}`;
     const privKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', {
       key: privKey,
     });
@@ -107,7 +107,7 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
     }
 
     // Read public key from identity_pubkey_${user_id}_${device_id}
-    const pubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
+    const pubKey = `identity_pubkey_${this.auth.userId}_${this.auth.deviceId}`;
     const pubKeyResponse = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', {
       key: pubKey,
     });
@@ -122,7 +122,7 @@ export class IpcIdentityKeyStore implements IIdentityKeyStore {
   }
 
   async getLocalRegistrationId(): Promise<number> {
-    const key = `registration_id_${this.auth.user_id}_${this.auth.device_id}`;
+    const key = `registration_id_${this.auth.userId}_${this.auth.deviceId}`;
     const response = await window.emberAPI.invoke<GetSafeStorageData>('GetSafeStorage', { key });
     if (!response.data?.value) {
       throw new Error('Registration ID not found in secure storage');
@@ -235,7 +235,7 @@ export class SignalService {
     readonly registrationId: number;
   }> {
     // Read private key from identity_key_${user_id}_${device_id}
-    const identityKey = `identity_key_${this.auth.user_id}_${this.auth.device_id}`;
+    const identityKey = `identity_key_${this.auth.userId}_${this.auth.deviceId}`;
     const identityResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
       key: identityKey,
     });
@@ -244,7 +244,7 @@ export class SignalService {
     }
 
     // Read public key from identity_pubkey_${user_id}_${device_id}
-    const identityPubKey = `identity_pubkey_${this.auth.user_id}_${this.auth.device_id}`;
+    const identityPubKey = `identity_pubkey_${this.auth.userId}_${this.auth.deviceId}`;
     const identityPubResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
       key: identityPubKey,
     });
@@ -252,7 +252,7 @@ export class SignalService {
       throw new Error('Identity public key not found in secure storage');
     }
 
-    const registrationKey = `registration_id_${this.auth.user_id}_${this.auth.device_id}`;
+    const registrationKey = `registration_id_${this.auth.userId}_${this.auth.deviceId}`;
     const registrationResponse = await this.invoke<GetSafeStorageData>('GetSafeStorage', {
       key: registrationKey,
     });

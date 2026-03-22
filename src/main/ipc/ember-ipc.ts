@@ -147,14 +147,14 @@ function handleGetAuth(_args: GetAuthArgs): GetAuthData | null {
   const auth: LocalAuthData | undefined = store.get('auth');
   if (!auth) return null;
 
-  if (!auth.token || !auth.user_id || !auth.device_id || !auth.hostname || !auth.username) {
+  if (!auth.token || !auth.userId || !auth.deviceId || !auth.hostname || !auth.username) {
     return null;
   }
 
   return {
     token: auth.token,
-    userId: auth.user_id,
-    deviceId: auth.device_id,
+    userId: auth.userId,
+    deviceId: auth.deviceId,
     hostname: auth.hostname,
     username: auth.username,
   };
@@ -379,10 +379,10 @@ const log = createLogger('EmberIPC');
 
 function getLocalAddress(): ProtocolAddress {
   const auth: LocalAuthData | undefined = store.get('auth');
-  if (!auth?.user_id || !auth?.device_id) {
+  if (!auth?.userId || !auth?.deviceId) {
     throw new Error('Not authenticated — cannot determine local address');
   }
-  return ProtocolAddress.new(`${auth.user_id}.${auth.device_id}`, 1);
+  return ProtocolAddress.new(`${auth.userId}.${auth.deviceId}`, 1);
 }
 
 function buildSignalStores(db: SignalDatabase) {

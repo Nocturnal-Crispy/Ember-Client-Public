@@ -7,7 +7,7 @@ interface ChannelsResponse {
 }
 
 interface EmberKeyResponse {
-  encrypted_key?: string;
+  encryptedKey?: string;
 }
 
 export async function fetchChannels(
@@ -47,8 +47,8 @@ export async function fetchEmberKey(
       { method: 'GET' },
       auth.token
     );
-    if (!data.encrypted_key) return null;
-    return { encryptedEmberKey: data.encrypted_key };
+    if (!data.encryptedKey) return null;
+    return { encryptedEmberKey: data.encryptedKey };
   } catch {
     return null;
   }

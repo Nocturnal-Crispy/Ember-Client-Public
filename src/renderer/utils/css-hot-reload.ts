@@ -64,7 +64,7 @@ class CssHotReloader {
       const href = sheet.getAttribute('href');
       if (href && href.includes(cssFileName || '')) {
         // Add cache-busting parameter to force refresh
-        const newHref = href + '?t=' + Date.now();
+        const newHref = `${href}?t=${Date.now()}`;
         sheet.setAttribute('href', newHref);
         console.log(`Refreshed stylesheet: ${newHref}`);
 

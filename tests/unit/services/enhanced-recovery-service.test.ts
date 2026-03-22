@@ -14,8 +14,8 @@ global.fetch = jest.fn();
 const mockAuth = {
   token: 'test-token',
   hostname: 'https://test.example.com',
-  user_id: 'user-123',
-  device_id: 'device-456',
+  userId: 'user-123',
+  deviceId: 'device-456',
   username: 'testuser',
 };
 
@@ -146,7 +146,7 @@ describe('EnhancedRecoveryService', () => {
 
     it('should generate different fingerprints for different devices', () => {
       // Change device ID
-      const differentAuth = { ...mockAuth, device_id: 'different-device' };
+      const differentAuth = { ...mockAuth, deviceId: 'different-device' };
       const differentService = new EnhancedRecoveryService(differentAuth, mockSignalSessionManager);
 
       const fingerprint1 = enhancedRecoveryService.generateDeviceFingerprint();
@@ -203,11 +203,16 @@ describe('EnhancedRecoveryService', () => {
 
   describe('getRecoveryCodeStatus', () => {
     it('should return status for non-existent recovery code', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 404,
-        json: async () => ({}),
-      });
+      // getRecoveryCodeStatus calls getRecoveryCodeData() then needsRotation() which calls getRecoveryCodeData() again
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({}),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({}),
+        });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
 
@@ -220,38 +225,47 @@ describe('EnhancedRecoveryService', () => {
     });
 
     it('should return status for enhanced recovery code', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          recovery_code: {
-            protocol_version: 2,
-            identity_key_type: 'ed25519',
-            last_rotated_at: Date.now(),
-          },
-        }),
-      });
+      const mockRecoveryCode = {
+        protocol_version: 2,
+        identity_key_type: 'ed25519',
+        last_rotated_at: Date.now(),
+      };
+
+      // getRecoveryCodeStatus calls getRecoveryCodeData() and then needsRotation() calls getRecoveryCodeData() again
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ recovery_code: mockRecoveryCode }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ recovery_code: mockRecoveryCode }),
+        });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
 
       expect(status.exists).toBe(true);
       expect(status.enhanced).toBe(true);
-      // Due to the mock setup, needsRotation will be true
-      expect(status.needsRotation).toBe(true);
-      // The recommendations will include rotation due to the mock setup
-      expect(status.recommendations).toContain('Rotate recovery code for security');
+      expect(status.needsRotation).toBe(false);
     });
 
     it('should return recommendations for legacy recovery code', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          recovery_code: {
-            protocol_version: 1,
-            identity_key_type: 'legacy',
-            last_rotated_at: Date.now() - 100 * 24 * 60 * 60 * 1000, // 100 days ago
-          },
-        }),
-      });
+      const mockRecoveryCode = {
+        protocol_version: 1,
+        identity_key_type: 'legacy',
+        last_rotated_at: Date.now() - 100 * 24 * 60 * 60 * 1000, // 100 days ago
+      };
+
+      // getRecoveryCodeStatus calls getRecoveryCodeData() and then needsRotation() calls getRecoveryCodeData() again
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ recovery_code: mockRecoveryCode }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ recovery_code: mockRecoveryCode }),
+        });
 
       const status = await enhancedRecoveryService.getRecoveryCodeStatus();
 

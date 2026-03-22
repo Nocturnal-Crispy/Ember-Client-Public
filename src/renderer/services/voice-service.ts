@@ -668,7 +668,7 @@ class VoiceManager {
         if (speaking !== isSpeakingLocal) {
           isSpeakingLocal = speaking;
           if (this.onSpeakingChanged && this.auth) {
-            this.onSpeakingChanged(this.auth.user_id, speaking);
+            this.onSpeakingChanged(this.auth.userId, speaking);
           }
         }
         if (this.channelId) requestAnimationFrame(check);

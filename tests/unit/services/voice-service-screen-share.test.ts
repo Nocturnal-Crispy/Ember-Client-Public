@@ -18,7 +18,7 @@
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeMockTrack(kind = 'video'): MediaStreamTrack {
-  return { kind, stop: jest.fn(), id: 'track-' + kind } as unknown as MediaStreamTrack;
+  return { kind, stop: jest.fn(), id: `track-${kind}` } as unknown as MediaStreamTrack;
 }
 
 function makeMockStream(

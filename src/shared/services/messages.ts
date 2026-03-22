@@ -10,21 +10,21 @@ interface AttachmentMeta {
 
 interface AttachmentUploadResponse {
   id: string;
-  created_at: number;
+  createdAt: number;
 }
 
 export interface AttachmentDownloadResponse {
   id: string;
-  encrypted_data: string;
-  original_name: string;
-  content_type: string;
-  size_bytes: number;
-  created_at: number;
+  encryptedData: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: number;
 }
 
 interface MessagesResponse {
   messages?: Message[];
-  has_more?: boolean;
+  hasMore?: boolean;
 }
 
 export async function fetchMessages(
@@ -44,7 +44,7 @@ export async function fetchMessages(
 
   return {
     messages: data.messages ?? [],
-    hasMore: data.has_more ?? false,
+    hasMore: data.hasMore ?? false,
   };
 }
 
@@ -110,7 +110,7 @@ export async function uploadAttachment(
     {
       method: 'POST',
       body: JSON.stringify({
-        encrypted_data: encryptedData,
+        encryptedData,
         ...meta,
       }),
     },
@@ -143,7 +143,7 @@ export async function uploadDMAttachment(
     {
       method: 'POST',
       body: JSON.stringify({
-        encrypted_data: encryptedData,
+        encryptedData,
         ...meta,
       }),
     },

@@ -19,8 +19,8 @@ export async function getValidAuth(): Promise<AuthData | null> {
     resp.success && resp.data
       ? {
           token: resp.data.token,
-          user_id: (resp.data as any).userId ?? (resp.data as any).user_id,
-          device_id: (resp.data as any).deviceId ?? (resp.data as any).device_id,
+          userId: (resp.data as any).userId ?? (resp.data as any).user_id,
+          deviceId: (resp.data as any).deviceId ?? (resp.data as any).device_id,
           hostname: resp.data.hostname,
           username: resp.data.username,
         }
@@ -41,8 +41,8 @@ export function isValidAuth(auth: unknown): auth is AuthData {
     typeof auth === 'object' &&
     'token' in auth &&
     'hostname' in auth &&
-    'user_id' in auth &&
-    'device_id' in auth &&
+    'userId' in auth &&
+    'deviceId' in auth &&
     typeof (auth as AuthData).token === 'string' &&
     typeof (auth as AuthData).hostname === 'string'
   );

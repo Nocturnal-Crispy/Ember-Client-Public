@@ -47,14 +47,14 @@ beforeEach(() => {
 describe('getUserDetails', () => {
   it('returns member details when user_id is in App.currentMembers', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'u1', username: 'Alice', status: 'online', role: 'member' },
-      { user_id: 'u2', username: 'Bob', status: 'offline', role: 'admin' },
+      { userId: 'u1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'u2', username: 'Bob', status: 'offline', role: 'admin' },
     ];
 
     const result = window.getUserDetails('u1');
 
     expect(result).not.toBeNull();
-    expect(result!.user_id).toBe('u1');
+    expect(result!.userId).toBe('u1');
     expect(result!.username).toBe('Alice');
     expect(result!.status).toBe('online');
     expect(result!.role).toBe('member');
@@ -62,7 +62,7 @@ describe('getUserDetails', () => {
 
   it('returns null when user_id is not in App.currentMembers', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'u1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'u1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
     const result = window.getUserDetails('u-unknown');
@@ -81,13 +81,13 @@ describe('getUserDetails', () => {
   it('includes optional avatar and custom_status fields when present', () => {
     (window as any).App.currentMembers = [
       {
-        user_id: 'u3',
+        userId: 'u3',
         username: 'Carol',
         status: 'away',
         role: 'owner',
         avatar: 'https://example.com/avatar.png',
-        custom_status: 'Working on stuff',
-        status_emoji: '🔥',
+        customStatus: 'Working on stuff',
+        statusEmoji: '🔥',
       },
     ];
 
@@ -95,28 +95,28 @@ describe('getUserDetails', () => {
 
     expect(result).not.toBeNull();
     expect(result!.avatar).toBe('https://example.com/avatar.png');
-    expect(result!.custom_status).toBe('Working on stuff');
-    expect(result!.status_emoji).toBe('🔥');
+    expect(result!.customStatus).toBe('Working on stuff');
+    expect(result!.statusEmoji).toBe('🔥');
   });
 });
 
 describe('getUserDetailsByUsername', () => {
   it('returns member details when username matches', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'u1', username: 'Alice', status: 'online', role: 'member' },
-      { user_id: 'u2', username: 'Bob', status: 'offline', role: 'admin' },
+      { userId: 'u1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'u2', username: 'Bob', status: 'offline', role: 'admin' },
     ];
 
     const result = window.getUserDetailsByUsername('Bob');
 
     expect(result).not.toBeNull();
-    expect(result!.user_id).toBe('u2');
+    expect(result!.userId).toBe('u2');
     expect(result!.username).toBe('Bob');
   });
 
   it('returns null when username is not found', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'u1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'u1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
     const result = window.getUserDetailsByUsername('Unknown');
@@ -126,7 +126,7 @@ describe('getUserDetailsByUsername', () => {
 
   it('is case-sensitive for username lookup', () => {
     (window as any).App.currentMembers = [
-      { user_id: 'u1', username: 'Alice', status: 'online', role: 'member' },
+      { userId: 'u1', username: 'Alice', status: 'online', role: 'member' },
     ];
 
     const result = window.getUserDetailsByUsername('alice');

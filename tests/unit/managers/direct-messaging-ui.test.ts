@@ -62,7 +62,7 @@ beforeAll(() => {
           return Promise.resolve({
             token: 'tok',
             hostname: 'http://localhost',
-            user_id: 'me',
+            userId: 'me',
             username: 'Me',
           });
         }
@@ -119,7 +119,7 @@ beforeAll(() => {
   (window as any).getValidAuth = jest.fn().mockResolvedValue({
     token: 'tok',
     hostname: 'http://localhost',
-    user_id: 'me',
+    userId: 'me',
     username: 'Me',
   });
   (window as any).announceToScreenReader = jest.fn();
@@ -162,7 +162,7 @@ describe('handleDmPresenceUpdate', () => {
     addTestConversation('ch-online-1', 'user-alice', 'Alice');
 
     (window as any).handleDmPresenceUpdate({
-      user_id: 'user-alice',
+      userId: 'user-alice',
       username: 'Alice',
       status: 'online',
     });
@@ -179,7 +179,7 @@ describe('handleDmPresenceUpdate', () => {
     addTestConversation('ch-offline-1', 'user-bob', 'Bob', true /* starts online */);
 
     (window as any).handleDmPresenceUpdate({
-      user_id: 'user-bob',
+      userId: 'user-bob',
       username: 'Bob',
       status: 'offline',
     });
@@ -195,7 +195,7 @@ describe('handleDmPresenceUpdate', () => {
   it('does not throw for unknown user IDs', () => {
     expect(() => {
       (window as any).handleDmPresenceUpdate({
-        user_id: 'nobody-xyz',
+        userId: 'nobody-xyz',
         username: 'Nobody',
         status: 'online',
       });

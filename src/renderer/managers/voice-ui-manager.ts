@@ -36,7 +36,7 @@
       await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
 
       // Optimistically remove self from sidebar presence for the channel being left
-      const leavingSelfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+      const leavingSelfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.userId;
       if (leavingSelfId) {
         const presence = App.voiceChannelPresence.get(leavingChannelId);
         if (presence) {
@@ -187,7 +187,7 @@
     await (App.voiceManager as { leaveChannel(): Promise<void> }).leaveChannel();
 
     // Optimistically remove self from sidebar presence before the server confirms
-    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
+    const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.userId;
     if (selfId && leavingChannelId) {
       const presence = App.voiceChannelPresence.get(leavingChannelId);
       if (presence) {
@@ -208,52 +208,52 @@
   }
 
   function handleVoiceUserJoined(payload: {
-    channel_id: string;
-    user_id: string;
+    channelId: string;
+    userId: string;
     username: string;
   }): void {
-    const { channel_id, user_id, username } = payload;
-    log.info('Voice user joined', { channel_id, user_id, username });
+    const { channelId, userId, username } = payload;
+    log.info('Voice user joined', { channel_id: channelId, user_id: userId, username });
 
     // Update cross-channel sidebar presence (visible to all ember members)
-    const existingJoined = App.voiceChannelPresence.get(channel_id) ?? new Map<string, string>();
-    App.voiceChannelPresence.set(channel_id, new Map(existingJoined).set(user_id, username));
-    renderVoiceParticipants(channel_id);
+    const existingJoined = App.voiceChannelPresence.get(channelId) ?? new Map<string, string>();
+    App.voiceChannelPresence.set(channelId, new Map(existingJoined).set(userId, username));
+    renderVoiceParticipants(channelId);
 
     // Only update own-session state and play sound when it's our active channel
-    if (channel_id === App.activeVoiceChannelId) {
-      App.voiceParticipants.set(user_id, username);
+    if (channelId === App.activeVoiceChannelId) {
+      App.voiceParticipants.set(userId, username);
       playVoiceSound('userJoin');
     }
   }
 
-  function handleVoiceUserLeft(payload: { channel_id: string; user_id: string }): void {
-    const { channel_id, user_id } = payload;
-    log.info('Voice user left', { channel_id, user_id });
+  function handleVoiceUserLeft(payload: { channelId: string; userId: string }): void {
+    const { channelId, userId } = payload;
+    log.info('Voice user left', { channel_id: channelId, user_id: userId });
 
     // Update cross-channel sidebar presence
-    const channelPresence = App.voiceChannelPresence.get(channel_id);
+    const channelPresence = App.voiceChannelPresence.get(channelId);
     if (channelPresence) {
       const updated = new Map(channelPresence);
-      updated.delete(user_id);
-      App.voiceChannelPresence.set(channel_id, updated);
-      renderVoiceParticipants(channel_id);
+      updated.delete(userId);
+      App.voiceChannelPresence.set(channelId, updated);
+      renderVoiceParticipants(channelId);
     }
 
     // Only update own-session state when it's our active channel
-    if (channel_id === App.activeVoiceChannelId) {
-      App.voiceParticipants.delete(user_id);
-      App.videoParticipants.delete(user_id);
-      removeVideoTile(user_id);
+    if (channelId === App.activeVoiceChannelId) {
+      App.voiceParticipants.delete(userId);
+      App.videoParticipants.delete(userId);
+      removeVideoTile(userId);
       updateVideoGridVisibility();
-      updateSpeakingIndicator(user_id, false);
-      const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.user_id;
-      if (user_id !== selfId) playVoiceSound('userLeave');
+      updateSpeakingIndicator(userId, false);
+      const selfId = (App.voiceManager as { auth?: AuthForVoice } | null)?.auth?.userId;
+      if (userId !== selfId) playVoiceSound('userLeave');
     }
   }
 
   function getMemberAvatar(userId: string): string {
-    const member = App.currentMembers.find(m => m.user_id === userId);
+    const member = App.currentMembers.find(m => m.userId === userId);
     return member?.avatar ?? '';
   }
 
@@ -350,7 +350,7 @@
     if (panel) {
       panel.classList.remove('hidden');
       const nameEl = panel.querySelector('.voice-channel-name');
-      if (nameEl) nameEl.textContent = '\uD83D\uDD0A ' + channelName;
+      if (nameEl) nameEl.textContent = `\uD83D\uDD0A ${channelName}`;
     }
   }
 
@@ -522,7 +522,7 @@
     let rawSources: Array<{
       id: string;
       name: string;
-      display_id: string;
+      displayId: string;
       thumbnail: string;
       pipeWireNodeId: number | null;
     }>;
@@ -537,7 +537,7 @@
       id: s.id,
       name: s.name,
       thumbnailDataUrl: s.thumbnail,
-      type: s.display_id ? 'screen' : 'window',
+      type: s.displayId ? 'screen' : 'window',
     }));
 
     let audioAvailable = false;
@@ -630,7 +630,7 @@
   function resolveSpotlight(desiredTiles: Set<string>): string | null {
     if (App.focusedTileId && desiredTiles.has(App.focusedTileId)) return App.focusedTileId;
     if (App.lastScreenShareUserId) {
-      const t = App.lastScreenShareUserId + ':screen';
+      const t = `${App.lastScreenShareUserId}:screen`;
       if (desiredTiles.has(t)) return t;
     }
     for (const t of desiredTiles) if (t.endsWith(':screen')) return t;
@@ -653,7 +653,7 @@
       _userToVideoStreamId?: Map<string, string>;
       _userToScreenStreamId?: Map<string, string>;
     } | null;
-    const selfId = vm?.auth?.user_id;
+    const selfId = vm?.auth?.userId;
     let selfUsername = vm?.auth?.username;
     let selfAvatar = '';
     if (!selfUsername) {
@@ -892,7 +892,7 @@
       item.classList.toggle('active', item.dataset['page'] === page)
     );
     document.querySelectorAll('.settings-page').forEach(el => el.classList.add('hidden'));
-    document.getElementById('settings-page-' + page)?.classList.remove('hidden');
+    document.getElementById(`settings-page-${page}`)?.classList.remove('hidden');
     if (page === 'voice-video') {
       stopMicTest();
       stopCameraPreview();
@@ -1144,7 +1144,7 @@
         updateUserPanelAvatar(dataUrl, auth.username ?? '');
 
         // Update the current user's entry in the member list
-        updateMemberListAvatar(auth.user_id ?? '', dataUrl);
+        updateMemberListAvatar(auth.userId ?? '', dataUrl);
 
         showAccountStatus('settings-avatar-status', 'Avatar updated!', 'success');
         log.info('Avatar updated');
@@ -1272,7 +1272,7 @@
       _addOption(inputSel, 'default', 'Default Microphone');
       _addOption(outputSel, 'default', 'Default Speaker');
       devices.forEach(d => {
-        const label = d.label || d.kind + ' (' + d.deviceId.slice(0, 8) + ')';
+        const label = d.label || `${d.kind} (${d.deviceId.slice(0, 8)})`;
         if (d.kind === 'audioinput') _addOption(inputSel, d.deviceId, label);
         if (d.kind === 'audiooutput') _addOption(outputSel, d.deviceId, label);
       });
@@ -1291,7 +1291,7 @@
       devices
         .filter(d => d.kind === 'videoinput')
         .forEach(d => {
-          _addOption(cameraSel, d.deviceId, d.label || 'Camera (' + d.deviceId.slice(0, 8) + ')');
+          _addOption(cameraSel, d.deviceId, d.label || `Camera (${d.deviceId.slice(0, 8)})`);
         });
     } catch (e) {
       console.warn('[VV] enumerateCameras failed:', e);
@@ -1472,8 +1472,8 @@
       const ivv = document.getElementById('vv-input-volume-val');
       const ovv = document.getElementById('vv-output-volume-val');
       const svv = document.getElementById('vv-sensitivity-val');
-      if (ivv) ivv.textContent = (settings.inputVolume ?? 0) + '%';
-      if (ovv) ovv.textContent = (settings.outputVolume ?? 0) + '%';
+      if (ivv) ivv.textContent = `${settings.inputVolume ?? 0}%`;
+      if (ovv) ovv.textContent = `${settings.outputVolume ?? 0}%`;
       if (svv) svv.textContent = String(settings.sensitivityThreshold ?? 0);
 
       setChecked('vv-echo-cancellation', settings.echoCancellation ?? true);
@@ -1507,7 +1507,7 @@
           'disconnect',
         ] as SoundType[]
       ).forEach(k => {
-        setChecked('vv-sound-' + k, sounds[k] !== false);
+        setChecked(`vv-sound-${k}`, sounds[k] !== false);
       });
     } catch (e) {
       console.error('[VV] populateVoiceVideoSettings failed:', e);
@@ -1582,8 +1582,8 @@
   (function initVoiceVideoControls() {
     type SliderEntry = [string, string, (v: string) => string];
     const sliderMap: SliderEntry[] = [
-      ['vv-input-volume', 'vv-input-volume-val', v => v + '%'],
-      ['vv-output-volume', 'vv-output-volume-val', v => v + '%'],
+      ['vv-input-volume', 'vv-input-volume-val', v => `${v}%`],
+      ['vv-output-volume', 'vv-output-volume-val', v => `${v}%`],
       ['vv-sensitivity', 'vv-sensitivity-val', v => v],
     ];
     sliderMap.forEach(([sliderId, valId, fmt]) => {
@@ -1662,16 +1662,16 @@
   }
 
   function handleMemberUpdate(payload: {
-    user_id: string;
+    userId: string;
     avatar?: string;
     username?: string;
   }): void {
     if (payload.avatar !== undefined) {
-      updateMemberListAvatar(payload.user_id, payload.avatar);
+      updateMemberListAvatar(payload.userId, payload.avatar);
     }
     if (payload.username !== undefined) {
       const nameEl = document.querySelector(
-        `#member-list .member[data-user-id="${CSS.escape(payload.user_id)}"] .member-name`
+        `#member-list .member[data-user-id="${CSS.escape(payload.userId)}"] .member-name`
       ) as HTMLElement | null;
       if (nameEl) nameEl.textContent = payload.username;
     }

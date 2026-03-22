@@ -16,8 +16,8 @@
       const auth = (await ipcRenderer.invoke('get-auth')) as {
         token?: string;
         hostname?: string;
-        user_id?: string;
-        device_id?: string;
+        userId?: string;
+        deviceId?: string;
         username?: string;
       } | null;
       if (!auth || !auth.token || !auth.hostname) return;
@@ -34,8 +34,8 @@
       );
       await ipcRenderer.invoke('save-auth', {
         token: refreshed.token,
-        user_id: refreshed.user_id,
-        device_id: refreshed.device_id,
+        userId: refreshed.userId,
+        deviceId: refreshed.deviceId,
         hostname: auth.hostname,
         username: refreshed.username,
       });
@@ -274,30 +274,30 @@
   }
 
   function handlePresenceUpdate(payload: {
-    user_id: string;
+    userId: string;
     username: string;
     status: UserStatus;
-    custom_status?: string;
-    status_emoji?: string;
+    customStatus?: string;
+    statusEmoji?: string;
   }): void {
-    const { user_id, username, status, custom_status, status_emoji } = payload;
-    const memberIdx = App.currentMembers.findIndex(m => m.user_id === user_id);
+    const { userId, username, status, customStatus, statusEmoji } = payload;
+    const memberIdx = App.currentMembers.findIndex(m => m.userId === userId);
     if (memberIdx !== -1) {
       App.currentMembers[memberIdx].status = status;
-      if (custom_status !== undefined) {
-        App.currentMembers[memberIdx].custom_status = custom_status;
+      if (customStatus !== undefined) {
+        App.currentMembers[memberIdx].customStatus = customStatus;
       }
-      if (status_emoji !== undefined) {
-        App.currentMembers[memberIdx].status_emoji = status_emoji;
+      if (statusEmoji !== undefined) {
+        App.currentMembers[memberIdx].statusEmoji = statusEmoji;
       }
     } else {
       App.currentMembers.push({
-        user_id,
+        userId,
         username,
         status,
         role: 'member',
-        custom_status,
-        status_emoji,
+        customStatus,
+        statusEmoji,
       });
     }
     window.renderMemberList(App.currentMembers);
@@ -311,35 +311,35 @@
   async function handleIncomingMessage(
     payload: {
       id: string;
-      channel_id: string;
-      sender_user_id: string;
+      channelId: string;
+      senderUserId: string;
     } & Record<string, unknown>
   ): Promise<void> {
     // Check if this is a DM channel by checking if there's a DM entry for this channel
     const isDmChannel =
       typeof window.getEmberIdForDmChannel === 'function' &&
-      window.getEmberIdForDmChannel(payload.channel_id) !== null;
+      window.getEmberIdForDmChannel(payload.channelId) !== null;
 
     if (isDmChannel) {
       // Always dispatch DM messages as dm-channel-message events
       window.dispatchEvent(new CustomEvent('dm-channel-message', { detail: payload }));
       // Mark as unread if not the active channel
-      if (payload.channel_id !== App.activeChannelId) {
-        window.markChannelUnread(payload.channel_id);
+      if (payload.channelId !== App.activeChannelId) {
+        window.markChannelUnread(payload.channelId);
       }
       return;
     }
 
     // Handle regular channel messages
-    if (payload.channel_id !== App.activeChannelId) {
-      window.markChannelUnread(payload.channel_id);
+    if (payload.channelId !== App.activeChannelId) {
+      window.markChannelUnread(payload.channelId);
       return;
     }
     if (recentMessageIds.has(payload.id)) return;
     const auth = (await ipcRenderer.invoke('get-auth')) as {
-      user_id?: string;
+      userId?: string;
     } | null;
-    if (auth && payload.sender_user_id === auth.user_id) {
+    if (auth && payload.senderUserId === auth.userId) {
       App.ownedMessageIds.add(payload.id);
       return;
     }
@@ -352,9 +352,9 @@
   function handleEmberUpdated(payload: {
     id: string;
     name: string;
-    icon_data?: string;
-    created_at: number;
-    is_owner: boolean;
+    iconData?: string;
+    createdAt: number;
+    isOwner: boolean;
   }): void {
     // Update the ember in the current embers list if it exists
     const emberIndex = App.currentEmbers.findIndex(e => e.id === payload.id);
@@ -362,8 +362,8 @@
       App.currentEmbers[emberIndex] = {
         id: payload.id,
         name: payload.name,
-        icon_data: payload.icon_data || null,
-        is_owner: payload.is_owner,
+        iconData: payload.iconData || null,
+        isOwner: payload.isOwner,
       };
 
       // Re-render the server list to show updated ember
@@ -381,39 +381,39 @@
   }
 
   async function handleMembershipUpdated(payload: {
-    ember_id: string;
-    user_id: string;
+    emberId: string;
+    userId: string;
     username: string;
     action: string;
   }): Promise<void> {
-    const { ember_id, user_id, username, action } = payload;
+    const { emberId, userId, username, action } = payload;
 
     // Only refresh members list if this is for the currently active ember
-    if (App.activeEmberId !== ember_id) {
+    if (App.activeEmberId !== emberId) {
       log.debug('Membership update for different ember, ignoring', {
         active_ember_id: App.activeEmberId,
-        update_ember_id: ember_id,
+        update_ember_id: emberId,
       });
       return;
     }
 
     log.info('Membership updated, refreshing members list', {
-      ember_id,
-      user_id,
+      ember_id: emberId,
+      user_id: userId,
       username,
       action,
     });
 
     // Refresh the members list to get the latest data
-    const members = await window.fetchMembers(ember_id);
+    const members = await window.fetchMembers(emberId);
     window.renderMemberList(members);
 
     // Update crypto routing state based on membership change
     const memberCount = members.length;
     if (action === 'joined') {
-      window.cryptoRouting.onMemberAdded(ember_id, memberCount);
+      window.cryptoRouting.onMemberAdded(emberId, memberCount);
     } else if (action === 'left' || action === 'kicked') {
-      window.cryptoRouting.onMemberRemoved(ember_id, memberCount);
+      window.cryptoRouting.onMemberRemoved(emberId, memberCount);
     }
   }
 

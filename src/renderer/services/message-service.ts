@@ -63,13 +63,13 @@
         return null;
       }
       const auth = (await ipcRenderer.invoke('get-auth')) as {
-        user_id?: string;
-        device_id?: string;
+        userId?: string;
+        deviceId?: string;
       } | null;
-      if (!auth?.user_id || !auth?.device_id) return null;
+      if (!auth?.userId || !auth?.deviceId) return null;
       return JSON.stringify({
         v: SK_VERSION,
-        sa: `${auth.user_id}.${auth.device_id}`,
+        sa: `${auth.userId}.${auth.deviceId}`,
         ct: encResp.data.ciphertext,
       });
     } catch (err) {
@@ -400,12 +400,12 @@
 
   async function handleEditedMessage(payload: {
     id: string;
-    channel_id: string;
+    channelId: string;
     ciphertext: string;
-    protocol_version?: number;
-    envelope_type?: string;
+    protocolVersion?: number;
+    envelopeType?: string;
   }): Promise<void> {
-    if (payload.channel_id !== App.activeChannelId) return;
+    if (payload.channelId !== App.activeChannelId) return;
     const messageDiv = messagesContainer?.querySelector(
       `[data-message-id="${payload.id}"]`
     ) as HTMLElement | null;
@@ -413,7 +413,7 @@
     const textEl = messageDiv.querySelector('.message-text') as HTMLElement | null;
     if (!textEl) return;
     if (!App.activeEmberId) return;
-    if (payload.envelope_type === 'signal_group') {
+    if (payload.envelopeType === 'signal_group') {
       const plaintext = await tryGroupDecrypt(payload.ciphertext);
       if (plaintext === null) return;
       textEl.textContent = plaintext;
@@ -421,7 +421,7 @@
       return;
     }
 
-    if (payload.envelope_type === 'signal_dm') {
+    if (payload.envelopeType === 'signal_dm') {
       textEl.textContent = '[Requires app update to view this message]';
       markMessageAsEdited(messageDiv);
       return;
@@ -504,7 +504,7 @@
   async function displayDecryptedMessage(msg: Message, prepend = false): Promise<void> {
     if (!App.activeEmberId) return;
     let plaintext: string | null = null;
-    const envelopeType = msg.envelope_type;
+    const envelopeType = msg.envelopeType;
     if (envelopeType === 'signal_group') {
       plaintext = await tryGroupDecrypt(msg.ciphertext);
       if (plaintext === null) {
@@ -523,10 +523,10 @@
           addMessage(
             msg.username ?? 'Unknown',
             '[Waiting for sender key — message will be readable once keys arrive]',
-            msg.created_at,
+            msg.createdAt,
             prepend,
             msg.id,
-            msg.chat_color
+            msg.chatColor
           );
           return;
         }
@@ -535,10 +535,10 @@
       addMessage(
         msg.username ?? 'Unknown',
         '[Requires app update to view this message]',
-        msg.created_at,
+        msg.createdAt,
         prepend,
         msg.id,
-        msg.chat_color
+        msg.chatColor
       );
       return;
     }
@@ -547,10 +547,10 @@
       addMessage(
         msg.username ?? 'Unknown',
         '[Failed to decrypt message]',
-        msg.created_at,
+        msg.createdAt,
         prepend,
         msg.id,
-        msg.chat_color
+        msg.chatColor
       );
       return;
     }
@@ -568,10 +568,10 @@
         addMessage(
           msg.username ?? 'Unknown',
           parsed.body,
-          msg.created_at,
+          msg.createdAt,
           prepend,
           msg.id,
-          msg.chat_color,
+          msg.chatColor,
           attachment
         );
         return;
@@ -585,10 +585,10 @@
         addMessage(
           msg.username ?? 'Unknown',
           '',
-          msg.created_at,
+          msg.createdAt,
           prepend,
           msg.id,
-          msg.chat_color,
+          msg.chatColor,
           undefined,
           parsed
         );
@@ -597,14 +597,7 @@
         // fall through to plain-text rendering
       }
     }
-    addMessage(
-      msg.username ?? 'Unknown',
-      plaintext,
-      msg.created_at,
-      prepend,
-      msg.id,
-      msg.chat_color
-    );
+    addMessage(msg.username ?? 'Unknown', plaintext, msg.createdAt, prepend, msg.id, msg.chatColor);
   }
 
   function escapeHtml(text: string): string {
@@ -993,7 +986,7 @@
 
     // Fetch auth once to populate ownership cache (fast IPC read from safeStorage)
     const authForOwnership = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
-    currentUserId = authForOwnership?.user_id ?? null;
+    currentUserId = authForOwnership?.userId ?? null;
     currentUsername = authForOwnership?.username ?? '';
 
     const { messages, hasMore } = await fetchMessages(channelId);
@@ -1007,7 +1000,7 @@
     });
 
     for (const msg of messages) {
-      if (currentUserId && msg.sender_user_id === currentUserId) {
+      if (currentUserId && msg.senderUserId === currentUserId) {
         App.ownedMessageIds.add(msg.id);
       }
       await displayDecryptedMessage(msg);
@@ -1070,7 +1063,7 @@
 
           // Prepend messages in reverse order so oldest appears at top
           for (let i = messages.length - 1; i >= 0; i--) {
-            if (currentUserId && messages[i].sender_user_id === currentUserId) {
+            if (currentUserId && messages[i].senderUserId === currentUserId) {
               App.ownedMessageIds.add(messages[i].id);
             }
             await displayDecryptedMessage(messages[i], true);
@@ -1133,7 +1126,7 @@
           oldestMessageId = messages[0].id;
           // Prepend in reverse order so oldest appears at top
           for (let i = messages.length - 1; i >= 0; i--) {
-            if (currentUserId && messages[i].sender_user_id === currentUserId) {
+            if (currentUserId && messages[i].senderUserId === currentUserId) {
               App.ownedMessageIds.add(messages[i].id);
             }
             await displayDecryptedMessage(messages[i], true);

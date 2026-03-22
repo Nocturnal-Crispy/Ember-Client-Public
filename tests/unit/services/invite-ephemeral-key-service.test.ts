@@ -14,8 +14,8 @@ global.fetch = jest.fn();
 const mockAuth = {
   token: 'test-token',
   hostname: 'https://test.example.com',
-  user_id: 'user-123',
-  device_id: 'device-456',
+  userId: 'user-123',
+  deviceId: 'device-456',
   username: 'testuser',
 };
 
@@ -267,9 +267,9 @@ describe('InviteEphemeralKeyService', () => {
     it('should generate ephemeral keys for invite', async () => {
       const mockEpoch = {
         id: 'epoch-789',
-        ember_id: 'ember-456',
-        epoch_number: 1,
-        created_at: Date.now(),
+        emberId: 'ember-456',
+        epochNumber: 1,
+        createdAt: Date.now(),
       };
 
       mockSignalSessionManager.getCurrentEpoch.mockResolvedValue(mockEpoch as any);
@@ -385,9 +385,9 @@ describe('InviteEphemeralKeyService', () => {
     it('should setup complete ephemeral keys for invite', async () => {
       const mockEpoch = {
         id: 'epoch-789',
-        ember_id: 'ember-456',
-        epoch_number: 1,
-        created_at: Date.now(),
+        emberId: 'ember-456',
+        epochNumber: 1,
+        createdAt: Date.now(),
       };
 
       const mockDistributionMessage = new TextEncoder().encode('distribution-message');

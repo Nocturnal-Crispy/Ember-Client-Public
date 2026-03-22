@@ -30,7 +30,7 @@ export type SoundType =
   | 'disconnect';
 
 export interface VoiceParticipant {
-  user_id: string;
+  userId: string;
   username: string;
 }
 
@@ -43,7 +43,7 @@ export interface ICEServer {
 export interface AuthForVoice {
   token: string;
   hostname: string;
-  user_id: string;
+  userId: string;
   username: string;
 }
 

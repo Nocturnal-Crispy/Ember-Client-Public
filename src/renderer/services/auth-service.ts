@@ -357,7 +357,7 @@
       signalIdentity = (await window.electronAPI.authService.generateDeviceIdentity()) as any;
     } catch (error) {
       log.error('Failed to generate device identity', { error: (error as Error).message });
-      throw new Error('Failed to generate device identity: ' + (error as Error).message);
+      throw new Error(`Failed to generate device identity: ${(error as Error).message}`);
     }
 
     if (!signalIdentity) {
@@ -388,9 +388,9 @@
     const privateKeyBase64 = bytesToBase64(signalIdentity.identityKeyPair.privateKey);
 
     return {
-      device_id: signalIdentity.deviceId,
-      public_key: publicKeyBase64,
-      private_key: privateKeyBase64,
+      deviceId: signalIdentity.deviceId,
+      publicKey: publicKeyBase64,
+      privateKey: privateKeyBase64,
     };
   }
 
@@ -472,7 +472,7 @@
         'get-device-identity'
       )) as DeviceIdentity | null;
 
-      if (!deviceIdentity || !deviceIdentity.private_key) {
+      if (!deviceIdentity || !deviceIdentity.privateKey) {
         if (!deviceIdentity) {
           log.info('No device identity found, generating new one');
         } else {
@@ -481,11 +481,11 @@
         deviceIdentity = await generateDeviceIdentity();
         await ipcRenderer.invoke('save-device-identity', deviceIdentity);
         log.info('New device identity saved', {
-          device_id: deviceIdentity.device_id,
+          device_id: deviceIdentity.deviceId,
         });
       } else {
         log.debug('Existing device identity loaded', {
-          device_id: deviceIdentity.device_id,
+          device_id: deviceIdentity.deviceId,
         });
       }
 
@@ -493,9 +493,9 @@
 
       if (isLoginMode) {
         log.info('Initiating login request', { username });
-        authData = await login(hostname, username, password, deviceIdentity.device_id);
+        authData = await login(hostname, username, password, deviceIdentity.deviceId);
         log.info('Login successful', {
-          user_id: authData.user_id,
+          user_id: authData.userId,
           username: authData.username,
         });
       } else {
@@ -504,11 +504,11 @@
         log.debug('Recovery code generated for new account');
 
         // Validate device identity private key before decoding
-        if (!deviceIdentity.private_key) {
+        if (!deviceIdentity.privateKey) {
           throw new Error('Device identity private key is missing. Please try registering again.');
         }
 
-        const privateKeyBytes = decodeBase64ToBytes(deviceIdentity.private_key);
+        const privateKeyBytes = decodeBase64ToBytes(deviceIdentity.privateKey);
         const recoveryData: RecoveryData = await emberCrypto.encryptPrivateKeyWithRecoveryCode(
           privateKeyBytes,
           recoveryCode
@@ -542,19 +542,19 @@
           username,
           password,
           signalIdentity,
-          deviceIdentity.public_key,
+          deviceIdentity.publicKey,
           recoveryData.encrypted,
           recoveryData.salt
         );
 
         log.info('Registration successful with Signal keys', {
-          user_id: authData.user_id,
+          user_id: authData.userId,
           username: authData.username,
         });
 
         // Store Signal registration ID for main process Signal database
         await window.emberAPI.invoke('SetSafeStorage', {
-          key: `registration_id_${authData.user_id}_${authData.device_id}`,
+          key: `registration_id_${authData.userId}_${authData.deviceId}`,
           value: String(signalIdentity.registrationId),
         });
 
@@ -564,37 +564,37 @@
       log.debug('Saving auth data to store');
       await ipcRenderer.invoke('save-auth', {
         token: authData.token,
-        user_id: authData.user_id,
-        device_id: authData.device_id,
+        userId: authData.userId,
+        deviceId: authData.deviceId,
         hostname,
         username: authData.username,
       });
       log.info('Auth data saved', {
         username: authData.username,
-        user_id: authData.user_id,
+        user_id: authData.userId,
       });
 
       // Store Signal identity private key so main process can open the Signal database
-      if (deviceIdentity.private_key) {
+      if (deviceIdentity.privateKey) {
         await window.emberAPI.invoke('SetSafeStorage', {
-          key: `identity_key_${authData.user_id}_${authData.device_id}`,
-          value: deviceIdentity.private_key,
+          key: `identity_key_${authData.userId}_${authData.deviceId}`,
+          value: deviceIdentity.privateKey,
         });
         log.debug('Signal identity key stored in safeStorage');
       }
 
       // ── Minimum client version gate ────────────────────────────────────
-      if (authData.minimum_client_version) {
+      if (authData.minimumClientVersion) {
         try {
           const appVersion = (await ipcRenderer.invoke('get-app-version')) as string;
-          if (compareVersions(appVersion, authData.minimum_client_version) < 0) {
+          if (compareVersions(appVersion, authData.minimumClientVersion) < 0) {
             log.warn('Client version below minimum', {
               app_version: appVersion,
-              minimum: authData.minimum_client_version,
+              minimum: authData.minimumClientVersion,
             });
             hideLoading();
             showError(
-              `Your Ember client (v${appVersion}) is outdated. Please update to v${authData.minimum_client_version} or later.`
+              `Your Ember client (v${appVersion}) is outdated. Please update to v${authData.minimumClientVersion} or later.`
             );
             return;
           }

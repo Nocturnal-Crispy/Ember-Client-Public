@@ -13,8 +13,8 @@ export async function fetchEmbers(auth: AuthData): Promise<Ember[]> {
 
 export interface CreateEmberRequest {
   name: string;
-  icon_data?: string;
-  encrypted_ember_key: string;
+  iconData?: string;
+  encryptedEmberKey: string;
 }
 
 export async function createEmber(
@@ -29,7 +29,7 @@ export async function createEmber(
 
 export interface UpdateEmberRequest {
   name?: string;
-  icon_data?: string;
+  iconData?: string;
 }
 
 export async function updateEmber(
@@ -38,7 +38,7 @@ export async function updateEmber(
   updates: UpdateEmberRequest
 ): Promise<Ember> {
   // Validate that at least one field is provided
-  if (updates.name === undefined && updates.icon_data === undefined) {
+  if (updates.name === undefined && updates.iconData === undefined) {
     throw new Error('At least one field must be provided for update');
   }
 
@@ -67,17 +67,17 @@ export async function updateEmber(
 
 export interface CreateInviteRequest {
   code?: string;
-  max_uses?: number;
-  expires_in?: number;
-  encrypted_ember_key: string;
-  key_salt: string;
+  maxUses?: number;
+  expiresIn?: number;
+  encryptedEmberKey: string;
+  keySalt: string;
 }
 
 export interface CreateInviteResponse {
   code: string;
-  invite_url: string;
-  created_at: number;
-  expires_at?: number;
+  inviteUrl: string;
+  createdAt: number;
+  expiresAt?: number;
 }
 
 export async function createInvite(
@@ -92,8 +92,8 @@ export async function createInvite(
   }
 ): Promise<CreateInviteResponse> {
   const requestBody: CreateInviteRequest = {
-    encrypted_ember_key: encryptedEmberKey,
-    key_salt: keySalt,
+    encryptedEmberKey,
+    keySalt,
   };
 
   if (options?.code) {
@@ -101,11 +101,11 @@ export async function createInvite(
   }
 
   if (options?.maxUses) {
-    requestBody.max_uses = options.maxUses;
+    requestBody.maxUses = options.maxUses;
   }
 
   if (options?.expiresIn) {
-    requestBody.expires_in = options.expiresIn;
+    requestBody.expiresIn = options.expiresIn;
   }
 
   const response = await apiRequest<CreateInviteResponse>(
@@ -122,12 +122,12 @@ export async function createInvite(
 }
 
 export interface InviteInfo {
-  ember_name: string;
-  ember_icon?: string;
-  member_count: number;
+  emberName: string;
+  emberIcon?: string;
+  memberCount: number;
   code: string;
-  encrypted_ember_key: string;
-  key_salt: string;
+  encryptedEmberKey: string;
+  keySalt: string;
   hostname?: string;
 }
 
@@ -149,13 +149,13 @@ export async function fetchInviteInfo(
 }
 
 export interface AcceptInviteRequest {
-  encrypted_ember_key: string;
+  encryptedEmberKey: string;
 }
 
 export interface AcceptInviteResponse {
-  ember_id: string;
-  ember_name: string;
-  ember_icon?: string;
+  emberId: string;
+  emberName: string;
+  emberIcon?: string;
 }
 
 export async function acceptInvite(
@@ -167,7 +167,7 @@ export async function acceptInvite(
   const targetHostname = hostname ?? auth.hostname;
 
   const requestBody: AcceptInviteRequest = {
-    encrypted_ember_key: encryptedEmberKey,
+    encryptedEmberKey,
   };
 
   const response = await apiRequest<AcceptInviteResponse>(
@@ -186,10 +186,10 @@ export async function acceptInvite(
 export interface Invite {
   code: string;
   uses: number;
-  max_uses?: number;
-  created_by: string;
-  created_at: number;
-  expires_at?: number;
+  maxUses?: number;
+  createdBy: string;
+  createdAt: number;
+  expiresAt?: number;
 }
 
 export interface ListInvitesResponse {

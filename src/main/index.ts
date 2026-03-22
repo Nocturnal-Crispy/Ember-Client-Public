@@ -70,7 +70,7 @@ function isValidRgbString(value: unknown): boolean {
 
 function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
   const result: ThemeSettings = { ...defaultThemeSettings };
-  let repairedFields: string[] = [];
+  const repairedFields: string[] = [];
 
   if (typeof saved.themeId === 'string' && saved.themeId.length > 0) {
     result.themeId = saved.themeId;
@@ -293,7 +293,7 @@ function createWindow(isAuthenticated: boolean) {
 function checkAuthentication(): boolean {
   log.debug('Checking authentication state');
   const auth = store.get('auth');
-  const isAuth = !!(auth && auth.token && auth.user_id && auth.device_id);
+  const isAuth = !!(auth && auth.token && auth.userId && auth.deviceId);
   log.debug('Authentication check complete', { authenticated: isAuth });
   return isAuth;
 }
@@ -388,10 +388,10 @@ async function reinitializeSignalDatabase(): Promise<boolean> {
   let localRegistrationId: number | null = null;
   let localIdentityAddress: string | null = null;
 
-  if (authData && authData.user_id && authData.device_id) {
+  if (authData && authData.userId && authData.deviceId) {
     // Get Signal identity private key for Signal database authentication
     const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
-      `identity_key_${authData.user_id}_${authData.device_id}`
+      `identity_key_${authData.userId}_${authData.deviceId}`
     );
     const { privateKeyBytes: resolvedKey, localIdentityPrivateKeyBytes: resolvedIdentityKey } =
       resolveSignalKeyBytes(signalIdentityKey);
@@ -409,11 +409,11 @@ async function reinitializeSignalDatabase(): Promise<boolean> {
       log.error('Signal database: No Signal identity key found - user must re-register');
     }
 
-    localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
+    localIdentityAddress = `${authData.userId}.${authData.deviceId}`;
 
     // Get registration ID
     const registrationIdStr = await electronSafeStorageFunctions.getSafeStorage(
-      `registration_id_${authData.user_id}_${authData.device_id}`
+      `registration_id_${authData.userId}_${authData.deviceId}`
     );
     if (registrationIdStr) {
       const parsed = parseInt(registrationIdStr, 10);
@@ -514,7 +514,7 @@ function checkSafeStorageAtStartup(): void {
   // Check for Signal identity keys in safeStorage
   const authData = store.get('auth') as any;
   let hasSignalKeys = false;
-  if (authData && authData.user_id && authData.device_id) {
+  if (authData && authData.userId && authData.deviceId) {
     // We can't check async functions here, but we'll assume there might be keys
     // This is a best-effort check since we can't await in this sync function
     hasSignalKeys = true;
@@ -606,7 +606,7 @@ ipcMain.handle('get-device-identity', async () => {
 
 ipcMain.handle('save-device-identity', async (_event, deviceIdentity) => {
   log.debug('IPC: save-device-identity', {
-    device_id: deviceIdentity?.device_id,
+    device_id: deviceIdentity?.deviceId,
   });
   const { private_key, ...deviceWithoutKey } = deviceIdentity;
   store.set('device', deviceWithoutKey);
@@ -627,12 +627,12 @@ ipcMain.handle('get-auth', () => {
 ipcMain.handle('save-auth', (_event, authData) => {
   log.info('IPC: save-auth', {
     username: authData?.username,
-    user_id: authData?.user_id,
+    user_id: authData?.userId,
   });
   store.set('auth', authData);
   if (authData.hostname) {
-    const settings = store.get('settings') ?? { last_hostname: '' };
-    settings.last_hostname = authData.hostname;
+    const settings = store.get('settings') ?? { lastHostname: '' };
+    settings.lastHostname = authData.hostname;
     store.set('settings', settings);
     log.debug('Last hostname updated');
   }
@@ -677,7 +677,7 @@ ipcMain.handle('delete-safe-storage', async (_event, { key }) => {
 ipcMain.handle('get-last-hostname', () => {
   log.debug('IPC: get-last-hostname');
   const settings = store.get('settings');
-  const hostname = settings?.last_hostname || 'https://ember-chat.com';
+  const hostname = settings?.lastHostname || 'https://ember-chat.com';
   log.debug('Last hostname retrieved');
   return hostname;
 });
@@ -1271,10 +1271,10 @@ if (!gotTheLock) {
     let localRegistrationId: number | null = null;
     let localIdentityAddress: string | null = null;
 
-    if (authData && authData.user_id && authData.device_id) {
+    if (authData && authData.userId && authData.deviceId) {
       // Get Signal identity private key for database authentication
       const signalIdentityKey = await electronSafeStorageFunctions.getSafeStorage(
-        `identity_key_${authData.user_id}_${authData.device_id}`
+        `identity_key_${authData.userId}_${authData.deviceId}`
       );
       const { privateKeyBytes: resolvedKey, localIdentityPrivateKeyBytes: resolvedIdentityKey } =
         resolveSignalKeyBytes(signalIdentityKey);
@@ -1295,11 +1295,11 @@ if (!gotTheLock) {
         log.debug('Signal database: No Signal identity key found');
       }
 
-      localIdentityAddress = `${authData.user_id}.${authData.device_id}`;
+      localIdentityAddress = `${authData.userId}.${authData.deviceId}`;
 
       // Get registration ID
       const registrationIdStr = await electronSafeStorageFunctions.getSafeStorage(
-        `registration_id_${authData.user_id}_${authData.device_id}`
+        `registration_id_${authData.userId}_${authData.deviceId}`
       );
       if (registrationIdStr) {
         const parsed = parseInt(registrationIdStr, 10);

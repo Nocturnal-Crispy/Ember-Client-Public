@@ -135,7 +135,7 @@ beforeEach(() => {
 describe('openUserDetailsModal', () => {
   it('removes the hidden class from the modal', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -150,7 +150,7 @@ describe('openUserDetailsModal', () => {
 
   it('displays the username in the modal', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -175,7 +175,7 @@ describe('openUserDetailsModal', () => {
 
   it('displays the user status', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'away',
       role: 'member',
@@ -190,7 +190,7 @@ describe('openUserDetailsModal', () => {
 
   it('displays the user role', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u2',
+      userId: 'u2',
       username: 'Bob',
       status: 'online',
       role: 'owner',
@@ -205,7 +205,7 @@ describe('openUserDetailsModal', () => {
 
   it('shows voice channel info when user is in voice', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -221,7 +221,7 @@ describe('openUserDetailsModal', () => {
 
   it('hides voice info when user is not in voice', () => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -245,7 +245,7 @@ describe('openUserDetailsModal', () => {
 
   it('resolves userId via getUserDetailsByUsername when userId is empty string', () => {
     const resolvedMember = {
-      user_id: 'u-resolved',
+      userId: 'u-resolved',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -290,7 +290,7 @@ describe('closeUserDetailsModal', () => {
 describe('modal close interactions', () => {
   beforeEach(() => {
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',
@@ -329,7 +329,7 @@ describe('DM button', () => {
   it('opens the DM screen and navigates to the conversation when clicked', () => {
     const mockOpenDMScreen = (window as any).openDMScreen as jest.Mock;
     mockGetUserDetails.mockReturnValue({
-      user_id: 'u1',
+      userId: 'u1',
       username: 'Alice',
       status: 'online',
       role: 'member',

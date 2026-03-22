@@ -6,12 +6,12 @@
 export interface WebSocketMessage {
   type: string;
   payload?: any;
-  channel_id?: string;
-  ember_id?: string;
+  channelId?: string;
+  emberId?: string;
 }
 
 export interface PresenceUpdate {
-  user_id: string;
+  userId: string;
   status: 'online' | 'offline' | 'away' | 'invisible';
   username: string;
 }
@@ -119,7 +119,7 @@ export class EmberWebSocket {
   public subscribeToChannel(channelId: string): void {
     this.sendMessage({
       type: 'subscribe',
-      channel_id: channelId,
+      channelId,
     });
   }
 
@@ -129,7 +129,7 @@ export class EmberWebSocket {
   public unsubscribeFromChannel(channelId: string): void {
     this.sendMessage({
       type: 'unsubscribe',
-      channel_id: channelId,
+      channelId,
     });
   }
 
@@ -139,7 +139,7 @@ export class EmberWebSocket {
   public subscribeToEmber(emberId: string): void {
     this.sendMessage({
       type: 'subscribe_ember',
-      ember_id: emberId,
+      emberId,
     });
   }
 

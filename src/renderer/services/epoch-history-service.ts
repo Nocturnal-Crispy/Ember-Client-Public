@@ -88,7 +88,7 @@ export class EpochHistoryService {
         created_at: message.created_at,
       };
     } catch (error) {
-      throw new Error('Legacy message decryption failed: ' + (error as Error).message);
+      throw new Error(`Legacy message decryption failed: ${(error as Error).message}`);
     }
   }
 
@@ -149,11 +149,11 @@ export class EpochHistoryService {
 
     // Find the key for the current user
     const userKey = epochKeys.find(
-      key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+      key => key.user_id === this.auth.userId && key.device_id === this.auth.deviceId
     );
 
     if (!userKey) {
-      throw new Error('No epoch key found for current user in epoch ' + message.epoch_id);
+      throw new Error(`No epoch key found for current user in epoch ${message.epoch_id}`);
     }
 
     // Decrypt the epoch key (simplified implementation)
@@ -178,9 +178,9 @@ export class EpochHistoryService {
     // Check cache first
     if (
       this.epochKeyCache.has(epochId) &&
-      this.epochKeyCache.get(epochId)?.has(this.auth.device_id)
+      this.epochKeyCache.get(epochId)?.has(this.auth.deviceId)
     ) {
-      return this.epochKeyCache.get(epochId)!.get(this.auth.device_id)!;
+      return this.epochKeyCache.get(epochId)!.get(this.auth.deviceId)!;
     }
 
     // Fetch epoch keys from server
@@ -188,7 +188,7 @@ export class EpochHistoryService {
 
     // Find the key for the current user
     const userKey = epochKeys.find(
-      key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+      key => key.user_id === this.auth.userId && key.device_id === this.auth.deviceId
     );
 
     if (!userKey) {
@@ -202,7 +202,7 @@ export class EpochHistoryService {
     if (!this.epochKeyCache.has(epochId)) {
       this.epochKeyCache.set(epochId, new Map());
     }
-    this.epochKeyCache.get(epochId)!.set(this.auth.device_id, decryptedKey);
+    this.epochKeyCache.get(epochId)!.set(this.auth.deviceId, decryptedKey);
 
     return decryptedKey;
   }
@@ -261,7 +261,7 @@ export class EpochHistoryService {
         // Only fetch keys if we don't already have them cached
         if (
           !this.epochKeyCache.has(epochId) ||
-          !this.epochKeyCache.get(epochId)?.has(this.auth.device_id)
+          !this.epochKeyCache.get(epochId)?.has(this.auth.deviceId)
         ) {
           await this.getEpochKey(epochId);
         }
@@ -321,7 +321,7 @@ export class EpochHistoryService {
       if (message.epoch_id) {
         const epochKeys = await this.epochService.getEpochKeys(message.epoch_id);
         return epochKeys.some(
-          key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+          key => key.user_id === this.auth.userId && key.device_id === this.auth.deviceId
         );
       }
 

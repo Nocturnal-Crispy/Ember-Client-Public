@@ -16,17 +16,17 @@ import { apiRequest } from '../api';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface SenderKeyDistributionUpload {
-  readonly recipient_user_id: string;
-  readonly recipient_device_id: string;
-  readonly distribution_message: string;
+  readonly recipientUserId: string;
+  readonly recipientDeviceId: string;
+  readonly distributionMessage: string;
 }
 
 export interface PendingDistribution {
   readonly id: string;
-  readonly ember_id: string;
-  readonly sender_user_id: string;
-  readonly sender_device_id: string;
-  readonly distribution_message: string;
+  readonly emberId: string;
+  readonly senderUserId: string;
+  readonly senderDeviceId: string;
+  readonly distributionMessage: string;
 }
 
 export interface DeviceTarget {
@@ -108,15 +108,15 @@ export async function acknowledgeDistribution(
  * @returns Array of DeviceTarget (server excludes the requesting device)
  */
 export async function fetchEmberMembers(auth: AuthData, emberId: string): Promise<DeviceTarget[]> {
-  const data = await apiRequest<{ members: Array<{ user_id: string; device_id: string }> }>(
+  const data = await apiRequest<{ members: Array<{ userId: string; deviceId: string }> }>(
     auth.hostname,
     `/api/v1/embers/${emberId}/members`,
     { method: 'GET' },
     auth.token
   );
   return (data.members ?? []).map(m => ({
-    userId: m.user_id,
-    deviceId: m.device_id,
+    userId: m.userId,
+    deviceId: m.deviceId,
   }));
 }
 
@@ -144,9 +144,9 @@ export async function distributeToMembers(
       const recipientAddress = `${member.userId}.${member.deviceId}`;
       const encrypted = await crypto.encrypt(recipientAddress, distributionBytes);
       return {
-        recipient_user_id: member.userId,
-        recipient_device_id: member.deviceId,
-        distribution_message: toBase64(encrypted),
+        recipientUserId: member.userId,
+        recipientDeviceId: member.deviceId,
+        distributionMessage: toBase64(encrypted),
       };
     })
   );
@@ -168,8 +168,8 @@ export async function processIncomingDistributions(
 ): Promise<void> {
   const pending = await fetchPendingDistributions(auth);
   for (const dist of pending) {
-    const senderAddress = `${dist.sender_user_id}.${dist.sender_device_id}`;
-    const ciphertext = fromBase64(dist.distribution_message);
+    const senderAddress = `${dist.senderUserId}.${dist.senderDeviceId}`;
+    const ciphertext = fromBase64(dist.distributionMessage);
     const distributionBytes = await crypto.decrypt(senderAddress, ciphertext);
     await installSenderKey(senderAddress, distributionBytes);
     await acknowledgeDistribution(auth, dist.id);

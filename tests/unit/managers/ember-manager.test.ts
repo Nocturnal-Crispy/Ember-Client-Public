@@ -64,7 +64,7 @@ beforeAll(() => {
     signalSessionManager: null,
     protocolVersion: 0,
     migrationStatus: 'idle',
-    initializeSignalSessionManager: async function (): Promise<void> {},
+    async initializeSignalSessionManager(): Promise<void> {},
     pendingAttachment: null,
     gifFavorites: [],
     _vvSounds: null,
@@ -125,8 +125,8 @@ beforeAll(() => {
   (window as any).getValidAuth = jest.fn().mockResolvedValue({
     token: 'tok',
     hostname: 'http://localhost:8085',
-    user_id: 'u1',
-    device_id: 'd1',
+    userId: 'u1',
+    deviceId: 'd1',
     username: 'alice',
   });
 
@@ -237,8 +237,8 @@ describe('fetchEmbers', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'u1',
-          device_id: 'd1',
+          userId: 'u1',
+          deviceId: 'd1',
           username: 'alice',
         });
       }
@@ -269,8 +269,8 @@ describe('fetchEmbers', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'u1',
-          device_id: 'd1',
+          userId: 'u1',
+          deviceId: 'd1',
           username: 'alice',
         });
       }
@@ -297,8 +297,8 @@ describe('fetchEmbers', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'u1',
-          device_id: 'd1',
+          userId: 'u1',
+          deviceId: 'd1',
           username: 'alice',
         });
       }
@@ -326,8 +326,8 @@ describe('fetchEmberKey', () => {
           return Promise.resolve({
             token: 'tok',
             hostname: 'http://localhost:8085',
-            user_id: 'u1',
-            device_id: 'd1',
+            userId: 'u1',
+            deviceId: 'd1',
             username: 'alice',
           });
         }
@@ -391,8 +391,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'u1',
-          device_id: 'd1',
+          userId: 'u1',
+          deviceId: 'd1',
           username: 'alice',
         });
       }
@@ -432,8 +432,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
     (window as any).getValidAuth = jest.fn().mockResolvedValue({
       token: 'tok',
       hostname: 'http://localhost:8085',
-      user_id: 'u1',
-      device_id: 'd1',
+      userId: 'u1',
+      deviceId: 'd1',
       username: 'alice',
     });
   });
@@ -482,7 +482,7 @@ describe('Self-Distribution Fix for Solo Users', () => {
           ok: true,
           json: () =>
             Promise.resolve({
-              members: [{ user_id: 'u1', device_id: 'd1' }], // Current user included
+              members: [{ userId: 'u1', deviceId: 'd1' }], // Current user included
             }),
         });
       }
@@ -521,8 +521,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
           json: () =>
             Promise.resolve({
               members: [
-                { user_id: 'u1', device_id: 'd1' }, // Current user
-                { user_id: 'u2', device_id: 'd2' }, // Other user
+                { userId: 'u1', deviceId: 'd1' }, // Current user
+                { userId: 'u2', deviceId: 'd2' }, // Other user
               ],
             }),
         });
@@ -546,8 +546,8 @@ describe('Self-Distribution Fix for Solo Users', () => {
     // Self is installed locally, only other member goes to server
     expect(requestBody.distributions).toHaveLength(1);
     expect(requestBody.distributions[0]).toMatchObject({
-      recipient_user_id: 'u2',
-      recipient_device_id: 'd2',
+      recipientUserId: 'u2',
+      recipientDeviceId: 'd2',
     });
 
     // ProcessSenderKeyDistribution called for self (IPC stores under self-recv:: prefix)
@@ -618,8 +618,8 @@ describe('Race Condition: Messages Before Keys', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'u1',
-          device_id: 'd1',
+          userId: 'u1',
+          deviceId: 'd1',
           username: 'alice',
         });
       }
@@ -693,7 +693,7 @@ describe('Race Condition: Messages Before Keys', () => {
         operationOrder.push('fetch-messages');
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ messages: [], has_more: false }),
+          json: () => Promise.resolve({ messages: [], hasMore: false }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -782,7 +782,7 @@ describe('Race Condition: Messages Before Keys', () => {
         expect(distributionCompleted).toBe(true);
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ messages: [], has_more: false }),
+          json: () => Promise.resolve({ messages: [], hasMore: false }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -840,8 +840,8 @@ describe('Current Error Reproduction from Logs', () => {
         return Promise.resolve({
           token: 'tok',
           hostname: 'http://localhost:8085',
-          user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
-          device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+          userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+          deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
           username: 'Mike',
         });
       }
@@ -853,7 +853,7 @@ describe('Current Error Reproduction from Logs', () => {
     (window as any).fetchMembers = jest
       .fn()
       .mockResolvedValue([
-        { user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', username: 'Mike', status: 'online' },
+        { userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83', username: 'Mike', status: 'online' },
       ]);
     (window as any).renderMemberList = jest.fn();
     (window as any).wsSubscribeToEmber = jest.fn();
@@ -877,7 +877,7 @@ describe('Current Error Reproduction from Logs', () => {
                 memberCount: 1,
                 members: [
                   {
-                    user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+                    userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
                     username: 'Mike',
                     status: 'online',
                   },
@@ -897,12 +897,12 @@ describe('Current Error Reproduction from Logs', () => {
             ok: true,
             json: () =>
               Promise.resolve({
-                registration_id: 1,
-                device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
-                identity_key: 'test-identity-key',
-                signed_prekey_id: 1,
-                signed_prekey_public: 'test-signed-prekey',
-                signed_prekey_signature: 'test-signature',
+                registrationId: 1,
+                deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+                identityKey: 'test-identity-key',
+                signedPrekeyId: 1,
+                signedPrekeyPublic: 'test-signed-prekey',
+                signedPrekeySignature: 'test-signature',
               }),
           });
         }
@@ -916,7 +916,7 @@ describe('Current Error Reproduction from Logs', () => {
       });
 
       // Mock emberAPI to support local self-distribution
-      let callSequence: string[] = [];
+      const callSequence: string[] = [];
       mockEmberApiInvoke.mockImplementation((cmd: string) => {
         callSequence.push(cmd);
         if (cmd === 'GetAuth') {
@@ -956,8 +956,8 @@ describe('Current Error Reproduction from Logs', () => {
       (window as any).getValidAuth = jest.fn().mockResolvedValue({
         token: 'tok',
         hostname: 'http://localhost:8085',
-        user_id: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
-        device_id: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
+        userId: 'ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83',
+        deviceId: 'ab3bb081-7ca0-499b-8bb3-dfd5ae645818',
         username: 'Mike',
       });
 
@@ -983,11 +983,11 @@ describe('Current Error Reproduction from Logs', () => {
       const mockMessage = {
         id: 'cadc4ed0-24ff-4d77-be56-1c9f9e078069',
         username: 'Mike',
-        created_at: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         ciphertext:
           '{"v":2,"sa":"ccfebf40-cfb6-4e1c-b8c3-a0ddb7692f83.ab3bb081-7ca0-499b-8bb3-dfd5ae645818","ct":"encrypted"}',
-        envelope_type: 'signal_group',
-        chat_color: '#000000',
+        envelopeType: 'signal_group',
+        chatColor: '#000000',
       };
 
       // Mock emberAPI for decryption - track GroupDecrypt calls
@@ -1042,8 +1042,8 @@ describe('Current Error Reproduction from Logs', () => {
           return Promise.resolve({
             token: 'test-token',
             hostname: 'http://localhost:8085',
-            user_id: 'test-user',
-            device_id: 'test-device',
+            userId: 'test-user',
+            deviceId: 'test-device',
             username: 'TestUser',
           });
         }
@@ -1077,9 +1077,9 @@ describe('Current Error Reproduction from Logs', () => {
           Promise.resolve({
             id: 'cadc4ed0-24ff-4d77-be56-1c9f9e078069',
             username: 'Mike',
-            created_at: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
             ciphertext: 'encrypted-message',
-            envelope_type: 'signal_group',
+            envelopeType: 'signal_group',
           }),
       });
 

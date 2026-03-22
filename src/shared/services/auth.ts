@@ -41,7 +41,7 @@ export async function login(
   try {
     return await apiRequest<AuthResponse>(hostname, '/api/v1/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, device_id: deviceId }),
+      body: JSON.stringify({ username, password, deviceId }),
     });
   } catch (err) {
     if (err instanceof ApiError && err.statusCode === 401) {
@@ -65,9 +65,9 @@ export async function register(
     body: JSON.stringify({
       username,
       password,
-      device_id: deviceId,
-      public_key: publicKey,
-      encrypted_device_key: encryptedDeviceKey,
+      deviceId,
+      publicKey,
+      encryptedDeviceKey,
       salt,
     }),
   });

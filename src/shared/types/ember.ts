@@ -5,42 +5,42 @@ export type UserStatus = 'online' | 'idle' | 'dnd' | 'invisible' | 'offline';
 export interface Ember {
   id: string;
   name: string;
-  icon_data?: string | null;
-  owner_id?: string;
-  is_owner?: boolean;
+  iconData?: string | null;
+  ownerId?: string;
+  isOwner?: boolean;
 }
 
 export interface Channel {
   id: string;
-  ember_id: string;
+  emberId: string;
   name: string;
   type: 'text' | 'voice';
-  category_id?: string | null;
+  categoryId?: string | null;
   description?: string;
   position?: number;
 }
 
 export interface Category {
   id: string;
-  ember_id: string;
+  emberId: string;
   name: string;
   position?: number;
 }
 
 export interface Member {
-  user_id: string;
+  userId: string;
   username: string;
   status: UserStatus;
   role: 'owner' | 'admin' | 'member';
   avatar?: string;
-  custom_status?: string;
-  status_emoji?: string;
+  customStatus?: string;
+  statusEmoji?: string;
 }
 
 export interface ChannelReorderUpdate {
   id: string;
   position: number;
-  category_id?: string | null;
+  categoryId?: string | null;
 }
 
 export interface CategoryReorderUpdate {
@@ -56,16 +56,16 @@ export interface DragItem {
 export interface DmEmber {
   id: string;
   name: string;
-  created_at: string;
-  partner_id: string;
-  partner_username: string;
-  partner_avatar: string;
+  createdAt: string;
+  partnerId: string;
+  partnerUsername: string;
+  partnerAvatar: string;
 }
 
 export interface CreateDmRequest {
-  user_id: string;
-  encrypted_key_self: string;
-  encrypted_key_peer: string;
+  userId: string;
+  encryptedKeySelf: string;
+  encryptedKeyPeer: string;
 }
 
 export interface ContextMenuTarget {

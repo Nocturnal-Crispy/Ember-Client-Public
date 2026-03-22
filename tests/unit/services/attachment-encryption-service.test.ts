@@ -14,8 +14,8 @@ global.fetch = jest.fn();
 const mockAuth = {
   token: 'test-token',
   hostname: 'https://test.example.com',
-  user_id: 'user-123',
-  device_id: 'device-456',
+  userId: 'user-123',
+  deviceId: 'device-456',
   username: 'testuser',
 };
 
@@ -164,7 +164,7 @@ describe('AttachmentEncryptionService', () => {
             Authorization: 'Bearer test-token',
             'Content-Type': 'application/json',
           }),
-          body: expect.stringContaining('"attachment_id":"attachment-123"'),
+          body: expect.stringContaining('"attachmentId":"attachment-123"'),
         })
       );
     });
@@ -215,11 +215,11 @@ describe('AttachmentEncryptionService', () => {
       const mockKeys = [
         {
           id: 'key-123',
-          attachment_id: 'attachment-456',
-          user_id: 'user-123',
-          device_id: 'device-456',
-          encrypted_key: 'encrypted-key',
-          created_at: Date.now(),
+          attachmentId: 'attachment-456',
+          userId: 'user-123',
+          deviceId: 'device-456',
+          encryptedKey: 'encrypted-key',
+          createdAt: Date.now(),
         },
       ];
 
@@ -263,13 +263,13 @@ describe('AttachmentEncryptionService', () => {
 
       const mockMetadata = {
         id: 'attachment-456',
-        channel_id: channelId,
-        uploader_id: 'user-123',
-        original_name: fileName,
-        content_type: contentType,
-        size_bytes: data.length,
-        created_at: Date.now(),
-        attachment_key_id: 'key-789',
+        channelId: channelId,
+        uploaderId: 'user-123',
+        originalName: fileName,
+        contentType: contentType,
+        sizeBytes: data.length,
+        createdAt: Date.now(),
+        attachmentKeyId: 'key-789',
       };
 
       (global.fetch as jest.Mock)
@@ -313,13 +313,13 @@ describe('AttachmentEncryptionService', () => {
 
       const mockMetadata = {
         id: 'attachment-456',
-        conversation_id: conversationId,
-        uploader_id: 'user-123',
-        original_name: fileName,
-        content_type: contentType,
-        size_bytes: data.length,
-        created_at: Date.now(),
-        attachment_key_id: 'key-789',
+        conversationId: conversationId,
+        uploaderId: 'user-123',
+        originalName: fileName,
+        contentType: contentType,
+        sizeBytes: data.length,
+        createdAt: Date.now(),
+        attachmentKeyId: 'key-789',
       };
 
       (global.fetch as jest.Mock)
@@ -350,29 +350,29 @@ describe('AttachmentEncryptionService', () => {
 
       const mockMetadata = {
         id: attachmentId,
-        original_name: 'test.txt',
-        content_type: 'text/plain',
-        size_bytes: originalData.length,
-        created_at: Date.now(),
-        uploader_id: 'user-123',
-        attachment_key_id: 'key-789',
+        originalName: 'test.txt',
+        contentType: 'text/plain',
+        sizeBytes: originalData.length,
+        createdAt: Date.now(),
+        uploaderId: 'user-123',
+        attachmentKeyId: 'key-789',
       };
 
       const mockKeys = [
         {
           id: 'key-123',
-          attachment_id: attachmentId,
-          user_id: 'user-123',
-          device_id: 'device-456',
+          attachmentId: attachmentId,
+          userId: 'user-123',
+          deviceId: 'device-456',
           encrypted_key: btoa(
             JSON.stringify({
-              attachment_key: key,
-              for_user_id: 'user-123',
-              created_by: 'user-123',
+              attachmentKey: key,
+              forUserId: 'user-123',
+              createdBy: 'user-123',
               timestamp: Date.now(),
             })
           ),
-          created_at: Date.now(),
+          createdAt: Date.now(),
         },
       ];
 

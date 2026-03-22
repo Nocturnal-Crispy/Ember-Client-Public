@@ -17,32 +17,32 @@ export interface RTCSessionDescriptionInit {
 
 export interface Message {
   id: string;
-  channel_id: string;
-  sender_id: string;
-  sender_user_id: string;
+  channelId: string;
+  senderId: string;
+  senderUserId: string;
   username?: string;
-  chat_color?: string;
+  chatColor?: string;
   ciphertext: string;
-  envelope_type?: string;
-  created_at?: number;
-  updated_at?: number;
+  envelopeType?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface WsMessage {
   type: string;
   payload?: Record<string, unknown>;
-  channel_id?: string;
-  ember_id?: string;
+  channelId?: string;
+  emberId?: string;
   candidate?: RTCIceCandidateInit;
   sdp?: RTCSessionDescriptionInit;
 }
 
 export interface PresenceUpdatePayload {
-  user_id: string;
+  userId: string;
   username: string;
   status: UserStatus;
-  custom_status?: string;
-  status_emoji?: string;
+  customStatus?: string;
+  statusEmoji?: string;
 }
 
 export interface LogPayload {

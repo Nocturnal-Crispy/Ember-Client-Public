@@ -27,13 +27,13 @@
       throw new Error(`Auth data missing in ${context}`);
     }
 
-    if (auth1.user_id !== auth2.user_id || auth1.device_id !== auth2.device_id) {
+    if (auth1.userId !== auth2.userId || auth1.deviceId !== auth2.deviceId) {
       log.error('Auth data inconsistency detected', {
         context,
-        auth1_user_id: auth1.user_id,
-        auth1_device_id: auth1.device_id,
-        auth2_user_id: auth2.user_id,
-        auth2_device_id: auth2.device_id,
+        auth1_user_id: auth1.userId,
+        auth1_device_id: auth1.deviceId,
+        auth2_user_id: auth2.userId,
+        auth2_device_id: auth2.deviceId,
       });
       throw new Error(`Auth data inconsistency in ${context}: user_id or device_id mismatch`);
     }
@@ -55,7 +55,7 @@
       // This validates that the Signal database is accessible and using correct keys
       const testResult = await window.emberAPI.invoke<{ distributionId: string | null }>(
         'LoadDistributionId',
-        { address: `${auth.user_id}.${auth.device_id}` }
+        { address: `${auth.userId}.${auth.deviceId}` }
       );
 
       // Check if the operation succeeded
@@ -64,8 +64,8 @@
       }
 
       log.debug('Crypto state validation passed', {
-        user_id: auth.user_id,
-        device_id: auth.device_id,
+        user_id: auth.userId,
+        device_id: auth.deviceId,
         has_distribution_id: testResult.data?.distributionId ? true : false,
       });
     } catch (error) {
@@ -78,8 +78,8 @@
         err.message.includes('data may be corrupted')
       ) {
         log.error('Crypto state validation failed - authentication error', {
-          user_id: auth.user_id,
-          device_id: auth.device_id,
+          user_id: auth.userId,
+          device_id: auth.deviceId,
           error: err.message,
           security_impact: 'high',
         });
@@ -88,8 +88,8 @@
 
       // Other errors might be network-related or temporary
       log.warn('Crypto state validation failed - non-authentication error', {
-        user_id: auth.user_id,
-        device_id: auth.device_id,
+        user_id: auth.userId,
+        device_id: auth.deviceId,
         error: err.message,
       });
       throw new Error(`Crypto state validation failed: ${err.message}`);
@@ -159,17 +159,17 @@
   function syncCryptoStateFromServer(
     emberId: string,
     serverState: {
-      crypto_mode?: string;
-      sender_key_status?: string;
-      active_distribution_id?: string | null;
-      sender_key_epoch?: number;
+      cryptoMode?: string;
+      senderKeyStatus?: string;
+      activeDistributionId?: string | null;
+      senderKeyEpoch?: number;
     }
   ): void {
     setCryptoState(emberId, {
-      cryptoMode: (serverState.crypto_mode as CryptoMode) ?? 'pairwise_bootstrap',
-      senderKeyStatus: (serverState.sender_key_status as SenderKeyStatus) ?? 'not_initialized',
-      activeDistributionId: serverState.active_distribution_id ?? null,
-      senderKeyEpoch: serverState.sender_key_epoch ?? 0,
+      cryptoMode: (serverState.cryptoMode as CryptoMode) ?? 'pairwise_bootstrap',
+      senderKeyStatus: (serverState.senderKeyStatus as SenderKeyStatus) ?? 'not_initialized',
+      activeDistributionId: serverState.activeDistributionId ?? null,
+      senderKeyEpoch: serverState.senderKeyEpoch ?? 0,
     });
   }
 
@@ -284,7 +284,7 @@
     try {
       // CRITICAL FIX: Ensure authentication is properly synchronized before creating sender keys
       const auth = await getValidAuth();
-      if (!auth || !auth.token || !auth.user_id || !auth.device_id) {
+      if (!auth || !auth.token || !auth.userId || !auth.deviceId) {
         throw new Error('Not authenticated — cannot determine local address');
       }
 
@@ -330,7 +330,7 @@
     if (sessionResponse.success && sessionResponse.data?.record) return;
 
     // CRITICAL FIX: Check if this is a self-session (user establishing session with own device)
-    const isSelfSession = userId === auth.user_id && deviceId === auth.device_id;
+    const isSelfSession = userId === auth.userId && deviceId === auth.deviceId;
 
     // CRITICAL FIX: Even for self-sessions, we need to establish a proper Signal session
     // The previous assumption that Signal Protocol can handle self-encryption without a session was incorrect
@@ -445,7 +445,7 @@
             address,
             error: err.message,
             retry: retries,
-            maxRetries: maxRetries,
+            maxRetries,
             delay: retryDelay * Math.pow(2, retries - 1),
           });
           // Exponential backoff
@@ -476,20 +476,20 @@
         return;
       }
       const membersData = (await membersResponse.json()) as {
-        members: Array<{ user_id: string; device_id: string }>;
+        members: Array<{ userId: string; deviceId: string }>;
       };
       const members = membersData.members ?? [];
 
       const distributions: Array<{
-        recipient_user_id: string;
-        recipient_device_id: string;
-        distribution_message: string;
+        recipientUserId: string;
+        recipientDeviceId: string;
+        distributionMessage: string;
       }> = [];
 
       // Install a self-receive copy of the sender key. The IPC handler stores it
       // under a "self-recv::" prefixed address so it doesn't corrupt the encrypt
       // chain. This allows self-decrypt of own messages on history reload.
-      const selfAddress = `${auth.user_id}.${auth.device_id}`;
+      const selfAddress = `${auth.userId}.${auth.deviceId}`;
       const selfProcessResult = await window.emberAPI.invoke('ProcessSenderKeyDistribution', {
         senderAddress: selfAddress,
         distributionMessage,
@@ -504,13 +504,13 @@
       // Distribute to other members (if any)
       for (const member of members) {
         // Skip if this is the current user's device (already added above)
-        if (member.user_id === auth.user_id && member.device_id === auth.device_id) {
+        if (member.userId === auth.userId && member.deviceId === auth.deviceId) {
           continue;
         }
 
         try {
-          await ensureSignalSession(auth, member.user_id, member.device_id);
-          const address = `${member.user_id}.${member.device_id}`;
+          await ensureSignalSession(auth, member.userId, member.deviceId);
+          const address = `${member.userId}.${member.deviceId}`;
           const encResponse = await window.emberAPI.invoke<{
             ciphertext: string;
             messageType: number;
@@ -527,14 +527,14 @@
             mt: encResponse.data.messageType,
           });
           distributions.push({
-            recipient_user_id: member.user_id,
-            recipient_device_id: member.device_id,
-            distribution_message: btoa(envelope),
+            recipientUserId: member.userId,
+            recipientDeviceId: member.deviceId,
+            distributionMessage: btoa(envelope),
           });
         } catch (memberErr) {
           const err = memberErr as Error;
           log.warn('Skipping member for distribution', {
-            user_id: member.user_id,
+            user_id: member.userId,
             error: err.message,
           });
         }
@@ -557,20 +557,20 @@
 
         // CRITICAL FIX: Log successful distribution operation
         const duration = Date.now() - startTime;
-        logCryptoOperation('distribute', auth.user_id, distributionId, true, undefined, duration);
+        logCryptoOperation('distribute', auth.userId, distributionId, true, undefined, duration);
       } else {
         // No other members to distribute to — this is normal for solo users.
         // The sender already has the key from createSenderKeyDistribution.
         log.debug('No remote distributions needed', { ember_id: emberId });
         const duration = Date.now() - startTime;
-        logCryptoOperation('distribute', auth.user_id, distributionId, true, undefined, duration);
+        logCryptoOperation('distribute', auth.userId, distributionId, true, undefined, duration);
       }
     } catch (error) {
       const err = error as Error;
       const duration = Date.now() - startTime;
 
       // CRITICAL FIX: Log failed distribution operation
-      logCryptoOperation('distribute', auth.user_id, distributionId, false, err.message, duration);
+      logCryptoOperation('distribute', auth.userId, distributionId, false, err.message, duration);
 
       log.error('Failed to distribute sender key', {
         ember_id: emberId,
@@ -590,9 +590,9 @@
       const data = (await response.json()) as {
         distributions: Array<{
           id: string;
-          sender_user_id: string;
-          sender_device_id: string;
-          distribution_message: string;
+          senderUserId: string;
+          senderDeviceId: string;
+          distributionMessage: string;
         }>;
       };
       const pending = data.distributions ?? [];
@@ -600,8 +600,8 @@
       let processed = 0;
       for (const dist of pending) {
         try {
-          const senderAddress = `${dist.sender_user_id}.${dist.sender_device_id}`;
-          const envelope = JSON.parse(atob(dist.distribution_message)) as {
+          const senderAddress = `${dist.senderUserId}.${dist.senderDeviceId}`;
+          const envelope = JSON.parse(atob(dist.distributionMessage)) as {
             ct: string;
             mt: number;
           };
@@ -766,9 +766,9 @@
         serverIcon.classList.add('active');
       }
 
-      if (ember.icon_data) {
+      if (ember.iconData) {
         const img = document.createElement('img');
-        img.src = ember.icon_data;
+        img.src = ember.iconData;
         img.alt = ember.name;
         img.style.width = '100%';
         img.style.height = '100%';
@@ -820,7 +820,7 @@
       // Right-click context menu (owners only)
       serverIcon.addEventListener('contextmenu', (e: MouseEvent) => {
         e.preventDefault();
-        if (ember.is_owner) showEmberContextMenu(e.clientX, e.clientY, ember);
+        if (ember.isOwner) showEmberContextMenu(e.clientX, e.clientY, ember);
       });
 
       if (separator) {
@@ -896,7 +896,7 @@
     // CRITICAL FIX: Capture auth data once and use consistently throughout
     // Don't fetch auth again - it could be different and cause crypto inconsistencies
     const auth = await getValidAuth();
-    if (!auth || !auth.token || !auth.hostname || !auth.user_id || !auth.device_id) {
+    if (!auth || !auth.token || !auth.hostname || !auth.userId || !auth.deviceId) {
       throw new Error('Not authenticated - cannot load server content');
     }
 
@@ -1202,7 +1202,7 @@
       const requestBody: Record<string, unknown> = {
         name: serverName,
       };
-      if (App.currentIconData) requestBody['icon_data'] = App.currentIconData;
+      if (App.currentIconData) requestBody['iconData'] = App.currentIconData;
 
       const response = await fetch(`${auth.hostname}/api/v1/embers`, {
         method: 'POST',
@@ -1363,9 +1363,9 @@
 
     // Pre-fill current values
     if (editEmberNameInput) editEmberNameInput.value = ember.name;
-    if (ember.icon_data) {
-      App.currentIconData = ember.icon_data;
-      updateEditIconPreview(ember.icon_data);
+    if (ember.iconData) {
+      App.currentIconData = ember.iconData;
+      updateEditIconPreview(ember.iconData);
     }
 
     editEmberModal.classList.remove('hidden');
@@ -1514,7 +1514,7 @@
 
     // Check if anything actually changed
     const nameChanged = emberName !== editingEmber.name;
-    const iconChanged = App.currentIconData !== editingEmber.icon_data;
+    const iconChanged = App.currentIconData !== editingEmber.iconData;
 
     if (!nameChanged && !iconChanged) {
       closeEditEmberModal();
@@ -1542,7 +1542,7 @@
       // Build update request with only changed fields
       const updates: any = {};
       if (nameChanged) updates.name = emberName;
-      if (iconChanged) updates.icon_data = App.currentIconData;
+      if (iconChanged) updates.iconData = App.currentIconData;
 
       const updatedEmber = await window.electronAPI.emberService.updateEmber(
         auth,

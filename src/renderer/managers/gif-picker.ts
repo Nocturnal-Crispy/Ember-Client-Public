@@ -192,7 +192,7 @@
   function createHeartButton(url: string, title: string, thumbnailUrl: string): HTMLButtonElement {
     const favorited = isFavorited(url);
     const btn = document.createElement('button');
-    btn.className = 'gif-picker-heart-btn' + (favorited ? ' gif-picker-heart-btn--active' : '');
+    btn.className = `gif-picker-heart-btn${favorited ? ' gif-picker-heart-btn--active' : ''}`;
     btn.title = favorited ? 'Remove from favorites' : 'Add to favorites';
     btn.textContent = favorited ? '\u2665' : '\u2661';
     btn.type = 'button';

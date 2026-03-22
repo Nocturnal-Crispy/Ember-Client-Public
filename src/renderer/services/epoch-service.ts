@@ -301,8 +301,8 @@ export class EpochService {
       const newKey = this.generateEpochKey();
 
       const keyRequest: EpochKeyRequest = {
-        user_id: this.auth.user_id,
-        device_id: this.auth.device_id,
+        user_id: this.auth.userId,
+        device_id: this.auth.deviceId,
         encrypted_key: newKey,
       };
 
@@ -333,7 +333,7 @@ export class EpochService {
 
       // Find the key for the current user
       const userKey = epochKeys.find(
-        key => key.user_id === this.auth.user_id && key.device_id === this.auth.device_id
+        key => key.user_id === this.auth.userId && key.device_id === this.auth.deviceId
       );
 
       if (!userKey) {

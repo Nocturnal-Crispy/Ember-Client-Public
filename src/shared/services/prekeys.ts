@@ -20,7 +20,7 @@ export async function uploadSignedPreKey(
     },
     body: JSON.stringify({
       id: signedPreKey.id,
-      public_key: Buffer.from(signedPreKey.keyPair.publicKey).toString('base64'),
+      publicKey: Buffer.from(signedPreKey.keyPair.publicKey).toString('base64'),
       signature: Buffer.from(signedPreKey.signature).toString('base64'),
       timestamp: signedPreKey.timestamp,
     }),
@@ -44,7 +44,7 @@ export async function uploadOneTimePreKeys(
     body: JSON.stringify(
       prekeys.map(prekey => ({
         id: prekey.id,
-        public_key: Buffer.from(prekey.keyPair.publicKey).toString('base64'),
+        publicKey: Buffer.from(prekey.keyPair.publicKey).toString('base64'),
       }))
     ),
   });
@@ -90,15 +90,18 @@ export async function fetchPreKeyBundle(
   const data = await response.json();
 
   // Map response to local PreKeyBundle type from signal-types.ts
+  // Server returns nested camelCase: { identityKey, registrationId, signedPreKey: { id, publicKey, signature, ... }, oneTimePreKey?: { id, publicKey } }
   return {
-    registrationId: data.registration_id,
-    deviceId: data.device_id,
-    preKeyId: data.prekey_id,
-    preKey: data.prekey_public ? new Uint8Array(data.prekey_public) : undefined,
-    signedPreKeyId: data.signed_prekey_id,
-    signedPreKey: new Uint8Array(data.signed_prekey_public),
-    signedPreKeySignature: new Uint8Array(data.signed_prekey_signature),
-    identityKey: new Uint8Array(data.identity_key),
+    registrationId: data.registrationId,
+    deviceId: data.signedPreKey?.deviceId,
+    preKeyId: data.oneTimePreKey?.id,
+    preKey: data.oneTimePreKey?.publicKey
+      ? new Uint8Array(data.oneTimePreKey.publicKey)
+      : undefined,
+    signedPreKeyId: data.signedPreKey?.id,
+    signedPreKey: new Uint8Array(data.signedPreKey.publicKey),
+    signedPreKeySignature: new Uint8Array(data.signedPreKey.signature),
+    identityKey: new Uint8Array(data.identityKey),
   };
 }
 

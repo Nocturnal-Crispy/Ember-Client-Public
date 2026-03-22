@@ -135,8 +135,8 @@ describe('fetchChannels', () => {
 
   it('returns the channels array from a successful response', async () => {
     const mockChannels = [
-      { id: 'ch-1', ember_id: 'e-1', name: 'general', type: 'text' },
-      { id: 'ch-2', ember_id: 'e-1', name: 'voice', type: 'voice' },
+      { id: 'ch-1', emberId: 'e-1', name: 'general', type: 'text' },
+      { id: 'ch-2', emberId: 'e-1', name: 'voice', type: 'voice' },
     ];
 
     mockEmberApiInvoke.mockResolvedValueOnce({
@@ -182,11 +182,11 @@ describe('fetchChannels', () => {
       hostname: 'http://localhost:8085',
       username: 'alice',
     };
-    // The auth passed to channelService will be in AuthData format (user_id/device_id)
+    // The auth passed to channelService will be in AuthData format (userId/deviceId)
     const expectedAuth = {
       token: 'tok',
-      user_id: 'u1',
-      device_id: 'd1',
+      userId: 'u1',
+      deviceId: 'd1',
       hostname: 'http://localhost:8085',
       username: 'alice',
     };
@@ -210,7 +210,7 @@ describe('fetchCategories', () => {
   });
 
   it('returns categories from a successful response', async () => {
-    const mockCats = [{ id: 'cat-1', ember_id: 'e-1', name: 'Text Channels' }];
+    const mockCats = [{ id: 'cat-1', emberId: 'e-1', name: 'Text Channels' }];
     mockEmberApiInvoke.mockResolvedValueOnce({
       success: true,
       data: {
@@ -244,8 +244,8 @@ describe('renderChannels', () => {
 
   it('creates a .channel element for each text channel', () => {
     const channels = [
-      { id: 'ch-1', ember_id: 'e-1', name: 'general', type: 'text' as const },
-      { id: 'ch-2', ember_id: 'e-1', name: 'announcements', type: 'text' as const },
+      { id: 'ch-1', emberId: 'e-1', name: 'general', type: 'text' as const },
+      { id: 'ch-2', emberId: 'e-1', name: 'announcements', type: 'text' as const },
     ];
 
     (window as any).renderChannels(channels, []);
@@ -255,7 +255,7 @@ describe('renderChannels', () => {
 
   it('creates a .voice-participant-list element after each voice channel', () => {
     const channels = [
-      { id: 'vc-1', ember_id: 'e-1', name: 'General Voice', type: 'voice' as const },
+      { id: 'vc-1', emberId: 'e-1', name: 'General Voice', type: 'voice' as const },
     ];
 
     (window as any).renderChannels(channels, []);
@@ -265,8 +265,8 @@ describe('renderChannels', () => {
 
   it('creates both .channel elements and voice participant lists for mixed channels', () => {
     const channels = [
-      { id: 'ch-1', ember_id: 'e-1', name: 'general', type: 'text' as const },
-      { id: 'vc-1', ember_id: 'e-1', name: 'voice', type: 'voice' as const },
+      { id: 'ch-1', emberId: 'e-1', name: 'general', type: 'text' as const },
+      { id: 'vc-1', emberId: 'e-1', name: 'voice', type: 'voice' as const },
     ];
 
     (window as any).renderChannels(channels, []);
@@ -282,7 +282,7 @@ describe('renderChannels', () => {
     channelsContainer.appendChild(staleEl);
 
     (window as any).renderChannels(
-      [{ id: 'ch-new', ember_id: 'e-1', name: 'new', type: 'text' as const }],
+      [{ id: 'ch-new', emberId: 'e-1', name: 'new', type: 'text' as const }],
       []
     );
 
@@ -302,7 +302,7 @@ describe('renderChannels', () => {
   });
 
   it('sets data-channel-id attribute on each channel element', () => {
-    const channels = [{ id: 'ch-abc', ember_id: 'e-1', name: 'test', type: 'text' as const }];
+    const channels = [{ id: 'ch-abc', emberId: 'e-1', name: 'test', type: 'text' as const }];
 
     (window as any).renderChannels(channels, []);
 
@@ -328,7 +328,7 @@ describe('markChannelUnread', () => {
 
   it('adds has-unread class to the matching channel element', () => {
     (window as any).renderChannels(
-      [{ id: 'ch-bg', ember_id: 'e-1', name: 'background', type: 'text' as const }],
+      [{ id: 'ch-bg', emberId: 'e-1', name: 'background', type: 'text' as const }],
       []
     );
 
@@ -356,7 +356,7 @@ describe('markChannelUnread', () => {
     const mockPlay = jest.fn();
     (window as any).playNotificationSound = mockPlay;
     (window as any).renderChannels(
-      [{ id: 'ch-sound', ember_id: 'e-1', name: 'soundtest', type: 'text' as const }],
+      [{ id: 'ch-sound', emberId: 'e-1', name: 'soundtest', type: 'text' as const }],
       []
     );
 
@@ -370,7 +370,7 @@ describe('markChannelUnread', () => {
     const mockPlay = jest.fn();
     (window as any).playNotificationSound = mockPlay;
     (window as any).renderChannels(
-      [{ id: 'ch-dup', ember_id: 'e-1', name: 'duptest', type: 'text' as const }],
+      [{ id: 'ch-dup', emberId: 'e-1', name: 'duptest', type: 'text' as const }],
       []
     );
     (window as any).markChannelUnread('ch-dup');
@@ -384,7 +384,7 @@ describe('markChannelUnread', () => {
 
   it('removes has-unread class when the channel is clicked', () => {
     (window as any).renderChannels(
-      [{ id: 'ch-click', ember_id: 'e-1', name: 'clickme', type: 'text' as const }],
+      [{ id: 'ch-click', emberId: 'e-1', name: 'clickme', type: 'text' as const }],
       []
     );
     (window as any).markChannelUnread('ch-click');
@@ -422,8 +422,8 @@ describe('clearAllChannelUnread', () => {
   it('removes has-unread class from all channel elements', () => {
     (window as any).renderChannels(
       [
-        { id: 'ch-ra-1', ember_id: 'e-1', name: 'general', type: 'text' as const },
-        { id: 'ch-ra-2', ember_id: 'e-1', name: 'random', type: 'text' as const },
+        { id: 'ch-ra-1', emberId: 'e-1', name: 'general', type: 'text' as const },
+        { id: 'ch-ra-2', emberId: 'e-1', name: 'random', type: 'text' as const },
       ],
       []
     );

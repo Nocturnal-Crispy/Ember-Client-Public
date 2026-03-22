@@ -20,14 +20,14 @@ export interface MigrationOutcome {
 }
 
 interface DeviceUpdateRequest {
-  identity_key: string;
-  protocol_version: number;
-  proof_of_possession: string;
+  identityKey: string;
+  protocolVersion: number;
+  proofOfPossession: string;
 }
 
 interface DeviceUpdateResponse {
   message: string;
-  protocol_version: number;
+  protocolVersion: number;
 }
 
 /**
@@ -130,9 +130,9 @@ export async function performMigration(
       {
         method: 'PATCH',
         body: JSON.stringify({
-          identity_key: identityKeyBase64,
-          protocol_version: 1,
-          proof_of_possession: proofOfPossession,
+          identityKey: identityKeyBase64,
+          protocolVersion: 1,
+          proofOfPossession,
         } satisfies DeviceUpdateRequest),
       },
       auth.token

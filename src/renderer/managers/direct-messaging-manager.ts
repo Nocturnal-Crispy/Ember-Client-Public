@@ -40,10 +40,10 @@
 
   // ─── Auth helpers ──────────────────────────────────────────────────────────
 
-  async function getAuth(): Promise<{ token: string; hostname: string; user_id: string } | null> {
+  async function getAuth(): Promise<{ token: string; hostname: string; userId: string } | null> {
     const auth = await window.getValidAuth();
     if (!auth?.token || !auth?.hostname) return null;
-    return auth as { token: string; hostname: string; user_id: string };
+    return auth as { token: string; hostname: string; userId: string };
   }
 
   async function getDevice(): Promise<{ public_key: string; private_key: string } | null> {
@@ -92,7 +92,7 @@
         const isRecipient =
           requestStatus === 'pending' &&
           dm.requester_id !== undefined &&
-          dm.requester_id !== auth.user_id;
+          dm.requester_id !== auth.userId;
 
         const channels = await fetchDmChannels(auth, dm.id);
         const entry: DmEntry = {
@@ -321,7 +321,7 @@
         partnerUsername: participantUsername,
         requestId,
         isRecipient: false,
-        requesterId: auth.user_id,
+        requesterId: auth.userId,
       });
     }
 
@@ -496,7 +496,7 @@
           envelope_type?: string;
         }>;
       };
-      const currentUserId = auth.user_id;
+      const currentUserId = auth.userId;
 
       return await Promise.all(
         (data.messages ?? []).map(async msg => {
@@ -614,7 +614,7 @@
         window.displayDmMessage({
           id: msg.id,
           conversationId: channelId,
-          senderId: auth.user_id,
+          senderId: auth.userId,
           content: plaintext,
           timestamp: Date.now() / 1000,
           isOwn: true,
@@ -689,7 +689,7 @@
           messageType
         );
         const messageContent = new TextDecoder().decode(plaintextBytes);
-        const isOwn = senderId === auth.user_id;
+        const isOwn = senderId === auth.userId;
         window.displayDmMessage({
           id: String(payload['id'] ?? ''),
           conversationId: channelId,
@@ -719,7 +719,7 @@
       return;
     }
 
-    const isOwn = senderId === auth.user_id;
+    const isOwn = senderId === auth.userId;
 
     // Non-Signal envelopes cannot be decrypted.
     window.displayDmMessage({

@@ -80,9 +80,9 @@
     const channelsByCategory: Record<string, Channel[]> = {};
     const uncategorized: Channel[] = [];
     channels.forEach(ch => {
-      if (ch.category_id) {
-        if (!channelsByCategory[ch.category_id]) channelsByCategory[ch.category_id] = [];
-        channelsByCategory[ch.category_id].push(ch);
+      if (ch.categoryId) {
+        if (!channelsByCategory[ch.categoryId]) channelsByCategory[ch.categoryId] = [];
+        channelsByCategory[ch.categoryId].push(ch);
       } else {
         uncategorized.push(ch);
       }
@@ -99,7 +99,7 @@
       channelEl.className = 'channel';
       channelEl.dataset['channelId'] = channel.id;
       channelEl.dataset['itemType'] = 'channel';
-      channelEl.dataset['catId'] = channel.category_id ?? '';
+      channelEl.dataset['catId'] = channel.categoryId ?? '';
 
       const iconEl = document.createElement('span');
       iconEl.className = 'channel-icon';
@@ -139,7 +139,7 @@
           id: channel.id,
           name: channel.name,
           channelType: channel.type,
-          categoryId: channel.category_id ?? null,
+          categoryId: channel.categoryId ?? null,
           description: channel.description ?? '',
         });
       });
@@ -175,7 +175,7 @@
         const insertAfter = e.clientY > rect.top + rect.height / 2;
         const dropped = App.dragItem;
         App.dragItem = null;
-        await reorderChannels(dropped.id, channel.id, channel.category_id ?? null, insertAfter);
+        await reorderChannels(dropped.id, channel.id, channel.categoryId ?? null, insertAfter);
       });
 
       if (!autoSelect && channel.type === 'text') autoSelect = { el: channelEl, channel };
@@ -319,20 +319,20 @@
         updates.push({
           id: draggedId,
           position: position++,
-          category_id: newCategoryId ?? null,
+          categoryId: newCategoryId ?? null,
         });
         inserted = true;
       }
       updates.push({
         id,
         position: position++,
-        category_id: catId === '' ? null : catId,
+        categoryId: catId === '' ? null : catId,
       });
       if (insertAfter && relativeToChannelId && id === relativeToChannelId) {
         updates.push({
           id: draggedId,
           position: position++,
-          category_id: newCategoryId ?? null,
+          categoryId: newCategoryId ?? null,
         });
         inserted = true;
       }
@@ -341,7 +341,7 @@
       updates.push({
         id: draggedId,
         position,
-        category_id: newCategoryId ?? null,
+        categoryId: newCategoryId ?? null,
       });
 
     try {
