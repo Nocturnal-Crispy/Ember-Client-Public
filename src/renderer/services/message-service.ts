@@ -325,7 +325,7 @@
       log.debug('Message sent', { message_id: msgData.id, envelope: requestBody.envelopeType });
       window.registerSentMessageId(msgData.id);
       App.ownedMessageIds.add(msgData.id);
-      await displayDecryptedMessage(msgData);
+      await displayDecryptedMessage(msgData, false, true);
       return msgData.id;
     } catch (error) {
       const err = error as Error;
@@ -600,10 +600,51 @@
     }
   }
 
-  async function displayDecryptedMessage(msg: Message, prepend = false): Promise<void> {
+  async function displayDecryptedMessage(
+    msg: Message,
+    prepend = false,
+    skipReplay = false
+  ): Promise<void> {
     if (!App.activeEmberId) return;
     let plaintext: string | null = null;
     const envelopeType = msg.envelopeType;
+    const msgAny = msg as any;
+
+    // Replay protection for history envelope types — only for live WS messages
+    if (
+      (envelopeType === 'history_channel' || envelopeType === 'history_dm') &&
+      !skipReplay &&
+      !prepend
+    ) {
+      const replayGuard = (window as any).replayProtection as
+        | {
+            acceptMessage(
+              conversationId: string,
+              epoch: number,
+              senderDeviceId: string,
+              messageSequence: number
+            ): boolean;
+          }
+        | undefined;
+      if (replayGuard) {
+        const seq = Number(msgAny.messageSequence ?? 0);
+        const epoch = Number(msgAny.epoch ?? 0);
+        const senderDevice = String(msgAny.senderDeviceId ?? '');
+        if (
+          senderDevice &&
+          !replayGuard.acceptMessage(App.activeEmberId, epoch, senderDevice, seq)
+        ) {
+          log.warn('Replay protection rejected message', {
+            message_id: msg.id,
+            epoch,
+            sequence: seq,
+            senderDevice,
+          });
+          return;
+        }
+      }
+    }
+
     if (envelopeType === 'signal_group') {
       const result = await tryGroupDecrypt(msg.ciphertext);
       plaintext = result.plaintext;
@@ -657,7 +698,6 @@
           }
         | undefined;
       if (historyCrypto) {
-        const msgAny = msg as any;
         plaintext = await historyCrypto
           .decrypt(
             App.activeEmberId,
@@ -672,6 +712,42 @@
         addMessage(
           msg.username ?? 'Unknown',
           '[History key unavailable — cannot decrypt this message]',
+          msg.createdAt,
+          prepend,
+          msg.id,
+          msg.chatColor
+        );
+        return;
+      }
+    } else if (envelopeType === 'history_dm') {
+      const historyCrypto = (window as any).historyCryptoService as
+        | {
+            decryptDm(
+              conversationId: string,
+              ct: string,
+              nonce: string,
+              epoch: number,
+              seq: number,
+              senderDeviceId: string
+            ): Promise<string | null>;
+          }
+        | undefined;
+      if (historyCrypto && App.activeEmberId) {
+        plaintext = await historyCrypto
+          .decryptDm(
+            App.activeEmberId,
+            msg.ciphertext,
+            msgAny.nonce ?? '',
+            msgAny.epoch ?? 0,
+            msgAny.messageSequence ?? 0,
+            msgAny.senderDeviceId ?? ''
+          )
+          .catch(() => null);
+      }
+      if (plaintext === null) {
+        addMessage(
+          msg.username ?? 'Unknown',
+          '[DM history key unavailable — cannot decrypt this message]',
           msg.createdAt,
           prepend,
           msg.id,
@@ -1140,7 +1216,7 @@
       if (currentUserId && msg.senderUserId === currentUserId) {
         App.ownedMessageIds.add(msg.id);
       }
-      await displayDecryptedMessage(msg);
+      await displayDecryptedMessage(msg, false, true);
     }
 
     // Clean up old messages if needed

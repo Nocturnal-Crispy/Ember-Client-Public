@@ -301,7 +301,9 @@
       }
     }
 
-    // Signal Protocol sender keys are used for all encrypted messaging
+    // DM CMK is NOT created here — recipient hasn't accepted yet.
+    // CMK is created in acceptDMRequest when both parties are members.
+    // Pre-acceptance messages use Signal direct encryption as fallback.
 
     window.addDmConversationToList({
       id: channels.textChannelId,
@@ -433,9 +435,33 @@
     // Always subscribe — fixes BP-2 where subscription was skipped for existing entries
     window.wsSubscribeToChannel(channels.textChannelId);
 
-    fetchAndCacheEmberKey(emberId).catch((err: Error) =>
-      log.warn('fetchAndCacheEmberKey error (no-op in Signal DMs)', { emberId, error: err.message })
-    );
+    // Create and distribute DM CMK now that both parties are members.
+    // This is the single creation point — startDmConversation does NOT create CMK
+    // because the recipient isn't a member yet at that stage.
+    try {
+      const historyCrypto = (window as any).historyCryptoService;
+      if (historyCrypto) {
+        const membersResp = await fetch(
+          `${auth.hostname}/api/v1/embers/${emberId}/device-members`,
+          { headers: { Authorization: `Bearer ${auth.token}` } }
+        );
+        if (membersResp.ok) {
+          const membersData = (await membersResp.json()) as {
+            members?: Array<{ userId: string; deviceId: string }>;
+          };
+          const members = membersData.members ?? [];
+          if (members.length > 0) {
+            await historyCrypto.createAndDistributeDmCmk(emberId, members);
+            log.info('DM CMK created on accept', { emberId });
+          }
+        }
+      }
+    } catch (cmkErr) {
+      log.warn('DM CMK creation deferred on accept', {
+        emberId,
+        error: (cmkErr as Error).message,
+      });
+    }
 
     // Hide the pending banner now that the DM is accepted
     if (typeof window.hideDmPendingBanner === 'function') {
@@ -555,7 +581,47 @@
             }
           }
 
-          // Non-Signal envelopes cannot be decrypted.
+          // Try history_dm envelope decryption via dmCmk
+          if (envelopeType === 'history_dm') {
+            const historyCrypto = (window as any).historyCryptoService;
+            if (historyCrypto && entry) {
+              try {
+                const msgAny = msg as Record<string, unknown>;
+                const nonceB64 = String(msgAny['nonce'] ?? '');
+                const epochVal = Number(msgAny['epoch'] ?? 0);
+                const seqVal = Number(msgAny['messageSequence'] ?? 0);
+                const senderDevice = String(msg.senderDeviceId ?? '');
+                const decrypted = await historyCrypto.decryptDm(
+                  entry.emberId,
+                  msg.ciphertext,
+                  nonceB64,
+                  epochVal,
+                  seqVal,
+                  senderDevice
+                );
+                if (decrypted !== null) {
+                  return {
+                    id: msg.id,
+                    conversationId: channelId,
+                    senderId,
+                    content: decrypted,
+                    timestamp:
+                      typeof msg.createdAt === 'number'
+                        ? msg.createdAt
+                        : new Date(msg.createdAt).getTime() / 1000,
+                    isOwn,
+                  };
+                }
+              } catch (err) {
+                log.error('DM history key decrypt failed', {
+                  message_id: msg.id,
+                  error: (err as Error).message,
+                });
+              }
+            }
+          }
+
+          // Non-decryptable envelope
           return {
             id: msg.id,
             conversationId: channelId,
@@ -582,11 +648,52 @@
     const entry = dmByTextChannel.get(channelId);
     if (!auth || !entry) throw new Error('DM channel not found');
 
-    const device = (await ipcRenderer.invoke('get-device-identity')) as {
-      device_id?: string;
+    const fullAuth = (await ipcRenderer.invoke('get-auth')) as {
+      deviceId?: string;
     } | null;
-    const deviceId = device?.device_id ?? '';
+    const deviceId = fullAuth?.deviceId ?? '';
 
+    // Try Layer 2 (dmCmk) encryption first for persistent history
+    const historyCrypto = (window as any).historyCryptoService;
+    if (historyCrypto) {
+      try {
+        const historyResult = await historyCrypto.encryptDm(entry.emberId, plaintext);
+        if (historyResult) {
+          const res = await fetch(`${auth.hostname}/api/v1/channels/${channelId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+            body: JSON.stringify({
+              ciphertext: historyResult.ciphertext,
+              nonce: historyResult.nonce,
+              epoch: historyResult.epoch,
+              envelopeType: 'history_dm',
+              deviceId,
+              protocolVersion: 2,
+            }),
+          });
+          if (!res.ok) throw new Error('Failed to send message');
+          const msg = (await res.json()) as { id: string };
+          pendingMessageIds.add(msg.id);
+          window.displayDmMessage({
+            id: msg.id,
+            conversationId: channelId,
+            senderId: auth.userId,
+            content: plaintext,
+            timestamp: Date.now() / 1000,
+            isOwn: true,
+          });
+          log.debug('DM sent with history key encryption', { channelId });
+          return msg.id;
+        }
+      } catch (historyErr) {
+        log.warn('DM history key encrypt failed, falling back to Signal', {
+          channelId,
+          error: (historyErr as Error).message,
+        });
+      }
+    }
+
+    // Fallback: Signal Protocol direct encryption
     const signalManager = App.signalSessionManager;
     if (signalManager && entry.partnerDeviceId) {
       const signalAddress = `${entry.partnerId}.${entry.partnerDeviceId}`;
@@ -620,11 +727,11 @@
           timestamp: Date.now() / 1000,
           isOwn: true,
         });
+        log.debug('DM sent with Signal encryption (fallback)', { channelId });
         return msg.id;
       }
     }
 
-    // Signal Protocol is required for direct messaging
     const errMsg =
       'Encryption unavailable — session not established. Please restart the application.';
     (window as any).showInputError?.(errMsg);
@@ -645,7 +752,11 @@
     const entry = dmByTextChannel.get(channelId);
     if (entry) {
       App.activeEmberId = entry.emberId;
-      fetchAndCacheEmberKey(entry.emberId).catch(() => null);
+      // Prefetch DM CMK for history-based decryption
+      const historyCrypto = (window as any).historyCryptoService;
+      if (historyCrypto) {
+        historyCrypto.getDmCmk(entry.emberId).catch(() => null);
+      }
     }
   }
 
@@ -723,7 +834,49 @@
 
     const isOwn = senderId === auth.userId;
 
-    // Non-Signal envelopes cannot be decrypted.
+    // Try history_dm envelope decryption
+    if (envelopeType === 'history_dm') {
+      const historyCrypto = (window as any).historyCryptoService;
+      if (historyCrypto && entry) {
+        try {
+          const nonceB64 = String(payload['nonce'] ?? '');
+          const epochVal = Number(payload['epoch'] ?? 0);
+          const seqVal = Number(payload['messageSequence'] ?? payload['message_sequence'] ?? 0);
+          const senderDeviceId = String(
+            payload['senderDeviceId'] ?? payload['sender_device_id'] ?? ''
+          );
+          const decrypted = await historyCrypto.decryptDm(
+            entry.emberId,
+            String(payload['ciphertext'] ?? ''),
+            nonceB64,
+            epochVal,
+            seqVal,
+            senderDeviceId
+          );
+          if (decrypted !== null) {
+            window.displayDmMessage({
+              id: String(payload['id'] ?? ''),
+              conversationId: channelId,
+              senderId,
+              content: decrypted,
+              timestamp: createdAt,
+              isOwn,
+            });
+            if (!isOwn && typeof window.playNotificationSound === 'function') {
+              window.playNotificationSound('dmMessage');
+            }
+            return;
+          }
+        } catch (err) {
+          log.error('DM history key decrypt failed for WS message', {
+            message_id: String(payload['id'] ?? ''),
+            error: (err as Error).message,
+          });
+        }
+      }
+    }
+
+    // Non-decryptable envelope
     window.displayDmMessage({
       id: String(payload['id'] ?? ''),
       conversationId: channelId,
@@ -867,13 +1020,15 @@
 
     const entry = dmByEmberId.get(emberId);
     if (entry) {
-      // Mark the entry as accepted. The requester generated the key at request time
-      // and it is already in cache — no re-fetch needed.
       entry.requestStatus = 'accepted';
-      // Ensure the channel stays subscribed after acceptance (hardening).
       window.wsSubscribeToChannel(entry.textChannelId);
       if (typeof window.hideDmPendingBanner === 'function') {
         window.hideDmPendingBanner(entry.textChannelId);
+      }
+      // Fetch the DM CMK created by the accepter so requester can use history encryption
+      const historyCrypto = (window as any).historyCryptoService;
+      if (historyCrypto) {
+        historyCrypto.getDmCmk(emberId).catch(() => null);
       }
       log.info('DM request was accepted by recipient', { emberId });
     }

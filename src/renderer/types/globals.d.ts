@@ -481,7 +481,7 @@ declare global {
     // Globals set by message-service.ts
     sendEncryptedMessage(channelId: string, plaintext: string): Promise<string>;
     sendGifMessage(url: string, title: string): Promise<void>;
-    displayDecryptedMessage(msg: Message, prepend?: boolean): Promise<void>;
+    displayDecryptedMessage(msg: Message, prepend?: boolean, skipReplay?: boolean): Promise<void>;
     handleEditedMessage(msg: Message): Promise<void>;
     escapeHtml(text: string): string;
     loadChannelMessages(channelId: string, forceRefresh?: boolean): Promise<void>;

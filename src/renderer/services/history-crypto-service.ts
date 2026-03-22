@@ -42,6 +42,22 @@
     return `${emberId}:${epoch}`;
   }
 
+  // ── Local DM CMK cache ──────────────────────────────────────────────────────
+
+  const dmCmkCache = new Map<string, Uint8Array>();
+
+  interface DmKeyEnvelopeFromServer {
+    id: string;
+    conversationId: string;
+    epoch: number;
+    senderUserId: string;
+    senderDeviceId: string;
+    userId: string;
+    deviceId: string;
+    encryptedKey: string;
+    messageType: number;
+  }
+
   // ── Inline HKDF-SHA256 (no imports needed) ─────────────────────────────────
 
   function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -141,6 +157,7 @@
 
   const EPOCH_HISTORY_INFO = 'ember-epoch-history-v1';
   const CHANNEL_MSG_INFO = 'ember-channel-msg-v1';
+  const DM_MSG_INFO_PREFIX = 'ember-dm-msg-v1';
   const enc = new TextEncoder();
 
   async function deriveEhk(crk: Uint8Array, epoch: number): Promise<Uint8Array> {
@@ -154,6 +171,15 @@
 
   function buildAad(emberId: string, epoch: number): Uint8Array {
     return concat(enc.encode(emberId), uint32BE(epoch), new Uint8Array(8));
+  }
+
+  async function deriveDmMessageKey(cmk: Uint8Array, epoch: number): Promise<Uint8Array> {
+    // Fixed salt/info — per-message uniqueness from random GCM nonce (same pattern as channels)
+    return hkdf(cmk, uint32BE(epoch), DM_MSG_INFO_PREFIX, 32);
+  }
+
+  function buildDmAad(conversationId: string, epoch: number): Uint8Array {
+    return concat(enc.encode(conversationId), uint32BE(epoch));
   }
 
   // ── HistoryCryptoService class ─────────────────────────────────────────────
@@ -213,9 +239,9 @@
           { headers: { Authorization: `Bearer ${this.auth.token}` } }
         );
         if (!response.ok) return 0;
-        const data = (await response.json()) as { epochs?: Array<{ epoch_number: number }> };
+        const data = (await response.json()) as { epochs?: Array<{ epochNumber: number }> };
         const epochs = data.epochs ?? [];
-        return epochs.length > 0 ? epochs[0].epoch_number : 0;
+        return epochs.length > 0 ? epochs[0].epochNumber : 0;
       } catch {
         return 0;
       }
@@ -327,10 +353,242 @@
       }
     }
 
+    // ── DM CMK Methods ──────────────────────────────────────────────────────
+
+    async getDmCmk(conversationId: string, epoch: number = 0): Promise<Uint8Array | null> {
+      const cached = dmCmkCache.get(`${conversationId}:${epoch}`);
+      if (cached) return cached;
+
+      try {
+        const response = await fetch(`${this.getBaseUrl()}/api/v1/dm/${conversationId}/keys`, {
+          headers: { Authorization: `Bearer ${this.auth.token}` },
+        });
+        if (!response.ok) return null;
+
+        const data = (await response.json()) as { envelopes: DmKeyEnvelopeFromServer[] };
+        if (!data.envelopes || data.envelopes.length === 0) return null;
+
+        const envelope = data.envelopes.find(e => e.epoch === epoch);
+        if (!envelope) return null;
+
+        const signalManager = (window as any).App?.signalSessionManager;
+        if (!signalManager) return null;
+
+        const ct = Uint8Array.from(atob(envelope.encryptedKey), c => c.charCodeAt(0));
+        const cmkBytes = await signalManager.decrypt(
+          `${envelope.senderUserId}.${envelope.senderDeviceId}`,
+          ct,
+          envelope.messageType
+        );
+
+        if (cmkBytes.length !== 32) return null;
+
+        dmCmkCache.set(`${conversationId}:${epoch}`, cmkBytes);
+        return cmkBytes;
+      } catch {
+        return null;
+      }
+    }
+
+    async createAndDistributeDmCmk(
+      conversationId: string,
+      deviceMembers: Array<{ userId: string; deviceId: string }>,
+      epoch: number = 0
+    ): Promise<boolean> {
+      try {
+        const signalManager = (window as any).App?.signalSessionManager;
+        if (!signalManager) return false;
+
+        const cmk = crypto.getRandomValues(new Uint8Array(32));
+        dmCmkCache.set(`${conversationId}:${epoch}`, cmk);
+
+        const envelopes = [];
+        for (const member of deviceMembers) {
+          try {
+            await signalManager.ensureSession(member.userId, member.deviceId);
+            const address = `${member.userId}.${member.deviceId}`;
+            const encrypted = await signalManager.encrypt(address, cmk);
+            envelopes.push({
+              userId: member.userId,
+              deviceId: member.deviceId,
+              encryptedKey: btoa(String.fromCharCode(...encrypted.ciphertext)),
+              messageType: encrypted.messageType,
+            });
+          } catch {
+            // Skip unreachable devices
+          }
+        }
+
+        // Also encrypt to self so we can recover dmCmk after restart
+        try {
+          const selfAddress = `${this.auth.userId}.${this.auth.deviceId}`;
+          const selfEncrypted = await signalManager.encrypt(selfAddress, cmk);
+          envelopes.push({
+            userId: this.auth.userId,
+            deviceId: this.auth.deviceId,
+            encryptedKey: btoa(String.fromCharCode(...selfEncrypted.ciphertext)),
+            messageType: selfEncrypted.messageType,
+          });
+        } catch {
+          // Self-encryption may fail if no self-session — CMK is still cached locally
+        }
+
+        if (envelopes.length === 0) return true;
+
+        const response = await fetch(`${this.getBaseUrl()}/api/v1/dm/${conversationId}/keys`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.auth.token}`,
+          },
+          body: JSON.stringify({ conversationId, epoch, envelopes }),
+        });
+
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    async encryptDm(
+      conversationId: string,
+      plaintext: string
+    ): Promise<{ ciphertext: string; nonce: string; epoch: number } | null> {
+      const epoch = 0;
+      const cmk = await this.getDmCmk(conversationId, epoch);
+      if (!cmk) return null;
+
+      const msgKey = await deriveDmMessageKey(cmk, epoch);
+      const aad = buildDmAad(conversationId, epoch);
+      const plaintextBytes = new TextEncoder().encode(plaintext);
+      const result = await aesEncrypt(msgKey, plaintextBytes, aad);
+
+      return {
+        ciphertext: btoa(String.fromCharCode(...result.ciphertext)),
+        nonce: btoa(String.fromCharCode(...result.nonce)),
+        epoch,
+      };
+    }
+
+    async decryptDm(
+      conversationId: string,
+      ciphertextB64: string,
+      nonceB64: string,
+      epoch: number,
+      _messageSequence: number,
+      _senderDeviceId: string
+    ): Promise<string | null> {
+      const cmk = await this.getDmCmk(conversationId, epoch);
+      if (!cmk) return null;
+
+      try {
+        const msgKey = await deriveDmMessageKey(cmk, epoch);
+        const aad = buildDmAad(conversationId, epoch);
+        const ct = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
+        const nonce = Uint8Array.from(atob(nonceB64), c => c.charCodeAt(0));
+        const pt = await aesDecrypt(msgKey, ct, nonce, aad);
+        return new TextDecoder().decode(pt);
+      } catch {
+        return null;
+      }
+    }
+
     clear(): void {
       crkCache.clear();
+      dmCmkCache.clear();
+    }
+  }
+
+  // ── Replay Protection (inline — shared module can't be imported in renderer IIFE) ──
+
+  const REPLAY_WINDOW_SIZE = 2048;
+  const REPLAY_STORAGE_PREFIX = 'ember_replay_';
+
+  interface ReplayChannelState {
+    highestSequence: number;
+    seen: Set<number>;
+  }
+
+  const replayState = new Map<string, ReplayChannelState>();
+
+  function replayKey(conversationId: string, epoch: number, senderDeviceId: string): string {
+    return `${conversationId}:${epoch}:${senderDeviceId}`;
+  }
+
+  function loadPersistedFloor(key: string): number {
+    try {
+      const stored = localStorage.getItem(REPLAY_STORAGE_PREFIX + key);
+      if (stored !== null) {
+        const val = parseInt(stored, 10);
+        if (!isNaN(val)) return val;
+      }
+    } catch {
+      // localStorage may be unavailable
+    }
+    return -1;
+  }
+
+  function persistFloor(key: string, highestSequence: number): void {
+    try {
+      localStorage.setItem(REPLAY_STORAGE_PREFIX + key, String(highestSequence));
+    } catch {
+      // localStorage may be unavailable
+    }
+  }
+
+  function removePersistedFloor(key: string): void {
+    try {
+      localStorage.removeItem(REPLAY_STORAGE_PREFIX + key);
+    } catch {
+      // ignore
+    }
+  }
+
+  function acceptMessage(
+    conversationId: string,
+    epoch: number,
+    senderDeviceId: string,
+    messageSequence: number
+  ): boolean {
+    const key = replayKey(conversationId, epoch, senderDeviceId);
+    let state = replayState.get(key);
+
+    if (!state) {
+      const persisted = loadPersistedFloor(key);
+      state = { highestSequence: persisted, seen: new Set() };
+      replayState.set(key, state);
+    }
+
+    if (state.seen.has(messageSequence)) return false;
+
+    const floor = state.highestSequence - REPLAY_WINDOW_SIZE;
+    if (messageSequence < floor) return false;
+
+    state.seen.add(messageSequence);
+
+    if (messageSequence > state.highestSequence) {
+      state.highestSequence = messageSequence;
+      persistFloor(key, state.highestSequence);
+      const newFloor = state.highestSequence - REPLAY_WINDOW_SIZE;
+      if (newFloor > 0) {
+        for (const seq of state.seen) {
+          if (seq < newFloor) state.seen.delete(seq);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  function clearReplayStateForConversation(conversationId: string): void {
+    for (const key of Array.from(replayState.keys())) {
+      if (key.startsWith(`${conversationId}:`)) {
+        replayState.delete(key);
+        removePersistedFloor(key);
+      }
     }
   }
 
   (window as any).HistoryCryptoService = HistoryCryptoService;
+  (window as any).replayProtection = { acceptMessage, clearReplayStateForConversation };
 })();
