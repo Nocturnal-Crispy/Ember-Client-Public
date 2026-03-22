@@ -35,7 +35,6 @@ describe('Direct Messaging System Initialization', () => {
     // Mock window.App with minimal required properties
     window.App = {
       initializeSignalSessionManager: jest.fn(),
-      emberKeyCache: new Map(),
     } as any;
 
     // Mock logger

@@ -627,6 +627,42 @@
     window.cryptoRouting.onRotationComplete(emberId, newDistId);
   }
 
+  /**
+   * Handle a CRK rotation event: generate a new CRK for the given epoch
+   * and distribute envelopes to all current member devices.
+   */
+  async function handleCrkRotation(emberId: string, epochNumber: number): Promise<void> {
+    const historyCrypto = (window as any).historyCryptoService;
+    if (!historyCrypto) return;
+
+    try {
+      const auth = await getValidAuth();
+      if (!auth || !auth.token || !auth.hostname) return;
+
+      const membersResp = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/device-members`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!membersResp.ok) return;
+
+      const membersData = (await membersResp.json()) as {
+        members?: Array<{ userId: string; deviceId: string }>;
+      };
+      const members = membersData.members ?? [];
+      if (members.length === 0) return;
+
+      const created = await historyCrypto.createAndDistributeCrk(emberId, members, epochNumber);
+      if (created) {
+        log.info('CRK rotated successfully', { ember_id: emberId, epoch: epochNumber });
+      }
+    } catch (err) {
+      log.warn('CRK rotation failed (another client may have handled it)', {
+        ember_id: emberId,
+        epoch: epochNumber,
+        error: (err as Error).message,
+      });
+    }
+  }
+
   // ─── Ember order (localStorage) ───────────────────────────────────────────
 
   const EMBER_ORDER_KEY = 'ember_order';
@@ -851,6 +887,13 @@
       await createSenderKeyForEmber(emberId);
       await processIncomingSenderKeyDistributions();
       await distributeSenderKeyToMembers(emberId, auth);
+
+      // Prefetch CRK for Layer 2 history key decryption
+      const historyCrypto = (window as any).historyCryptoService;
+      if (historyCrypto) {
+        const epoch = await historyCrypto.getCurrentEpoch(emberId);
+        await historyCrypto.getCrk(emberId, epoch);
+      }
     } catch (skErr) {
       const errorMessage = (skErr as Error).message;
 
@@ -1176,6 +1219,35 @@
           log.warn('Sender key initialization deferred', {
             ember_id: newEmber.id,
             error: (skErr as Error).message,
+          });
+        }
+
+        // Initialize Layer 2 CRK (epoch 0) for history key encryption
+        try {
+          const historyCrypto = (window as any).historyCryptoService;
+          if (historyCrypto) {
+            const auth = await window.getValidAuth?.();
+            if (auth) {
+              const membersResp = await fetch(
+                `${auth.hostname}/api/v1/embers/${newEmber.id}/device-members`,
+                { headers: { Authorization: `Bearer ${auth.token}` } }
+              );
+              if (membersResp.ok) {
+                const membersData = (await membersResp.json()) as {
+                  members?: Array<{ userId: string; deviceId: string }>;
+                };
+                const members = membersData.members ?? [];
+                if (members.length > 0) {
+                  await historyCrypto.createAndDistributeCrk(newEmber.id, members);
+                  log.info('CRK initialized for new ember', { ember_id: newEmber.id, epoch: 0 });
+                }
+              }
+            }
+          }
+        } catch (crkErr) {
+          log.warn('CRK initialization deferred', {
+            ember_id: newEmber.id,
+            error: (crkErr as Error).message,
           });
         }
       }
@@ -1550,6 +1622,7 @@
   window.closeCreateServerModal = closeCreateServerModal;
   window.handleSenderKeyMemberJoined = handleSenderKeyMemberJoined;
   window.handleSenderKeyMemberLeft = handleSenderKeyMemberLeft;
+  window.handleCrkRotation = handleCrkRotation;
   window.processIncomingDistributions = processIncomingSenderKeyDistributions;
   window.distributeSenderKeyToMembers = distributeSenderKeyToMembersWrapper;
   window.ensureSenderKeyForEmber = ensureSenderKeyForEmber;

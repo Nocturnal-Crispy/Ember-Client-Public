@@ -24,7 +24,6 @@ beforeAll(() => {
   // 1. Bootstrap App state
   require('../../../src/renderer/managers/app-state');
   const App = (window as any).App;
-  App.emberKeyCache.set(EMBER_ID, new Uint8Array(32).fill(7));
   App.activeChannelId = null;
   App.currentMembers = [];
   App.signalSessionManager = {

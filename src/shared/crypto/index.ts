@@ -2,9 +2,14 @@ export * from './signal-types';
 export * from './envelope';
 export * from './signal-store';
 export * from './key-migration';
-export * from './migration-flow';
 export * from './recovery';
 export * from './ember-ipc-types';
+export * from './history-key-types';
+export * from './hkdf';
+export * from './aes-gcm';
+export * from './dm-key-service';
+export * from './channel-key-service';
+export * from './replay-protection';
 export {
   initiateSession as initiateSignalSession,
   encryptMessage as encryptSignalMessage,

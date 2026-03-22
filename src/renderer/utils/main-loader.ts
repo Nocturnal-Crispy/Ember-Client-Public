@@ -21,6 +21,7 @@
     '../../dist/renderer/services/epoch-history-service.js',
     '../../dist/renderer/services/invite-ephemeral-key-service.js',
     '../../dist/renderer/managers/signal-session-manager.js',
+    '../../dist/renderer/services/history-crypto-service.js',
     '../../dist/renderer/managers/app-state.js',
     '../../dist/renderer/services/voice-service.js',
     '../../dist/renderer/services/websocket-service.js',

@@ -973,28 +973,27 @@
         const arrayBuffer = await file.arrayBuffer();
         const fileBytes = new Uint8Array(arrayBuffer);
 
-        // For DM attachments, we need to encrypt with the ember key
-        // Get ember key via the DM manager (it maps channel->ember and uses App.emberKeyCache)
-        const emberKey = await (async (): Promise<Uint8Array | null> => {
-          // Directly call the DM manager's key fetch function if available
-          if (typeof (window as any).fetchAndCacheEmberKeyForChannel === 'function') {
-            return (window as any).fetchAndCacheEmberKeyForChannel(activeConversationId);
-          }
-          // Fallback: find emberId via the DM manager's internal map and fetch via ember-key-cache
-          if (typeof (window as any).getEmberIdForDmChannel === 'function') {
-            const emberId = (window as any).getEmberIdForDmChannel(activeConversationId);
-            if (emberId && window.App.emberKeyCache.has(emberId)) {
-              return window.App.emberKeyCache.get(emberId) ?? null;
-            }
-          }
-          return null;
-        })();
+        // Per-attachment AES-256-GCM encryption
+        const toAB = (b: Uint8Array): ArrayBuffer =>
+          b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+        const attachmentKey = crypto.getRandomValues(new Uint8Array(32));
+        const attachmentIv = crypto.getRandomValues(new Uint8Array(12));
+        const ck = await crypto.subtle.importKey(
+          'raw',
+          toAB(attachmentKey),
+          { name: 'AES-GCM' },
+          false,
+          ['encrypt']
+        );
+        const encBuf = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv: toAB(attachmentIv), tagLength: 128 },
+          ck,
+          toAB(fileBytes)
+        );
+        const encryptedBase64 = btoa(String.fromCharCode(...new Uint8Array(encBuf)));
+        const hashBuf = await crypto.subtle.digest('SHA-256', toAB(fileBytes));
+        const plaintextHash = btoa(String.fromCharCode(...new Uint8Array(hashBuf)));
 
-        if (!emberKey) {
-          throw new Error('Ember key not available for encryption');
-        }
-
-        const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, emberKey);
         const { id } = await window.electronAPI.messageService.uploadAttachment(
           auth,
           activeConversationId,
@@ -1002,11 +1001,18 @@
           { name, size: file.size, mime: file.type }
         );
 
-        // Build file message payload
         const attachmentPayload = JSON.stringify({
           t: 'file',
           body: content,
-          a: { id, name, size: file.size, mime: file.type },
+          a: {
+            id,
+            name,
+            size: file.size,
+            mime: file.type,
+            key: btoa(String.fromCharCode(...attachmentKey)),
+            iv: btoa(String.fromCharCode(...attachmentIv)),
+            hash: plaintextHash,
+          },
         });
         content = attachmentPayload;
       }

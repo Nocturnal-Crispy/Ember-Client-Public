@@ -489,27 +489,27 @@
       const data = (await res.json()) as {
         messages: Array<{
           id: string;
-          sender_user_id: string;
-          sender_device_id?: string;
-          message_type?: number;
+          senderUserId: string;
+          senderDeviceId?: string;
+          messageType?: number;
           ciphertext: string;
-          created_at: number;
-          envelope_type?: string;
+          createdAt: number;
+          envelopeType?: string;
         }>;
       };
       const currentUserId = auth.userId;
 
       return await Promise.all(
         (data.messages ?? []).map(async msg => {
-          const envelopeType = msg.envelope_type;
-          const senderId = msg.sender_user_id;
+          const envelopeType = msg.envelopeType;
+          const senderId = msg.senderUserId;
           const isOwn = senderId === currentUserId;
 
           if (
             envelopeType === 'signal_dm' &&
             signalManager &&
-            msg.sender_device_id &&
-            typeof msg.message_type === 'number'
+            msg.senderDeviceId &&
+            typeof msg.messageType === 'number'
           ) {
             try {
               const ciphertextBytes = new Uint8Array(
@@ -517,11 +517,11 @@
                   .split('')
                   .map(c => c.charCodeAt(0))
               );
-              const senderAddress = `${senderId}.${msg.sender_device_id}`;
+              const senderAddress = `${senderId}.${msg.senderDeviceId}`;
               const plaintextBytes = await signalManager.decrypt(
                 senderAddress,
                 ciphertextBytes,
-                msg.message_type
+                msg.messageType
               );
               const messageContent = new TextDecoder().decode(plaintextBytes);
               return {
@@ -530,9 +530,9 @@
                 senderId,
                 content: messageContent,
                 timestamp:
-                  typeof msg.created_at === 'number'
-                    ? msg.created_at
-                    : new Date(msg.created_at).getTime() / 1000,
+                  typeof msg.createdAt === 'number'
+                    ? msg.createdAt
+                    : new Date(msg.createdAt).getTime() / 1000,
                 isOwn,
               };
             } catch (err) {
@@ -547,9 +547,9 @@
                 senderId,
                 content: '[Failed to decrypt message]',
                 timestamp:
-                  typeof msg.created_at === 'number'
-                    ? msg.created_at
-                    : new Date(msg.created_at).getTime() / 1000,
+                  typeof msg.createdAt === 'number'
+                    ? msg.createdAt
+                    : new Date(msg.createdAt).getTime() / 1000,
                 isOwn,
               };
             }
@@ -562,9 +562,9 @@
             senderId,
             content: '[This message cannot be decrypted — unsupported envelope]',
             timestamp:
-              typeof msg.created_at === 'number'
-                ? msg.created_at
-                : new Date(msg.created_at).getTime() / 1000,
+              typeof msg.createdAt === 'number'
+                ? msg.createdAt
+                : new Date(msg.createdAt).getTime() / 1000,
             isOwn,
           };
         })
@@ -603,10 +603,10 @@
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
           body: JSON.stringify({
             ciphertext: ciphertextBase64,
-            envelope_type: 'signal_dm',
-            message_type: messageType,
-            device_id: deviceId,
-            protocol_version: 1,
+            envelopeType: 'signal_dm',
+            messageType,
+            deviceId,
+            protocolVersion: 1,
           }),
         });
         if (!res.ok) throw new Error('Failed to send message');
@@ -667,15 +667,17 @@
     const auth = await getAuth();
     if (!auth) return;
 
-    const senderId = String(payload['sender_user_id'] ?? '');
-    const createdAt = Number(payload['created_at'] ?? 0);
-    const envelopeType = payload['envelope_type'];
+    const senderId = String(payload['senderUserId'] ?? payload['sender_user_id'] ?? '');
+    const createdAt = Number(payload['createdAt'] ?? payload['created_at'] ?? 0);
+    const envelopeType = payload['envelopeType'] ?? payload['envelope_type'];
     const signalManager = App.signalSessionManager;
 
     if (envelopeType === 'signal_dm' && signalManager) {
       const ciphertextBase64 = String(payload['ciphertext'] ?? '');
-      const messageType = Number(payload['message_type'] ?? 3);
-      const senderDeviceId = String(payload['sender_device_id'] ?? '1');
+      const messageType = Number(payload['messageType'] ?? payload['message_type'] ?? 3);
+      const senderDeviceId = String(
+        payload['senderDeviceId'] ?? payload['sender_device_id'] ?? '1'
+      );
       const senderAddress = `${senderId}.${senderDeviceId}`;
       try {
         const ciphertextBytes = new Uint8Array(

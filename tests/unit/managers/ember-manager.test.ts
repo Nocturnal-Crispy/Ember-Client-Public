@@ -27,7 +27,7 @@ beforeAll(() => {
   (window as any).App = {
     activeChannelId: null,
     activeEmberId: null,
-    emberKeyCache: new Map(),
+
     ownedMessageIds: new Set(),
     currentEmbers: [],
     currentMembers: [],
@@ -181,7 +181,6 @@ beforeEach(() => {
   // Reset App state between tests
   (window as any).App.activeEmberId = 'test-ember-id'; // Set active ember for message tests
   (window as any).App.activeChannelId = null;
-  (window as any).App.emberKeyCache.clear();
   (window as any).App.currentEmbers = [];
   (window as any).App.ownedMessageIds.clear();
   mockEmberServiceFetchEmbers.mockClear();

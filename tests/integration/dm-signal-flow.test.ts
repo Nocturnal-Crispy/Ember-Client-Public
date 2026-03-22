@@ -112,7 +112,6 @@ function buildFetchMock(): jest.MockedFunction<typeof fetch> {
 function setupWindowGlobals(): void {
   Object.assign(window, {
     App: {
-      emberKeyCache: new Map<string, Uint8Array>(),
       signalSessionReady: new Map<string, boolean>(),
       signalSessionManager: mockSignalService,
       ownedMessageIds: new Set<string>(),
@@ -213,7 +212,7 @@ describe('dm-signal-flow', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(`/channels/${TEXT_CHANNEL_ID}/messages`),
         expect.objectContaining({
-          body: expect.stringContaining('"envelope_type":"signal_dm"'),
+          body: expect.stringContaining('"envelopeType":"signal_dm"'),
         })
       );
     });

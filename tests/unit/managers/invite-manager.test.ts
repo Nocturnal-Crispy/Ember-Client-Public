@@ -67,7 +67,6 @@ beforeAll(() => {
 beforeEach(() => {
   (window as any).App.pendingInvite = null;
   (window as any).App.activeEmberId = null;
-  (window as any).App.emberKeyCache.clear();
 });
 
 // ─── processInviteLink ────────────────────────────────────────────────────────

@@ -101,6 +101,13 @@
             window.handleEditedMessage(
               data.payload as unknown as Parameters<typeof window.handleEditedMessage>[0]
             );
+          } else if (data.type === 'delete_message' && data.payload) {
+            const msgId = String(data.payload['id'] ?? '');
+            log.debug('WebSocket: delete_message received', { id: msgId });
+            if (msgId) {
+              const el = document.querySelector(`[data-message-id="${CSS.escape(msgId)}"]`);
+              if (el) el.remove();
+            }
           } else if (data.type === 'presence_update' && data.payload) {
             log.debug('WebSocket: presence_update', {
               user_id: String(data.payload['user_id'] ?? ''),
@@ -187,6 +194,18 @@
             if (emberId) {
               window.cryptoRouting.onMemberRemoved(emberId, 0);
               window.handleSenderKeyMemberLeft(emberId);
+            }
+          } else if (data.type === 'crk_rotation_required' && data.payload) {
+            const emberId = String(data.payload['emberId'] ?? '');
+            const epochNumber = Number(data.payload['epochNumber'] ?? 0);
+            const reason = String(data.payload['reason'] ?? '');
+            log.info('WebSocket: CRK rotation required', {
+              ember_id: emberId,
+              epoch: epochNumber,
+              reason,
+            });
+            if (emberId && epochNumber > 0) {
+              window.handleCrkRotation?.(emberId, epochNumber);
             }
           }
         } catch (err) {
@@ -412,7 +431,7 @@
     const memberCount = members.length;
     if (action === 'joined') {
       window.cryptoRouting.onMemberAdded(emberId, memberCount);
-    } else if (action === 'left' || action === 'kicked') {
+    } else if (action === 'left' || action === 'kicked' || action === 'removed') {
       window.cryptoRouting.onMemberRemoved(emberId, memberCount);
     }
   }

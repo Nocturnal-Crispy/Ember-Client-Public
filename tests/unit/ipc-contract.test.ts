@@ -17,7 +17,6 @@ describe('IPC contract consistency', () => {
       activeChannelId: 'ch-1',
       activeEmberId: 'ember-1',
       migrationStatus: 'idle',
-      emberKeyCache: new Map(),
     };
   });
 

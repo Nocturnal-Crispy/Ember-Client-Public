@@ -399,7 +399,6 @@ declare global {
   interface AppState {
     activeChannelId: string | null;
     activeEmberId: string | null;
-    emberKeyCache: Map<string, Uint8Array>;
     ownedMessageIds: Set<string>;
     currentEmbers: Ember[];
     currentMembers: Member[];
@@ -440,6 +439,7 @@ declare global {
     _pttListening: boolean;
     signalSessionReady: Map<string, boolean>;
     signalSessionManager: import('../managers/signal-session-manager').SignalSessionManager | null;
+    historyCryptoService: import('../services/history-crypto-service').HistoryCryptoService | null;
     initializeSignalSessionManager(): void;
   }
 
@@ -574,6 +574,7 @@ declare global {
     closeCreateServerModal(): void;
     handleSenderKeyMemberJoined(emberId: string): Promise<void>;
     handleSenderKeyMemberLeft(emberId: string): Promise<void>;
+    handleCrkRotation?(emberId: string, epochNumber: number): Promise<void>;
     processIncomingDistributions?(): Promise<void>;
     distributeSenderKeyToMembers(emberId: string): Promise<void>;
     ensureSenderKeyForEmber(emberId: string): Promise<string | null>;

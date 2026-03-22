@@ -14,11 +14,6 @@ describe('App initial state', () => {
     expect((window as any).App.activeEmberId).toBeNull();
   });
 
-  it('has an empty emberKeyCache Map', () => {
-    expect((window as any).App.emberKeyCache).toBeInstanceOf(Map);
-    expect((window as any).App.emberKeyCache.size).toBe(0);
-  });
-
   it('has null wsConnection and wsReconnectTimer', () => {
     expect((window as any).App.wsConnection).toBeNull();
     expect((window as any).App.wsReconnectTimer).toBeNull();

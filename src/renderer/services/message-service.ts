@@ -79,34 +79,47 @@
     }
   }
 
-  async function tryGroupDecrypt(ciphertext: string): Promise<string | null> {
+  interface GroupDecryptResult {
+    plaintext: string | null;
+    permanentFailure: boolean;
+  }
+
+  function isOldCounterError(errorMsg: string): boolean {
+    return /old counter \d+/.test(errorMsg);
+  }
+
+  async function tryGroupDecrypt(ciphertext: string): Promise<GroupDecryptResult> {
     try {
-      if (!ciphertext.startsWith('{"v":2')) return null;
+      if (!ciphertext.startsWith('{"v":2')) return { plaintext: null, permanentFailure: false };
       const envelope = JSON.parse(ciphertext) as {
         v?: number;
         sa?: string;
         ct?: string;
       };
-      if (envelope.v !== SK_VERSION || !envelope.sa || !envelope.ct) return null;
+      if (envelope.v !== SK_VERSION || !envelope.sa || !envelope.ct)
+        return { plaintext: null, permanentFailure: false };
       const decResp = await window.emberAPI.invoke<{ plaintext: string }>('GroupDecrypt', {
         senderAddress: envelope.sa,
         ciphertext: envelope.ct,
       });
       if (!decResp.success || !decResp.data?.plaintext) {
+        const errorMsg = (decResp as any).error ?? '';
+        const permanent = isOldCounterError(errorMsg);
         log.warn('GroupDecrypt returned failure', {
           success: decResp.success,
-          error: (decResp as any).error ?? 'none',
+          error: errorMsg || 'none',
           hasData: !!decResp.data,
           senderAddress: envelope.sa,
+          permanentFailure: permanent,
         });
-        return null;
+        return { plaintext: null, permanentFailure: permanent };
       }
-      return base64ToText(decResp.data.plaintext);
+      return { plaintext: base64ToText(decResp.data.plaintext), permanentFailure: false };
     } catch (err) {
       log.error('tryGroupDecrypt exception', {
         error: err instanceof Error ? err.message : String(err),
       });
-      return null;
+      return { plaintext: null, permanentFailure: false };
     }
   }
 
@@ -145,27 +158,65 @@
 
   // ─── Attachment message helpers ────────────────────────────────────────────
 
+  function toAB(bytes: Uint8Array): ArrayBuffer {
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  }
+
   async function buildFileMessageText(
     text: string,
     auth: AuthData,
-    channelId: string,
-    emberKey: Uint8Array
+    channelId: string
   ): Promise<string> {
     const attachment = App.pendingAttachment!;
     const { file, name, size, type } = attachment;
     const arrayBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(arrayBuffer);
-    const encryptedBase64 = window.electronAPI.crypto.encryptFileBytes(fileBytes, emberKey);
+
+    // Per-attachment AES-256-GCM encryption (no dependency on legacy emberKeyCache)
+    const attachmentKey = crypto.getRandomValues(new Uint8Array(32));
+    const attachmentIv = crypto.getRandomValues(new Uint8Array(12));
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      toAB(attachmentKey),
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: toAB(attachmentIv), tagLength: 128 },
+      cryptoKey,
+      toAB(fileBytes)
+    );
+    const encryptedBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+
+    // Compute plaintext hash for integrity verification
+    const hashBuffer = await crypto.subtle.digest('SHA-256', toAB(fileBytes));
+    const plaintextHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
     const { id } = await window.electronAPI.messageService.uploadAttachment(
       auth,
       channelId,
       encryptedBase64,
       { name, size, mime: type }
     );
-    const payload: { t: string; body: string; spoiler?: boolean; a: AttachmentData } = {
+
+    const payload: {
+      t: string;
+      body: string;
+      spoiler?: boolean;
+      a: AttachmentData & { key?: string; iv?: string; hash?: string };
+    } = {
       t: 'file',
       body: text,
-      a: { id, name, size, mime: type },
+      a: {
+        id,
+        name,
+        size,
+        mime: type,
+        key: btoa(String.fromCharCode(...attachmentKey)),
+        iv: btoa(String.fromCharCode(...attachmentIv)),
+        hash: plaintextHash,
+      },
     };
     if (attachment.spoiler) {
       payload.spoiler = true;
@@ -199,33 +250,59 @@
     const hasPendingAttachment = !!App.pendingAttachment;
     if (!plaintext && !hasPendingAttachment) return '';
 
-    const emberKey = hasPendingAttachment ? App.emberKeyCache.get(App.activeEmberId) : null;
-    if (hasPendingAttachment && !emberKey) {
-      log.error('Cannot encrypt attachment: ember key not in cache', {
-        ember_id: App.activeEmberId,
-        channel_id: targetChannelId,
-      });
-      throw new Error('Ember key not available');
-    }
     log.debug('Sending encrypted message', { channel_id: App.activeChannelId });
     try {
       const auth = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
       if (!auth || !auth.token || !auth.hostname) return '';
       let messageText = plaintext;
       if (hasPendingAttachment) {
-        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!, emberKey!);
+        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!);
         window.clearPendingAttachment();
       }
-      log.debug('Attempting group encrypt', {
+      log.debug('Attempting message encrypt', {
         ember_id: App.activeEmberId,
         has_ember_id: !!App.activeEmberId,
       });
-      const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
-      if (!groupCiphertext) {
-        const errMsg =
-          'Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.';
-        (window as any).showInputError?.(errMsg);
-        throw new Error(errMsg);
+
+      // Try history key encryption first (Layer 2), fall back to sender key (Layer 1)
+      const historyCrypto = (window as any).historyCryptoService as
+        | {
+            encrypt(
+              emberId: string,
+              text: string
+            ): Promise<{ ciphertext: string; nonce: string; epoch: number } | null>;
+          }
+        | undefined;
+
+      const historyResult = historyCrypto
+        ? await historyCrypto.encrypt(App.activeEmberId, messageText).catch(() => null)
+        : null;
+
+      let requestBody: Record<string, unknown>;
+
+      if (historyResult) {
+        requestBody = {
+          ciphertext: historyResult.ciphertext,
+          nonce: historyResult.nonce,
+          epoch: historyResult.epoch,
+          protocolVersion: 2,
+          envelopeType: 'history_channel',
+        };
+        log.debug('Using history key encryption', { epoch: historyResult.epoch });
+      } else {
+        const groupCiphertext = await tryGroupEncrypt(messageText, App.activeEmberId);
+        if (!groupCiphertext) {
+          const errMsg =
+            'Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.';
+          (window as any).showInputError?.(errMsg);
+          throw new Error(errMsg);
+        }
+        requestBody = {
+          ciphertext: groupCiphertext,
+          protocolVersion: 1,
+          envelopeType: 'signal_group',
+        };
+        log.debug('Using sender key encryption (fallback)');
       }
 
       const response = await fetch(
@@ -236,11 +313,7 @@
             'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.token}`,
           },
-          body: JSON.stringify({
-            ciphertext: groupCiphertext,
-            protocol_version: 1,
-            envelope_type: 'signal_group',
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
       if (!response.ok) {
@@ -249,7 +322,7 @@
       }
 
       const msgData = (await response.json()) as Message;
-      log.debug('Message sent with sender key', { message_id: msgData.id });
+      log.debug('Message sent', { message_id: msgData.id, envelope: requestBody.envelopeType });
       window.registerSentMessageId(msgData.id);
       App.ownedMessageIds.add(msgData.id);
       await displayDecryptedMessage(msgData);
@@ -286,8 +359,44 @@
     if (!App.activeEmberId || !App.activeChannelId) return;
     const auth = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
     if (!auth || !auth.token || !auth.hostname) throw new Error('Not authenticated');
-    const groupCiphertext = await tryGroupEncrypt(newText, App.activeEmberId);
-    if (groupCiphertext) {
+    // Try history key encryption first, fall back to sender key
+    const historyCrypto = (window as any).historyCryptoService as
+      | {
+          encrypt(
+            emberId: string,
+            text: string
+          ): Promise<{ ciphertext: string; nonce: string; epoch: number } | null>;
+        }
+      | undefined;
+
+    const historyResult = historyCrypto
+      ? await historyCrypto.encrypt(App.activeEmberId, newText).catch(() => null)
+      : null;
+
+    let editBody: Record<string, unknown>;
+
+    if (historyResult) {
+      editBody = {
+        ciphertext: historyResult.ciphertext,
+        nonce: historyResult.nonce,
+        epoch: historyResult.epoch,
+        protocolVersion: 2,
+        envelopeType: 'history_channel',
+      };
+    } else {
+      const groupCiphertext = await tryGroupEncrypt(newText, App.activeEmberId);
+      if (!groupCiphertext) throw new Error('Encryption unavailable for edit');
+      // For sender key edits, provide empty nonce/epoch=0 to satisfy server validation
+      editBody = {
+        ciphertext: groupCiphertext,
+        nonce: '',
+        epoch: 0,
+        protocolVersion: 1,
+        envelopeType: 'signal_group',
+      };
+    }
+
+    if (editBody) {
       const response = await fetch(
         `${auth.hostname}/api/v1/channels/${App.activeChannelId}/messages/${messageId}`,
         {
@@ -296,11 +405,7 @@
             'Content-Type': 'application/json',
             Authorization: `Bearer ${auth.token}`,
           },
-          body: JSON.stringify({
-            ciphertext: groupCiphertext,
-            protocol_version: 1,
-            envelope_type: 'signal_group',
-          }),
+          body: JSON.stringify(editBody),
         }
       );
       if (!response.ok) {
@@ -410,9 +515,9 @@
     if (!textEl) return;
     if (!App.activeEmberId) return;
     if (payload.envelopeType === 'signal_group') {
-      const plaintext = await tryGroupDecrypt(payload.ciphertext);
-      if (plaintext === null) return;
-      textEl.textContent = plaintext;
+      const result = await tryGroupDecrypt(payload.ciphertext);
+      if (result.plaintext === null) return;
+      textEl.textContent = result.plaintext;
       markMessageAsEdited(messageDiv);
       return;
     }
@@ -438,10 +543,8 @@
     attachment?: AttachmentData,
     gif?: { url: string; title?: string }
   ): void {
-    const capturedEmberId = App.activeEmberId;
     const capturedChannelId = App.activeChannelId;
-    const getEmberKey = async (_cid: string): Promise<Uint8Array | null> =>
-      capturedEmberId ? (App.emberKeyCache.get(capturedEmberId) ?? null) : null;
+    const getEmberKey = async (_cid: string): Promise<Uint8Array | null> => null;
     const messageDiv = window.createBasicMessageElement(
       author,
       text,
@@ -502,23 +605,13 @@
     let plaintext: string | null = null;
     const envelopeType = msg.envelopeType;
     if (envelopeType === 'signal_group') {
-      plaintext = await tryGroupDecrypt(msg.ciphertext);
+      const result = await tryGroupDecrypt(msg.ciphertext);
+      plaintext = result.plaintext;
       if (plaintext === null) {
-        log.warn('Sender key decrypt failed, triggering distribution fetch', {
-          message_id: msg.id,
-        });
-
-        // Trigger distribution fetch and retry decryption
-        await window.processIncomingDistributions?.();
-
-        // Retry decryption after distribution fetch
-        plaintext = await tryGroupDecrypt(msg.ciphertext);
-
-        if (plaintext === null) {
-          // Still failed - show waiting message
+        if (result.permanentFailure) {
           addMessage(
             msg.username ?? 'Unknown',
-            '[Waiting for sender key — message will be readable once keys arrive]',
+            '[Message from before key refresh — cannot be decrypted]',
             msg.createdAt,
             prepend,
             msg.id,
@@ -526,6 +619,65 @@
           );
           return;
         }
+
+        log.warn('Sender key decrypt failed, triggering distribution fetch', {
+          message_id: msg.id,
+        });
+
+        await window.processIncomingDistributions?.();
+
+        const retry = await tryGroupDecrypt(msg.ciphertext);
+        plaintext = retry.plaintext;
+
+        if (plaintext === null) {
+          const displayText = retry.permanentFailure
+            ? '[Message from before key refresh — cannot be decrypted]'
+            : '[Waiting for sender key — message will be readable once keys arrive]';
+          addMessage(
+            msg.username ?? 'Unknown',
+            displayText,
+            msg.createdAt,
+            prepend,
+            msg.id,
+            msg.chatColor
+          );
+          return;
+        }
+      }
+    } else if (envelopeType === 'history_channel') {
+      const historyCrypto = (window as any).historyCryptoService as
+        | {
+            decrypt(
+              emberId: string,
+              ct: string,
+              nonce: string,
+              epoch: number,
+              seq: number
+            ): Promise<string | null>;
+          }
+        | undefined;
+      if (historyCrypto) {
+        const msgAny = msg as any;
+        plaintext = await historyCrypto
+          .decrypt(
+            App.activeEmberId,
+            msg.ciphertext,
+            msgAny.nonce ?? msgAny.epochCiphertext ?? '',
+            msgAny.epoch ?? 0,
+            msgAny.messageSequence ?? 0
+          )
+          .catch(() => null);
+      }
+      if (plaintext === null) {
+        addMessage(
+          msg.username ?? 'Unknown',
+          '[History key unavailable — cannot decrypt this message]',
+          msg.createdAt,
+          prepend,
+          msg.id,
+          msg.chatColor
+        );
+        return;
       }
     } else if (envelopeType === 'signal_dm') {
       addMessage(

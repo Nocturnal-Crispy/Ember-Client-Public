@@ -7,7 +7,6 @@ window.App = {
   // ── Messaging / channel ──────────────────────────────────────────────────
   activeChannelId: null,
   activeEmberId: null,
-  emberKeyCache: new Map<string, Uint8Array>(),
   ownedMessageIds: new Set<string>(),
 
   // ── Server list ──────────────────────────────────────────────────────────
@@ -61,6 +60,7 @@ window.App = {
   // ── Signal Protocol ───────────────────────────────────────────────────────
   signalSessionReady: new Map<string, boolean>(),
   signalSessionManager: null as any,
+  historyCryptoService: null as any,
 
   // ── Signal Session Manager Initialization ───────────────────────────────
   async initializeSignalSessionManager(): Promise<void> {
@@ -88,8 +88,20 @@ window.App = {
     } catch (error) {
       console.error('[App] Failed to initialize SignalSessionManager:', error);
       this.signalSessionManager = null;
-      // Don't throw - allow app to continue without Signal functionality
       console.warn('[App] Continuing without Signal encryption - messages will not be encrypted');
+    }
+
+    // Initialize HistoryCryptoService for Layer 2 history key encryption.
+    // Independent of SignalSessionManager — uses its own auth handling.
+    try {
+      const auth = await window.getValidAuth?.();
+      if (auth && typeof (window as any).HistoryCryptoService !== 'undefined') {
+        this.historyCryptoService = new (window as any).HistoryCryptoService(auth);
+        (window as any).historyCryptoService = this.historyCryptoService;
+        console.log('[App] HistoryCryptoService initialized successfully');
+      }
+    } catch (historyError) {
+      console.warn('[App] HistoryCryptoService initialization failed:', historyError);
     }
   },
 

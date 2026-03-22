@@ -34,7 +34,7 @@ beforeAll(() => {
   (window as any).App = {
     activeChannelId: null,
     activeEmberId: null,
-    emberKeyCache: new Map(),
+
     ownedMessageIds: new Set(),
     currentEmbers: [],
     currentMembers: [],

@@ -8,7 +8,7 @@
 const mockWindow = {
   App: {
     activeEmberId: 'test-ember-id',
-    emberKeyCache: new Map(),
+
     ownedMessageIds: new Set(),
   },
   electronAPI: {

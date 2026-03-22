@@ -52,11 +52,10 @@ export interface SignalDatabase
 
 const DB_FILENAME = 'signal-state.db';
 const HKDF_INFO = Buffer.from('signal-db-encryption');
-// All-zeros salt is permitted by RFC 5869 and safe here because the IKM is a
-// high-entropy 32-byte Curve25519 private key. A non-zero per-application salt
-// (e.g. SHA-256 of a constant string) would provide stronger domain separation
-// and is the recommended upgrade path if the IKM source ever changes.
-const HKDF_SALT = Buffer.alloc(32);
+// Domain-specific salt per RFC 5869 section 3.1 — ensures the same IKM used
+// in different contexts produces different derived keys. Requires fresh
+// database on first use (not backward-compatible with zero-salt databases).
+const HKDF_SALT = nodeCrypto.createHash('sha256').update('ember-signal-db-v1').digest();
 const DERIVED_KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;

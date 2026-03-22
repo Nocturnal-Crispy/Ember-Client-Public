@@ -724,7 +724,6 @@
       log.info('Force logout initiated, clearing session state');
       hideReconnectionOverlay();
       window.disconnectWebSocket();
-      App.emberKeyCache.clear();
       App.ownedMessageIds.clear();
       App.activeChannelId = null;
       if (App.healthcheckInterval) {
