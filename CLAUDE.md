@@ -9,16 +9,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm install                          # Install dependencies (also rebuilds ember-shared)
-npm run build                        # build:shared (../ember-shared) + tsc → public/src/js/
+npm install                          # Install dependencies (rebuilds better-sqlite3)
+npm run build                        # inject-key + tsc (main + renderer) → dist/
+npm run dev                          # rebuild better-sqlite3 + build + electron (NODE_ENV=development)
 npm start                            # build + electron .
 npm test                             # Jest (tests/jest.config.ts)
 npm test -- --watch
 npm test -- --coverage
 npm test -- tests/unit/path/to/test.test.ts   # single test file
-npm run dist:linux                   # AppImage + deb
-npm run dist:win                     # nsis + portable
-npm run dist:mac                     # dmg + zip
+npm run test:e2e                     # Playwright E2E tests
+npm run dist:linux                   # secure-build + AppImage + deb
+npm run dist:win                     # secure-build + nsis + portable
+npm run dist:mac                     # secure-build + dmg + zip
+npm run lint:fix                     # Auto-fix lint + formatting (Prettier via ESLint)
+npm run lint                         # Check only
 ./scripts/release.sh                 # tests → version bump → dist → GitHub release
 ```
 
@@ -26,25 +30,30 @@ npm run dist:mac                     # dmg + zip
 
 Always edit TypeScript sources; compiled JS is auto-generated:
 
-| Source                 | Output                     |
-| ---------------------- | -------------------------- |
-| `src/main.ts`          | `public/src/js/main.js`    |
-| `src/preload.ts`       | `public/src/js/preload.js` |
-| `src/renderer/**/*.ts` | `public/src/js/**/*.js`    |
+| Source                 | Output                       |
+| ---------------------- | ---------------------------- |
+| `src/main/*.ts`        | `dist/main/*.js`             |
+| `src/preload/*.ts`     | `dist/preload/*.js`          |
+| `src/renderer/**/*.ts` | `dist/renderer/**/*.js`      |
 
-`tsconfig.json` compiles everything under `src/` → `public/src/js/` (single config, `module: "none"`).
+Three tsconfig files:
+- `tsconfig.json` — base config with path aliases (`ember-shared` → `src/shared`)
+- `tsconfig.main.json` — main process + preload → `dist/` (CommonJS)
+- `tsconfig.renderer.json` — renderer scripts → `dist/renderer/` (ES2020, `module: "none"`)
 
 ---
 
 ## Architecture
 
-### ember-shared Bridge
+### ember-shared
 
-`ember-shared` (`../ember-shared/`) is the platform-agnostic service library. `npm run build` automatically runs `build:shared` first. In tests, it is resolved directly to source via `moduleNameMapper`:
+`ember-shared` is embedded within ember-client at `src/shared/` (not a separate monorepo directory). It is resolved via tsconfig path alias:
 
 ```
-ember-shared → ../ember-shared/src/index
+ember-shared → src/shared (path alias in tsconfig.json)
 ```
+
+In tests, it is resolved via Jest `moduleNameMapper` to the same source path.
 
 Functions exposed via `contextBridge` in `preload.ts`:
 
@@ -69,16 +78,21 @@ ALLOWED_ON:     handle-invite-link
 
 ### Renderer Bootstrap
 
-`public/index.html` has a single `<script defer src="src/js/utils/main-loader.js">`. At `DOMContentLoaded`, `main-loader` fetches all HTML fragments in parallel, assembles the DOM, then loads scripts **sequentially** in dependency order:
+`src/renderer/index.html` has a single `<script defer>` pointing to `main-loader.js`. At `DOMContentLoaded`, `main-loader` fetches all HTML fragments in parallel, assembles the DOM, then loads **34 scripts sequentially** in dependency order:
 
 ```
-logger.js → app-state.js → voice-service.js → websocket-service.js →
-message-service.js → channel-manager.js → ember-manager.js →
-invite-manager.js → voice-ui-manager.js → renderer.js
+logger → theme-manager → auth-loader → signal-service → signal-session-manager →
+history-crypto-service → app-state → voice-service → websocket-service →
+user-service → user-details-modal → username-click-handler → messages-area →
+format-toolbar → crypto-routing-service → message-service → channel-manager →
+ember-manager → invite-manager → screen-share-modal → voice-ui-manager →
+provisioning-service → notification-settings → plugin-settings → app-lock-manager →
+update-notifier → update-modal → version-display → direct-messaging-manager →
+direct-messaging-ui → read-all-manager → emoji-picker → gif-picker → renderer
 ```
 
-HTML fragments live in `public/src/html/*.html` (one per UI section/modal).
-CSS files live in `public/src/css/` — one file per concern (`settings.css`, `voice.css`, etc.).
+HTML fragments live in `src/renderer/*.html` (one per UI section/modal).
+CSS files live in `src/renderer/styles/` — one file per concern.
 
 ### Renderer Module Pattern (IIFE)
 
