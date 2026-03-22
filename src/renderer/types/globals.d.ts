@@ -652,6 +652,26 @@ declare global {
     resolveSpotlight(desiredTiles: Set<string>): string | null;
     // Globals set by theme-manager.ts
     initThemeSettings(): Promise<void>;
+    // Globals set by provisioning-service.ts
+    renderDevicesPage(): Promise<void>;
+    fetchDeviceList(): Promise<
+      Array<{
+        id: string;
+        publicKey: string;
+        identityKey: string;
+        protocolVersion: number;
+        createdAt: number;
+        isCurrent: boolean;
+      }>
+    >;
+    revokeDevice(deviceId: string): Promise<boolean>;
+    createProvisioningRequest(): Promise<unknown>;
+    approveProvisioningRequest(
+      requestId: string,
+      newDeviceUserId: string,
+      newDeviceId: string
+    ): Promise<boolean>;
+    downloadAndImportBundle(requestId: string): Promise<boolean>;
     // Globals set by update-notifier.ts
     checkForUpdate(): Promise<void>;
     dismissUpdateNotification(): void;

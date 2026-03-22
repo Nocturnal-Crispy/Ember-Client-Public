@@ -901,6 +901,9 @@
     if (page === 'themes') {
       window.initThemeSettings();
     }
+    if (page === 'devices' && typeof window.renderDevicesPage === 'function') {
+      window.renderDevicesPage();
+    }
   }
 
   async function populateSettingsAccount(): Promise<void> {

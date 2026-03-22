@@ -493,6 +493,147 @@
       }
     }
 
+    // Sync all CRK envelopes for a single ember — decrypts and caches any missing epochs.
+    async syncCrksForEmber(emberId: string): Promise<number> {
+      try {
+        const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/crk`, {
+          headers: { Authorization: `Bearer ${this.auth.token}` },
+        });
+        if (!response.ok) return 0;
+
+        const data = (await response.json()) as { envelopes: CrkEnvelopeFromServer[] };
+        if (!data.envelopes || data.envelopes.length === 0) return 0;
+
+        const signalManager = (window as any).App?.signalSessionManager;
+        if (!signalManager) return 0;
+
+        let synced = 0;
+        for (const envelope of data.envelopes) {
+          const key = cacheKey(emberId, envelope.epoch);
+          if (crkCache.has(key)) continue;
+
+          try {
+            const ct = Uint8Array.from(atob(envelope.encryptedKey), c => c.charCodeAt(0));
+            const crkBytes = await signalManager.decrypt(
+              `${envelope.senderUserId}.${envelope.senderDeviceId}`,
+              ct,
+              envelope.messageType
+            );
+            if (crkBytes.length === 32) {
+              crkCache.set(key, { emberId, epoch: envelope.epoch, crk: crkBytes });
+              synced++;
+            }
+          } catch {
+            // Skip envelopes we can't decrypt (e.g. from a different sender session)
+          }
+        }
+        return synced;
+      } catch {
+        return 0;
+      }
+    }
+
+    // Sync CRK envelopes for all embers the user belongs to.
+    // Call on WebSocket reconnect to catch up on missed epoch rotations.
+    // Parallelized to avoid slow sequential fetching across many embers.
+    async syncAllCrks(): Promise<void> {
+      try {
+        const embers = await window.fetchEmbers();
+        await Promise.allSettled(embers.map(ember => this.syncCrksForEmber(ember.id)));
+      } catch {
+        // Non-fatal — will be retried on next reconnect or message receive
+      }
+    }
+
+    // Returns all cached CRK epochs for a given ember (used for re-wrapping to new members).
+    getCachedCrkEpochs(emberId: string): Array<{ epoch: number; crk: Uint8Array }> {
+      const results: Array<{ epoch: number; crk: Uint8Array }> = [];
+      for (const [key, value] of crkCache) {
+        if (key.startsWith(`${emberId}:`)) {
+          results.push({ epoch: value.epoch, crk: value.crk });
+        }
+      }
+      return results.sort((a, b) => a.epoch - b.epoch);
+    }
+
+    // Returns all cached DM CMKs (used for provisioning bundle).
+    getCachedDmCmks(): Array<{ conversationId: string; epoch: number; cmk: Uint8Array }> {
+      const results: Array<{ conversationId: string; epoch: number; cmk: Uint8Array }> = [];
+      for (const [key, cmk] of dmCmkCache) {
+        const parts = key.split(':');
+        if (parts.length === 2) {
+          results.push({
+            conversationId: parts[0],
+            epoch: parseInt(parts[1], 10),
+            cmk,
+          });
+        }
+      }
+      return results;
+    }
+
+    // Re-wrap all cached CRK epochs for a newly added member's devices.
+    // Enables new members to read prior message history.
+    async rewrapCrksForNewMember(
+      emberId: string,
+      newMemberDevices: Array<{ userId: string; deviceId: string }>
+    ): Promise<number> {
+      const signalManager = (window as any).App?.signalSessionManager;
+      if (!signalManager) return 0;
+
+      // First sync to ensure we have all available epochs
+      await this.syncCrksForEmber(emberId);
+      const epochs = this.getCachedCrkEpochs(emberId);
+      if (epochs.length === 0) return 0;
+
+      let rewrapped = 0;
+      for (const { epoch, crk } of epochs) {
+        const envelopes = [];
+        for (const device of newMemberDevices) {
+          try {
+            await signalManager.ensureSession(device.userId, device.deviceId);
+            const address = `${device.userId}.${device.deviceId}`;
+            const encrypted = await signalManager.encrypt(address, crk);
+            envelopes.push({
+              userId: device.userId,
+              deviceId: device.deviceId,
+              encryptedKey: btoa(String.fromCharCode(...encrypted.ciphertext)),
+              messageType: encrypted.messageType,
+            });
+          } catch {
+            // Skip unreachable devices
+          }
+        }
+
+        if (envelopes.length === 0) continue;
+
+        try {
+          const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/crk`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.auth.token}`,
+            },
+            body: JSON.stringify({ epoch, envelopes }),
+          });
+          if (response.ok) rewrapped++;
+        } catch {
+          // Non-fatal — new member won't be able to read this epoch
+        }
+      }
+
+      return rewrapped;
+    }
+
+    // Import a provisioning bundle's keys directly into caches.
+    // Called by provisioning-service after decrypting the bundle from the existing device.
+    importBundle(bundle: {
+      channelKeys: Array<{ emberId: string; epoch: number; crk: string }>;
+      dmKeys: Array<{ conversationId: string; epoch: number; cmk: string }>;
+    }): void {
+      importProvisioningBundle(bundle);
+    }
+
     clear(): void {
       crkCache.clear();
       dmCmkCache.clear();
@@ -585,6 +726,30 @@
       if (key.startsWith(`${conversationId}:`)) {
         replayState.delete(key);
         removePersistedFloor(key);
+      }
+    }
+  }
+
+  // Import a provisioning bundle's keys directly into caches.
+  // Called by provisioning-service after decrypting the bundle from the existing device.
+  function importProvisioningBundle(bundle: {
+    channelKeys: Array<{ emberId: string; epoch: number; crk: string }>;
+    dmKeys: Array<{ conversationId: string; epoch: number; cmk: string }>;
+  }): void {
+    for (const ck of bundle.channelKeys) {
+      const crk = Uint8Array.from(atob(ck.crk), c => c.charCodeAt(0));
+      if (crk.length === 32) {
+        crkCache.set(cacheKey(ck.emberId, ck.epoch), {
+          emberId: ck.emberId,
+          epoch: ck.epoch,
+          crk,
+        });
+      }
+    }
+    for (const dk of bundle.dmKeys) {
+      const cmk = Uint8Array.from(atob(dk.cmk), c => c.charCodeAt(0));
+      if (cmk.length === 32) {
+        dmCmkCache.set(`${dk.conversationId}:${dk.epoch}`, cmk);
       }
     }
   }

@@ -387,6 +387,151 @@
 }
 
 /* =====================================================
+   Device Management
+   ===================================================== */
+
+.device-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.device-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.device-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.device-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.device-id {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(var(--rgb-text), 0.9);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.device-meta {
+  font-size: 11px;
+  color: rgba(var(--rgb-text), 0.5);
+}
+
+.device-current-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(var(--rgb-highlight), 1);
+  margin-bottom: 2px;
+}
+
+.device-revoke-btn {
+  background: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.device-revoke-btn:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.3);
+}
+
+.device-revoke-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.provisioning-section {
+  margin-top: 24px;
+}
+
+.provisioning-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(var(--rgb-text), 0.9);
+  margin: 0 0 6px;
+}
+
+.provisioning-description {
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.5);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.provisioning-request-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid rgba(var(--rgb-text), 0.1);
+}
+
+.provisioning-request-info {
+  font-size: 13px;
+  color: rgba(var(--rgb-text), 0.7);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.provisioning-approve-btn {
+  background: rgba(var(--rgb-highlight), 0.15);
+  color: rgba(var(--rgb-highlight), 1);
+  border: 1px solid rgba(var(--rgb-highlight), 0.3);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.provisioning-approve-btn:hover:not(:disabled) {
+  background: rgba(var(--rgb-highlight), 0.3);
+}
+
+.provisioning-approve-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.provisioning-approved-btn {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.provisioning-no-requests {
+  font-size: 12px;
+  color: rgba(var(--rgb-text), 0.4);
+  font-style: italic;
+  margin: 0;
+}
+
+/* =====================================================
    Voice & Video Settings
    ===================================================== */
 

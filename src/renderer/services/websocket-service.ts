@@ -79,6 +79,12 @@
           log.debug('Re-subscribing to DM channels');
           window.resubscribeDmChannels();
         }
+        // Sync CRK envelopes for missed epoch rotations while offline
+        if (App.historyCryptoService?.syncAllCrks) {
+          App.historyCryptoService
+            .syncAllCrks()
+            .catch((e: unknown) => log.warn('CRK sync on reconnect failed', { error: String(e) }));
+        }
       };
 
       App.wsConnection.onmessage = (event: MessageEvent) => {
@@ -207,6 +213,10 @@
             if (emberId && epochNumber > 0) {
               window.handleCrkRotation?.(emberId, epochNumber);
             }
+          } else if (data.type === 'device_revoked' && data.payload) {
+            const deviceId = String(data.payload['deviceId'] ?? '');
+            log.info('WebSocket: device revoked', { device_id: deviceId });
+            window.dispatchEvent(new CustomEvent('device-revoked', { detail: data.payload }));
           }
         } catch (err) {
           log.error('WebSocket message parse error', { error: String(err) });
@@ -407,21 +417,70 @@
   }): Promise<void> {
     const { emberId, userId, username, action } = payload;
 
-    // Only refresh members list if this is for the currently active ember
-    if (App.activeEmberId !== emberId) {
-      log.debug('Membership update for different ember, ignoring', {
-        active_ember_id: App.activeEmberId,
-        update_ember_id: emberId,
-      });
-      return;
-    }
-
-    log.info('Membership updated, refreshing members list', {
+    log.info('Membership updated', {
       ember_id: emberId,
       user_id: userId,
       username,
       action,
     });
+
+    // CRK re-wrapping for new members — runs regardless of active ember.
+    // Re-encrypts all prior epoch CRKs so the new member can read history.
+    if (action === 'joined') {
+      const historyCrypto = App.historyCryptoService;
+      if (historyCrypto) {
+        (async () => {
+          try {
+            const auth = await window.getValidAuth();
+            if (!auth) return;
+            // Don't re-wrap for ourselves joining
+            if (userId === auth.userId) return;
+            // Only the ember owner's device performs re-wrapping to avoid
+            // write amplification when many devices are online.
+            const embers = await window.fetchEmbers();
+            const ember = embers.find(e => e.id === emberId);
+            if (!ember || !ember.isOwner) return;
+            // Verify the new member is actually in the ember's member list
+            // before trusting the WebSocket event payload.
+            const members = await window.fetchMembers(emberId);
+            const isMember = members.some(m => m.userId === userId);
+            if (!isMember) return;
+            const devicesResp = await fetch(
+              `${auth.hostname.startsWith('http') ? auth.hostname : `https://${auth.hostname}`}/api/v1/users/${userId}/devices`,
+              { headers: { Authorization: `Bearer ${auth.token}` } }
+            );
+            if (!devicesResp.ok) return;
+            const devicesData = (await devicesResp.json()) as {
+              devices: Array<{ id: string; userId?: string }>;
+            };
+            const newMemberDevices = (devicesData.devices ?? []).map(d => ({
+              userId,
+              deviceId: d.id,
+            }));
+            if (newMemberDevices.length === 0) return;
+            const count = await historyCrypto.rewrapCrksForNewMember(emberId, newMemberDevices);
+            if (count > 0) {
+              log.info('CRK re-wrapped for new member', {
+                ember_id: emberId,
+                user_id: userId,
+                epochs_rewrapped: count,
+              });
+            }
+          } catch (e) {
+            log.warn('CRK re-wrap for new member failed', {
+              ember_id: emberId,
+              user_id: userId,
+              error: String(e),
+            });
+          }
+        })();
+      }
+    }
+
+    // Only refresh UI if this is for the currently active ember
+    if (App.activeEmberId !== emberId) {
+      return;
+    }
 
     // Refresh the members list to get the latest data
     const members = await window.fetchMembers(emberId);

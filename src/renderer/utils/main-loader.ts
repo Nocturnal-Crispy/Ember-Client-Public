@@ -37,6 +37,7 @@
     '../../dist/renderer/managers/invite-manager.js',
     '../../dist/renderer/components/screen-share-modal.js',
     '../../dist/renderer/managers/voice-ui-manager.js',
+    '../../dist/renderer/services/provisioning-service.js',
     '../../dist/renderer/managers/notification-settings.js',
     '../../dist/renderer/managers/plugin-settings.js',
     '../../dist/renderer/managers/app-lock-manager.js',
