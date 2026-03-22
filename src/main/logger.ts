@@ -24,12 +24,37 @@ const C = {
 // File logging for development
 let logFileStream: fs.WriteStream | null = null;
 
+const MAX_LOG_FILES = 5;
+
+function isTestEnvironment(): boolean {
+  return process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
+}
+
 function isDevelopmentMode(): boolean {
   return process.env.NODE_ENV !== 'production' || (app && !app.isPackaged);
 }
 
+function pruneOldLogFiles(logsDir: string) {
+  try {
+    const logFiles = fs
+      .readdirSync(logsDir)
+      .filter(f => f.startsWith('ember-client-') && f.endsWith('.log'))
+      .map(f => ({
+        name: f,
+        mtimeMs: fs.statSync(path.join(logsDir, f)).mtimeMs,
+      }))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    for (const file of logFiles.slice(MAX_LOG_FILES)) {
+      fs.unlinkSync(path.join(logsDir, file.name));
+    }
+  } catch (error) {
+    console.warn('Failed to prune old log files:', error);
+  }
+}
+
 function initializeFileLogging() {
-  if (!isDevelopmentMode()) return;
+  if (!isDevelopmentMode() || isTestEnvironment()) return;
 
   try {
     const logsDir = path.join(process.cwd(), 'logs');
@@ -47,6 +72,9 @@ function initializeFileLogging() {
 
     // Write header when starting new session
     logFileStream.write(`=== Ember Client Started at ${new Date().toISOString()} ===\n`);
+
+    // Prune old log files, keeping only the most recent
+    pruneOldLogFiles(logsDir);
 
     // Ensure file is closed on exit
     process.on('exit', () => {
