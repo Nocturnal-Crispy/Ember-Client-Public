@@ -11,22 +11,6 @@ export async function fetchEmbers(auth: AuthData): Promise<Ember[]> {
   return data.embers ?? [];
 }
 
-export interface CreateEmberRequest {
-  name: string;
-  iconData?: string;
-  encryptedEmberKey: string;
-}
-
-export async function createEmber(
-  _auth: AuthData,
-  _name: string,
-  _devicePublicKey: string,
-  _devicePrivateKey: string,
-  _iconData?: string
-): Promise<Ember> {
-  throw new Error('NaCl crypto removed — use Signal Protocol ember creation instead');
-}
-
 export interface UpdateEmberRequest {
   name?: string;
   iconData?: string;

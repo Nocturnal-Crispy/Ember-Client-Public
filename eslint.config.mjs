@@ -64,6 +64,41 @@ export default [
       // See: https://typescript-eslint.io/troubleshooting/faqs/eslint#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
       'no-undef': 'off',
 
+      // Block NaCl re-introduction (Phase 4 cleanup)
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'tweetnacl',
+              message: 'TweetNaCl removed — use Signal Protocol via @signalapp/libsignal-client',
+            },
+            {
+              name: 'tweetnacl-util',
+              message: 'TweetNaCl removed — use Signal Protocol via @signalapp/libsignal-client',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/key-migration*'],
+              message: 'key-migration.ts deleted — use signal-keygen.ts instead',
+            },
+            {
+              group: ['**/migration-flow*'],
+              message: 'migration-flow.ts deleted — legacy migration code removed',
+            },
+            {
+              group: ['**/epoch-service*', '**/epoch-history-service*'],
+              message: 'Epoch placeholder services deleted — use history-crypto-service.ts',
+            },
+            {
+              group: ['**/invite-ephemeral-key-service*'],
+              message: 'invite-ephemeral-key-service.ts deleted — placeholder removed',
+            },
+          ],
+        },
+      ],
+
       // General JavaScript rules
       'no-console': 'off',
       'no-debugger': 'warn',

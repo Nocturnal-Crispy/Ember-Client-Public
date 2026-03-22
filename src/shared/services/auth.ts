@@ -1,11 +1,11 @@
-import type { AuthResponse, DeviceIdentity, SignalDeviceCredentials } from '../types';
+import type { AuthResponse, SignalDeviceCredentials } from '../types';
 import { apiRequest, ApiError } from '../api';
 import {
   generateIdentityKey,
   generateRegistrationId,
   generateSignedPreKey,
   generateOneTimePreKeys,
-} from '../crypto/key-migration';
+} from '../crypto/signal-keygen';
 
 function generateUUID(): string {
   const bytes = new Uint8Array(16);
@@ -93,15 +93,6 @@ export async function registerWithSignalKeys(
   );
 }
 
-export async function registerWithRecovery(
-  _hostname: string,
-  _username: string,
-  _password: string,
-  _deviceIdentity: DeviceIdentity
-): Promise<AuthResponse & { _recoveryCode: string }> {
-  throw new Error('NaCl crypto removed — use Signal Protocol registration instead');
-}
-
 export function validateLoginForm(
   hostname: string,
   username: string,
@@ -131,19 +122,4 @@ export function validateRegisterForm(
   if (loginError) return loginError;
   if (password !== confirmPassword) return 'Passwords do not match';
   return null;
-}
-
-export interface LoginWithRecoveryResult {
-  auth: AuthResponse;
-  recoveredIdentity: DeviceIdentity;
-}
-
-export async function loginWithRecoveryCode(
-  _hostname: string,
-  _username: string,
-  _password: string,
-  _recoveryCode: string,
-  _newDeviceId: string
-): Promise<LoginWithRecoveryResult> {
-  throw new Error('NaCl crypto removed — use Signal Protocol device recovery instead');
 }

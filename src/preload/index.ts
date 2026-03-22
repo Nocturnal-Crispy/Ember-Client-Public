@@ -1,10 +1,4 @@
-import type {
-  AuthData,
-  DeviceIdentity,
-  SignalDeviceCredentials,
-  EmberCmd,
-  EmberIpcResponse,
-} from '../shared';
+import type { AuthData, SignalDeviceCredentials, EmberCmd, EmberIpcResponse } from '../shared';
 import { contextBridge, ipcRenderer } from 'electron';
 import * as emberCrypto from '../shared';
 import * as emberServices from '../shared';
@@ -12,15 +6,6 @@ import * as nodeCrypto from 'crypto';
 import { refreshToken } from './services/token-refresh-service';
 import { getTokenExpiry, isTokenExpiringSoon } from './utils/token-utils';
 const { IPC_CHANNELS } = require('../shared/constants');
-
-function bytesToBase64(bytes: Uint8Array): string {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes).toString('base64');
-  }
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
 
 function base64ToBytes(base64: string): Uint8Array {
   if (typeof Buffer !== 'undefined') {
@@ -320,19 +305,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         saltBase64
       );
     },
-    encryptFileBytes: (fileBytes: Uint8Array, key: Uint8Array): string => {
-      if (key.byteLength !== 32) {
-        throw new Error(`encryptFileBytes: expected 32-byte key, got ${key.byteLength}`);
-      }
-
-      const iv = nodeCrypto.randomBytes(12);
-      const cipher = nodeCrypto.createCipheriv('aes-256-gcm', Buffer.from(key), iv);
-      const ciphertext = Buffer.concat([cipher.update(Buffer.from(fileBytes)), cipher.final()]);
-      const tag = cipher.getAuthTag();
-
-      const combined = Buffer.concat([iv, tag, ciphertext]);
-      return bytesToBase64(new Uint8Array(combined));
-    },
+    // Legacy decrypt-only: encryptFileBytes removed (Phase 4 cleanup).
+    // Retained for backward compat with pre-migration attachments (iv‖tag‖ciphertext format).
+    // New attachments use per-attachment AES-256-GCM in message-service.ts.
     decryptFileBytes: (encryptedBase64: string, key: Uint8Array): Uint8Array | null => {
       if (key.byteLength !== 32) return null;
 
@@ -402,18 +377,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         publicKey,
         encryptedDeviceKey,
         salt
-      ),
-    registerWithRecovery: (
-      hostname: string,
-      username: string,
-      password: string,
-      deviceIdentity: unknown
-    ) =>
-      emberServices.registerWithRecovery(
-        hostname,
-        username,
-        password,
-        deviceIdentity as DeviceIdentity
       ),
     validateLoginForm: (hostname: string, username: string, password: string) =>
       emberServices.validateLoginForm(hostname, username, password),

@@ -343,23 +343,6 @@
       if (inviteLinkInput) inviteLinkInput.value = data.invite_url ?? '';
       inviteLinkResult?.classList.remove('hidden');
 
-      // Setup ephemeral keys for the invite
-      if (data.invite_id && window.App.signalSessionManager) {
-        try {
-          log.info('Setting up invite ephemeral keys...', { invite_id: data.invite_id });
-          await window.App.signalSessionManager.setupInviteEphemeralKeys(
-            data.invite_id,
-            App.activeEmberId!
-          );
-          log.info('Invite ephemeral keys setup complete');
-        } catch (error) {
-          const err = error as Error;
-          log.error('Failed to setup invite ephemeral keys:', { error: err.message });
-          // Don't fail the entire invite creation for ephemeral key setup errors
-          showCreateInviteError('Invite created but ephemeral key setup failed');
-        }
-      }
-
       log.info('Invite created successfully', { ember_id: App.activeEmberId });
     } catch (error) {
       const err = error as Error;
@@ -545,22 +528,6 @@
           ember_id: data.ember_id,
           name: data.ember_name ?? '',
         });
-
-        // Process Signal Protocol ephemeral keys
-        if (data.invite_id && window.App.signalSessionManager) {
-          try {
-            log.info('Processing invite ephemeral keys...', { invite_id: data.invite_id });
-            await window.App.signalSessionManager.completeInviteAcceptance(
-              data.invite_id,
-              data.ember_id
-            );
-            log.info('Invite ephemeral keys processed successfully');
-          } catch (error) {
-            const err = error as Error;
-            log.error('Failed to process invite ephemeral keys:', { error: err.message });
-            // Don't fail the entire invite acceptance for ephemeral key processing errors
-          }
-        }
       }
       closeAcceptInviteModal();
       window.hideWelcomeScreen();

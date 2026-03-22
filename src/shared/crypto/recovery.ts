@@ -1,13 +1,17 @@
 /**
  * Recovery code generation and key encryption/decryption.
  *
- * Uses PBKDF2 for key derivation and AES-256-GCM for encryption.
- * These operations are protocol-agnostic — they work for both
- * legacy NaCl keys and Signal Protocol identity keys.
+ * Uses async PBKDF2 for key derivation and AES-256-GCM for encryption.
+ * Protocol-agnostic — works for Signal Protocol identity keys.
  */
 
 import * as nodeCrypto from 'crypto';
+import { promisify } from 'util';
 
+const pbkdf2 = promisify(nodeCrypto.pbkdf2);
+
+// TODO: Bump to 600_000 once a version byte is prefixed to the encrypted blob,
+// allowing old 100k blobs to be detected and decrypted at the old iteration count.
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 32;
 const IV_BYTES = 12;
@@ -21,9 +25,9 @@ export function generateRecoveryCode(length = 16): string {
   return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}-${code.slice(12, 16)}`;
 }
 
-function deriveKey(recoveryCode: string, salt: Uint8Array): Buffer {
+async function deriveKey(recoveryCode: string, salt: Uint8Array): Promise<Buffer> {
   const normalized = recoveryCode.replace(/-/g, '');
-  return nodeCrypto.pbkdf2Sync(normalized, salt, PBKDF2_ITERATIONS, KEY_BYTES, 'sha256');
+  return pbkdf2(normalized, salt, PBKDF2_ITERATIONS, KEY_BYTES, 'sha256');
 }
 
 export async function encryptPrivateKeyWithRecoveryCode(
@@ -31,7 +35,7 @@ export async function encryptPrivateKeyWithRecoveryCode(
   recoveryCode: string
 ): Promise<{ encrypted: string; salt: string }> {
   const salt = nodeCrypto.randomBytes(SALT_BYTES);
-  const key = deriveKey(recoveryCode, salt);
+  const key = await deriveKey(recoveryCode, salt);
   const iv = nodeCrypto.randomBytes(IV_BYTES);
 
   const cipher = nodeCrypto.createCipheriv('aes-256-gcm', key, iv);
@@ -55,7 +59,7 @@ export async function decryptPrivateKeyWithRecoveryCode(
   try {
     const combined = Buffer.from(encryptedBase64, 'base64');
     const salt = Buffer.from(saltBase64, 'base64');
-    const key = deriveKey(recoveryCode, salt);
+    const key = await deriveKey(recoveryCode, salt);
 
     const iv = combined.subarray(0, IV_BYTES);
     const tag = combined.subarray(IV_BYTES, IV_BYTES + 16);

@@ -6,7 +6,7 @@ import type {
   PreKeyBundle,
 } from '../crypto/signal-types';
 import type { IPreKeyStore } from '../crypto/signal-store';
-import { generateOneTimePreKeys, generateSignedPreKey } from '../crypto/key-migration';
+import { generateOneTimePreKeys, generateSignedPreKey } from '../crypto/signal-keygen';
 
 export async function uploadSignedPreKey(
   auth: AuthData,

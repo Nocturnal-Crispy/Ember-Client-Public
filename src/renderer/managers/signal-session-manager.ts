@@ -12,9 +12,6 @@
 declare global {
   interface Window {
     SignalService?: any;
-    EpochService?: any;
-    EpochHistoryService?: any;
-    InviteEphemeralKeyService?: any;
   }
 }
 
@@ -51,9 +48,6 @@ export interface SignalSessionManagerInterface {
 export class SignalSessionManager implements SignalSessionManagerInterface {
   private readonly auth: AuthData;
   private signalService: any;
-  private epochService: any;
-  private epochHistoryService: any;
-  private inviteEphemeralKeyService: any;
   private isInitialized = false;
 
   constructor(auth: AuthData) {
@@ -306,83 +300,6 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
     );
   }
 
-  // ─── Epoch Management Methods ─────────────────────────────────────────────
-
-  /**
-   * Get the epoch service for advanced epoch operations
-   */
-  getEpochService(): any {
-    if (!this.epochService) {
-      if (!window.EpochService) {
-        throw new Error('EpochService not available - check script loading order');
-      }
-      this.epochService = new window.EpochService(this.auth, this);
-    }
-    return this.epochService;
-  }
-
-  /**
-   * Get the epoch history service for decrypting historical messages
-   */
-  getEpochHistoryService(): any {
-    if (!this.epochHistoryService) {
-      if (!window.EpochHistoryService) {
-        throw new Error('EpochHistoryService not available - check script loading order');
-      }
-      const epochService = this.getEpochService();
-      this.epochHistoryService = new window.EpochHistoryService(this.auth, epochService, this);
-    }
-    return this.epochHistoryService;
-  }
-
-  /**
-   * Rotate epoch for an ember (convenience method)
-   */
-  async rotateEpoch(emberId: string): Promise<any> {
-    return this.getEpochService().rotateEpoch(emberId);
-  }
-
-  /**
-   * Get current epoch for an ember (convenience method)
-   */
-  async getCurrentEpoch(emberId: string): Promise<any> {
-    return this.getEpochService().getCurrentEpoch(emberId);
-  }
-
-  /**
-   * Process pending epoch rotations (convenience method)
-   */
-  async processPendingRotations(): Promise<void> {
-    return this.getEpochService().processPendingRotations();
-  }
-
-  /**
-   * Get the invite ephemeral key service for invite key management
-   */
-  getInviteEphemeralKeyService(): any {
-    if (!this.inviteEphemeralKeyService) {
-      if (!window.InviteEphemeralKeyService) {
-        throw new Error('InviteEphemeralKeyService not available - check script loading order');
-      }
-      this.inviteEphemeralKeyService = new window.InviteEphemeralKeyService(this.auth, this);
-    }
-    return this.inviteEphemeralKeyService;
-  }
-
-  /**
-   * Setup ephemeral keys for an invite (convenience method)
-   */
-  async setupInviteEphemeralKeys(inviteId: string, emberId: string): Promise<void> {
-    return this.getInviteEphemeralKeyService().setupInviteEphemeralKeys(inviteId, emberId);
-  }
-
-  /**
-   * Complete invite acceptance with ephemeral key processing (convenience method)
-   */
-  async completeInviteAcceptance(inviteId: string, emberId: string): Promise<void> {
-    return this.getInviteEphemeralKeyService().completeInviteAcceptance(inviteId, emberId);
-  }
-
   /**
    * Get the auth data used to initialize this manager
    */
@@ -402,17 +319,6 @@ export class SignalSessionManager implements SignalSessionManagerInterface {
    */
   destroy(): void {
     this.isInitialized = false;
-
-    // Clean up services
-    if (this.epochService) {
-      this.epochService = null;
-    }
-    if (this.epochHistoryService) {
-      this.epochHistoryService = null;
-    }
-    if (this.inviteEphemeralKeyService) {
-      this.inviteEphemeralKeyService = null;
-    }
 
     // Clean up signal service if it has cleanup method
     if (this.signalService && typeof (this.signalService as any).destroy === 'function') {

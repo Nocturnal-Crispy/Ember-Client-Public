@@ -989,10 +989,6 @@
     }, 30_000);
   }
 
-  // ─── Device key enrollment ─────────────────────────────────────────────────
-
-  // (multi-device NaCl device-key enrollment removed)
-
   // ─── Initialization ────────────────────────────────────────────────────────
 
   async function initializeDirectMessaging(): Promise<void> {

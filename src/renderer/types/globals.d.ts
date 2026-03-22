@@ -223,7 +223,6 @@ declare global {
       recoveryCode: string,
       saltBase64: string
     ): Promise<Uint8Array | null>;
-    encryptFileBytes(fileBytes: Uint8Array, key: Uint8Array): string;
     decryptFileBytes(encryptedBase64: string, key: Uint8Array): Uint8Array | null;
   }
 
@@ -271,12 +270,6 @@ declare global {
       encryptedDeviceKey: string,
       salt: string
     ): Promise<AuthResponse>;
-    registerWithRecovery(
-      hostname: string,
-      username: string,
-      password: string,
-      deviceIdentity: DeviceIdentity
-    ): Promise<AuthResponse & { _recoveryCode: string }>;
     validateLoginForm(hostname: string, username: string, password: string): string | null;
     validateRegisterForm(
       hostname: string,
