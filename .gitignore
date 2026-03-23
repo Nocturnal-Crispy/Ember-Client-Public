@@ -25,3 +25,8 @@ logs/
 test-data
 test-results/
 test-results-report/
+
+
+# Claude Flow
+.claude-flow/
+.claude/

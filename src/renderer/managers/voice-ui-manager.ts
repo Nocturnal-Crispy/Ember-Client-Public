@@ -300,6 +300,7 @@
       nameEl.textContent = username;
       item.appendChild(avatarEl);
       item.appendChild(nameEl);
+      (window as any).makeUsernameClickable?.(item, userId, username);
       list.appendChild(item);
     });
   }
