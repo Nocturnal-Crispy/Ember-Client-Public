@@ -279,19 +279,19 @@
   function wsSubscribeToChannel(channelId: string): void {
     if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
     log.debug('Subscribing to channel', { channel_id: channelId });
-    App.wsConnection.send(JSON.stringify({ type: 'subscribe', channel_id: channelId }));
+    App.wsConnection.send(JSON.stringify({ type: 'subscribe', channelId }));
   }
 
   function wsSubscribeToEmber(emberId: string): void {
     if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
     log.debug('Subscribing to ember', { ember_id: emberId });
-    App.wsConnection.send(JSON.stringify({ type: 'subscribe_ember', ember_id: emberId }));
+    App.wsConnection.send(JSON.stringify({ type: 'subscribe_ember', emberId }));
   }
 
   function wsUnsubscribeFromChannel(channelId: string): void {
     if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
     log.debug('Unsubscribing from channel', { channel_id: channelId });
-    App.wsConnection.send(JSON.stringify({ type: 'unsubscribe', channel_id: channelId }));
+    App.wsConnection.send(JSON.stringify({ type: 'unsubscribe', channelId }));
   }
 
   function registerSentMessageId(id: string): void {

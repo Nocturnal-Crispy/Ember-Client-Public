@@ -260,7 +260,7 @@ class VoiceManager {
         this.ws.send(
           JSON.stringify({
             type: 'voice_ice_candidate',
-            channel_id: this.channelId,
+            channelId: this.channelId,
             candidate: event.candidate,
             target: 0, // publisher PC
           })
@@ -297,7 +297,7 @@ class VoiceManager {
     this.ws.send(
       JSON.stringify({
         type: 'voice_join',
-        channel_id: channelId,
+        channelId,
         offer: { type: offer.type, sdp: offer.sdp },
       })
     );
@@ -420,7 +420,7 @@ class VoiceManager {
           this.ws.send(
             JSON.stringify({
               type: 'voice_ice_candidate',
-              channel_id: this.channelId,
+              channelId: this.channelId,
               candidate: event.candidate,
               target: 1, // subscriber PC
             })
@@ -476,7 +476,7 @@ class VoiceManager {
     this.ws.send(
       JSON.stringify({
         type: 'voice_answer',
-        channel_id: this.channelId,
+        channelId: this.channelId,
         sdp: answer,
       })
     );
@@ -1138,7 +1138,7 @@ class VoiceManager {
     this.ws.send(
       JSON.stringify({
         type: 'voice_renegotiate',
-        channel_id: this.channelId,
+        channelId: this.channelId,
         offer: { type: offer.type, sdp: offer.sdp },
       })
     );
@@ -1146,11 +1146,11 @@ class VoiceManager {
     this.ws.send(
       JSON.stringify({
         type: 'screen_share_start',
-        channel_id: this.channelId,
-        screen_stream_id: stream.id,
+        channelId: this.channelId,
+        screenStreamId: stream.id,
       })
     );
-    _voiceLog.info('screen_share_start sent to server', { screen_stream_id: stream.id });
+    _voiceLog.info('screen_share_start sent to server', { screenStreamId: stream.id });
 
     this.isScreenSharing = true;
     _voiceLog.info('Screen share started, renegotiation offer sent');
@@ -1174,7 +1174,7 @@ class VoiceManager {
         this.ws.send(
           JSON.stringify({
             type: 'voice_renegotiate',
-            channel_id: this.channelId,
+            channelId: this.channelId,
             offer: { type: offer.type, sdp: offer.sdp },
           })
         );
@@ -1187,7 +1187,7 @@ class VoiceManager {
       this.ws.send(
         JSON.stringify({
           type: 'screen_share_stop',
-          channel_id: this.channelId,
+          channelId: this.channelId,
         })
       );
       _voiceLog.info('screen_share_stop sent to server');
