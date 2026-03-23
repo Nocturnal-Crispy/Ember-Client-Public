@@ -1,0 +1,209 @@
+<!-- Account Recovery Modal -->
+<div id="recovery-modal" class="modal-overlay" style="display: none">
+  <div class="modal-content" style="max-width: 480px; max-height: 90vh; display: flex; flex-direction: column">
+    <div class="modal-header">
+      <h2 style="color: #fff; font-size: 1.2rem">Account Recovery</h2>
+      <button type="button" class="modal-close-btn" id="recovery-close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 16px; overflow-y: auto; flex: 1">
+      <!-- Mode selector -->
+      <div id="recovery-mode-select">
+        <p style="color: #b9bbbe; font-size: 0.85rem; margin-bottom: 16px">
+          Choose a recovery option. You will need your username, password, and a 2FA code or backup
+          code.
+        </p>
+        <button
+          type="button"
+          id="recovery-mode-device-btn"
+          class="submit-btn"
+          style="width: 100%; margin-bottom: 12px"
+        >
+          Register New Device
+        </button>
+        <button
+          type="button"
+          id="recovery-mode-password-btn"
+          class="submit-btn"
+          style="width: 100%"
+        >
+          Change Password
+        </button>
+      </div>
+
+      <!-- Device Recovery Form -->
+      <div id="recovery-device-form" style="display: none">
+        <p style="color: #b9bbbe; font-size: 0.85rem; margin-bottom: 16px">
+          Register this device with your account using your credentials and a 2FA or backup code.
+        </p>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Server Hostname</label
+          >
+          <input
+            type="text"
+            id="recovery-device-hostname"
+            class="form-input"
+            placeholder="https://ember-chat.com"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Username</label
+          >
+          <input
+            type="text"
+            id="recovery-device-username"
+            class="form-input"
+            placeholder="Username"
+            autocomplete="username"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Password</label
+          >
+          <input
+            type="password"
+            id="recovery-device-password"
+            class="form-input"
+            placeholder="Password"
+            autocomplete="current-password"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >2FA Code or Backup Code</label
+          >
+          <input
+            type="text"
+            id="recovery-device-code"
+            class="form-input"
+            placeholder="6-digit code or backup code"
+            autocomplete="one-time-code"
+            style="width: 100%; box-sizing: border-box; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 2px"
+          />
+        </div>
+        <p
+          id="recovery-device-error"
+          style="color: #f04747; font-size: 0.8rem; margin-bottom: 8px; display: none"
+        ></p>
+        <p
+          id="recovery-device-success"
+          style="color: #43b581; font-size: 0.8rem; margin-bottom: 8px; display: none"
+        ></p>
+        <button
+          type="button"
+          id="recovery-device-submit"
+          class="submit-btn"
+          style="width: 100%; margin-bottom: 8px"
+        >
+          Recover Device
+        </button>
+        <button
+          type="button"
+          id="recovery-device-back"
+          style="background: none; border: none; color: #72767d; cursor: pointer; font-size: 0.8rem; width: 100%; text-align: center; padding: 8px"
+        >
+          Back
+        </button>
+      </div>
+
+      <!-- Change Password Form -->
+      <div id="recovery-password-form" style="display: none">
+        <p style="color: #b9bbbe; font-size: 0.85rem; margin-bottom: 16px">
+          Change your password using your username and a 2FA or backup code.
+        </p>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Server Hostname</label
+          >
+          <input
+            type="text"
+            id="recovery-password-hostname"
+            class="form-input"
+            placeholder="https://ember-chat.com"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Username</label
+          >
+          <input
+            type="text"
+            id="recovery-password-username"
+            class="form-input"
+            placeholder="Username"
+            autocomplete="username"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >New Password</label
+          >
+          <input
+            type="password"
+            id="recovery-password-new"
+            class="form-input"
+            placeholder="New password (min 8 characters)"
+            autocomplete="new-password"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >Confirm New Password</label
+          >
+          <input
+            type="password"
+            id="recovery-password-confirm"
+            class="form-input"
+            placeholder="Confirm new password"
+            autocomplete="new-password"
+            style="width: 100%; box-sizing: border-box"
+          />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px">
+          <label style="color: #b9bbbe; font-size: 0.8rem; display: block; margin-bottom: 4px"
+            >2FA Code or Backup Code</label
+          >
+          <input
+            type="text"
+            id="recovery-password-code"
+            class="form-input"
+            placeholder="6-digit code or backup code"
+            autocomplete="one-time-code"
+            style="width: 100%; box-sizing: border-box; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 2px"
+          />
+        </div>
+        <p
+          id="recovery-password-error"
+          style="color: #f04747; font-size: 0.8rem; margin-bottom: 8px; display: none"
+        ></p>
+        <p
+          id="recovery-password-success"
+          style="color: #43b581; font-size: 0.8rem; margin-bottom: 8px; display: none"
+        ></p>
+        <button
+          type="button"
+          id="recovery-password-submit"
+          class="submit-btn"
+          style="width: 100%; margin-bottom: 8px"
+        >
+          Change Password
+        </button>
+        <button
+          type="button"
+          id="recovery-password-back"
+          style="background: none; border: none; color: #72767d; cursor: pointer; font-size: 0.8rem; width: 100%; text-align: center; padding: 8px"
+        >
+          Back
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -45,12 +45,13 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
-      const [titleBar, loginForm, modalTotpLogin, modalTotpSetup, overlayLoading] =
+      const [titleBar, loginForm, modalTotpLogin, modalTotpSetup, modalRecovery, overlayLoading] =
         await Promise.all([
           fetchFragment('title-bar.html'),
           fetchFragment('login-form.html'),
           fetchFragment('modal-totp-login.html'),
           fetchFragment('modal-totp-setup.html'),
+          fetchFragment('modal-recovery.html'),
           fetchFragment('overlay-loading.html'),
         ]);
 
@@ -58,6 +59,7 @@
       document.body.appendChild(parseFragment(loginForm));
       document.body.appendChild(parseFragment(modalTotpLogin));
       document.body.appendChild(parseFragment(modalTotpSetup));
+      document.body.appendChild(parseFragment(modalRecovery));
       document.body.appendChild(parseFragment(overlayLoading));
 
       // Load scripts sequentially — order matters for dependencies

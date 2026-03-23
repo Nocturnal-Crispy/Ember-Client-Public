@@ -159,6 +159,7 @@
     log.info('Auth page initializing');
     initializeElements();
     attachEventListeners();
+    initRecoveryModal();
 
     ipcRenderer.invoke('get-last-hostname').then(lastHostname => {
       if (lastHostname && elements.hostname) {
@@ -560,6 +561,257 @@
           resolve(); // Don't block registration if 2FA setup fails
         }
       })();
+    });
+  }
+
+  // ── Account Recovery Modal ──────────────────────────────────────────────
+
+  function initRecoveryModal(): void {
+    const modal = document.getElementById('recovery-modal');
+    const closeBtn = document.getElementById('recovery-close');
+    const modeSelect = document.getElementById('recovery-mode-select');
+    const deviceForm = document.getElementById('recovery-device-form');
+    const passwordForm = document.getElementById('recovery-password-form');
+    const recoveryLink = document.getElementById('recovery-link');
+
+    if (!modal || !recoveryLink) return;
+
+    function showMode(mode: 'select' | 'device' | 'password'): void {
+      if (modeSelect) modeSelect.style.display = mode === 'select' ? 'block' : 'none';
+      if (deviceForm) deviceForm.style.display = mode === 'device' ? 'block' : 'none';
+      if (passwordForm) passwordForm.style.display = mode === 'password' ? 'block' : 'none';
+    }
+
+    function openModal(): void {
+      // Pre-fill hostname from login form
+      const hostname = elements.hostname?.value.trim() ?? '';
+      const hostnameInputs = modal!.querySelectorAll<HTMLInputElement>(
+        '#recovery-device-hostname, #recovery-password-hostname'
+      );
+      hostnameInputs.forEach(input => {
+        input.value = hostname;
+      });
+      showMode('select');
+      modal!.style.display = 'flex';
+    }
+
+    function closeModal(): void {
+      modal!.style.display = 'none';
+    }
+
+    recoveryLink.addEventListener('click', openModal);
+    closeBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e: Event) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Mode selection buttons
+    document.getElementById('recovery-mode-device-btn')?.addEventListener('click', () => {
+      showMode('device');
+    });
+    document.getElementById('recovery-mode-password-btn')?.addEventListener('click', () => {
+      showMode('password');
+    });
+    document.getElementById('recovery-device-back')?.addEventListener('click', () => {
+      showMode('select');
+    });
+    document.getElementById('recovery-password-back')?.addEventListener('click', () => {
+      showMode('select');
+    });
+
+    // ── Device Recovery ──────────────────────────────────────────────────
+
+    document.getElementById('recovery-device-submit')?.addEventListener('click', async () => {
+      const hostname = (
+        document.getElementById('recovery-device-hostname') as HTMLInputElement
+      )?.value.trim();
+      const username = (
+        document.getElementById('recovery-device-username') as HTMLInputElement
+      )?.value.trim();
+      const password = (document.getElementById('recovery-device-password') as HTMLInputElement)
+        ?.value;
+      const totpCode = (
+        document.getElementById('recovery-device-code') as HTMLInputElement
+      )?.value.trim();
+      const errorEl = document.getElementById('recovery-device-error');
+      const successEl = document.getElementById('recovery-device-success');
+      const submitBtn = document.getElementById('recovery-device-submit') as HTMLButtonElement;
+
+      if (errorEl) errorEl.style.display = 'none';
+      if (successEl) successEl.style.display = 'none';
+
+      if (!hostname || !username || !password || !totpCode) {
+        if (errorEl) {
+          errorEl.textContent = 'All fields are required';
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+
+      try {
+        submitBtn.textContent = 'Recovering...';
+        submitBtn.disabled = true;
+
+        // Generate new device identity
+        const identity = await generateDeviceIdentity();
+        await ipcRenderer.invoke('save-device-identity', identity);
+
+        const resp = await fetch(`${hostname}/api/v1/recover-device`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            password,
+            totpCode,
+            newDeviceId: identity.deviceId,
+            newPublicKey: identity.publicKey,
+          }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || 'Recovery failed');
+        }
+
+        if (data.requires2FA) {
+          throw new Error('Please enter your 2FA code or backup code');
+        }
+
+        // Save auth and proceed to login
+        await ipcRenderer.invoke('save-auth', {
+          token: data.token,
+          userId: data.userId,
+          deviceId: data.deviceId,
+          hostname,
+          username: data.username,
+        });
+
+        await ipcRenderer.invoke('save-device-identity', identity, {
+          hostname,
+          userId: data.userId,
+        });
+
+        await ipcRenderer.invoke('save-login-hint', {
+          hostname,
+          username,
+          userId: data.userId,
+        });
+
+        if (identity.privateKey) {
+          await window.emberAPI.invoke('SetSafeStorage', {
+            key: `identity_key_${data.userId}_${data.deviceId}`,
+            value: identity.privateKey,
+          });
+        }
+
+        log.info('Device recovery successful', { user_id: data.userId });
+
+        if (successEl) {
+          successEl.textContent = 'Device recovered! Logging in...';
+          successEl.style.display = 'block';
+        }
+
+        setTimeout(() => {
+          closeModal();
+          ipcRenderer.send('auth-success');
+        }, 1000);
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = (err as Error).message;
+          errorEl.style.display = 'block';
+        }
+        submitBtn.textContent = 'Recover Device';
+        submitBtn.disabled = false;
+      }
+    });
+
+    // ── Change Password ──────────────────────────────────────────────────
+
+    document.getElementById('recovery-password-submit')?.addEventListener('click', async () => {
+      const hostname = (
+        document.getElementById('recovery-password-hostname') as HTMLInputElement
+      )?.value.trim();
+      const username = (
+        document.getElementById('recovery-password-username') as HTMLInputElement
+      )?.value.trim();
+      const newPw = (document.getElementById('recovery-password-new') as HTMLInputElement)?.value;
+      const confirmPw = (document.getElementById('recovery-password-confirm') as HTMLInputElement)
+        ?.value;
+      const totpCode = (
+        document.getElementById('recovery-password-code') as HTMLInputElement
+      )?.value.trim();
+      const errorEl = document.getElementById('recovery-password-error');
+      const successEl = document.getElementById('recovery-password-success');
+      const submitBtn = document.getElementById('recovery-password-submit') as HTMLButtonElement;
+
+      if (errorEl) errorEl.style.display = 'none';
+      if (successEl) successEl.style.display = 'none';
+
+      if (!hostname || !username || !newPw || !confirmPw || !totpCode) {
+        if (errorEl) {
+          errorEl.textContent = 'All fields are required';
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+
+      if (newPw.length < 8) {
+        if (errorEl) {
+          errorEl.textContent = 'New password must be at least 8 characters';
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+
+      if (newPw !== confirmPw) {
+        if (errorEl) {
+          errorEl.textContent = 'New passwords do not match';
+          errorEl.style.display = 'block';
+        }
+        return;
+      }
+
+      try {
+        submitBtn.textContent = 'Changing...';
+        submitBtn.disabled = true;
+
+        const resp = await fetch(`${hostname}/api/v1/change-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            totpCode,
+            newPassword: newPw,
+          }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || 'Password change failed');
+        }
+
+        if (data.requires2FA) {
+          throw new Error('Please enter your 2FA code or backup code');
+        }
+
+        log.info('Password changed successfully');
+
+        if (successEl) {
+          successEl.textContent = 'Password changed! You can now log in with your new password.';
+          successEl.style.display = 'block';
+        }
+
+        submitBtn.textContent = 'Done';
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = (err as Error).message;
+          errorEl.style.display = 'block';
+        }
+        submitBtn.textContent = 'Change Password';
+        submitBtn.disabled = false;
+      }
     });
   }
 
