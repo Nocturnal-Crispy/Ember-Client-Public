@@ -1084,10 +1084,12 @@
   function showLoadingIndicator(): HTMLElement {
     const loadingIndicator = document.createElement('div');
     loadingIndicator.className = 'messages-loading-indicator';
-    loadingIndicator.innerHTML = `
-      <div class="loading-spinner"></div>
-      <div class="loading-text">Loading more messages...</div>
-    `;
+    const spinnerDiv = document.createElement('div');
+    spinnerDiv.className = 'loading-spinner';
+    const loadingText = document.createElement('div');
+    loadingText.className = 'loading-text';
+    loadingText.textContent = 'Loading more messages...';
+    loadingIndicator.replaceChildren(spinnerDiv, loadingText);
 
     // Add styles for the loading indicator
     loadingIndicator.style.cssText = `

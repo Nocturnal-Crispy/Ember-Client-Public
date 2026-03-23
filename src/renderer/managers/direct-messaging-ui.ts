@@ -378,12 +378,15 @@
     const resultsContainer = dmSidebarElement.querySelector('.dm-search-results') as HTMLElement;
     if (!resultsContainer) return;
 
-    resultsContainer.innerHTML = `
-      <div class="dm-search-loading">
-        <div class="dm-loading-spinner"></div>
-        <div class="dm-loading-text">Searching...</div>
-      </div>
-    `;
+    const loadingWrapper = document.createElement('div');
+    loadingWrapper.className = 'dm-search-loading';
+    const spinnerEl = document.createElement('div');
+    spinnerEl.className = 'dm-loading-spinner';
+    const textEl = document.createElement('div');
+    textEl.className = 'dm-loading-text';
+    textEl.textContent = 'Searching...';
+    loadingWrapper.replaceChildren(spinnerEl, textEl);
+    resultsContainer.replaceChildren(loadingWrapper);
 
     resultsContainer.style.display = 'block';
     const convList1 = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
@@ -399,12 +402,16 @@
     const resultsContainer = dmSidebarElement.querySelector('.dm-search-results') as HTMLElement;
     if (!resultsContainer) return;
 
-    resultsContainer.innerHTML = `
-      <div class="dm-search-no-results">
-        <div class="dm-no-results-icon">🔍</div>
-        <div class="dm-no-results-text">No users found for "${query}"</div>
-      </div>
-    `;
+    const noResultsWrapper = document.createElement('div');
+    noResultsWrapper.className = 'dm-search-no-results';
+    const noResultsIcon = document.createElement('div');
+    noResultsIcon.className = 'dm-no-results-icon';
+    noResultsIcon.textContent = '🔍';
+    const noResultsText = document.createElement('div');
+    noResultsText.className = 'dm-no-results-text';
+    noResultsText.textContent = `No users found for "${query}"`;
+    noResultsWrapper.replaceChildren(noResultsIcon, noResultsText);
+    resultsContainer.replaceChildren(noResultsWrapper);
 
     resultsContainer.style.display = 'block';
     const convList2 = dmSidebarElement.querySelector('.dm-conversation-list') as HTMLElement;
@@ -707,11 +714,16 @@
     // Create and add empty state
     const emptyState = document.createElement('div');
     emptyState.className = 'dm-empty-state';
-    emptyState.innerHTML = `
-      <div class="dm-empty-icon">💬</div>
-      <div class="dm-empty-title">No Direct Messages</div>
-      <div class="dm-empty-text">Start a conversation with someone!</div>
-    `;
+    const emptyIcon = document.createElement('div');
+    emptyIcon.className = 'dm-empty-icon';
+    emptyIcon.textContent = '💬';
+    const emptyTitle = document.createElement('div');
+    emptyTitle.className = 'dm-empty-title';
+    emptyTitle.textContent = 'No Direct Messages';
+    const emptyText = document.createElement('div');
+    emptyText.className = 'dm-empty-text';
+    emptyText.textContent = 'Start a conversation with someone!';
+    emptyState.replaceChildren(emptyIcon, emptyTitle, emptyText);
 
     conversationList.appendChild(emptyState);
   }
@@ -1393,7 +1405,7 @@
       read: '✓✓',
     };
 
-    statusElement.innerHTML = statusIcons[status] || '';
+    statusElement.textContent = statusIcons[status] || '';
   }
 
   /**
@@ -1757,11 +1769,18 @@
   function setupAriaLabels(): void {
     // Create live regions for screen reader announcements
     const liveRegions = document.createElement('div');
-    liveRegions.innerHTML = `
-      <div class="dm-live-region polite" aria-live="polite" aria-atomic="true"></div>
-      <div class="dm-live-region assertive" aria-live="assertive" aria-atomic="true"></div>
-      <div class="dm-status-indicator" aria-live="polite"></div>
-    `;
+    const politeRegion = document.createElement('div');
+    politeRegion.className = 'dm-live-region polite';
+    politeRegion.setAttribute('aria-live', 'polite');
+    politeRegion.setAttribute('aria-atomic', 'true');
+    const assertiveRegion = document.createElement('div');
+    assertiveRegion.className = 'dm-live-region assertive';
+    assertiveRegion.setAttribute('aria-live', 'assertive');
+    assertiveRegion.setAttribute('aria-atomic', 'true');
+    const statusIndicator = document.createElement('div');
+    statusIndicator.className = 'dm-status-indicator';
+    statusIndicator.setAttribute('aria-live', 'polite');
+    liveRegions.replaceChildren(politeRegion, assertiveRegion, statusIndicator);
     document.body.appendChild(liveRegions);
 
     // Add ARIA labels to chat actions
