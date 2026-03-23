@@ -168,6 +168,7 @@ declare global {
 
   interface PluginSettings {
     readAllButton: boolean;
+    memberListToggle: boolean;
     appLock: AppLockSettings;
   }
 
@@ -646,6 +647,8 @@ declare global {
     // Globals set by plugin-settings.ts
     initPluginSettings(): void;
     getPluginSettings(): PluginSettings;
+    toggleMemberList(): void;
+    isMemberListCollapsed(): boolean;
     // Globals set by app-lock-manager.ts
     initAppLock(): void;
     lockApp(): void;

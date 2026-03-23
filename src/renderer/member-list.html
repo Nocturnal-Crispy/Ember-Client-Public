@@ -1,2 +1,24 @@
 <!-- Member List (Right Sidebar) -->
-<div class="member-list" id="member-list" style="display: none"></div>
+<div class="member-list" id="member-list" style="display: none">
+  <div class="member-list-header" id="member-list-header">
+    <span class="member-list-title">Members</span>
+    <button
+      class="member-list-collapse-btn"
+      id="member-list-collapse-btn"
+      title="Collapse member list"
+    >
+      &#x00BB;
+    </button>
+  </div>
+  <div class="member-list-content" id="member-list-content"></div>
+</div>
+<!-- Expand tab (visible only when member list is collapsed) -->
+<div class="member-list-expand-tab" id="member-list-expand-tab" style="display: none">
+  <button
+    class="member-list-expand-btn"
+    id="member-list-expand-btn"
+    title="Expand member list"
+  >
+    &#x00AB;
+  </button>
+</div>

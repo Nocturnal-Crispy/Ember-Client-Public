@@ -17,6 +17,7 @@
 
   const DEFAULT_SETTINGS: PluginSettings = {
     readAllButton: false,
+    memberListToggle: false,
     appLock: DEFAULT_APP_LOCK,
   };
 
@@ -46,6 +47,73 @@
     if (btn) {
       btn.style.display = settings.readAllButton ? '' : 'none';
     }
+    applyMemberListToggle(settings.memberListToggle);
+  }
+
+  const MEMBER_LIST_COLLAPSED_KEY = 'ember_member_list_collapsed';
+
+  function isMemberListCollapsed(): boolean {
+    return localStorage.getItem(MEMBER_LIST_COLLAPSED_KEY) === 'true';
+  }
+
+  function setMemberListCollapsed(collapsed: boolean): void {
+    localStorage.setItem(MEMBER_LIST_COLLAPSED_KEY, String(collapsed));
+  }
+
+  function updateVersionDisplay(collapsed: boolean): void {
+    const versionDisplay = document.getElementById('version-display');
+    if (versionDisplay) {
+      versionDisplay.style.display = collapsed ? 'none' : '';
+    }
+  }
+
+  function applyMemberListToggle(enabled: boolean): void {
+    const header = document.getElementById('member-list-header');
+    const memberList = document.getElementById('member-list');
+    const expandTab = document.getElementById('member-list-expand-tab');
+
+    if (!enabled) {
+      // Plugin disabled — hide header and expand tab, show member list normally
+      if (header) header.classList.remove('visible');
+      if (memberList) memberList.classList.remove('collapsed');
+      if (expandTab) expandTab.style.display = 'none';
+      updateVersionDisplay(false);
+      return;
+    }
+
+    // Plugin enabled — show header
+    if (header) header.classList.add('visible');
+
+    // Restore collapsed state
+    const collapsed = isMemberListCollapsed();
+    if (collapsed) {
+      if (memberList) memberList.classList.add('collapsed');
+      if (expandTab) expandTab.style.display = '';
+    } else {
+      if (memberList) memberList.classList.remove('collapsed');
+      if (expandTab) expandTab.style.display = 'none';
+    }
+    updateVersionDisplay(collapsed);
+  }
+
+  function toggleMemberList(): void {
+    const settings = loadSettings();
+    if (!settings.memberListToggle) return;
+
+    const collapsed = !isMemberListCollapsed();
+    setMemberListCollapsed(collapsed);
+
+    const memberList = document.getElementById('member-list');
+    const expandTab = document.getElementById('member-list-expand-tab');
+
+    if (collapsed) {
+      if (memberList) memberList.classList.add('collapsed');
+      if (expandTab) expandTab.style.display = '';
+    } else {
+      if (memberList) memberList.classList.remove('collapsed');
+      if (expandTab) expandTab.style.display = 'none';
+    }
+    updateVersionDisplay(collapsed);
   }
 
   function initPluginSettings(): void {
@@ -63,6 +131,41 @@
         saveSettings(settings);
         applySettings(settings);
         log.info('Plugin settings updated', { readAllButton: String(settings.readAllButton) });
+      });
+    }
+
+    // ─── Member List Toggle ─────────────────────────────────────────────────
+
+    const memberListToggle = document.getElementById(
+      'plugin-member-list-toggle'
+    ) as HTMLInputElement | null;
+    if (memberListToggle) {
+      memberListToggle.checked = settings.memberListToggle;
+      memberListToggle.addEventListener('change', () => {
+        settings = {
+          ...settings,
+          memberListToggle: memberListToggle.checked,
+        };
+        saveSettings(settings);
+        applySettings(settings);
+        log.info('Member list toggle updated', {
+          memberListToggle: String(settings.memberListToggle),
+        });
+      });
+    }
+
+    // Wire collapse/expand buttons
+    const collapseBtn = document.getElementById('member-list-collapse-btn');
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', () => {
+        toggleMemberList();
+      });
+    }
+
+    const expandBtn = document.getElementById('member-list-expand-btn');
+    if (expandBtn) {
+      expandBtn.addEventListener('click', () => {
+        toggleMemberList();
       });
     }
 
@@ -277,6 +380,8 @@
 
   window.initPluginSettings = initPluginSettings;
   window.getPluginSettings = loadSettings;
+  window.toggleMemberList = toggleMemberList;
+  window.isMemberListCollapsed = isMemberListCollapsed;
 
   initPluginSettings();
 })();

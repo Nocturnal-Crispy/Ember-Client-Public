@@ -179,7 +179,21 @@
           if (voiceControls) (voiceControls as HTMLElement).style.display = '';
         }
         if (chatContainer) (chatContainer as HTMLElement).style.display = '';
-        if (memberList) (memberList as HTMLElement).style.display = '';
+        if (memberList) {
+          (memberList as HTMLElement).style.display = '';
+          const collapsed =
+            typeof window.isMemberListCollapsed === 'function' &&
+            typeof window.getPluginSettings === 'function' &&
+            window.getPluginSettings().memberListToggle &&
+            window.isMemberListCollapsed();
+          if (collapsed) {
+            (memberList as HTMLElement).classList.add('collapsed');
+          } else {
+            (memberList as HTMLElement).classList.remove('collapsed');
+          }
+          const expandTab = document.getElementById('member-list-expand-tab');
+          if (expandTab) expandTab.style.display = collapsed ? '' : 'none';
+        }
         if (welcomeScreen) (welcomeScreen as HTMLElement).style.display = '';
       }
 
@@ -1184,9 +1198,11 @@
     }
 
     function renderMemberList(members: Member[]): void {
+      const memberListContent = document.getElementById('member-list-content');
       const memberList = document.getElementById('member-list');
-      if (!memberList) return;
-      memberList.innerHTML = '';
+      const target = memberListContent ?? memberList;
+      if (!target) return;
+      target.replaceChildren();
       App.currentMembers = members;
       const groups: Record<string, { label: string; members: Member[] }> = {
         online: { label: 'ONLINE', members: [] },
@@ -1204,7 +1220,7 @@
         const categoryEl = document.createElement('div');
         categoryEl.className = 'member-category';
         categoryEl.textContent = `${group.label} — ${group.members.length}`;
-        memberList.appendChild(categoryEl);
+        target.appendChild(categoryEl);
         group.members.forEach(member => {
           const memberEl = document.createElement('div');
           memberEl.className = 'member';
@@ -1249,7 +1265,7 @@
 
           memberEl.appendChild(avatarEl);
           memberEl.appendChild(nameWrapEl);
-          memberList.appendChild(memberEl);
+          target.appendChild(memberEl);
         });
       });
 
@@ -1281,11 +1297,28 @@
       const welcomeScreen = document.getElementById('welcome-screen');
       const chatContainer = document.getElementById('chat-container');
       const memberList = document.getElementById('member-list');
+      const expandTab = document.getElementById('member-list-expand-tab');
       const channels = document.querySelector('.channels') as HTMLElement | null;
       const serverHeader = document.querySelector('.server-header') as HTMLElement | null;
       welcomeScreen?.classList.add('hidden');
       if (chatContainer) chatContainer.style.display = '';
-      if (memberList) (memberList as HTMLElement).style.display = '';
+      // Respect collapsed state from plugin
+      const collapsed =
+        typeof window.isMemberListCollapsed === 'function' &&
+        typeof window.getPluginSettings === 'function' &&
+        window.getPluginSettings().memberListToggle &&
+        window.isMemberListCollapsed();
+      if (memberList) {
+        (memberList as HTMLElement).style.display = '';
+        if (collapsed) {
+          memberList.classList.add('collapsed');
+        } else {
+          memberList.classList.remove('collapsed');
+        }
+      }
+      if (expandTab) {
+        expandTab.style.display = collapsed ? '' : 'none';
+      }
       if (channels) channels.style.display = '';
       if (serverHeader) serverHeader.style.display = '';
     }
