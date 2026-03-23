@@ -46,11 +46,10 @@
 
     for (const [channelId, participants] of presence.entries()) {
       if (participants.has(userId)) {
-        // Use the channel name from App channel list if available
-        const channels = (App as any).currentChannels as
-          | Array<{ id: string; name: string }>
-          | undefined;
-        const channelName = channels?.find(ch => ch.id === channelId)?.name ?? channelId;
+        // Look up channel name from the DOM channel list
+        const channelEl = document.querySelector(`.channel[data-channel-id="${channelId}"]`);
+        const channelName =
+          channelEl?.querySelector('.channel-name')?.textContent?.trim() ?? channelId;
         log.debug('getUserVoiceChannel: user found in voice', { userId, channelId });
         return { channelId, channelName };
       }

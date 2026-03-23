@@ -218,6 +218,12 @@ class VoiceManager {
 
     this._setupLocalAudioMonitor();
 
+    // Apply push-to-talk if enabled — must happen after localStream is created
+    // so the initial mute and keydown/keyup handlers can access the audio tracks.
+    if (s.pushToTalk === true) {
+      this.setPushToTalk(true, s.pttKey ?? 'Backquote');
+    }
+
     // Create peer connection before sending voice_join so we can include the
     // offer in the join message. ion-SFU requires the client to be the offerer.
     _voiceLog.debug('Creating RTCPeerConnection');
