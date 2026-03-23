@@ -30,3 +30,6 @@ test-results-report/
 # Claude Flow
 .claude-flow/
 .claude/
+
+# Windsurf
+.windsurf/
