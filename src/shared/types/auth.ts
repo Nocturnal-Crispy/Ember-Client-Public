@@ -19,8 +19,6 @@ export interface RegistrationPayload {
   password: string;
   deviceId: string;
   publicKey: string;
-  encryptedDeviceKey: string;
-  salt: string;
 }
 
 export interface LoginPayload {
@@ -30,13 +28,9 @@ export interface LoginPayload {
 }
 
 export interface AuthResponse extends AuthData {
-  _recoveryCode?: string;
+  requires2FA?: boolean;
+  challengeToken?: string;
   minimumClientVersion?: string;
-}
-
-export interface RecoveryData {
-  encrypted: string;
-  salt: string;
 }
 
 export interface SignalDeviceCredentials {

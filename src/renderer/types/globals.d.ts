@@ -14,7 +14,6 @@ import type {
   RegistrationPayload,
   LoginPayload,
   AuthResponse,
-  RecoveryData,
   Ember,
   Channel,
   Category,
@@ -47,8 +46,6 @@ declare global {
   type RegistrationPayload = import('../../shared').RegistrationPayload;
   type LoginPayload = import('../../shared').LoginPayload;
   type AuthResponse = import('../../shared').AuthResponse;
-  type RecoveryData = import('../../shared').RecoveryData;
-
   type EmberCmd = import('../../shared').EmberCmd;
   type EmberIpcResponse<D = unknown> = import('../../shared').EmberIpcResponse<D>;
   type LoadSessionData = import('../../shared').LoadSessionData;
@@ -77,6 +74,7 @@ declare global {
   type ISignedPreKeyStore = import('../../shared').ISignedPreKeyStore;
   type IKyberPreKeyStore = import('../../shared').IKyberPreKeyStore;
   type PreKeyBundle = import('../../shared').PreKeyBundle;
+  type SignalDeviceCredentials = import('../../shared').SignalDeviceCredentials;
 
   type Ember = import('../../shared').Ember;
   type Channel = import('../../shared').Channel;
@@ -242,16 +240,6 @@ declare global {
   }
 
   interface EmberCryptoAPI {
-    generateRecoveryCode(length?: number): string;
-    encryptPrivateKeyWithRecoveryCode(
-      privateKey: Uint8Array,
-      recoveryCode: string
-    ): Promise<{ encrypted: string; salt: string }>;
-    decryptPrivateKeyWithRecoveryCode(
-      encryptedBase64: string,
-      recoveryCode: string,
-      saltBase64: string
-    ): Promise<Uint8Array | null>;
     decryptFileBytes(encryptedBase64: string, key: Uint8Array): Uint8Array | null;
   }
 
@@ -274,30 +262,28 @@ declare global {
   }
 
   interface AuthServiceAPI {
-    generateDeviceIdentity(): DeviceIdentity;
+    generateDeviceIdentity(): Promise<DeviceIdentity>;
     login(
       hostname: string,
       username: string,
       password: string,
-      deviceId: string
+      deviceId: string,
+      totpCode?: string,
+      challengeToken?: string
     ): Promise<AuthResponse>;
     register(
       hostname: string,
       username: string,
       password: string,
       deviceId: string,
-      publicKey: string,
-      encryptedDeviceKey: string,
-      salt: string
+      publicKey: string
     ): Promise<AuthResponse>;
     registerWithSignalKeys(
       hostname: string,
       username: string,
       password: string,
-      signalIdentity: SignalDeviceIdentity,
-      publicKey: string,
-      encryptedDeviceKey: string,
-      salt: string
+      signalIdentity: SignalDeviceCredentials,
+      publicKey: string
     ): Promise<AuthResponse>;
     validateLoginForm(hostname: string, username: string, password: string): string | null;
     validateRegisterForm(
@@ -398,6 +384,13 @@ declare global {
     teardown(): Promise<void>;
   }
 
+  interface TOTPService {
+    setup(): Promise<{ url: string; backupCodes: string[] }>;
+    verify(code: string): Promise<void>;
+    disable(code: string): Promise<void>;
+    getStatus(): Promise<boolean>;
+  }
+
   interface ElectronAPI {
     ipc: IPCRenderer;
     crypto: EmberCryptoAPI;
@@ -410,6 +403,7 @@ declare global {
     onCssHotReload: (callback: (message: { path: string; content: string }) => void) => void;
     desktopCapturer: DesktopCapturerAPI;
     audioCapture: AudioCaptureAPI;
+    generateQRDataURL(text: string): Promise<string>;
   }
 
   interface EmberAPI {
@@ -470,6 +464,7 @@ declare global {
     emberLog: EmberLogAPI;
     electronAPI: ElectronAPI;
     emberAPI: EmberAPI;
+    totpService: TOTPService;
     // Auth utilities
     getValidAuth(): Promise<AuthData | null>;
     getAuthSync(): AuthData | null;

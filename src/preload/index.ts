@@ -1,10 +1,10 @@
 import type { AuthData, SignalDeviceCredentials, EmberCmd, EmberIpcResponse } from '../shared';
 import { contextBridge, ipcRenderer } from 'electron';
-import * as emberCrypto from '../shared';
 import * as emberServices from '../shared';
 import * as nodeCrypto from 'crypto';
 import { refreshToken } from './services/token-refresh-service';
 import { getTokenExpiry, isTokenExpiringSoon } from './utils/token-utils';
+import QRCode from 'qrcode';
 const { IPC_CHANNELS } = require('../shared/constants');
 
 function base64ToBytes(base64: string): Uint8Array {
@@ -286,26 +286,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   crypto: {
-    generateRecoveryCode: (length?: number): string => {
-      return emberCrypto.generateRecoveryCode(length);
-    },
-    encryptPrivateKeyWithRecoveryCode: (
-      privateKey: Uint8Array,
-      recoveryCode: string
-    ): Promise<{ encrypted: string; salt: string }> => {
-      return emberCrypto.encryptPrivateKeyWithRecoveryCode(privateKey, recoveryCode);
-    },
-    decryptPrivateKeyWithRecoveryCode: (
-      encryptedBase64: string,
-      recoveryCode: string,
-      saltBase64: string
-    ): Promise<Uint8Array | null> => {
-      return emberCrypto.decryptPrivateKeyWithRecoveryCode(
-        encryptedBase64,
-        recoveryCode,
-        saltBase64
-      );
-    },
     // Legacy decrypt-only: encryptFileBytes removed (Phase 4 cleanup).
     // Retained for backward compat with pre-migration attachments (iv‖tag‖ciphertext format).
     // New attachments use per-attachment AES-256-GCM in message-service.ts.
@@ -341,43 +321,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw error;
       }
     },
-    login: (hostname: string, username: string, password: string, deviceId: string) =>
-      emberServices.login(hostname, username, password, deviceId),
+    login: (
+      hostname: string,
+      username: string,
+      password: string,
+      deviceId: string,
+      totpCode?: string,
+      challengeToken?: string
+    ) => emberServices.login(hostname, username, password, deviceId, totpCode, challengeToken),
     register: (
       hostname: string,
       username: string,
       password: string,
       deviceId: string,
-      publicKey: string,
-      encryptedDeviceKey: string,
-      salt: string
-    ) =>
-      emberServices.register(
-        hostname,
-        username,
-        password,
-        deviceId,
-        publicKey,
-        encryptedDeviceKey,
-        salt
-      ),
+      publicKey: string
+    ) => emberServices.register(hostname, username, password, deviceId, publicKey),
     registerWithSignalKeys: (
       hostname: string,
       username: string,
       password: string,
       signalIdentity: unknown,
-      publicKey: string,
-      encryptedDeviceKey: string,
-      salt: string
+      publicKey: string
     ) =>
       emberServices.registerWithSignalKeys(
         hostname,
         username,
         password,
         signalIdentity as SignalDeviceCredentials,
-        publicKey,
-        encryptedDeviceKey,
-        salt
+        publicKey
       ),
     validateLoginForm: (hostname: string, username: string, password: string) =>
       emberServices.validateLoginForm(hostname, username, password),
@@ -441,6 +412,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   getKlipyApiKey: () => ipcRenderer.invoke('get-klipy-api-key'),
+
+  generateQRDataURL: (text: string): Promise<string> =>
+    QRCode.toDataURL(text, {
+      width: 200,
+      margin: 2,
+      color: { dark: '#ffffff', light: '#00000000' },
+    }),
 
   desktopCapturer: {
     getSources: () => ipcRenderer.invoke('get-screen-sources'),

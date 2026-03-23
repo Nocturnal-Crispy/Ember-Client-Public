@@ -36,12 +36,17 @@ export async function login(
   hostname: string,
   username: string,
   password: string,
-  deviceId: string
+  deviceId: string,
+  totpCode?: string,
+  challengeToken?: string
 ): Promise<AuthResponse> {
   try {
+    const body: Record<string, string> = { username, password, deviceId };
+    if (totpCode) body.totpCode = totpCode;
+    if (challengeToken) body.challengeToken = challengeToken;
     return await apiRequest<AuthResponse>(hostname, '/api/v1/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, deviceId }),
+      body: JSON.stringify(body),
     });
   } catch (err) {
     if (err instanceof ApiError && err.statusCode === 401) {
@@ -56,9 +61,7 @@ export async function register(
   username: string,
   password: string,
   deviceId: string,
-  publicKey: string,
-  encryptedDeviceKey: string,
-  salt: string
+  publicKey: string
 ): Promise<AuthResponse> {
   return apiRequest<AuthResponse>(hostname, '/api/v1/register', {
     method: 'POST',
@@ -67,8 +70,6 @@ export async function register(
       password,
       deviceId,
       publicKey,
-      encryptedDeviceKey,
-      salt,
     }),
   });
 }
@@ -78,9 +79,7 @@ export async function registerWithSignalKeys(
   username: string,
   password: string,
   signalCredentials: SignalDeviceCredentials,
-  publicKey: string,
-  encryptedDeviceKey: string,
-  salt: string
+  publicKey: string
 ): Promise<AuthResponse> {
   const identityKeyB64 = btoa(
     String.fromCharCode(...new Uint8Array(signalCredentials.identityKeyPair.publicKey))
@@ -92,8 +91,6 @@ export async function registerWithSignalKeys(
       password,
       deviceId: signalCredentials.deviceId,
       publicKey,
-      encryptedDeviceKey,
-      salt,
       identityKey: identityKeyB64,
       registrationId: signalCredentials.registrationId,
     }),

@@ -1,75 +1,10 @@
 /**
  * Auth service — TypeScript conversion of public/auth.js.
- * Handles login/signup/recovery flows on the auth page.
+ * Handles login/signup flows on the auth page.
  */
 (function (): void {
   const ipcRenderer = window.electronAPI.ipc;
   const log = window.emberLog.createLogger('Auth');
-  const emberCrypto = window.electronAPI.crypto;
-
-  /**
-   * Safely decodes a Base64 string to Uint8Array with proper validation.
-   * @param b64 - Base64 encoded string
-   * @returns Uint8Array of decoded bytes
-   * @throws Error with descriptive message for invalid inputs
-   */
-  function decodeBase64ToBytes(b64: string): Uint8Array {
-    // Input validation
-    if (b64 === null || b64 === undefined) {
-      throw new Error('Base64 input cannot be null or undefined');
-    }
-
-    if (typeof b64 !== 'string') {
-      throw new Error('Base64 input must be a string');
-    }
-
-    // Empty string is valid (decodes to empty array)
-    if (b64 === '') {
-      return new Uint8Array(0);
-    }
-
-    // Check for correct padding first
-    const paddingIndex = b64.indexOf('=');
-    if (paddingIndex !== -1) {
-      // Padding can only appear at the end
-      const hasInvalidPadding = b64
-        .slice(paddingIndex)
-        .split('')
-        .some(char => char !== '=');
-      if (hasInvalidPadding) {
-        throw new Error('Invalid Base64 format: padding characters must be at the end');
-      }
-
-      // Maximum 2 padding characters allowed
-      const paddingCount = b64.slice(paddingIndex).length;
-      if (paddingCount > 2) {
-        throw new Error('Invalid Base64 format: too many padding characters');
-      }
-    }
-
-    // Base64 validation regex - matches valid Base64 characters only
-    // Allows A-Z, a-z, 0-9, +, /, = for padding
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-
-    if (!base64Regex.test(b64)) {
-      throw new Error('Invalid Base64 format: contains characters outside valid Base64 alphabet');
-    }
-
-    try {
-      const binary = atob(b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
-    } catch (error) {
-      // Catch any remaining atob errors and provide a better message
-      if (error instanceof DOMException) {
-        throw new Error(`Base64 decoding failed: ${error.message}`);
-      }
-      throw new Error('Base64 decoding failed: unexpected error');
-    }
-  }
 
   function compareVersions(a: string, b: string): number {
     const partsA = a.split('.').map(Number);
@@ -404,33 +339,228 @@
     return window.electronAPI.authService.login(hostname, username, password, deviceId);
   }
 
-  function showRecoveryCodeModal(recoveryCode: string): void {
-    log.info('Showing recovery code modal to user');
-    const modal = document.getElementById('recovery-code-modal');
-    const display = document.getElementById('recovery-code-display');
-    const copyBtn = document.getElementById('recovery-code-copy-btn');
-    const continueBtn = document.getElementById('recovery-code-continue-btn');
-    if (!modal || !display) return;
-    display.textContent = recoveryCode;
-    modal.classList.remove('hidden');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(recoveryCode).then(() => {
-          log.debug('Recovery code copied to clipboard by user');
-          copyBtn.textContent = 'Copied!';
+  function showTOTPLoginModal(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const modal = document.getElementById('totp-login-modal');
+      const codeInput = document.getElementById('totp-login-code') as HTMLInputElement | null;
+      const submitBtn = document.getElementById('totp-login-submit');
+      const cancelBtn = document.getElementById('totp-login-cancel');
+      const errorEl = document.getElementById('totp-login-error');
+
+      if (!modal || !codeInput) {
+        reject(new Error('TOTP login modal not found'));
+        return;
+      }
+
+      modal.classList.remove('hidden');
+      codeInput.value = '';
+      codeInput.focus();
+      if (errorEl) errorEl.classList.add('hidden');
+
+      function cleanup(): void {
+        modal!.classList.add('hidden');
+        if (submitBtn) submitBtn.removeEventListener('click', onSubmit);
+        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+        if (codeInput) codeInput.removeEventListener('keydown', onKeydown);
+      }
+
+      function onSubmit(): void {
+        const code = codeInput!.value.trim();
+        if (!code) {
+          if (errorEl) {
+            errorEl.textContent = 'Please enter your 2FA code';
+            errorEl.classList.remove('hidden');
+          }
+          return;
+        }
+        cleanup();
+        resolve(code);
+      }
+
+      function onCancel(): void {
+        cleanup();
+        reject(new Error('2FA verification cancelled'));
+      }
+
+      function onKeydown(e: KeyboardEvent): void {
+        if (e.key === 'Enter') onSubmit();
+        if (e.key === 'Escape') onCancel();
+      }
+
+      if (submitBtn) submitBtn.addEventListener('click', onSubmit);
+      if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+      codeInput.addEventListener('keydown', onKeydown);
+    });
+  }
+
+  async function showTOTPSetupModal(hostname: string, token: string): Promise<void> {
+    return new Promise((resolve, _reject) => {
+      const modal = document.getElementById('totp-setup-modal');
+      const qrContainer = document.getElementById('totp-setup-qr');
+      const secretEl = document.getElementById('totp-setup-secret');
+      const codeInput = document.getElementById('totp-setup-code') as HTMLInputElement | null;
+      const verifyBtn = document.getElementById('totp-setup-verify-btn');
+      const errorEl = document.getElementById('totp-setup-error');
+      const closeBtn = document.getElementById('totp-setup-close');
+      const stepQR = document.getElementById('totp-setup-step-qr');
+      const stepBackup = document.getElementById('totp-setup-step-backup');
+      const backupCodesEl = document.getElementById('totp-setup-backup-codes');
+      const copyBtn = document.getElementById('totp-setup-copy-backup');
+      const doneBtn = document.getElementById('totp-setup-done-btn');
+
+      if (!modal || !qrContainer || !codeInput) {
+        log.warn('TOTP setup modal elements not found, skipping 2FA setup');
+        resolve();
+        return;
+      }
+
+      let backupCodes: string[] = [];
+
+      function cleanup(): void {
+        modal!.classList.add('hidden');
+        if (verifyBtn) verifyBtn.removeEventListener('click', onVerify);
+        if (closeBtn) closeBtn.removeEventListener('click', onClose);
+        if (doneBtn) doneBtn.removeEventListener('click', onDone);
+        if (copyBtn) copyBtn.removeEventListener('click', onCopy);
+        if (codeInput) codeInput.removeEventListener('keydown', onKeydown);
+      }
+
+      function onClose(): void {
+        cleanup();
+        resolve();
+      }
+
+      function onDone(): void {
+        cleanup();
+        resolve();
+      }
+
+      async function onCopy(): Promise<void> {
+        try {
+          await navigator.clipboard.writeText(backupCodes.join('\n'));
+          if (copyBtn) copyBtn.textContent = 'Copied!';
           setTimeout(() => {
-            copyBtn.textContent = 'Copy to Clipboard';
+            if (copyBtn) copyBtn.textContent = 'Copy All Codes';
           }, 2000);
-        });
-      });
-    }
-    if (continueBtn) {
-      continueBtn.addEventListener('click', () => {
-        log.info('User acknowledged recovery code, proceeding to main app');
-        modal.classList.add('hidden');
-        ipcRenderer.send('auth-success');
-      });
-    }
+        } catch {
+          log.warn('Failed to copy backup codes to clipboard');
+        }
+      }
+
+      async function onVerify(): Promise<void> {
+        const code = codeInput!.value.trim();
+        if (!code || code.length !== 6) {
+          if (errorEl) {
+            errorEl.textContent = 'Please enter a 6-digit code';
+            errorEl.style.display = 'block';
+          }
+          return;
+        }
+
+        try {
+          if (verifyBtn) {
+            verifyBtn.textContent = 'Verifying...';
+            (verifyBtn as HTMLButtonElement).disabled = true;
+          }
+
+          const resp = await fetch(`${hostname}/api/v1/2fa/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ code }),
+          });
+
+          if (!resp.ok) {
+            const data = await resp.json();
+            throw new Error(data.error || 'Invalid code');
+          }
+
+          log.info('2FA verified and enabled during registration');
+
+          // Show backup codes step
+          if (stepQR) stepQR.style.display = 'none';
+          if (stepBackup) stepBackup.style.display = 'block';
+          if (backupCodesEl) {
+            backupCodesEl.textContent = '';
+            for (const code of backupCodes) {
+              const span = document.createElement('span');
+              span.textContent = code;
+              span.style.padding = '4px';
+              backupCodesEl.appendChild(span);
+            }
+          }
+        } catch (err) {
+          if (errorEl) {
+            errorEl.textContent = (err as Error).message;
+            errorEl.style.display = 'block';
+          }
+          if (verifyBtn) {
+            verifyBtn.textContent = 'Verify & Enable';
+            (verifyBtn as HTMLButtonElement).disabled = false;
+          }
+        }
+      }
+
+      function onKeydown(e: KeyboardEvent): void {
+        if (e.key === 'Enter') onVerify();
+        if (e.key === 'Escape') onClose();
+      }
+
+      // Initiate setup by calling the server
+      (async () => {
+        try {
+          const resp = await fetch(`${hostname}/api/v1/2fa/setup`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!resp.ok) {
+            const data = await resp.json();
+            throw new Error(data.error || 'Failed to setup 2FA');
+          }
+
+          const data = (await resp.json()) as { url: string; backupCodes: string[] };
+          backupCodes = data.backupCodes;
+
+          // Extract secret from otpauth URL for manual entry
+          const urlObj = new URL(data.url);
+          const secret = urlObj.searchParams.get('secret') || '';
+          if (secretEl) secretEl.textContent = secret;
+
+          // Render QR code
+          const qrDataURL = await window.electronAPI.generateQRDataURL(data.url);
+          const img = document.createElement('img');
+          img.src = qrDataURL;
+          img.alt = 'TOTP QR Code';
+          img.style.width = '200px';
+          img.style.height = '200px';
+          qrContainer.textContent = '';
+          qrContainer.appendChild(img);
+
+          // Show modal and wire up events
+          if (stepQR) stepQR.style.display = 'block';
+          if (stepBackup) stepBackup.style.display = 'none';
+          if (errorEl) errorEl.style.display = 'none';
+          codeInput.value = '';
+          modal.classList.remove('hidden');
+          codeInput.focus();
+
+          if (verifyBtn) verifyBtn.addEventListener('click', onVerify);
+          if (closeBtn) closeBtn.addEventListener('click', onClose);
+          if (doneBtn) doneBtn.addEventListener('click', onDone);
+          if (copyBtn) copyBtn.addEventListener('click', onCopy);
+          codeInput.addEventListener('keydown', onKeydown);
+        } catch (err) {
+          log.error('Failed to initiate 2FA setup', { error: (err as Error).message });
+          resolve(); // Don't block registration if 2FA setup fails
+        }
+      })();
+    });
   }
 
   async function handleSubmit(): Promise<void> {
@@ -474,14 +604,28 @@
       if (isLoginMode) {
         log.info('Initiating login request', { username });
         authData = await login(hostname, username, password, deviceIdentity.deviceId);
+
+        if (authData.requires2FA) {
+          log.info('2FA required, showing TOTP input');
+          hideLoading();
+          const totpCode = await showTOTPLoginModal();
+          showLoading('Verifying 2FA...', 'Authenticating');
+          authData = await window.electronAPI.authService.login(
+            hostname,
+            username,
+            password,
+            deviceIdentity.deviceId,
+            totpCode,
+            authData.challengeToken
+          );
+        }
+
         log.info('Login successful', {
           user_id: authData.userId,
           username: authData.username,
         });
       } else {
         log.info('Initiating registration request', { username });
-        const recoveryCode = emberCrypto.generateRecoveryCode();
-        log.debug('Recovery code generated for new account');
 
         // Generate a single Signal identity for everything
         const signalIdentity =
@@ -511,23 +655,12 @@
         };
         await ipcRenderer.invoke('save-device-identity', deviceIdentity);
 
-        const privateKeyBytes = decodeBase64ToBytes(privateKeyB64);
-        const recoveryData: RecoveryData = await emberCrypto.encryptPrivateKeyWithRecoveryCode(
-          privateKeyBytes,
-          recoveryCode
-        );
-        log.debug('Recovery code generated, registering with Signal keys', {
-          deviceId: signalIdentity.deviceId,
-        });
-
         authData = await window.electronAPI.authService.registerWithSignalKeys(
           hostname,
           username,
           password,
           signalIdentity,
-          publicKeyB64,
-          recoveryData.encrypted,
-          recoveryData.salt
+          publicKeyB64
         );
 
         log.info('Registration successful with Signal keys', {
@@ -577,8 +710,6 @@
           key: `registration_id_${authData.userId}_${authData.deviceId}`,
           value: String(signalIdentity.registrationId),
         });
-
-        authData._recoveryCode = recoveryCode;
       }
 
       log.debug('Saving auth data to store');
@@ -641,12 +772,14 @@
 
       hideLoading();
 
-      if (authData._recoveryCode) {
-        showRecoveryCodeModal(authData._recoveryCode);
-      } else {
-        log.info('Authentication complete, transitioning to main app');
-        ipcRenderer.send('auth-success');
+      // ── 2FA setup for new registrations ──────────────────────────────
+      if (!isLoginMode) {
+        log.info('Showing 2FA setup for new registration');
+        await showTOTPSetupModal(hostname, authData.token);
       }
+
+      log.info('Authentication complete, transitioning to main app');
+      ipcRenderer.send('auth-success');
     } catch (error) {
       hideLoading();
       const err = error as Error;

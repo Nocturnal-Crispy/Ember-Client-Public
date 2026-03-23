@@ -1,0 +1,34 @@
+<!-- TOTP 2FA Login Modal -->
+<div id="totp-login-modal" class="loading-overlay hidden">
+  <div class="login-card" style="max-width: 400px; text-align: center">
+    <div class="login-header">
+      <h1 style="color: #faa61a; font-size: 1.3rem">Two-Factor Authentication</h1>
+      <p style="color: #b9bbbe; font-size: 0.85rem; margin-top: 8px; line-height: 1.5">
+        Enter the 6-digit code from your authenticator app,
+        or use a backup code.
+      </p>
+    </div>
+    <div style="margin: 20px 0">
+      <input
+        type="text"
+        id="totp-login-code"
+        class="form-input"
+        placeholder="000000"
+        maxlength="16"
+        autocomplete="one-time-code"
+        style="text-align: center; font-size: 1.4rem; letter-spacing: 6px; font-family: 'Courier New', monospace; padding: 14px"
+      />
+    </div>
+    <p id="totp-login-error" class="hidden" style="color: #f04747; font-size: 0.8rem; margin-bottom: 12px"></p>
+    <button type="button" id="totp-login-submit" class="submit-btn" style="width: 100%">
+      Verify
+    </button>
+    <button
+      type="button"
+      id="totp-login-cancel"
+      style="background: none; border: none; color: #72767d; cursor: pointer; font-size: 0.8rem; margin-top: 12px; padding: 8px"
+    >
+      Cancel
+    </button>
+  </div>
+</div>

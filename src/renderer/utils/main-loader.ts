@@ -16,6 +16,7 @@
     '../../dist/renderer/utils/logger.js',
     '../../dist/renderer/managers/theme-manager.js',
     '../../dist/renderer/utils/auth-loader.js',
+    '../../dist/renderer/services/totp-service.js',
     '../../dist/renderer/services/signal-service.js',
     '../../dist/renderer/managers/signal-session-manager.js',
     '../../dist/renderer/services/history-crypto-service.js',
@@ -116,6 +117,7 @@
         modalUpdate,
         modalAppLock,
         modalScreenShare,
+        modalTotpSetup,
       ] = await Promise.all([
         fetchFragment('title-bar.html'),
         fetchFragment('server-list.html'),
@@ -148,6 +150,7 @@
         fetchFragment('modal-update.html'),
         fetchFragment('modal-app-lock.html'),
         fetchFragment('modal-screen-share.html'),
+        fetchFragment('modal-totp-setup.html'),
       ]);
 
       // Title bar (top-level)
@@ -191,6 +194,7 @@
       document.body.appendChild(parseFragment(modalUpdate));
       document.body.appendChild(parseFragment(modalAppLock));
       document.body.appendChild(parseFragment(modalScreenShare));
+      document.body.appendChild(parseFragment(modalTotpSetup));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

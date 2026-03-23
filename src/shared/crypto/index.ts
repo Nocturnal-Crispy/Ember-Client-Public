@@ -2,7 +2,6 @@ export * from './signal-types';
 export * from './envelope';
 export * from './signal-store';
 export * from './signal-keygen';
-export * from './recovery';
 export * from './ember-ipc-types';
 export * from './history-key-types';
 export * from './hkdf';
