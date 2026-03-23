@@ -447,9 +447,10 @@
 
     try {
       log.debug('Loading device identity');
-      let deviceIdentity = (await ipcRenderer.invoke(
-        'get-device-identity'
-      )) as DeviceIdentity | null;
+      let deviceIdentity = (await ipcRenderer.invoke('get-device-identity', {
+        hostname,
+        username,
+      })) as DeviceIdentity | null;
 
       if (!deviceIdentity || !deviceIdentity.privateKey) {
         if (!deviceIdentity) {
@@ -588,7 +589,21 @@
         hostname,
         username: authData.username,
       });
-      log.info('Auth data saved', {
+
+      // Save device identity under scoped key (hostname + userId)
+      await ipcRenderer.invoke('save-device-identity', deviceIdentity, {
+        hostname,
+        userId: authData.userId,
+      });
+
+      // Update loginHint so next login with this username resolves to this userId
+      await ipcRenderer.invoke('save-login-hint', {
+        hostname,
+        username,
+        userId: authData.userId,
+      });
+
+      log.info('Auth data and scoped device identity saved', {
         username: authData.username,
         user_id: authData.userId,
       });

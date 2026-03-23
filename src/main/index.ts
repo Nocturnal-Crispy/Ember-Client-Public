@@ -9,6 +9,7 @@ import {
   desktopCapturer,
   dialog,
 } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as nodeCrypto from 'crypto';
 import Store from 'electron-store';
@@ -34,7 +35,7 @@ import {
 import { isDev } from './dev';
 import { KLIPPY_API_KEY } from './api-key';
 import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from '../shared/types';
-import { openSignalDatabase, ensureSignalDatabaseFile } from './signal-db';
+import { openSignalDatabase, ensureSignalDatabaseFile, getSignalDbFilename } from './signal-db';
 import type { SignalDatabase } from './signal-db';
 import { registerEmberIpcHandlers, updateSignalDatabase } from './ipc/ember-ipc';
 import { resolveSignalKeyBytes } from './signal-key-utils';
@@ -384,6 +385,10 @@ async function reinitializeSignalDatabase(): Promise<boolean> {
   let localIdentityPrivateKeyBytes: Buffer | null = null;
   let localRegistrationId: number | null = null;
   let localIdentityAddress: string | null = null;
+  const dbFilename =
+    authData?.userId && authData?.deviceId
+      ? getSignalDbFilename(authData.userId, authData.deviceId)
+      : undefined;
 
   if (authData && authData.userId && authData.deviceId) {
     // Get Signal identity private key for Signal database authentication
@@ -426,6 +431,7 @@ async function reinitializeSignalDatabase(): Promise<boolean> {
         localIdentityPrivateKey: localIdentityPrivateKeyBytes ?? undefined,
         localRegistrationId: localRegistrationId ?? undefined,
         localIdentityAddress: localIdentityAddress ?? undefined,
+        dbFilename,
       });
       updateSignalDatabase(signalDb);
       log.info('Signal database re-initialized and IPC handlers updated');
@@ -476,14 +482,23 @@ ipcMain.on('auth-success', async () => {
 });
 
 ipcMain.on('auth-logout', () => {
-  log.info('Logout signal received, clearing auth and loading login window');
+  log.info('Logout signal received, clearing session state');
   store.delete('auth');
+  store.delete('currentDevice');
+  // Do NOT delete device:<hostname>:<userId> — preserve for re-login
+  // Do NOT delete Signal DB file — preserve for re-login
+  // Do NOT delete safeStorage keys — already scoped by userId+deviceId
 
-  // CRITICAL FIX: Close Signal database on logout to prevent cross-user data leakage
   if (signalDb) {
     signalDb.closeDatabase();
     signalDb = null;
     log.debug('Signal database closed on logout');
+  }
+
+  // Clean up legacy global device key if present
+  if (store.get('device')) {
+    store.delete('device');
+    log.debug('Legacy global device key cleaned up');
   }
 
   if (mainWindow) {
@@ -589,28 +604,140 @@ function decryptPrivateKey(stored: string): string {
 
 // ─── IPC: Device identity ─────────────────────────────────────────────────────
 
-ipcMain.handle('get-device-identity', async () => {
-  log.debug('IPC: get-device-identity');
-  const device = store.get('device') ?? null;
-  if (!device) {
-    log.debug('No device identity found in store');
+ipcMain.handle(
+  'get-device-identity',
+  async (_event, scope?: { hostname?: string; username?: string }) => {
+    log.debug('IPC: get-device-identity', { scope: scope ?? 'current' });
+
+    // Reattach privateKey from safeStorage so callers get a complete DeviceIdentity
+    async function reattachPrivateKey(
+      device: Record<string, unknown>,
+      userId: string
+    ): Promise<Record<string, unknown>> {
+      if (device.privateKey) return device;
+      const deviceId = device.deviceId as string | undefined;
+      if (!userId || !deviceId) return device;
+      const storedKey = await electronSafeStorageFunctions.getSafeStorage(
+        `identity_key_${userId}_${deviceId}`
+      );
+      if (storedKey) {
+        return { ...device, privateKey: storedKey };
+      }
+      return device;
+    }
+
+    if (scope?.hostname && scope?.username) {
+      // Pre-login: resolve via loginHint → userId → scoped device
+      const hintKey = `loginHint:${scope.hostname}:${scope.username}`;
+      const cachedUserId = store.get(hintKey) as string | undefined;
+
+      if (cachedUserId) {
+        const deviceKey = `device:${scope.hostname}:${cachedUserId}`;
+        const device = store.get(deviceKey) as Record<string, unknown> | undefined;
+        if (device) {
+          log.debug('Scoped device identity found via loginHint', {
+            hostname: scope.hostname,
+            userId: cachedUserId,
+            deviceId: device.deviceId,
+          });
+          return reattachPrivateKey(device, cachedUserId);
+        }
+      }
+
+      log.debug('No scoped device identity found', {
+        hostname: scope.hostname,
+        username: scope.username,
+      });
+      return null;
+    }
+
+    // Post-login callers: return current device
+    const currentRef = store.get('currentDevice') as
+      | { hostname?: string; userId?: string }
+      | undefined;
+    if (currentRef?.hostname && currentRef?.userId) {
+      const deviceKey = `device:${currentRef.hostname}:${currentRef.userId}`;
+      const device = store.get(deviceKey) as Record<string, unknown> | undefined;
+      if (device) {
+        log.debug('Current device identity retrieved');
+        return reattachPrivateKey(device, currentRef.userId);
+      }
+    }
+
+    // Fallback: check legacy global 'device' key (migration path)
+    const legacy = store.get('device') as Record<string, unknown> | null;
+    if (legacy) {
+      log.debug('Legacy global device identity found (migration)');
+      return legacy;
+    }
+
+    log.debug('No device identity found');
     return null;
   }
+);
 
-  log.debug('Device identity retrieved');
-  return device;
-});
+ipcMain.handle(
+  'save-device-identity',
+  async (
+    _event,
+    deviceIdentity: Record<string, unknown>,
+    scope?: { hostname?: string; userId?: string }
+  ) => {
+    log.debug('IPC: save-device-identity', {
+      device_id: deviceIdentity?.deviceId,
+      scope: scope ?? 'pre-login',
+    });
 
-ipcMain.handle('save-device-identity', async (_event, deviceIdentity) => {
-  log.debug('IPC: save-device-identity', {
-    device_id: deviceIdentity?.deviceId,
-  });
-  const { private_key: _, ...deviceWithoutKey } = deviceIdentity;
-  store.set('device', deviceWithoutKey);
+    // Fix: strip privateKey (camelCase), not private_key (snake_case)
+    const { privateKey: _pk, ...deviceWithoutKey } = deviceIdentity;
 
-  log.debug('Device identity saved');
-  return true;
-});
+    if (scope?.hostname && scope?.userId) {
+      // Post-login save: store under scoped key + set as current
+      const deviceKey = `device:${scope.hostname}:${scope.userId}`;
+      store.set(deviceKey, deviceWithoutKey);
+      store.set('currentDevice', {
+        hostname: scope.hostname,
+        userId: scope.userId,
+        deviceId: deviceIdentity.deviceId,
+      });
+      // Clean up pre-login pending device now that we have a proper scoped save
+      if (store.get('pendingDevice')) {
+        store.delete('pendingDevice');
+      }
+      log.debug('Scoped device identity saved', { deviceKey });
+    } else {
+      // Pre-login save (first-time user, no userId yet): save to temp key
+      store.set('pendingDevice', deviceWithoutKey);
+      log.debug('Pending device identity saved (pre-login)');
+    }
+
+    return true;
+  }
+);
+
+ipcMain.handle(
+  'save-login-hint',
+  async (
+    _event,
+    { hostname, username, userId }: { hostname: string; username: string; userId: string }
+  ) => {
+    if (
+      !hostname ||
+      !username ||
+      !userId ||
+      typeof hostname !== 'string' ||
+      typeof username !== 'string' ||
+      typeof userId !== 'string'
+    ) {
+      log.warn('IPC: save-login-hint called with invalid arguments');
+      return false;
+    }
+    log.debug('IPC: save-login-hint', { hostname, username });
+    const hintKey = `loginHint:${hostname}:${username}`;
+    store.set(hintKey, userId);
+    return true;
+  }
+);
 
 // ─── IPC: Auth storage ────────────────────────────────────────────────────────
 
@@ -1230,12 +1357,19 @@ if (!gotTheLock) {
     log.info('App ready');
 
     // ── Early Signal database check ──────────────────────────────────────────
-    // Create the database file + schema before anything else. This catches
-    // native-module issues (NODE_MODULE_VERSION / self-register) immediately
-    // at startup instead of after the user has gone through registration.
+    // Verify that better-sqlite3 loads correctly. If we have auth data, check
+    // the user-scoped DB file; otherwise just check the native module works.
+    const startupAuth = store.get('auth') as any;
     try {
-      ensureSignalDatabaseFile(app.getPath('userData'));
-      log.info('Signal database file verified');
+      if (startupAuth?.userId && startupAuth?.deviceId) {
+        const startupDbFilename = getSignalDbFilename(startupAuth.userId, startupAuth.deviceId);
+        ensureSignalDatabaseFile(app.getPath('userData'), startupDbFilename);
+        log.info('Signal database file verified', { dbFilename: startupDbFilename });
+      } else {
+        // No auth data — just verify that better-sqlite3 loads (uses default filename)
+        ensureSignalDatabaseFile(app.getPath('userData'));
+        log.info('Signal database native module verified (no auth data at startup)');
+      }
     } catch (err) {
       const errorStr = String(err);
       log.error('Signal database file check failed at startup', { error: errorStr });
@@ -1253,6 +1387,35 @@ if (!gotTheLock) {
 
     checkSafeStorageAtStartup();
 
+    // ── Legacy device migration ──────────────────────────────────────────────
+    // Migrate global 'device' store key → scoped 'device:<hostname>:<userId>'
+    const legacyDevice = store.get('device') as Record<string, unknown> | undefined;
+    if (legacyDevice && startupAuth?.hostname && startupAuth?.userId) {
+      const scopedKey = `device:${startupAuth.hostname}:${startupAuth.userId}`;
+      if (!store.get(scopedKey)) {
+        store.set(scopedKey, legacyDevice);
+        log.info('Migrated legacy device to scoped key', { scopedKey });
+      }
+      store.delete('device');
+      store.set('currentDevice', {
+        hostname: startupAuth.hostname,
+        userId: startupAuth.userId,
+        deviceId: legacyDevice.deviceId,
+      });
+      log.info('Legacy device migration complete');
+    }
+
+    // Migrate legacy signal-state.db → scoped signal-<userId>-<deviceId>.db
+    if (startupAuth?.userId && startupAuth?.deviceId) {
+      const legacyDbPath = path.join(app.getPath('userData'), 'signal-state.db');
+      const scopedDbFilename = getSignalDbFilename(startupAuth.userId, startupAuth.deviceId);
+      const scopedDbPath = path.join(app.getPath('userData'), scopedDbFilename);
+      if (fs.existsSync(legacyDbPath) && !fs.existsSync(scopedDbPath)) {
+        fs.renameSync(legacyDbPath, scopedDbPath);
+        log.info('Migrated legacy Signal DB to scoped filename', { scopedDbFilename });
+      }
+    }
+
     // Initialize auth service with safeStorage
     initializeAuthWithElectronSafeStorage();
 
@@ -1260,13 +1423,17 @@ if (!gotTheLock) {
     registerAudioCaptureHandlers(process.pid);
 
     // Open signal database using the device private key for HKDF
-    const authData = store.get('auth') as any;
+    const authData = startupAuth;
     let privateKeyBytes: Buffer | null = null;
 
     // Optional local Signal identity material for initialising libsignal store rows.
     let localIdentityPrivateKeyBytes: Buffer | null = null;
     let localRegistrationId: number | null = null;
     let localIdentityAddress: string | null = null;
+    const startupDbFilename =
+      authData?.userId && authData?.deviceId
+        ? getSignalDbFilename(authData.userId, authData.deviceId)
+        : undefined;
 
     if (authData && authData.userId && authData.deviceId) {
       // Get Signal identity private key for database authentication
@@ -1312,6 +1479,7 @@ if (!gotTheLock) {
           localIdentityPrivateKey: localIdentityPrivateKeyBytes ?? undefined,
           localRegistrationId: localRegistrationId ?? undefined,
           localIdentityAddress: localIdentityAddress ?? undefined,
+          dbFilename: startupDbFilename,
         });
         registerEmberIpcHandlers(signalDb);
         log.info('Signal database opened and IPC handlers registered');

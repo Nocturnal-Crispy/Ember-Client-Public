@@ -155,6 +155,7 @@ const ALLOWED_SEND: readonly string[] = [
 const ALLOWED_INVOKE: readonly string[] = [
   'get-device-identity',
   'save-device-identity',
+  'save-login-hint',
   'get-auth',
   'save-auth',
   'get-last-hostname',

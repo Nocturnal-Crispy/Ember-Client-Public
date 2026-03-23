@@ -65,7 +65,7 @@ describe('wsSubscribeToChannel', () => {
     (window as any).wsSubscribeToChannel('ch-123');
 
     expect(mockWsSend).toHaveBeenCalledWith(
-      JSON.stringify({ type: 'subscribe', channel_id: 'ch-123' })
+      JSON.stringify({ type: 'subscribe', channelId: 'ch-123' })
     );
   });
 
@@ -95,7 +95,7 @@ describe('wsSubscribeToEmber', () => {
     (window as any).wsSubscribeToEmber('e-456');
 
     expect(mockWsSend).toHaveBeenCalledWith(
-      JSON.stringify({ type: 'subscribe_ember', ember_id: 'e-456' })
+      JSON.stringify({ type: 'subscribe_ember', emberId: 'e-456' })
     );
   });
 
@@ -327,7 +327,7 @@ describe('wsUnsubscribeFromChannel', () => {
     (window as any).wsUnsubscribeFromChannel('ch-123');
 
     expect(mockWsSend).toHaveBeenCalledWith(
-      JSON.stringify({ type: 'unsubscribe', channel_id: 'ch-123' })
+      JSON.stringify({ type: 'unsubscribe', channelId: 'ch-123' })
     );
   });
 

@@ -194,12 +194,12 @@ describe('startScreenShare', () => {
     expect(mockWsMessages.length).toBe(2);
     const msg = JSON.parse(mockWsMessages[0]);
     expect(msg.type).toBe('voice_renegotiate');
-    expect(msg.channel_id).toBe(MOCK_CHANNEL_ID);
+    expect(msg.channelId).toBe(MOCK_CHANNEL_ID);
     expect(msg.offer).toMatchObject({ type: 'offer' });
     const ssMsg = JSON.parse(mockWsMessages[1]);
     expect(ssMsg.type).toBe('screen_share_start');
-    expect(ssMsg.channel_id).toBe(MOCK_CHANNEL_ID);
-    expect(typeof ssMsg.screen_stream_id).toBe('string');
+    expect(ssMsg.channelId).toBe(MOCK_CHANNEL_ID);
+    expect(typeof ssMsg.screenStreamId).toBe('string');
   });
 
   it('sets isScreenSharing=true and stores stream', async () => {
@@ -288,7 +288,7 @@ describe('stopScreenShare', () => {
     expect(renegMsg.type).toBe('voice_renegotiate');
     const stopMsg = JSON.parse(mockWsMessages[1]);
     expect(stopMsg.type).toBe('screen_share_stop');
-    expect(stopMsg.channel_id).toBe(MOCK_CHANNEL_ID);
+    expect(stopMsg.channelId).toBe(MOCK_CHANNEL_ID);
   });
 
   it('resets isScreenSharing and localScreenStream', async () => {

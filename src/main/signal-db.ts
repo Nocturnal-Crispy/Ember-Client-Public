@@ -50,7 +50,7 @@ export interface SignalDatabase
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DB_FILENAME = 'signal-state.db';
+const DEFAULT_DB_FILENAME = 'signal-state.db';
 const HKDF_INFO = Buffer.from('signal-db-encryption');
 // Domain-specific salt per RFC 5869 section 3.1 — ensures the same IKM used
 // in different contexts produces different derived keys. Requires fresh
@@ -60,6 +60,17 @@ const DERIVED_KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const ALGORITHM = 'aes-256-gcm' as const;
+
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+export function getSignalDbFilename(userId?: string, deviceId?: string): string {
+  if (userId && deviceId) {
+    return `signal-${sanitizeId(userId)}-${sanitizeId(deviceId)}.db`;
+  }
+  return DEFAULT_DB_FILENAME;
+}
 
 // ─── DDL ──────────────────────────────────────────────────────────────────────
 
@@ -181,8 +192,8 @@ function bufferEquals(a: Uint8Array, b: Uint8Array): boolean {
  *
  * The call is idempotent: if the file and tables already exist, it is a no-op.
  */
-export function ensureSignalDatabaseFile(userDataPath: string): void {
-  const dbPath = path.join(userDataPath, DB_FILENAME);
+export function ensureSignalDatabaseFile(userDataPath: string, dbFilename?: string): void {
+  const dbPath = path.join(userDataPath, dbFilename ?? DEFAULT_DB_FILENAME);
   let db: Database.Database | undefined;
 
   try {
@@ -220,9 +231,10 @@ export function openSignalDatabase(
     readonly localIdentityPublicKey?: Uint8Array;
     readonly localRegistrationId?: number;
     readonly localIdentityAddress?: string;
+    readonly dbFilename?: string;
   }
 ): SignalDatabase {
-  const dbPath = path.join(userDataPath, DB_FILENAME);
+  const dbPath = path.join(userDataPath, options?.dbFilename ?? DEFAULT_DB_FILENAME);
   let db: Database.Database | undefined;
 
   try {
