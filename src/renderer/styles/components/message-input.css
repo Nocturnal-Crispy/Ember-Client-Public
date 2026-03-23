@@ -52,6 +52,23 @@
   color: var(--highlight);
 }
 
+.send-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background-color: transparent;
+  color: rgba(var(--rgb-highlight), 0.4);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s ease;
+  padding: 0;
+}
+
+.send-btn:hover {
+  color: var(--highlight);
+}
+
 .message-input {
   flex: 1;
   background-color: transparent;

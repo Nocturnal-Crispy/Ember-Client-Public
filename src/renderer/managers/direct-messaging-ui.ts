@@ -189,6 +189,14 @@
       log.error('Message input not found in DM chat container');
     }
 
+    // Send button
+    const dmSendBtn = dmChatContainer.querySelector('#dm-send-btn') as HTMLButtonElement | null;
+    if (dmSendBtn) {
+      dmSendBtn.addEventListener('click', () => {
+        handleSendMessage();
+      });
+    }
+
     // GIF button — override window.sendGif to route to this DM conversation
     const gifButton = dmChatContainer.querySelector('#dm-gif-btn') as HTMLButtonElement | null;
     if (gifButton) {

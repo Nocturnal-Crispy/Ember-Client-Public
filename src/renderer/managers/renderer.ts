@@ -624,6 +624,23 @@
         }
       });
 
+      // Send button
+      const sendBtn = document.getElementById('send-btn');
+      if (sendBtn) {
+        sendBtn.addEventListener('click', async () => {
+          if (!messageInput) return;
+          const rawText = messageInput.value.trim();
+          const plaintext =
+            typeof (window as any).resolveMentions === 'function'
+              ? (window as any).resolveMentions(rawText)
+              : rawText;
+          if (plaintext || App.pendingAttachment) {
+            messageInput.value = '';
+            await window.sendEncryptedMessage(App.activeChannelId, plaintext);
+          }
+        });
+      }
+
       // Paste image from clipboard
       messageInput.addEventListener('paste', (e: ClipboardEvent) => {
         const items = e.clipboardData?.items;
