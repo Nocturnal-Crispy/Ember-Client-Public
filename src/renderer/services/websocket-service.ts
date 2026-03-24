@@ -450,6 +450,9 @@
             if (!ember) return;
             const cachedEpochs = historyCrypto.getCachedCrkEpochs(emberId);
             if (cachedEpochs.length === 0) return;
+            // Random jitter (0–3s) to reduce write amplification when multiple
+            // members are online — avoids all members re-wrapping simultaneously.
+            await new Promise(r => setTimeout(r, Math.random() * 3000));
             // Verify the new member is actually in the ember's member list
             // before trusting the WebSocket event payload.
             const members = await window.fetchMembers(emberId);

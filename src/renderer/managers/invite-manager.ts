@@ -688,8 +688,6 @@
             emberId,
             epochId: keyPackages[0].epochId,
             keyPackages: keyPackages.map(kp => ({
-              userId: '',
-              deviceId: '',
               encryptedKeyPackage: kp.encryptedKeyPackage,
             })),
           }),

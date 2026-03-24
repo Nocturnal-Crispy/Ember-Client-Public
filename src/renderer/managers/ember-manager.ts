@@ -935,6 +935,10 @@
               const deviceMembers = dmData.members ?? [];
               if (deviceMembers.length > 0) {
                 await historyCrypto.createAndDistributeCrk(emberId, deviceMembers, epoch);
+                // Re-sync from server to handle concurrent creation by another member.
+                // If another member created a different CRK for the same epoch, the server
+                // UPSERT means one wins. Re-syncing ensures our local cache matches.
+                await historyCrypto.syncCrksForEmber(emberId);
               }
             }
           } catch (crkErr) {
