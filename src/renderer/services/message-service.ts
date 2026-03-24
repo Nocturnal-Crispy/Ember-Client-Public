@@ -685,6 +685,26 @@
             msg.id,
             msg.chatColor
           );
+
+          // Schedule a background retry after a delay to handle in-flight distributions.
+          if (!retry.permanentFailure) {
+            const msgId = msg.id;
+            setTimeout(async () => {
+              try {
+                await window.processIncomingDistributions?.();
+                const finalRetry = await tryGroupDecrypt(msg.ciphertext);
+                if (finalRetry.plaintext !== null) {
+                  const el = document.querySelector(`[data-message-id="${CSS.escape(msgId)}"]`);
+                  if (el) {
+                    const contentEl = el.querySelector('.message-content');
+                    if (contentEl) contentEl.textContent = finalRetry.plaintext;
+                  }
+                }
+              } catch {
+                /* non-fatal delayed retry */
+              }
+            }, 3000);
+          }
           return;
         }
       }
@@ -720,7 +740,7 @@
       if (plaintext === null) {
         addMessage(
           msg.username ?? 'Unknown',
-          '[History key unavailable — cannot decrypt this message]',
+          '[History key pending — will appear when another member comes online]',
           msg.createdAt,
           prepend,
           msg.id,

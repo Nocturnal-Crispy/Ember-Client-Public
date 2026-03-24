@@ -689,6 +689,20 @@
       importProvisioningBundle(bundle);
     }
 
+    // Import a CRK directly into the cache, bypassing Signal session decryption.
+    // Used by invite-time pre-computation (Strategy B) where the CRK was encrypted
+    // with HKDF(invite_code) instead of a Signal session.
+    importCrk(emberId: string, epoch: number, crk: Uint8Array): void {
+      const key = cacheKey(emberId, epoch);
+      crkCache.set(key, { emberId, epoch, crk });
+      const b64 = btoa(String.fromCharCode(...crk));
+      window.emberAPI
+        .invoke('SetSafeStorage', { key: `crk_${emberId}_${epoch}`, value: b64 })
+        .catch(() => {
+          /* non-critical — in-memory cache is the primary */
+        });
+    }
+
     clear(): void {
       crkCache.clear();
       dmCmkCache.clear();

@@ -477,10 +477,36 @@
           });
         } catch (memberErr) {
           const err = memberErr as Error;
-          log.warn('Skipping member for distribution', {
+          log.warn('Distribution failed for member — retrying once', {
             user_id: member.userId,
+            device_id: member.deviceId,
             error: err.message,
           });
+          try {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await ensureSignalSession(auth, member.userId, member.deviceId);
+            const retryAddress = `${member.userId}.${member.deviceId}`;
+            const retryEnc = await window.emberAPI.invoke<{
+              ciphertext: string;
+              messageType: number;
+            }>('Encrypt', {
+              recipientAddress: retryAddress,
+              plaintext: distributionMessage,
+            });
+            if (retryEnc.success && retryEnc.data) {
+              const retryEnvelope = JSON.stringify({
+                ct: retryEnc.data.ciphertext,
+                mt: retryEnc.data.messageType,
+              });
+              distributions.push({
+                recipientUserId: member.userId,
+                recipientDeviceId: member.deviceId,
+                distributionMessage: btoa(retryEnvelope),
+              });
+            }
+          } catch {
+            /* truly skip after retry */
+          }
         }
       }
 
@@ -892,7 +918,70 @@
       const historyCrypto = (window as any).historyCryptoService;
       if (historyCrypto) {
         const epoch = await historyCrypto.getCurrentEpoch(emberId);
-        await historyCrypto.getCrk(emberId, epoch);
+        const existingCrk = await historyCrypto.getCrk(emberId, epoch);
+        if (!existingCrk && epoch > 0) {
+          // No CRK for current epoch — nobody was online to handle crk_rotation_required.
+          // Create and distribute one so we can send messages immediately (self-serve).
+          log.info('No CRK for current epoch, creating one', { ember_id: emberId, epoch });
+          try {
+            const deviceMembersResp = await fetch(
+              `${auth.hostname}/api/v1/embers/${emberId}/device-members`,
+              { headers: { Authorization: `Bearer ${auth.token}` } }
+            );
+            if (deviceMembersResp.ok) {
+              const dmData = (await deviceMembersResp.json()) as {
+                members?: Array<{ userId: string; deviceId: string }>;
+              };
+              const deviceMembers = dmData.members ?? [];
+              if (deviceMembers.length > 0) {
+                await historyCrypto.createAndDistributeCrk(emberId, deviceMembers, epoch);
+              }
+            }
+          } catch (crkErr) {
+            log.warn('Failed to create CRK for current epoch', {
+              error: (crkErr as Error).message,
+            });
+          }
+        }
+
+        // CRK catch-up: re-wrap for members who joined while we were offline.
+        // Any member with cached CRKs can perform this, not just the owner.
+        const cachedEpochs = historyCrypto.getCachedCrkEpochs(emberId);
+        if (cachedEpochs.length > 0) {
+          try {
+            const missingResp = await fetch(
+              `${auth.hostname}/api/v1/embers/${emberId}/crk/missing-members`,
+              { headers: { Authorization: `Bearer ${auth.token}` } }
+            );
+            if (missingResp.ok) {
+              const missingData = (await missingResp.json()) as {
+                missingMembers?: Array<{ userId: string; deviceId: string; epoch: number }>;
+              };
+              const missingMembers = missingData.missingMembers ?? [];
+              if (missingMembers.length > 0) {
+                const deviceMap = new Map<string, { userId: string; deviceId: string }>();
+                for (const m of missingMembers) {
+                  deviceMap.set(`${m.userId}.${m.deviceId}`, {
+                    userId: m.userId,
+                    deviceId: m.deviceId,
+                  });
+                }
+                const devices = Array.from(deviceMap.values());
+                const count = await historyCrypto.rewrapCrksForNewMember(emberId, devices);
+                if (count > 0) {
+                  log.info('CRK catch-up: re-wrapped for missing members', {
+                    ember_id: emberId,
+                    count,
+                  });
+                }
+              }
+            }
+          } catch (catchupErr) {
+            log.warn('CRK catch-up failed (non-fatal)', {
+              error: (catchupErr as Error).message,
+            });
+          }
+        }
       }
     } catch (skErr) {
       const errorMessage = (skErr as Error).message;

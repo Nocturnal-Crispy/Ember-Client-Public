@@ -344,6 +344,16 @@
       inviteLinkResult?.classList.remove('hidden');
 
       log.info('Invite created successfully', { ember_id: App.activeEmberId });
+
+      // Pre-compute CRK packages so joiner can decrypt history even when all members are offline.
+      // Uses HKDF(inviteCode) as a symmetric key to encrypt each CRK epoch.
+      preComputeCrkPackages(
+        auth.hostname!,
+        auth.token!,
+        App.activeEmberId!,
+        inviteCode,
+        data.inviteId ?? ''
+      );
     } catch (error) {
       const err = error as Error;
       log.error('Failed to create invite', {
@@ -529,6 +539,12 @@
           name: data.emberName ?? '',
         });
       }
+
+      // Fetch pre-computed CRK packages and sender key distributions from the invite.
+      if (data.emberId && data.inviteId && info.code) {
+        await fetchPreComputedKeys(hostname!, auth.token!, data.emberId, info.code, data.inviteId);
+      }
+
       closeAcceptInviteModal();
       window.hideWelcomeScreen();
       const embers = await window.fetchEmbers();
@@ -586,6 +602,183 @@
     } catch (error) {
       const err = error as Error;
       log.error('Error processing invite link', { error: err.message });
+    }
+  }
+
+  // ─── CRK Pre-computation for Invite ────────────────────────────────────────
+
+  async function deriveInviteKey(
+    inviteCode: string,
+    usage: 'encrypt' | 'decrypt'
+  ): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(inviteCode),
+      { name: 'HKDF' },
+      false,
+      ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: encoder.encode('ember-crk-invite'),
+        info: encoder.encode('crk-precompute'),
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      [usage]
+    );
+  }
+
+  function preComputeCrkPackages(
+    hostname: string,
+    token: string,
+    emberId: string,
+    inviteCode: string,
+    inviteId: string
+  ): void {
+    if (!inviteId) return;
+    const historyCrypto = (window as unknown as Record<string, unknown>).historyCryptoService as
+      | { getCachedCrkEpochs(id: string): Array<{ epoch: number; crk: Uint8Array }> }
+      | undefined;
+    if (!historyCrypto) return;
+
+    (async () => {
+      try {
+        const aesKey = await deriveInviteKey(inviteCode, 'encrypt');
+        const epochs = historyCrypto.getCachedCrkEpochs(emberId);
+        if (epochs.length === 0) return;
+
+        const epochsResp = await fetch(`${hostname}/api/v1/embers/${emberId}/epochs`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!epochsResp.ok) return;
+        const epochsData = (await epochsResp.json()) as {
+          epochs?: Array<{ id: string; epochNumber: number }>;
+        };
+        const epochMap = new Map(
+          (epochsData.epochs ?? []).map(e => [e.epochNumber, e.id] as const)
+        );
+
+        const keyPackages: Array<{ epochId: string; encryptedKeyPackage: string }> = [];
+        for (const { epoch, crk } of epochs) {
+          const epochId = epochMap.get(epoch);
+          if (!epochId) continue;
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const crkBuffer = new Uint8Array(crk).buffer as ArrayBuffer;
+          const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, crkBuffer);
+          const envelope = JSON.stringify({
+            iv: btoa(String.fromCharCode(...iv)),
+            ct: btoa(String.fromCharCode(...new Uint8Array(ct))),
+            epoch,
+          });
+          keyPackages.push({ epochId, encryptedKeyPackage: btoa(envelope) });
+        }
+
+        if (keyPackages.length === 0) return;
+
+        await fetch(`${hostname}/api/v1/invites/${inviteId}/ephemeral-keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            inviteId,
+            emberId,
+            epochId: keyPackages[0].epochId,
+            keyPackages: keyPackages.map(kp => ({
+              userId: '',
+              deviceId: '',
+              encryptedKeyPackage: kp.encryptedKeyPackage,
+            })),
+          }),
+        });
+        log.info('CRK packages pre-computed for invite', {
+          epochs: keyPackages.length,
+        });
+      } catch (e) {
+        log.warn('CRK pre-computation for invite failed (non-fatal)', { error: String(e) });
+      }
+    })();
+  }
+
+  async function fetchPreComputedKeys(
+    hostname: string,
+    token: string,
+    emberId: string,
+    inviteCode: string,
+    inviteId: string
+  ): Promise<void> {
+    if (!inviteId || !inviteCode) return;
+    try {
+      const ephResp = await fetch(`${hostname}/api/v1/invites/${inviteId}/ephemeral-keys`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (ephResp.ok) {
+        const ephData = (await ephResp.json()) as {
+          ephemeralKeys?: Array<{ encryptedPackage: string }>;
+        };
+        const packages = ephData.ephemeralKeys ?? [];
+        if (packages.length > 0) {
+          const aesKey = await deriveInviteKey(inviteCode, 'decrypt');
+          const historyCrypto = (window as unknown as Record<string, unknown>)
+            .historyCryptoService as
+            | { importCrk(id: string, epoch: number, crk: Uint8Array): void }
+            | undefined;
+          if (historyCrypto) {
+            for (const pkg of packages) {
+              try {
+                const envelope = JSON.parse(atob(pkg.encryptedPackage)) as {
+                  iv: string;
+                  ct: string;
+                  epoch: number;
+                };
+                const iv = Uint8Array.from(atob(envelope.iv), c => c.charCodeAt(0));
+                const ct = Uint8Array.from(atob(envelope.ct), c => c.charCodeAt(0));
+                const crkBytes = new Uint8Array(
+                  await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct)
+                );
+                if (crkBytes.length === 32) {
+                  historyCrypto.importCrk(emberId, envelope.epoch, crkBytes);
+                  log.info('Imported pre-computed CRK', { epoch: envelope.epoch });
+                }
+              } catch {
+                /* skip malformed package */
+              }
+            }
+          }
+        }
+      }
+
+      const skResp = await fetch(
+        `${hostname}/api/v1/invites/${inviteId}/sender-key-distributions`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (skResp.ok) {
+        const skData = (await skResp.json()) as {
+          senderKeyDistributions?: Array<{
+            senderUserId: string;
+            senderDeviceId: string;
+            distributionMessage: string;
+          }>;
+        };
+        for (const dist of skData.senderKeyDistributions ?? []) {
+          try {
+            const senderAddress = `${dist.senderUserId}.${dist.senderDeviceId}`;
+            await window.emberAPI.invoke('ProcessSenderKeyDistribution', {
+              senderAddress,
+              distributionMessage: dist.distributionMessage,
+            });
+          } catch {
+            /* non-fatal */
+          }
+        }
+      }
+    } catch (e) {
+      log.warn('Pre-computed key fetch failed (will rely on delayed re-wrap)', {
+        error: String(e),
+      });
     }
   }
 

@@ -85,6 +85,14 @@
             .syncAllCrks()
             .catch((e: unknown) => log.warn('CRK sync on reconnect failed', { error: String(e) }));
         }
+        // Sync sender key distributions for keys sent while offline
+        if (typeof window.processIncomingDistributions === 'function') {
+          window
+            .processIncomingDistributions()
+            .catch((e: unknown) =>
+              log.warn('Sender key sync on reconnect failed', { error: String(e) })
+            );
+        }
       };
 
       App.wsConnection.onmessage = (event: MessageEvent) => {
@@ -435,11 +443,13 @@
             if (!auth) return;
             // Don't re-wrap for ourselves joining
             if (userId === auth.userId) return;
-            // Only the ember owner's device performs re-wrapping to avoid
-            // write amplification when many devices are online.
+            // Any member with cached CRKs can re-wrap (not just the owner).
+            // Server uses UPSERT on channel_root_keys so concurrent writes are safe.
             const embers = await window.fetchEmbers();
             const ember = embers.find(e => e.id === emberId);
-            if (!ember || !ember.isOwner) return;
+            if (!ember) return;
+            const cachedEpochs = historyCrypto.getCachedCrkEpochs(emberId);
+            if (cachedEpochs.length === 0) return;
             // Verify the new member is actually in the ember's member list
             // before trusting the WebSocket event payload.
             const members = await window.fetchMembers(emberId);
