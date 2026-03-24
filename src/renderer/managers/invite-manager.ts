@@ -320,8 +320,8 @@
       const requestBody: Record<string, unknown> = {
         code: inviteCode,
       };
-      if (expiresIn > 0) requestBody['expires_in'] = expiresIn;
-      if (maxUses > 0) requestBody['max_uses'] = maxUses;
+      if (expiresIn > 0) requestBody['expiresIn'] = expiresIn;
+      if (maxUses > 0) requestBody['maxUses'] = maxUses;
 
       const response = await fetch(`${auth.hostname}/api/v1/embers/${App.activeEmberId}/invites`, {
         method: 'POST',
@@ -337,10 +337,10 @@
         };
         throw new Error(errorData.error ?? 'Failed to create invite');
       }
-      const data = (await response.json()) as { invite_url?: string; invite_id?: string };
+      const data = (await response.json()) as { inviteUrl?: string; inviteId?: string };
       const inviteLinkInput = getInviteLinkInput();
       const inviteLinkResult = getInviteLinkResult();
-      if (inviteLinkInput) inviteLinkInput.value = data.invite_url ?? '';
+      if (inviteLinkInput) inviteLinkInput.value = data.inviteUrl ?? '';
       inviteLinkResult?.classList.remove('hidden');
 
       log.info('Invite created successfully', { ember_id: App.activeEmberId });
@@ -391,14 +391,14 @@
   }
 
   interface InviteInfo {
-    ember_name?: string;
-    ember_icon?: string;
-    member_count?: number;
-    encrypted_ember_key?: string;
+    emberName?: string;
+    emberIcon?: string;
+    memberCount?: number;
+    encryptedEmberKey?: string;
     code: string;
-    key_salt?: string;
+    keySalt?: string;
     hostname?: string;
-    protocol_version?: number;
+    protocolVersion?: number;
   }
 
   function openAcceptInviteModal(inviteInfo: Record<string, unknown>): void {
@@ -421,9 +421,9 @@
     log.debug('Populating modal with invite info...');
     if (acceptInviteIcon) {
       while (acceptInviteIcon.firstChild) acceptInviteIcon.removeChild(acceptInviteIcon.firstChild);
-      if (info.ember_icon) {
+      if (info.emberIcon) {
         const img = document.createElement('img');
-        img.src = info.ember_icon;
+        img.src = info.emberIcon;
         img.alt = 'icon';
         Object.assign(img.style, {
           width: '100%',
@@ -433,11 +433,11 @@
         });
         acceptInviteIcon.appendChild(img);
       } else {
-        acceptInviteIcon.textContent = (info.ember_name ?? '?').charAt(0).toUpperCase();
+        acceptInviteIcon.textContent = (info.emberName ?? '?').charAt(0).toUpperCase();
       }
     }
-    if (acceptInviteName) acceptInviteName.textContent = info.ember_name ?? 'Unknown Server';
-    if (acceptInviteMembers) acceptInviteMembers.textContent = `${info.member_count ?? 0} members`;
+    if (acceptInviteName) acceptInviteName.textContent = info.emberName ?? 'Unknown Server';
+    if (acceptInviteMembers) acceptInviteMembers.textContent = `${info.memberCount ?? 0} members`;
     acceptInviteError?.classList.add('hidden');
     if (acceptInviteJoinBtn) {
       acceptInviteJoinBtn.disabled = false;
@@ -519,21 +519,21 @@
         throw new Error(errorData.error ?? 'Failed to join server');
       }
       const data = (await response.json()) as {
-        ember_id?: string;
-        ember_name?: string;
-        invite_id?: string;
+        emberId?: string;
+        emberName?: string;
+        inviteId?: string;
       };
-      if (data.ember_id) {
+      if (data.emberId) {
         log.info('Joined server via invite', {
-          ember_id: data.ember_id,
-          name: data.ember_name ?? '',
+          ember_id: data.emberId,
+          name: data.emberName ?? '',
         });
       }
       closeAcceptInviteModal();
       window.hideWelcomeScreen();
       const embers = await window.fetchEmbers();
       window.renderServerList(embers);
-      if (data.ember_id) window.switchToServer(data.ember_id, data.ember_name ?? '');
+      if (data.emberId) window.switchToServer(data.emberId, data.emberName ?? '');
     } catch (error) {
       const err = error as Error;
       log.error('Failed to accept invite', { error: err.message });
@@ -578,7 +578,7 @@
       const inviteInfo = (await response.json()) as Record<string, unknown>;
       inviteInfo['hostname'] = targetHostname;
       log.info('Invite info retrieved, opening accept modal', {
-        ember_name: String(inviteInfo['ember_name'] ?? ''),
+        ember_name: String(inviteInfo['emberName'] ?? ''),
       });
       log.debug('Calling openAcceptInviteModal...');
       openAcceptInviteModal(inviteInfo);

@@ -1348,6 +1348,10 @@ if (!gotTheLock) {
     log.info('open-url event received');
     event.preventDefault();
     handleInviteLink(url);
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
 
   app.setAsDefaultProtocolClient('ember');
