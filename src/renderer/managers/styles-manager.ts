@@ -36,8 +36,8 @@
     if (!container) return;
     container.replaceChildren();
 
-    // ─── Corner Rounding Slider ───
-    const radiusRow = document.createElement("div");
+    // ─── Corner Rounding Slider  ───
+    /*const radiusRow = document.createElement("div");
     radiusRow.className = "theme-color-row";
     radiusRow.style.display = "flex";
     radiusRow.style.justifyContent = "space-between";
@@ -60,8 +60,28 @@
       document.documentElement.style.setProperty('--main-radius', `${val}px`);
       const paddingVal = Math.floor(parseInt(val) / 2); 
       document.documentElement.style.setProperty('--main-padding', `${paddingVal}px`);
-    });
+    }); */
 
+    // ─── Style Preset Dropdown ───
+    const styleRow = document.createElement("div");
+    styleRow.className = "theme-color-row"; // Changed from "Styles" to match your other rows
+    styleRow.style.display = "flex";
+    styleRow.style.justifyContent = "space-between";
+    styleRow.style.alignItems = "center";
+    styleRow.style.marginTop = "10px";
+
+    styleRow.innerHTML = `
+      <label class="vv-label">UI Style</label>
+      <select id="ui-style-select" style="cursor: pointer; padding: 4px; border-radius: 4px;">
+        <option value="default">Default</option>
+        <option value="modern">Modern</option>
+      </select>
+    `
+
+;
+    container.appendChild(styleRow);
+
+    const styleSelect = styleRow.querySelector("#ui-style-select") as HTMLSelectElement;
 
 
     // ─── Inset Shadow Checkbox ───
@@ -87,12 +107,62 @@
         applyShadows(); 
       });
     }
+    
+
+    // Save Style
+    styleSelect.addEventListener("change", () => {
+        const selected = styleSelect.value;
+        console.log("Dropdown changed to:", selected);
+        
+        applyUIStyle(selected);
+        localStorage.setItem("ember_ui_style_pref", selected);
+    });
+
+    // ─── Sync Dropdown State on Render ───
+    const saved = localStorage.getItem("ember_ui_style_pref") || "modern";
+    styleSelect.value = saved;
+    applyUIStyle(saved); // Apply it immediately in case the page refreshed
   }
   
+
+// Load Style
+  (window as any).initUIStyleState = function(): void {
+      const savedStyle = localStorage.getItem("ember_ui_style_pref") || "modern";
+      console.log("Global initUIStyleState loading:", savedStyle);
+      applyUIStyle(savedStyle);
+      
+      const styleSelect = document.getElementById("ui-style-select") as HTMLSelectElement;
+      if (styleSelect) styleSelect.value = savedStyle;
+  };
+// Apply Style 
+function applyUIStyle(styleName: string): void {
+    // We target 'body' because it's always available immediately at startup
+    const body = document.body;
+
+    if (styleName === "modern") {
+        body.classList.add("modern-ui");
+    } else {
+        body.classList.remove("modern-ui");
+    }
+
+    console.log(`[Ember] UI Style set to: ${styleName}`);
+}
+
+
+
+
+
+
+
+
+  /*
+
   //  Load initial state
 const savedMemberList = localStorage.getItem("ember_styles_memberlist_hidden");
 let isMemberListHidden = savedMemberList === "true";
 
+
+  // Hide members list
 // Helper to apply the visual change
 function applyMemberListState(): void {
   const memberList = document.querySelector(".member-list") as HTMLElement;
@@ -130,16 +200,18 @@ document.addEventListener("mousedown", (e) => {
     }
   }
 }, true); 
-
+ */
 
 
 
 
   applyShadows();
-  applyMemberListState(); 
+/*  applyMemberListState(); */
 
 
 
   (window as any).initStylesSettings = initStylesSettings;
 })();
+
+
 

@@ -64,7 +64,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 12px;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03));
   background-color: var(--background);
 }
 

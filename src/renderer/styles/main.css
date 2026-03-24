@@ -38,3 +38,7 @@
 @import './utilities/transitions.css';
 @import './utilities/colors.css';
 @import './utilities/color-variables.css';
+
+/* Styles Presets */
+
+@import './stylepresets.css';

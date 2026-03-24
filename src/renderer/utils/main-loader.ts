@@ -14,8 +14,8 @@
 
   const SCRIPTS: string[] = [
     '../../dist/renderer/utils/logger.js',
-    '../../dist/renderer/managers/theme-manager.js',
     '../../dist/renderer/managers/styles-manager.js',
+    '../../dist/renderer/managers/theme-manager.js',
     '../../dist/renderer/utils/auth-loader.js',
     '../../dist/renderer/services/totp-service.js',
     '../../dist/renderer/services/signal-service.js',

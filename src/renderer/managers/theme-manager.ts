@@ -144,6 +144,7 @@
       const saved = (await ipcRenderer.invoke(
         "get-theme-settings"
       )) as ThemeSettings;
+
       if (!isValidThemeSettings(saved)) {
         log.warn("Theme settings failed integrity check on startup; using defaults", {
           received: JSON.stringify(saved),
@@ -152,14 +153,27 @@
       } else {
         pendingSettings = { ...saved };
       }
+
       applyThemeToDom(pendingSettings);
-      log.debug("Theme applied on startup", { themeId: pendingSettings.themeId });
+
+      // ─── NEW: Call your UI Style Logic ───
+      if ((window as any).initUIStyleState) {
+          (window as any).initUIStyleState();
+      }
+
+      log.debug("Theme and UI Style applied on startup", { themeId: pendingSettings.themeId });
     } catch (e) {
       log.error("Failed to load theme on startup; using defaults", { error: String(e) });
       pendingSettings = { ...DEFAULT_SETTINGS };
       applyThemeToDom(pendingSettings);
+
+      // Ensure it tries to load UI styles even if theme loading fails
+      if ((window as any).initUIStyleState) {
+          (window as any).initUIStyleState();
+      }
     }
   }
+
 
   // ─── Settings page UI ──────────────────────────────────────────────────────
 
@@ -465,11 +479,13 @@ function deleteCustomPreset(id: string): void {
     renderPresetCards();
 }
 
+// Save and Load 
 function saveCustomPresetsToDisk(): void {
     // We only want to save the themes starting with "custom-"
     const customOnly = PRESETS.filter(p => p.id.startsWith("custom-"));
     localStorage.setItem("ember_custom_themes", JSON.stringify(customOnly));
 }
+
 
 function loadCustomPresetsFromDisk(): void {
     const saved = localStorage.getItem("ember_custom_themes");
@@ -477,6 +493,9 @@ function loadCustomPresetsFromDisk(): void {
         const parsed: ThemePreset[] = JSON.parse(saved);
         // Add them to our live list
         PRESETS.push(...parsed);
+    }
+    if ((window as any).initUIStyleState) {
+        (window as any).initUIStyleState();
     }
 }
 
@@ -520,3 +539,4 @@ saveBtn?.addEventListener("click", () => {
   window.initThemeSettings = initThemeSettings;
 
 })();
+
