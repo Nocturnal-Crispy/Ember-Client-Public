@@ -17,7 +17,7 @@
     "dist:win": "npm run secure-build && electron-builder --win",
     "dist:mac": "npm run secure-build && electron-builder --mac",
     "pretest": "npm rebuild better-sqlite3",
-    "test": "jest --config ./tests/jest.config.ts",
+    "test": "node --max-old-space-size=4096 node_modules/.bin/jest --config ./tests/jest.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",

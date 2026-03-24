@@ -38,6 +38,9 @@ const config: Config = {
 
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
 
+  maxWorkers: 4,
+  workerIdleMemoryLimit: '512MB',
+
   clearMocks: true,
   restoreMocks: true,
 
