@@ -156,7 +156,7 @@
 
       applyThemeToDom(pendingSettings);
 
-      // ─── NEW: Call your UI Style Logic ───
+      // ─── Apply Custom UI Style Logic ───
       if ((window as any).initUIStyleState) {
           (window as any).initUIStyleState();
       }
@@ -190,8 +190,7 @@
       if (preset.id === pendingSettings.themeId) {
         card.classList.add("active");
       }
-      
-      // --- Inside the renderPresetCards loop ---
+
 
 // Only show delete button if it's a custom theme (IDs starting with 'custom-')
 if (preset.id.startsWith("custom-")) {
@@ -207,20 +206,13 @@ if (preset.id.startsWith("custom-")) {
     card.appendChild(deleteBtn);
 }
 
-
-// --- Inside your for (const preset of PRESETS) loop ---
-
-// 1. Create the container (This will show the Background color)
 const swatchContainer = document.createElement("div");
 swatchContainer.className = "theme-preset-swatch-container";
 swatchContainer.style.backgroundColor = `rgb(${preset.backgroundRgb})`; // Set the Background color
 
-// 2. Create the inner swatch (This shows the Accent color)
 const swatch = document.createElement("div");
 swatch.className = "theme-preset-swatch";
 swatch.style.backgroundColor = `rgb(${preset.accentRgb})`; // Set the Accent color
-
-// Append the container instead of just the swatch
 
 
       const name = document.createElement("span");
@@ -231,8 +223,6 @@ swatch.style.backgroundColor = `rgb(${preset.accentRgb})`; // Set the Accent col
       check.className = "theme-preset-check";
       check.textContent = "✓";
 
-
-      // 3. Nest them
 swatchContainer.appendChild(swatch);
 card.appendChild(swatchContainer); 
       card.appendChild(name);
@@ -241,7 +231,7 @@ card.appendChild(swatchContainer);
       card.addEventListener("click", () => selectPreset(preset));
       grid.appendChild(card);
     }
-      // ─── Render the "+" Add Button ───
+      // ─── Add custom theme ───
     const addBtn = document.createElement("div");
     addBtn.className = "theme-preset-card add-new-btn";
     addBtn.innerHTML = `<div class="theme-preset-swatch" style="background: #444; display: flex; align-items: center; justify-content: center; color: white;">+</div>
@@ -256,14 +246,12 @@ function createNewCustomPreset(): void {
     console.log("Add button clicked! Unhiding input...");
     
     const editor = document.getElementById("custom-theme-editor");
-    // Change "custom-bg-input" to "custom-bg-picker"
     const input = document.getElementById("custom-bg-picker") as HTMLInputElement;
     
     if (editor && input) {
         editor.style.display = "block"; 
         input.focus(); 
     } else {
-        // This will tell you exactly what is missing in the console
         console.error("Missing elements:", { editor, input });
     }
 }
@@ -435,7 +423,7 @@ function createNewCustomPreset(): void {
     syncChatColorPicker();
     updateSwatches();
 
-    // --- ADD YOUR STYLE INITIALIZATION HERE ---
+    // --- STYLE INITIALIZATION ---
     if (typeof (window as any).initStylesSettings === "function") {
       (window as any).initStylesSettings();
     }
@@ -453,7 +441,7 @@ const bgValueDisplay = document.getElementById("custom-bg-value");
 
 bgPicker?.addEventListener("input", (e) => {
     const hex = (e.target as HTMLInputElement).value;
-    const rgb = hexToRgbStr(hex); // Assuming you have a hexToRgbStr helper
+    const rgb = hexToRgbStr(hex); 
     
     // Update the "live" state
     pendingSettings.backgroundRgb = rgb;
@@ -465,17 +453,16 @@ bgPicker?.addEventListener("input", (e) => {
 });
 
 function deleteCustomPreset(id: string): void {
-    // 1. Remove from the array
     PRESETS = PRESETS.filter(p => p.id !== id);
     saveCustomPresetsToDisk();
 
-    // 2. If we just deleted the active theme, switch back to 'ember' default
+
     if (pendingSettings.themeId === id) {
         const defaultPreset = PRESETS.find(p => p.id === "ember") || PRESETS[0];
         selectPreset(defaultPreset);
     }
 
-    // 3. Refresh the UI
+    // Refresh the UI
     renderPresetCards();
 }
 
@@ -499,11 +486,8 @@ function loadCustomPresetsFromDisk(): void {
     }
 }
 
-
-// 1. Find or create the button in your HTML first!
 const saveBtn = document.getElementById("save-custom-btn");
 
-// 2. This is the "Listener"
 saveBtn?.addEventListener("click", () => {
     const nameInput = document.getElementById("custom-name-input") as HTMLInputElement;
     const userName = nameInput.value.trim() || "Custom Theme";
