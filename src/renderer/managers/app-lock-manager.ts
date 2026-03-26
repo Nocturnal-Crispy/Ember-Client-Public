@@ -282,7 +282,6 @@
   window.isAppLocked = isAppLocked;
   window.updateAppLockSettings = updateAppLockSettings;
   window.cleanupAppLock = cleanupAppLock;
-  window.cleanupAppLock = cleanupAppLock;
 
   initAppLock();
 })();

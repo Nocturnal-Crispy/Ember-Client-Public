@@ -128,7 +128,12 @@
     root.style.setProperty('--rgb-background', settings.backgroundRgb);
     root.style.setProperty('--rgb-surface', settings.surfaceRgb);
     root.style.setProperty('--rgb-surface-hover', computeSurfaceHover(settings.surfaceRgb));
-    if (settings.chatColor) {
+    if (
+      settings.chatColor &&
+      /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+        settings.chatColor
+      )
+    ) {
       root.style.setProperty('--chat-color', settings.chatColor);
     } else {
       root.style.removeProperty('--chat-color');

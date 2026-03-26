@@ -773,10 +773,13 @@
             ): Promise<string | null>;
           }
         | undefined;
-      if (historyCrypto && App.activeChannelId) {
+      const dmConversationId = App.activeChannelId
+        ? (window.getEmberIdForDmChannel?.(App.activeChannelId) ?? App.activeEmberId)
+        : App.activeEmberId;
+      if (historyCrypto && dmConversationId) {
         plaintext = await historyCrypto
           .decryptDm(
-            App.activeChannelId,
+            dmConversationId,
             msg.ciphertext,
             msgAny.nonce ?? '',
             msgAny.epoch ?? 0,

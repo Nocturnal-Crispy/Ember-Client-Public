@@ -1048,11 +1048,13 @@
   window.addEventListener('dm-channel-message', dmChannelMessageHandler);
   window.addEventListener('dm-request-accepted', dmRequestAcceptedHandler);
 
-  /** Remove DM event listeners — call on logout to prevent leaks. */
+  /** Remove DM event listeners and clear state — call on logout to prevent leaks. */
   function cleanupDirectMessaging(): void {
     window.removeEventListener('dm-channel-message', dmChannelMessageHandler);
     window.removeEventListener('dm-request-accepted', dmRequestAcceptedHandler);
-    log.info('DM event listeners removed');
+    dmByTextChannel.clear();
+    dmByEmberId.clear();
+    log.info('DM state and event listeners cleaned up');
   }
 
   // (device-key-fulfilled/device-key-requested handlers removed)

@@ -813,7 +813,7 @@ function isAllowedSafeStorageKey(key: unknown): key is string {
 
 ipcMain.handle('get-safe-storage', async (_event, { key }) => {
   log.debug('IPC: get-safe-storage');
-  if (!checkIpcRateLimit('get-safe-storage', 60)) {
+  if (!checkIpcRateLimit('get-safe-storage', 300)) {
     log.warn('IPC: get-safe-storage rate limited');
     return { success: false, error: 'Rate limited' };
   }
@@ -832,7 +832,7 @@ ipcMain.handle('get-safe-storage', async (_event, { key }) => {
 
 ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
   log.debug('IPC: set-safe-storage');
-  if (!checkIpcRateLimit('set-safe-storage', 60)) {
+  if (!checkIpcRateLimit('set-safe-storage', 300)) {
     log.warn('IPC: set-safe-storage rate limited');
     return { success: false, error: 'Rate limited' };
   }
@@ -851,7 +851,7 @@ ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
 
 ipcMain.handle('delete-safe-storage', async (_event, { key }) => {
   log.debug('IPC: delete-safe-storage');
-  if (!checkIpcRateLimit('delete-safe-storage', 60)) {
+  if (!checkIpcRateLimit('delete-safe-storage', 300)) {
     log.warn('IPC: delete-safe-storage rate limited');
     return { success: false, error: 'Rate limited' };
   }
@@ -1240,6 +1240,10 @@ ipcMain.handle('set-pin', (_event, pin: unknown) => {
 });
 
 ipcMain.handle('verify-pin', (_event, pin: unknown) => {
+  if (!checkIpcRateLimit('verify-pin', 5)) {
+    log.warn('IPC: verify-pin rate limited');
+    return false;
+  }
   if (typeof pin !== 'string') return false;
   const stored = store.get('appLockPin') as string | undefined;
   if (!stored) return false;
@@ -1343,7 +1347,7 @@ ipcMain.handle('get-popout-voice-context', () => {
 // ─── Invite protocol ──────────────────────────────────────────────────────────
 
 function isValidHost(host: string): boolean {
-  if (host.length === 0) return false;
+  if (host.length === 0 || host.length > 253) return false;
 
   // Check for IPv4: four octets, each 0-255
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -1392,9 +1396,16 @@ function parseInviteUrl(url: string): { code: string; hostname: string } | null 
   }
 
   // Validate port if present: must be numeric
-  if (port !== undefined && !/^\d{1,5}$/.test(port)) {
-    log.warn('Rejected invite URL: invalid port');
-    return null;
+  if (port !== undefined) {
+    if (!/^\d{1,5}$/.test(port)) {
+      log.warn('Rejected invite URL: invalid port format');
+      return null;
+    }
+    const portNum = parseInt(port, 10);
+    if (portNum < 1 || portNum > 65535) {
+      log.warn('Rejected invite URL: port out of range');
+      return null;
+    }
   }
 
   const hostname = port ? `${scheme}://${host}:${port}` : `${scheme}://${host}`;
