@@ -246,29 +246,44 @@
           App.wsReconnectTimer = setTimeout(() => {
             App.wsReconnectTimer = null;
             log.debug('Attempting WebSocket reconnect');
-            connectWebSocket().then(() => {
-              if (rejoinChannelId && rejoinChannelName) {
-                // Brief delay lets WS subscriptions (ember/channel) settle before
-                // sending voice_join, which requires an active channel subscription.
-                setTimeout(() => {
-                  if (
-                    App.wsConnection?.readyState === WebSocket.OPEN &&
-                    !App.activeVoiceChannelId
-                  ) {
-                    log.info('Auto-rejoining voice channel after reconnect', {
-                      channel_id: rejoinChannelId,
-                    });
-                    window
-                      .joinVoiceChannel(rejoinChannelId, rejoinChannelName)
-                      .catch((e: unknown) =>
-                        log.error('Voice auto-rejoin failed', {
-                          error: String(e),
-                        })
-                      );
-                  }
-                }, 500);
-              }
-            });
+            connectWebSocket()
+              .then(() => {
+                if (rejoinChannelId && rejoinChannelName) {
+                  // Brief delay lets WS subscriptions (ember/channel) settle before
+                  // sending voice_join, which requires an active channel subscription.
+                  setTimeout(() => {
+                    if (
+                      App.wsConnection?.readyState === WebSocket.OPEN &&
+                      !App.activeVoiceChannelId
+                    ) {
+                      log.info('Auto-rejoining voice channel after reconnect', {
+                        channel_id: rejoinChannelId,
+                      });
+                      window
+                        .joinVoiceChannel(rejoinChannelId, rejoinChannelName)
+                        .catch((e: unknown) =>
+                          log.error('Voice auto-rejoin failed', {
+                            error: String(e),
+                          })
+                        );
+                    }
+                  }, 500);
+                }
+              })
+              .catch((e: unknown) => {
+                log.error('WebSocket reconnection failed, scheduling retry', {
+                  error: String(e),
+                });
+                if (!App.wsReconnectTimer) {
+                  App.wsReconnectTimer = setTimeout(() => {
+                    App.wsReconnectTimer = null;
+                    log.debug('Retrying WebSocket reconnect after failure');
+                    connectWebSocket().catch((retryErr: unknown) =>
+                      log.error('WebSocket retry also failed', { error: String(retryErr) })
+                    );
+                  }, 3000);
+                }
+              });
           }, 3000);
         }
       };

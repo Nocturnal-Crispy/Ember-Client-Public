@@ -765,6 +765,22 @@
         clearInterval(App.healthcheckInterval);
         App.healthcheckInterval = null;
       }
+
+      // Destroy Signal session manager to prevent stale sessions on re-login
+      if (App.signalSessionManager) {
+        try {
+          App.signalSessionManager.destroy();
+        } catch (e) {
+          log.warn('Error destroying signalSessionManager', { error: (e as Error).message });
+        }
+        App.signalSessionManager = null;
+      }
+      App.signalSessionReady.clear();
+
+      // Clear history crypto service
+      App.historyCryptoService = null;
+      (window as any).historyCryptoService = null;
+
       log.info('Session cleared, sending auth-logout signal');
       ipcRenderer.send('auth-logout');
     }
