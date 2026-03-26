@@ -18,13 +18,43 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
+const SENSITIVE_LOG_KEYS = new Set([
+  'token',
+  'password',
+  'pin',
+  'secret',
+  'privateKey',
+  'private_key',
+  'recoveryCode',
+  'recovery_code',
+  'apiKey',
+  'api_key',
+  'authorization',
+  'ember_key',
+  'emberKey',
+  'inviteCode',
+  'invite_code',
+]);
+
+function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (SENSITIVE_LOG_KEYS.has(key) || SENSITIVE_LOG_KEYS.has(key.toLowerCase())) {
+      sanitized[key] = '[REDACTED]';
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 function preloadLog(level: string, message: string, data?: Record<string, unknown>) {
   try {
     ipcRenderer.send(IPC_CHANNELS.LOG_TO_CONSOLE, {
       level: level.toUpperCase(),
       context: 'Preload',
       message,
-      data: data || null,
+      data: data ? sanitizeLogData(data) : null,
     });
   } catch {
     /* ignore if IPC unavailable */

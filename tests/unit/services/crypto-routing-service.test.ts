@@ -103,6 +103,7 @@ describe('CryptoRoutingService', () => {
       (window as any).cryptoRouting.onMemberAdded('ember-2', 3);
 
       expect((window as any).setCryptoState).toHaveBeenCalledWith('ember-2', {
+        cryptoMode: 'sender_key_active',
         senderKeyStatus: 'distributing',
       });
     });

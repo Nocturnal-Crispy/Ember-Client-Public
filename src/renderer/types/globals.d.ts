@@ -655,6 +655,7 @@ declare global {
     unlockApp(pin: string): Promise<boolean>;
     isAppLocked(): boolean;
     updateAppLockSettings(settings: Partial<AppLockSettings>): void;
+    cleanupAppLock(): void;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;

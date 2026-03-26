@@ -213,6 +213,7 @@
         member_count: memberCount,
       });
       window.setCryptoState(emberId, {
+        cryptoMode: 'sender_key_active',
         senderKeyStatus: 'distributing',
       });
     }

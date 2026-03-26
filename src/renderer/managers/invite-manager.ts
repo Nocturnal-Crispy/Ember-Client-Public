@@ -288,12 +288,13 @@
   }
 
   async function handleCreateInvite(): Promise<void> {
-    if (!App.activeEmberId) {
+    const emberId = App.activeEmberId;
+    if (!emberId) {
       log.warn('Cannot create invite: no active ember');
       showCreateInviteError('No server selected');
       return;
     }
-    log.info('Creating invite', { ember_id: App.activeEmberId });
+    log.info('Creating invite', { ember_id: emberId });
     try {
       const createInviteBtn = getCreateInviteBtn();
       if (createInviteBtn) {
@@ -323,7 +324,7 @@
       if (expiresIn > 0) requestBody['expiresIn'] = expiresIn;
       if (maxUses > 0) requestBody['maxUses'] = maxUses;
 
-      const response = await fetch(`${auth.hostname}/api/v1/embers/${App.activeEmberId}/invites`, {
+      const response = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -343,21 +344,15 @@
       if (inviteLinkInput) inviteLinkInput.value = data.inviteUrl ?? '';
       inviteLinkResult?.classList.remove('hidden');
 
-      log.info('Invite created successfully', { ember_id: App.activeEmberId });
+      log.info('Invite created successfully', { ember_id: emberId });
 
       // Pre-compute CRK packages so joiner can decrypt history even when all members are offline.
       // Uses HKDF(inviteCode) as a symmetric key to encrypt each CRK epoch.
-      preComputeCrkPackages(
-        auth.hostname!,
-        auth.token!,
-        App.activeEmberId!,
-        inviteCode,
-        data.inviteId ?? ''
-      );
+      preComputeCrkPackages(auth.hostname!, auth.token!, emberId, inviteCode, data.inviteId ?? '');
     } catch (error) {
       const err = error as Error;
       log.error('Failed to create invite', {
-        ember_id: App.activeEmberId ?? '',
+        ember_id: emberId,
         error: err.message,
       });
       showCreateInviteError(err.message || 'Failed to create invite');
@@ -413,6 +408,20 @@
 
   function openAcceptInviteModal(inviteInfo: Record<string, unknown>): void {
     log.debug('openAcceptInviteModal called');
+
+    // Validate invite data shape before casting
+    if (
+      !inviteInfo ||
+      typeof inviteInfo !== 'object' ||
+      !('code' in inviteInfo) ||
+      typeof inviteInfo['code'] !== 'string'
+    ) {
+      log.error('Invalid invite data: missing required fields', {
+        hasCode: String('code' in (inviteInfo ?? {})),
+      });
+      return;
+    }
+
     const acceptInviteModal = getAcceptInviteModal();
     log.debug('acceptInviteModal element found:', { found: !!acceptInviteModal });
     if (!acceptInviteModal) {

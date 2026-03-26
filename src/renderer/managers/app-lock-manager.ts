@@ -263,11 +263,26 @@
 
   // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
+  /** Clean up all timers and listeners — call on logout to prevent leaks across sessions. */
+  function cleanupAppLock(): void {
+    stopIdleTimer();
+    detachActivityListeners();
+    if (focusLossTimerId !== null) {
+      clearTimeout(focusLossTimerId);
+      focusLossTimerId = null;
+    }
+    locked = false;
+    hideOverlay();
+    log.info('AppLockManager cleaned up');
+  }
+
   window.initAppLock = initAppLock;
   window.lockApp = lockApp;
   window.unlockApp = unlockApp;
   window.isAppLocked = isAppLocked;
   window.updateAppLockSettings = updateAppLockSettings;
+  window.cleanupAppLock = cleanupAppLock;
+  window.cleanupAppLock = cleanupAppLock;
 
   initAppLock();
 })();

@@ -46,6 +46,21 @@ import {
 
 const log = createLogger('Main');
 
+// ─── IPC rate limiter ─────────────────────────────────────────────────────────
+
+const ipcRateLimits = new Map<string, { count: number; resetTime: number }>();
+function checkIpcRateLimit(channel: string, maxPerMinute: number): boolean {
+  const now = Date.now();
+  const entry = ipcRateLimits.get(channel);
+  if (!entry || now > entry.resetTime) {
+    ipcRateLimits.set(channel, { count: 1, resetTime: now + 60000 });
+    return true;
+  }
+  if (entry.count >= maxPerMinute) return false;
+  entry.count++;
+  return true;
+}
+
 // ─── Theme defaults and validation ────────────────────────────────────────────
 
 const defaultThemeSettings: ThemeSettings = {
@@ -200,6 +215,7 @@ function createWindow(isAuthenticated: boolean) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // TODO: Evaluate enabling sandbox mode for improved process isolation
       sandbox: false,
       preload: path.join(__dirname, '../preload/index.js'),
       devTools: isDev,
@@ -737,7 +753,8 @@ ipcMain.handle(
       !userId ||
       typeof hostname !== 'string' ||
       typeof username !== 'string' ||
-      typeof userId !== 'string'
+      typeof userId !== 'string' ||
+      !/^[a-f0-9-]{36}$/.test(userId)
     ) {
       log.warn('IPC: save-login-hint called with invalid arguments');
       return false;
@@ -796,6 +813,10 @@ function isAllowedSafeStorageKey(key: unknown): key is string {
 
 ipcMain.handle('get-safe-storage', async (_event, { key }) => {
   log.debug('IPC: get-safe-storage');
+  if (!checkIpcRateLimit('get-safe-storage', 60)) {
+    log.warn('IPC: get-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
   if (!isAllowedSafeStorageKey(key)) {
     log.warn('IPC: get-safe-storage rejected — key not in allowlist');
     return { success: false, error: 'Key not allowed' };
@@ -811,6 +832,10 @@ ipcMain.handle('get-safe-storage', async (_event, { key }) => {
 
 ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
   log.debug('IPC: set-safe-storage');
+  if (!checkIpcRateLimit('set-safe-storage', 60)) {
+    log.warn('IPC: set-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
   if (!isAllowedSafeStorageKey(key)) {
     log.warn('IPC: set-safe-storage rejected — key not in allowlist');
     return { success: false, error: 'Key not allowed' };
@@ -826,6 +851,10 @@ ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
 
 ipcMain.handle('delete-safe-storage', async (_event, { key }) => {
   log.debug('IPC: delete-safe-storage');
+  if (!checkIpcRateLimit('delete-safe-storage', 60)) {
+    log.warn('IPC: delete-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
   if (!isAllowedSafeStorageKey(key)) {
     log.warn('IPC: delete-safe-storage rejected — key not in allowlist');
     return { success: false, error: 'Key not allowed' };
@@ -902,6 +931,15 @@ interface UpdateInfo {
 }
 
 ipcMain.handle('check-for-update', async (): Promise<UpdateInfo> => {
+  if (!checkIpcRateLimit('check-for-update', 5)) {
+    log.warn('IPC: check-for-update rate limited');
+    return {
+      updateAvailable: false,
+      currentVersion: app.getVersion(),
+      latestVersion: null,
+      error: 'Rate limited',
+    };
+  }
   const currentVersion = app.getVersion();
   try {
     const response = await net.fetch(
@@ -1076,7 +1114,7 @@ ipcMain.handle(
         } catch (checksumErr) {
           // Delete the untrusted file and abort the update.
           try {
-            require('fs').unlinkSync(result.filePath);
+            fs.unlinkSync(result.filePath);
           } catch {
             /* best-effort */
           }
@@ -1191,7 +1229,7 @@ ipcMain.handle('has-pin', () => {
 });
 
 ipcMain.handle('set-pin', (_event, pin: unknown) => {
-  if (typeof pin !== 'string' || pin.length < 4) {
+  if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
     log.warn('IPC: set-pin rejected — invalid PIN');
     return false;
   }
@@ -1264,6 +1302,10 @@ ipcMain.handle('open-video-popout', async (_event, args: unknown) => {
   const token = auth?.token ?? '';
 
   pendingPopoutContext = { channelName: channelName ?? '', token };
+  // Auto-cleanup to avoid lingering token in memory if pop-out never reads it
+  setTimeout(() => {
+    pendingPopoutContext = null;
+  }, 30000);
   log.info('Opening video pop-out window', { channelName });
 
   const popout = new BrowserWindow({
@@ -1276,6 +1318,7 @@ ipcMain.handle('open-video-popout', async (_event, args: unknown) => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // TODO: Evaluate enabling sandbox mode for improved process isolation
       sandbox: false,
       preload: path.join(__dirname, '../preload/video-popout-preload.js'),
       devTools: isDev,

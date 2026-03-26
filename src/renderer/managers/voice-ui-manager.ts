@@ -48,7 +48,7 @@
       }
 
       App.activeVoiceChannelId = null;
-      App.voiceParticipants.clear();
+      App.voiceParticipants = new Map<string, string>();
       hideVoiceControls();
       renderVoiceParticipants(null);
       document
@@ -74,9 +74,10 @@
       vm.onParticipantsChanged = (
         participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
-        // Update own-session participant list (used for video grid)
-        App.voiceParticipants.clear();
-        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
+        // Update own-session participant list (used for video grid) — atomic swap
+        const newParticipants = new Map<string, string>();
+        participants.forEach(p => newParticipants.set(p.user_id, p.username));
+        App.voiceParticipants = newParticipants;
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
           participants.filter(p => p.screen_sharing).map(p => p.user_id)
@@ -105,8 +106,10 @@
       vm.onParticipantsChanged = (
         participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
-        App.voiceParticipants.clear();
-        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
+        // Atomic swap — build new Map before assigning to avoid empty intermediate state
+        const newParticipants = new Map<string, string>();
+        participants.forEach(p => newParticipants.set(p.user_id, p.username));
+        App.voiceParticipants = newParticipants;
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
           participants.filter(p => p.screen_sharing).map(p => p.user_id)
@@ -200,7 +203,7 @@
 
     App.activeVoiceChannelId = null;
     App.activeVoiceChannelName = null;
-    App.voiceParticipants.clear();
+    App.voiceParticipants = new Map<string, string>();
     hideVoiceControls();
     document
       .querySelectorAll('.voice-avatar.speaking')
@@ -1657,7 +1660,7 @@
     (App.voiceManager as { _cleanup(): void })._cleanup();
     App.activeVoiceChannelId = null;
     App.activeVoiceChannelName = null;
-    App.voiceParticipants.clear();
+    App.voiceParticipants = new Map<string, string>();
     hideVoiceControls();
     document
       .querySelectorAll('.voice-avatar.speaking')

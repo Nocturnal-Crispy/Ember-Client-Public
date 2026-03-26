@@ -9,6 +9,7 @@
 
   const recentMessageIds = new Set<string>();
   const DEDUP_MAX_SIZE = 50;
+  let isConnecting = false;
 
   /** Refresh the stored token if it is expiring within 1 hour. */
   async function refreshTokenIfNeeded(): Promise<void> {
@@ -47,6 +48,8 @@
 
   async function connectWebSocket(): Promise<void> {
     if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN) return;
+    if (isConnecting) return;
+    isConnecting = true;
     log.debug('Connecting WebSocket');
     try {
       await refreshTokenIfNeeded();
@@ -54,13 +57,17 @@
         token?: string;
         hostname?: string;
       } | null;
-      if (!auth || !auth.token || !auth.hostname) return;
+      if (!auth || !auth.token || !auth.hostname) {
+        isConnecting = false;
+        return;
+      }
       const wsUrl = window.electronAPI.wsService.buildWsUrl(auth.hostname, auth.token);
       const wsBaseUrl = wsUrl.split('?')[0];
       log.info('WebSocket connecting', { url: wsBaseUrl });
       App.wsConnection = new WebSocket(wsUrl);
 
       App.wsConnection.onopen = () => {
+        isConnecting = false;
         log.info('WebSocket connected');
         console.log('WebSocket connected');
         // Clear reconnection timer on successful connect/reconnect
@@ -241,6 +248,7 @@
       };
 
       App.wsConnection.onclose = () => {
+        isConnecting = false;
         log.warn('WebSocket disconnected, scheduling reconnect in 3s');
         console.log('WebSocket disconnected');
         App.wsConnection = null;
@@ -301,6 +309,7 @@
         console.error('WebSocket error:', err);
       };
     } catch (error) {
+      isConnecting = false;
       const err = error as Error;
       log.error('Failed to connect WebSocket', { error: err.message });
       console.error('Failed to connect WebSocket:', error);

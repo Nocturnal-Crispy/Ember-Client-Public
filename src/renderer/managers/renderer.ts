@@ -786,6 +786,11 @@
         window.cleanupDirectMessaging();
       }
 
+      // Stop app lock idle timer and activity listeners to prevent leaks across sessions
+      if (typeof window.cleanupAppLock === 'function') {
+        window.cleanupAppLock();
+      }
+
       log.info('Session cleared, sending auth-logout signal');
       ipcRenderer.send('auth-logout');
     }
@@ -871,6 +876,7 @@
     }
 
     // Track current custom status locally so presence-only changes preserve it
+    let customStatusEscapeHandler: EventListener | null = null;
     let currentCustomStatus = '';
     let currentStatusEmoji = '';
 
@@ -1075,12 +1081,16 @@
         if (e.target === modal) closeCustomStatusModal();
       });
 
-      // Close on Escape
-      document.addEventListener('keydown', e => {
+      // Close on Escape — store handler reference so it can be removed if init is called again
+      if (customStatusEscapeHandler) {
+        document.removeEventListener('keydown', customStatusEscapeHandler);
+      }
+      customStatusEscapeHandler = ((e: KeyboardEvent): void => {
         if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
           closeCustomStatusModal();
         }
-      });
+      }) as EventListener;
+      document.addEventListener('keydown', customStatusEscapeHandler);
     }
 
     initCustomStatusModal();

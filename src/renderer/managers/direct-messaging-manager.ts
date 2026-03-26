@@ -746,17 +746,32 @@
     // the user switches to a different conversation.
     // BP-3 fix: set activeChannelId so websocket-service routes live messages
     // to displayMessage (the channel path) rather than dm-channel-message.
-    App.activeChannelId = channelId;
-    window.wsSubscribeToChannel(channelId);
 
-    const entry = dmByTextChannel.get(channelId);
-    if (entry) {
-      App.activeEmberId = entry.emberId;
-      // Prefetch DM CMK for history-based decryption
-      const historyCrypto = (window as any).historyCryptoService;
-      if (historyCrypto) {
-        historyCrypto.getDmCmk(entry.emberId).catch(() => null);
+    // Capture previous state so it can be restored if subscription fails
+    const previousChannelId = App.activeChannelId;
+    const previousEmberId = App.activeEmberId;
+
+    try {
+      window.wsSubscribeToChannel(channelId);
+      // Only set activeChannelId after subscription succeeds
+      App.activeChannelId = channelId;
+
+      const entry = dmByTextChannel.get(channelId);
+      if (entry) {
+        App.activeEmberId = entry.emberId;
+        // Prefetch DM CMK for history-based decryption
+        const historyCrypto = (window as any).historyCryptoService;
+        if (historyCrypto) {
+          historyCrypto.getDmCmk(entry.emberId).catch(() => null);
+        }
       }
+    } catch (err) {
+      log.error('Failed to activate DM conversation, restoring previous state', {
+        channelId,
+        error: String(err),
+      });
+      App.activeChannelId = previousChannelId;
+      App.activeEmberId = previousEmberId;
     }
   }
 

@@ -342,7 +342,14 @@
   async function initThemeSettings(): Promise<void> {
     try {
       const saved = (await ipcRenderer.invoke('get-theme-settings')) as ThemeSettings;
-      pendingSettings = { ...saved };
+      if (!isValidThemeSettings(saved)) {
+        log.warn('Theme settings failed validation in initThemeSettings; using defaults', {
+          received: JSON.stringify(saved),
+        });
+        pendingSettings = { ...DEFAULT_SETTINGS };
+      } else {
+        pendingSettings = { ...saved };
+      }
     } catch (e) {
       log.error('Failed to load theme settings', { error: String(e) });
     }
