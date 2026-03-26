@@ -63,6 +63,14 @@
       App.wsConnection.onopen = () => {
         log.info('WebSocket connected');
         console.log('WebSocket connected');
+        // Clear reconnection timer on successful connect/reconnect
+        if (App.reconnectionTimerInterval) {
+          clearInterval(App.reconnectionTimerInterval);
+          App.reconnectionTimerInterval = null;
+        }
+        if (typeof window.hideReconnectionOverlay === 'function') {
+          window.hideReconnectionOverlay();
+        }
         if (App.activeChannelId) {
           log.debug('Re-subscribing to active channel', {
             channel_id: App.activeChannelId,

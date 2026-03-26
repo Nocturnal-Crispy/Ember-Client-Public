@@ -54,6 +54,14 @@ try {
     });
   }
 
+  function isValidPreloadCssColor(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+    if (value === '') return false; // empty means no custom color — skip setProperty
+    return /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+      value
+    );
+  }
+
   // Enhanced validation with detailed logging
   if (savedTheme && document.documentElement) {
     const validationResults = {
@@ -85,7 +93,7 @@ try {
         .split(',')
         .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
       root.style.setProperty('--rgb-surface-hover', hoverParts.join(', '));
-      if (savedTheme.chatColor) {
+      if (isValidPreloadCssColor(savedTheme.chatColor)) {
         root.style.setProperty('--chat-color', savedTheme.chatColor);
       }
       preloadLog('debug', 'Theme applied synchronously in preload');
@@ -125,7 +133,7 @@ try {
             .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
           root.style.setProperty('--rgb-surface-hover', hoverParts.join(', '));
         }
-        if (savedTheme.chatColor) {
+        if (isValidPreloadCssColor(savedTheme.chatColor)) {
           root.style.setProperty('--chat-color', savedTheme.chatColor);
         }
         preloadLog('debug', 'Theme applied on DOMContentLoaded');

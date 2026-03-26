@@ -1001,15 +1001,15 @@
 
   // ─── WS message routing ────────────────────────────────────────────────────
 
-  window.addEventListener('dm-channel-message', ((e: CustomEvent) => {
+  const dmChannelMessageHandler = ((e: CustomEvent) => {
     handleIncomingMessage(e.detail).catch((err: Error) =>
       log.error('Failed to handle incoming DM message', { error: err.message })
     );
-  }) as EventListener);
+  }) as EventListener;
 
   // Handles the server-push event sent to the requester after the recipient
   // accepts the DM request. Fetches the peer-box key and marks the DM as active.
-  window.addEventListener('dm-request-accepted', ((e: CustomEvent) => {
+  const dmRequestAcceptedHandler = ((e: CustomEvent) => {
     const payload = e.detail as { ember_id?: string };
     const emberId = payload?.ember_id ?? '';
     if (!emberId) return;
@@ -1028,13 +1028,24 @@
       }
       log.info('DM request was accepted by recipient', { emberId });
     }
-  }) as EventListener);
+  }) as EventListener;
+
+  window.addEventListener('dm-channel-message', dmChannelMessageHandler);
+  window.addEventListener('dm-request-accepted', dmRequestAcceptedHandler);
+
+  /** Remove DM event listeners — call on logout to prevent leaks. */
+  function cleanupDirectMessaging(): void {
+    window.removeEventListener('dm-channel-message', dmChannelMessageHandler);
+    window.removeEventListener('dm-request-accepted', dmRequestAcceptedHandler);
+    log.info('DM event listeners removed');
+  }
 
   // (device-key-fulfilled/device-key-requested handlers removed)
 
   // ─── Expose globals ────────────────────────────────────────────────────────
 
   window.initializeDirectMessaging = initializeDirectMessaging;
+  window.cleanupDirectMessaging = cleanupDirectMessaging;
   window.startDmConversation = startDmConversation;
   window.sendDirectMessage = sendDirectMessage;
   window.setActiveDmConversation = setActiveDmConversation;

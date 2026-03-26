@@ -800,6 +800,12 @@
    * Set active conversation
    */
   function setActiveConversation(conversationId: string): void {
+    // Clear pending search timeout to prevent stale results firing on the new conversation
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
+    }
+
     // Clear unread count for the conversation being opened
     const prevConv = conversations.get(conversationId);
     if (prevConv && prevConv.unreadCount > 0) {

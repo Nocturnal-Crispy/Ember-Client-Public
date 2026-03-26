@@ -781,6 +781,11 @@
       App.historyCryptoService = null;
       (window as any).historyCryptoService = null;
 
+      // Clean up DM event listeners to prevent leaks across sessions
+      if (typeof window.cleanupDirectMessaging === 'function') {
+        window.cleanupDirectMessaging();
+      }
+
       log.info('Session cleared, sending auth-logout signal');
       ipcRenderer.send('auth-logout');
     }
@@ -1503,6 +1508,7 @@
     window.updateChatHeader = updateChatHeader;
     window.hideWelcomeScreen = hideWelcomeScreen;
     window.showWelcomeScreen = showWelcomeScreen;
+    window.hideReconnectionOverlay = hideReconnectionOverlay;
 
     initializeAppWithWS();
   });

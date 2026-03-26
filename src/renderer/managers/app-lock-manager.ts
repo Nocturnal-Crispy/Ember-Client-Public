@@ -153,11 +153,22 @@
   }
 
   const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'mousedown'] as const;
+  let activityListenersAttached = false;
+
+  function detachActivityListeners(): void {
+    if (!activityListenersAttached) return;
+    for (const evt of ACTIVITY_EVENTS) {
+      document.removeEventListener(evt, resetActivity);
+    }
+    activityListenersAttached = false;
+  }
 
   function attachActivityListeners(): void {
+    detachActivityListeners();
     for (const evt of ACTIVITY_EVENTS) {
       document.addEventListener(evt, resetActivity, { passive: true });
     }
+    activityListenersAttached = true;
   }
 
   // ─── Idle timer ──────────────────────────────────────────────────────────────

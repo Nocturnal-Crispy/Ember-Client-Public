@@ -705,7 +705,9 @@ declare global {
     updateChatHeader(name: string, description: string): void;
     hideWelcomeScreen(): void;
     showWelcomeScreen(): void;
+    hideReconnectionOverlay(): void;
     // Globals set by direct-messaging-manager.ts
+    cleanupDirectMessaging(): void;
     initializeDirectMessaging(): Promise<void>;
     startDmConversation(participantId: string, participantUsername: string): Promise<string | null>;
     fetchDMRequests(): Promise<

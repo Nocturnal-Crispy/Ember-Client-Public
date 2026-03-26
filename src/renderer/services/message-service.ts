@@ -128,6 +128,9 @@
   let oldestMessageId: string | null = null;
   let isLoadingOlderMessages = false;
 
+  // B9 fix: Store scroll handler reference to prevent event listener leaks on channel switch
+  let currentScrollHandler: (() => void) | null = null;
+
   // Current user ID and username cached for ownership checks (set in loadChannelMessages)
   let currentUserId: string | null = null;
   let currentUsername: string = '';
@@ -700,8 +703,17 @@
                     if (contentEl) contentEl.textContent = finalRetry.plaintext;
                   }
                 }
-              } catch {
-                /* non-fatal delayed retry */
+              } catch (retryErr) {
+                log.warn('Delayed group decryption retry failed permanently', {
+                  message_id: msgId,
+                  error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+                });
+                const el = document.querySelector(`[data-message-id="${CSS.escape(msgId)}"]`);
+                if (el) {
+                  const contentEl = el.querySelector('.message-content');
+                  if (contentEl)
+                    contentEl.textContent = '[Decryption failed — sender key unavailable]';
+                }
               }
             }, 3000);
           }
@@ -1167,6 +1179,9 @@
     isLoadingOlderMessages = false;
     App.ownedMessageIds.clear();
 
+    // Re-attach scroll handler to prevent listener leaks (B9)
+    attachScrollPaginationHandler();
+
     // Clear any pending attachment when switching channels
     window.clearPendingAttachment();
 
@@ -1378,8 +1393,6 @@
           // Restore scroll position so the viewport doesn't jump
           messagesContainer!.scrollTop = messagesContainer!.scrollHeight - prevScrollHeight;
         }
-        isLoadingOlderMessages = false;
-        hideLoadingIndicator(loadingIndicator);
 
         log.debug('Older messages loaded', {
           channel_id: App.activeChannelId,
@@ -1392,24 +1405,35 @@
           channel_id: App.activeChannelId,
           error: String(error),
         });
+      })
+      .finally(() => {
         isLoadingOlderMessages = false;
         hideLoadingIndicator(loadingIndicator);
       });
   }
 
-  if (messagesContainer) {
+  /**
+   * Attach scroll-based pagination listener to messagesContainer.
+   * Removes any previously attached handler to prevent event listener leaks (B9).
+   */
+  function attachScrollPaginationHandler(): void {
+    if (!messagesContainer) return;
+
+    // Remove previous handler if one exists
+    if (currentScrollHandler) {
+      messagesContainer.removeEventListener('scroll', currentScrollHandler);
+      currentScrollHandler = null;
+    }
+
     let scrollTimeout: NodeJS.Timeout | null = null;
 
-    messagesContainer.addEventListener('scroll', () => {
-      // Clear existing timeout
+    const handler = (): void => {
       if (scrollTimeout) {
         clearTimeout(scrollTimeout);
       }
 
-      // Debounce scroll events and check if we're near the top
       scrollTimeout = setTimeout(() => {
-        const scrollThreshold = 200; // Increased threshold for better UX
-        // Virtual scrolling disabled - use messagesContainer directly
+        const scrollThreshold = 200;
         const scrollTop = messagesContainer.scrollTop;
         const isNearTop = scrollTop < scrollThreshold;
         const hasMoreContent = hasMoreMessages && !isLoadingOlderMessages;
@@ -1423,9 +1447,15 @@
           });
           loadOlderMessages();
         }
-      }, 100); // 100ms debounce
-    });
+      }, 100);
+    };
+
+    currentScrollHandler = handler;
+    messagesContainer.addEventListener('scroll', handler);
   }
+
+  // Attach initial scroll handler
+  attachScrollPaginationHandler();
 
   window.sendEncryptedMessage = sendEncryptedMessage;
   window.sendGifMessage = sendGifMessage;

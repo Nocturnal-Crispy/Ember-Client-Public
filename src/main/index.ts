@@ -66,6 +66,14 @@ function isValidRgbString(value: unknown): boolean {
   });
 }
 
+function isValidCssColor(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  if (value === '') return true; // empty string means "no custom color"
+  return /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+    value
+  );
+}
+
 function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
   const result: ThemeSettings = { ...defaultThemeSettings };
   const repairedFields: string[] = [];
@@ -94,9 +102,11 @@ function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
     repairedFields.push('surfaceRgb');
   }
 
-  // chatColor is optional; accept empty string or any non-null string value
-  if (typeof saved.chatColor === 'string') {
-    result.chatColor = saved.chatColor;
+  // chatColor is optional; validate against safe CSS color formats
+  if (isValidCssColor(saved.chatColor)) {
+    result.chatColor = saved.chatColor!;
+  } else if (saved.chatColor !== undefined) {
+    repairedFields.push('chatColor');
   }
 
   if (repairedFields.length > 0) {
@@ -765,35 +775,66 @@ ipcMain.handle('save-auth', (_event, authData) => {
 
 // ─── IPC: SafeStorage for ember-shared auth service ─────────────────────────────
 
+const SAFE_STORAGE_ALLOWED_PREFIXES: readonly string[] = [
+  'identity_key_',
+  'registration_id_',
+  'signed_prekey_',
+  'crk_',
+  'sender_key_',
+  'dm_cmk_',
+  'epoch_key_',
+  'device_recovery_code',
+  'appLockPin',
+  'auth_token_',
+  'provisioning_',
+];
+
+function isAllowedSafeStorageKey(key: unknown): key is string {
+  if (typeof key !== 'string' || key.length === 0) return false;
+  return SAFE_STORAGE_ALLOWED_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
 ipcMain.handle('get-safe-storage', async (_event, { key }) => {
-  log.debug('IPC: get-safe-storage', { key });
+  log.debug('IPC: get-safe-storage');
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: get-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     const value = await electronSafeStorageFunctions.getSafeStorage(key);
     return { success: true, data: { value } };
   } catch (error) {
-    log.error('Failed to get safe storage', { key, error: (error as Error).message });
+    log.error('Failed to get safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
-  log.debug('IPC: set-safe-storage', { key });
+  log.debug('IPC: set-safe-storage');
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: set-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     await electronSafeStorageFunctions.setSafeStorage(key, value);
     return { success: true };
   } catch (error) {
-    log.error('Failed to set safe storage', { key, error: (error as Error).message });
+    log.error('Failed to set safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle('delete-safe-storage', async (_event, { key }) => {
-  log.debug('IPC: delete-safe-storage', { key });
+  log.debug('IPC: delete-safe-storage');
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: delete-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     await electronSafeStorageFunctions.deleteSafeStorage(key);
     return { success: true };
   } catch (error) {
-    log.error('Failed to delete safe storage', { key, error: (error as Error).message });
+    log.error('Failed to delete safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
@@ -1258,6 +1299,30 @@ ipcMain.handle('get-popout-voice-context', () => {
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────
 
+function isValidHost(host: string): boolean {
+  if (host.length === 0) return false;
+
+  // Check for IPv4: four octets, each 0-255
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    return ipv4Match.slice(1).every(octet => {
+      const n = parseInt(octet, 10);
+      return n >= 0 && n <= 255;
+    });
+  }
+
+  // RFC 1123 hostname: labels separated by dots
+  // Each label: 1-63 chars, starts/ends with alphanumeric, contains only alphanumeric and hyphens
+  const labels = host.split('.');
+  if (labels.length === 0) return false;
+  return labels.every(
+    label =>
+      label.length >= 1 &&
+      label.length <= 63 &&
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)
+  );
+}
+
 function parseInviteUrl(url: string): { code: string; hostname: string } | null {
   // ember://invite/<code>/<scheme>/<host>/<port>
   // e.g. ember://invite/abc123/http/localhost/8080
@@ -1277,8 +1342,8 @@ function parseInviteUrl(url: string): { code: string; hostname: string } | null 
     return null;
   }
 
-  // Validate host: must be a hostname or IP, no special characters
-  if (!/^[a-zA-Z0-9.-]+$/.test(host)) {
+  // Validate host: IPv4 (each octet 0-255) or RFC 1123 hostname
+  if (!isValidHost(host)) {
     log.warn('Rejected invite URL: invalid host');
     return null;
   }
