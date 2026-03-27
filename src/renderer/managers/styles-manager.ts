@@ -5,21 +5,21 @@
  */
 (function (): void {
   // --- Persistent State ------------------------------------------------------
-  const savedShadow = localStorage.getItem("ember_styles_shadow_enabled");
-  let isShadowEnabled = savedShadow !== null ? savedShadow === "true" : true;
+  const savedShadow = localStorage.getItem('ember_styles_shadow_enabled');
+  let isShadowEnabled = savedShadow !== null ? savedShadow === 'true' : true;
 
   function saveStylesToDisk(): void {
-    localStorage.setItem("ember_styles_shadow_enabled", isShadowEnabled.toString());
+    localStorage.setItem('ember_styles_shadow_enabled', isShadowEnabled.toString());
   }
 
   // --- Helper: Applies classes based on current state -------------------------
   function applyShadows(): void {
-    const targets = [".dm-main-area", ".channel-list", ".messages-container"];
+    const targets = ['.dm-main-area', '.channel-list', '.messages-container'];
     targets.forEach(selector => {
       const el = document.querySelector(selector);
       if (el) {
-        if (isShadowEnabled) el.classList.add("inset-shadow-active");
-        else el.classList.remove("inset-shadow-active");
+        if (isShadowEnabled) el.classList.add('inset-shadow-active');
+        else el.classList.remove('inset-shadow-active');
       }
     });
   }
@@ -32,7 +32,7 @@
 
   // --- UI Rendering ----------------------------------------------------------
   function renderStyleControls(): void {
-    const container = document.getElementById("styles-settings-container");
+    const container = document.getElementById('styles-settings-container');
     if (!container) return;
     container.replaceChildren();
 
@@ -63,12 +63,12 @@
     }); */
 
     // ─── Style Preset Dropdown ───
-    const styleRow = document.createElement("div");
-    styleRow.className = "theme-color-row"; // Changed from "Styles" to match your other rows
-    styleRow.style.display = "flex";
-    styleRow.style.justifyContent = "space-between";
-    styleRow.style.alignItems = "center";
-    styleRow.style.marginTop = "10px";
+    const styleRow = document.createElement('div');
+    styleRow.className = 'theme-color-row'; // Changed from "Styles" to match your other rows
+    styleRow.style.display = 'flex';
+    styleRow.style.justifyContent = 'space-between';
+    styleRow.style.alignItems = 'center';
+    styleRow.style.marginTop = '10px';
 
     styleRow.innerHTML = `
       <label class="vv-label">UI Style</label>
@@ -76,84 +76,72 @@
         <option value="default">Default</option>
         <option value="modern">Modern</option>
       </select>
-    `
-
-;
+    `;
     container.appendChild(styleRow);
 
-    const styleSelect = styleRow.querySelector("#ui-style-select") as HTMLSelectElement;
-
+    const styleSelect = styleRow.querySelector('#ui-style-select') as HTMLSelectElement;
 
     // ─── Inset Shadow Checkbox ───
-    const shadowRow = document.createElement("div");
-    shadowRow.className = "theme-color-row";
-    shadowRow.style.display = "flex";
-    shadowRow.style.justifyContent = "space-between";
-    shadowRow.style.alignItems = "center";
-    shadowRow.style.marginTop = "10px";
+    const shadowRow = document.createElement('div');
+    shadowRow.className = 'theme-color-row';
+    shadowRow.style.display = 'flex';
+    shadowRow.style.justifyContent = 'space-between';
+    shadowRow.style.alignItems = 'center';
+    shadowRow.style.marginTop = '10px';
     shadowRow.innerHTML = `
       <label class="vv-label">Deep Inset Shadows</label>
       <input type="checkbox" id="style-shadow-check" style="width: 20px; height: 20px; cursor: pointer;">
     `;
     container.appendChild(shadowRow);
 
-    const shadowCheck = shadowRow.querySelector("#style-shadow-check") as HTMLInputElement;
+    const shadowCheck = shadowRow.querySelector('#style-shadow-check') as HTMLInputElement;
 
     if (shadowCheck) {
       shadowCheck.checked = isShadowEnabled;
-      shadowCheck.addEventListener("change", (e) => {
+      shadowCheck.addEventListener('change', e => {
         isShadowEnabled = (e.target as HTMLInputElement).checked;
         saveStylesToDisk();
-        applyShadows(); 
+        applyShadows();
       });
     }
-    
 
     // Save Style
-    styleSelect.addEventListener("change", () => {
-        const selected = styleSelect.value;
-        console.log("Dropdown changed to:", selected);
-        
-        applyUIStyle(selected);
-        localStorage.setItem("ember_ui_style_pref", selected);
+    styleSelect.addEventListener('change', () => {
+      const selected = styleSelect.value;
+      console.log('Dropdown changed to:', selected);
+
+      applyUIStyle(selected);
+      localStorage.setItem('ember_ui_style_pref', selected);
     });
 
     // ─── Sync Dropdown State on Render ───
-    const saved = localStorage.getItem("ember_ui_style_pref") || "modern";
+    const saved = localStorage.getItem('ember_ui_style_pref') || 'modern';
     styleSelect.value = saved;
     applyUIStyle(saved); // Apply it immediately in case the page refreshed
   }
-  
 
-// Load Style
-  (window as any).initUIStyleState = function(): void {
-      const savedStyle = localStorage.getItem("ember_ui_style_pref") || "modern";
-      console.log("Global initUIStyleState loading:", savedStyle);
-      applyUIStyle(savedStyle);
-      
-      const styleSelect = document.getElementById("ui-style-select") as HTMLSelectElement;
-      if (styleSelect) styleSelect.value = savedStyle;
+  // Load Style
+  (window as any).initUIStyleState = function (): void {
+    const savedStyle = localStorage.getItem('ember_ui_style_pref') || 'modern';
+    console.log('Global initUIStyleState loading:', savedStyle);
+    applyUIStyle(savedStyle);
+
+    const styleSelect = document.getElementById('ui-style-select') as HTMLSelectElement;
+    if (styleSelect) styleSelect.value = savedStyle;
   };
-// Apply Style 
-function applyUIStyle(styleName: string): void {
+  // Apply Style
+  function applyUIStyle(styleName: string): void {
     // We target 'body' because it's always available immediately at startup
     const body = document.body;
 
-    if (styleName === "modern") {
-        body.classList.add("modern-ui");
+    if (styleName === 'modern') {
+      body.classList.add('modern-ui');
     } else {
-        body.classList.remove("modern-ui");
+      body.classList.remove('modern-ui');
     }
 
     console.log(`[Ember] UI Style set to: ${styleName}`);
-}
-
-
-
-
-
-
-
+  }
 
   /*
 
@@ -202,16 +190,8 @@ document.addEventListener("mousedown", (e) => {
 }, true); 
  */
 
-
-
-
   applyShadows();
-/*  applyMemberListState(); */
-
-
+  /*  applyMemberListState(); */
 
   (window as any).initStylesSettings = initStylesSettings;
 })();
-
-
-

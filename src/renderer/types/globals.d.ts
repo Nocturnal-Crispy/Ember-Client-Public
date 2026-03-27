@@ -221,6 +221,9 @@ declare global {
     size: number;
     mime: string;
     spoiler?: boolean;
+    key?: string;
+    iv?: string;
+    hash?: string;
   }
 
   interface AttachmentDownloadResult {
@@ -504,6 +507,7 @@ declare global {
     displayDecryptedMessage(msg: Message, prepend?: boolean, skipReplay?: boolean): Promise<void>;
     handleEditedMessage(msg: Message): Promise<void>;
     escapeHtml(text: string): string;
+    uint8ArrayToBase64(bytes: Uint8Array): string;
     loadChannelMessages(channelId: string, forceRefresh?: boolean): Promise<void>;
     fetchMessages(channelId: string, before?: string, limit?: number): Promise<FetchResult>;
     addMessage(

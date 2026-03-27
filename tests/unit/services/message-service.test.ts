@@ -187,6 +187,52 @@ describe('addMessage', () => {
   });
 });
 
+// ─── uint8ArrayToBase64 ──────────────────────────────────────────────────────────
+
+describe('uint8ArrayToBase64', () => {
+  it('is exported and callable', () => {
+    expect(typeof (window as any).uint8ArrayToBase64).toBe('function');
+  });
+
+  it('encodes an empty Uint8Array to an empty base64 string', () => {
+    const result = (window as any).uint8ArrayToBase64(new Uint8Array(0));
+    expect(result).toBe(btoa(''));
+  });
+
+  it('encodes a small Uint8Array correctly', () => {
+    const bytes = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    const result = (window as any).uint8ArrayToBase64(bytes);
+    expect(result).toBe(btoa('Hello'));
+  });
+
+  it('handles a buffer larger than the 8192 chunk size without throwing', () => {
+    // 100KB buffer — well above the chunk boundary
+    const size = 100 * 1024;
+    const bytes = new Uint8Array(size);
+    for (let i = 0; i < size; i++) bytes[i] = i % 256;
+
+    expect(() => {
+      (window as any).uint8ArrayToBase64(bytes);
+    }).not.toThrow();
+
+    // Verify round-trip: decode the base64 and compare
+    const base64 = (window as any).uint8ArrayToBase64(bytes);
+    const decoded = atob(base64);
+    expect(decoded.length).toBe(size);
+    for (let i = 0; i < size; i++) {
+      expect(decoded.charCodeAt(i)).toBe(i % 256);
+    }
+  });
+
+  it('handles a 1MB buffer without stack overflow', () => {
+    const size = 1024 * 1024;
+    const bytes = new Uint8Array(size);
+    expect(() => {
+      (window as any).uint8ArrayToBase64(bytes);
+    }).not.toThrow();
+  });
+});
+
 // ─── Sender Key Decryption Tests ───────────────────────────────────────────────────
 
 describe('Sender Key Decryption', () => {

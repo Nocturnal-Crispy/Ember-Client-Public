@@ -31,6 +31,16 @@
     return new TextDecoder().decode(bytes);
   }
 
+  function uint8ArrayToBase64(bytes: Uint8Array): string {
+    const CHUNK_SIZE = 8192;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  }
+
   async function tryGroupEncrypt(plaintext: string, emberId: string): Promise<string | null> {
     try {
       let distResp = await window.emberAPI.invoke<{
@@ -190,11 +200,11 @@
       cryptoKey,
       toAB(fileBytes)
     );
-    const encryptedBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+    const encryptedBase64 = uint8ArrayToBase64(new Uint8Array(encryptedBuffer));
 
     // Compute plaintext hash for integrity verification
     const hashBuffer = await crypto.subtle.digest('SHA-256', toAB(fileBytes));
-    const plaintextHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+    const plaintextHash = uint8ArrayToBase64(new Uint8Array(hashBuffer));
 
     const { id } = await window.electronAPI.messageService.uploadAttachment(
       auth,
@@ -1469,6 +1479,8 @@
   window.loadChannelMessages = loadChannelMessages;
   window.fetchMessages = fetchMessages;
   window.addMessage = addMessage;
+
+  window.uint8ArrayToBase64 = uint8ArrayToBase64;
 
   // Performance optimization functions
   window.getCachedMessages = getCachedMessages;

@@ -15,6 +15,42 @@
 
   type GetEmberKey = (channelId: string) => Promise<Uint8Array | null>;
 
+  function base64ToUint8Array(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  function toAB(bytes: Uint8Array): ArrayBuffer {
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  }
+
+  async function decryptWithAttachmentKey(
+    encryptedBase64: string,
+    keyB64: string,
+    ivB64: string
+  ): Promise<Uint8Array> {
+    const encryptedBytes = base64ToUint8Array(encryptedBase64);
+    const keyBytes = base64ToUint8Array(keyB64);
+    const ivBytes = base64ToUint8Array(ivB64);
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      toAB(keyBytes),
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: toAB(ivBytes), tagLength: 128 },
+      cryptoKey,
+      toAB(encryptedBytes)
+    );
+    return new Uint8Array(decrypted);
+  }
+
   // ─── Spoiler persistence ────────────────────────────────────────────────────
 
   const SPOILER_STORAGE_KEY = 'ember:spoiler-revealed';
@@ -635,6 +671,41 @@
 
   // ─── Attachment loading and downloading ────────────────────────────────────
 
+  function showImageBlob(
+    bytes: Uint8Array,
+    attachment: AttachmentData,
+    img: HTMLImageElement,
+    statusEl: HTMLElement,
+    wrapper: HTMLElement
+  ): void {
+    const blob = new Blob(
+      [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
+      { type: attachment.mime || 'image/png' }
+    );
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      wrapper.className = 'image-card-wrapper image-card-state-loaded';
+      img.addEventListener('click', () => {
+        (window as any).openImageViewer?.(url, attachment.name);
+      });
+      const scrollContainer = img.closest('.messages-container, #messages') as HTMLElement | null;
+      if (scrollContainer) {
+        const dist =
+          scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+        const expanded = Math.max(0, (img.offsetHeight || 300) - 80);
+        if (dist <= expanded + 60) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      }
+    };
+    img.onerror = () => {
+      statusEl.textContent = '[failed to load image]';
+      wrapper.className = 'image-card-wrapper image-card-state-error';
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
   function loadImageForCard(
     attachment: AttachmentData,
     img: HTMLImageElement,
@@ -643,78 +714,58 @@
     channelId: string,
     getEmberKey: GetEmberKey
   ): void {
-    getEmberKey(channelId)
-      .then(emberKey => {
-        if (!emberKey) {
-          statusEl.textContent = '[failed to load image]';
-          wrapper.className = 'image-card-wrapper image-card-state-error';
+    const setError = (): void => {
+      statusEl.textContent = '[failed to load image]';
+      wrapper.className = 'image-card-wrapper image-card-state-error';
+    };
+
+    ipcRenderer
+      .invoke('get-auth')
+      .then((authUnknown: unknown) => {
+        const auth = authUnknown as AuthData | null;
+        if (!auth) {
+          setError();
           return;
         }
-        ipcRenderer.invoke('get-auth').then((authUnknown: unknown) => {
-          const auth = authUnknown as AuthData | null;
-          if (!auth) {
-            statusEl.textContent = '[failed to load image]';
-            wrapper.className = 'image-card-wrapper image-card-state-error';
-            return;
-          }
-          window.electronAPI.messageService
-            .downloadAttachment(auth, channelId, attachment.id)
-            .then(resp => {
-              const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
-              if (!bytes) {
-                statusEl.textContent = '[failed to decrypt image]';
-                wrapper.className = 'image-card-wrapper image-card-state-error';
-                log.error('Failed to decrypt image attachment', {
+        window.electronAPI.messageService
+          .downloadAttachment(auth, channelId, attachment.id)
+          .then(async resp => {
+            if (attachment.key && attachment.iv) {
+              const bytes = await decryptWithAttachmentKey(
+                resp.encryptedData,
+                attachment.key,
+                attachment.iv
+              );
+              showImageBlob(bytes, attachment, img, statusEl, wrapper);
+            } else {
+              const emberKey = await getEmberKey(channelId);
+              if (!emberKey) {
+                log.error('Cannot load image: no ember key and no per-attachment key', {
                   id: attachment.id,
                 });
+                setError();
                 return;
               }
-              const blob = new Blob([new Uint8Array(bytes)], {
-                type: attachment.mime || 'image/png',
-              });
-              const url = URL.createObjectURL(blob);
-              img.onload = () => {
-                wrapper.className = 'image-card-wrapper image-card-state-loaded';
-                img.addEventListener('click', () => {
-                  (window as any).openImageViewer?.(url, attachment.name);
-                });
-                // Auto-scroll back to bottom when an image expands the layout
-                // and the user was already at the bottom.
-                const scrollContainer = img.closest(
-                  '.messages-container, #messages'
-                ) as HTMLElement | null;
-                if (scrollContainer) {
-                  const dist =
-                    scrollContainer.scrollHeight -
-                    scrollContainer.scrollTop -
-                    scrollContainer.clientHeight;
-                  const expanded = Math.max(0, (img.offsetHeight || 300) - 80);
-                  if (dist <= expanded + 60) {
-                    scrollContainer.scrollTop = scrollContainer.scrollHeight;
-                  }
-                }
-              };
-              img.onerror = () => {
-                statusEl.textContent = '[failed to load image]';
-                wrapper.className = 'image-card-wrapper image-card-state-error';
-                URL.revokeObjectURL(url);
-              };
-              img.src = url;
-            })
-            .catch((err: Error) => {
-              statusEl.textContent = '[failed to load image]';
-              wrapper.className = 'image-card-wrapper image-card-state-error';
-              log.error('Failed to download image attachment', {
-                id: attachment.id,
-                error: err.message,
-              });
+              const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
+              if (!bytes) {
+                log.error('Failed to decrypt image attachment', { id: attachment.id });
+                setError();
+                return;
+              }
+              showImageBlob(new Uint8Array(bytes), attachment, img, statusEl, wrapper);
+            }
+          })
+          .catch((err: Error) => {
+            setError();
+            log.error('Failed to download image attachment', {
+              id: attachment.id,
+              error: err.message,
             });
-        });
+          });
       })
       .catch((err: Error) => {
-        statusEl.textContent = '[failed to load image]';
-        wrapper.className = 'image-card-wrapper image-card-state-error';
-        log.error('Failed to get ember key for image', { error: err.message });
+        setError();
+        log.error('Failed to get auth for image', { error: err.message });
       });
   }
 
@@ -723,43 +774,61 @@
     channelId: string,
     getEmberKey: GetEmberKey
   ): void {
-    getEmberKey(channelId)
-      .then(emberKey => {
-        if (!emberKey) {
-          log.error('Cannot download: no ember key', { id: attachment.id });
-          return;
-        }
-        ipcRenderer.invoke('get-auth').then((authUnknown: unknown) => {
-          const auth = authUnknown as AuthData | null;
-          if (!auth) return;
-          window.electronAPI.messageService
-            .downloadAttachment(auth, channelId, attachment.id)
-            .then(resp => {
-              const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
-              if (!bytes) {
-                log.error('Failed to decrypt attachment', { id: attachment.id });
-                return;
-              }
-              const blob = new Blob([new Uint8Array(bytes)], {
-                type: resp.contentType || 'application/octet-stream',
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = resp.originalName;
-              a.click();
-              URL.revokeObjectURL(url);
-            })
-            .catch((err: Error) => {
-              log.error('Failed to download attachment', {
-                id: attachment.id,
-                error: err.message,
-              });
+    ipcRenderer
+      .invoke('get-auth')
+      .then(async (authUnknown: unknown) => {
+        const auth = authUnknown as AuthData | null;
+        if (!auth) return;
+        const resp = await window.electronAPI.messageService.downloadAttachment(
+          auth,
+          channelId,
+          attachment.id
+        );
+
+        let decryptedBytes: Uint8Array;
+        if (attachment.key && attachment.iv) {
+          decryptedBytes = await decryptWithAttachmentKey(
+            resp.encryptedData,
+            attachment.key,
+            attachment.iv
+          );
+        } else {
+          const emberKey = await getEmberKey(channelId);
+          if (!emberKey) {
+            log.error('Cannot download: no ember key and no per-attachment key', {
+              id: attachment.id,
             });
-        });
+            return;
+          }
+          const bytes = emberCrypto.decryptFileBytes(resp.encryptedData, emberKey);
+          if (!bytes) {
+            log.error('Failed to decrypt attachment', { id: attachment.id });
+            return;
+          }
+          decryptedBytes = new Uint8Array(bytes);
+        }
+
+        const blob = new Blob(
+          [
+            decryptedBytes.buffer.slice(
+              decryptedBytes.byteOffset,
+              decryptedBytes.byteOffset + decryptedBytes.byteLength
+            ) as ArrayBuffer,
+          ],
+          {
+            type: resp.contentType || 'application/octet-stream',
+          }
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = resp.originalName;
+        a.click();
+        URL.revokeObjectURL(url);
       })
       .catch((err: Error) => {
-        log.error('Failed to get ember key for download', {
+        log.error('Failed to download attachment', {
+          id: attachment.id,
           error: err.message,
         });
       });

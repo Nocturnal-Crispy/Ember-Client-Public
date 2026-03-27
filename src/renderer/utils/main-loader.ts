@@ -50,7 +50,6 @@
     '../../dist/renderer/managers/emoji-picker.js',
     '../../dist/renderer/managers/gif-picker.js',
     '../../dist/renderer/managers/renderer.js',
-
   ];
 
   async function fetchFragment(name: string): Promise<string> {
