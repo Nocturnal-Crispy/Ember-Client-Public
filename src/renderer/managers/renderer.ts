@@ -1281,6 +1281,16 @@
           nameEl.className = 'member-name';
           nameEl.textContent = member.username ?? 'Unknown';
           nameWrapEl.appendChild(nameEl);
+
+          // Crown icon for ember owner (inline with username)
+          const activeEmber = App.currentEmbers.find((e: Ember) => e.id === App.activeEmberId);
+          if (activeEmber?.ownerId && activeEmber.ownerId === member.userId) {
+            const crown = document.createElement('span');
+            crown.textContent = '\uD83D\uDC51';
+            crown.title = 'Ember Owner';
+            crown.style.cssText = 'margin-left: 4px; font-size: 0.7rem; vertical-align: middle;';
+            nameEl.appendChild(crown);
+          }
           // Make the entire member div clickable to open the user details modal.
           (window as any).makeUsernameClickable?.(memberEl, member.userId, member.username ?? '');
 
@@ -1450,17 +1460,19 @@
           }
         }
 
-        if (avatarData) {
-          const panelAvatar = document.querySelector(
-            '.user-panel .user-avatar'
-          ) as HTMLElement | null;
-          if (panelAvatar) {
+        const panelAvatar = document.querySelector(
+          '.user-panel .user-avatar'
+        ) as HTMLElement | null;
+        if (panelAvatar) {
+          if (avatarData) {
             const img = document.createElement('img');
             img.src = avatarData;
             img.alt = 'avatar';
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:0;';
             panelAvatar.textContent = '';
             panelAvatar.appendChild(img);
+          } else {
+            panelAvatar.textContent = auth.username.charAt(0).toUpperCase();
           }
         }
         log.info('User panel populated', { username: auth.username });

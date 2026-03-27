@@ -240,6 +240,24 @@
             const deviceId = String(data.payload['deviceId'] ?? '');
             log.info('WebSocket: device revoked', { device_id: deviceId });
             window.dispatchEvent(new CustomEvent('device-revoked', { detail: data.payload }));
+
+            // ── Permission system events ──────────────────────────────────
+          } else if (
+            data.type === 'role_created' ||
+            data.type === 'role_updated' ||
+            data.type === 'role_deleted'
+          ) {
+            log.debug('WebSocket: role event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('role-changed', { detail: data }));
+          } else if (data.type === 'member_role_assigned' || data.type === 'member_role_removed') {
+            log.debug('WebSocket: member role event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('member-role-changed', { detail: data }));
+          } else if (
+            data.type === 'channel_overwrite_set' ||
+            data.type === 'channel_overwrite_deleted'
+          ) {
+            log.debug('WebSocket: channel overwrite event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('channel-overwrite-changed', { detail: data }));
           }
         } catch (err) {
           log.error('WebSocket message parse error', { error: String(err) });

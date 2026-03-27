@@ -13,6 +13,10 @@ window.App = {
   currentEmbers: [],
   currentMembers: [],
 
+  // ── Permission system ──────────────────────────────────────────────────
+  currentRoles: [] as import('../../shared/types/permission').Role[],
+  myPermissions: 0n,
+
   // ── WebSocket ────────────────────────────────────────────────────────────
   wsConnection: null,
   wsReconnectTimer: null,

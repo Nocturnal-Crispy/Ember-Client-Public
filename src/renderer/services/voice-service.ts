@@ -814,24 +814,35 @@ class VoiceManager {
           Boolean(msg.payload['is_speaking'])
         );
         break;
-      case 'voice_participants':
-        _voiceLog.debug('Voice participants update', {
-          count: ((msg.payload['participants'] as unknown[]) ?? []).length,
-        });
-        this.handleParticipants(
-          msg.payload['participants'] as { user_id: string; username: string }[]
-        );
+      case 'voice_participants': {
+        // Normalize camelCase wire format (userId) to snake_case (user_id) used internally
+        const rawParticipants = (msg.payload['participants'] as Record<string, unknown>[]) ?? [];
+        const normalized = rawParticipants.map(p => ({
+          user_id: String(p['user_id'] ?? p['userId'] ?? ''),
+          username: String(p['username'] ?? ''),
+          screen_sharing: !!(p['screen_sharing'] ?? p['screenSharing']),
+          screen_stream_id: String(p['screen_stream_id'] ?? p['screenStreamId'] ?? ''),
+        }));
+        _voiceLog.debug('Voice participants update', { count: normalized.length });
+        this.handleParticipants(normalized);
         break;
+      }
       case 'voice_camera_on':
         if (this.onCameraStateChanged)
-          this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), true);
+          this.onCameraStateChanged(
+            String(msg.payload['user_id'] ?? msg.payload['userId'] ?? ''),
+            true
+          );
         break;
       case 'voice_camera_off':
         if (this.onCameraStateChanged)
-          this.onCameraStateChanged(String(msg.payload['user_id'] ?? ''), false);
+          this.onCameraStateChanged(
+            String(msg.payload['user_id'] ?? msg.payload['userId'] ?? ''),
+            false
+          );
         break;
       case 'screen_share_start': {
-        const ssUserId = String(msg.payload['user_id'] ?? '');
+        const ssUserId = String(msg.payload['user_id'] ?? msg.payload['userId'] ?? '');
         const ssStreamId = String(msg.payload['screen_stream_id'] ?? '');
         if (ssStreamId) {
           this._screenStreamIdToUser.set(ssStreamId, ssUserId);

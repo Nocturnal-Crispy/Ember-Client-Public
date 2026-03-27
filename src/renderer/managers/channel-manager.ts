@@ -421,7 +421,9 @@
     if (deleteLabel)
       deleteLabel.textContent = target.type === 'category' ? 'Delete Category' : 'Delete Channel';
 
-    const showEditDelete = target.type !== 'empty';
+    // Show edit/delete only if user has ManageChannels (1<<1) or ManageCategories (1<<7)
+    const canManage = (App.myPermissions & 2n) !== 0n || (App.myPermissions & 128n) !== 0n;
+    const showEditDelete = target.type !== 'empty' && canManage;
     const editSep = document.getElementById('ctx-edit-separator');
     const editItem = document.getElementById('ctx-edit-item');
     const deleteSep = document.getElementById('ctx-delete-separator');

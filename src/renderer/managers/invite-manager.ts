@@ -156,6 +156,25 @@
   if (serverHeader && serverHeaderMenu) {
     serverHeader.addEventListener('click', (e: Event) => {
       e.stopPropagation();
+      // Gate dropdown items by permission before showing
+      const perms = window.App.myPermissions ?? 0n;
+      const activeEmber = window.App.currentEmbers.find(
+        (em: Ember) => em.id === window.App.activeEmberId
+      );
+      const isOwner = activeEmber?.isOwner === true;
+      const canManageEmber = (perms & 4n) !== 0n; // ManageEmber (1<<2)
+      const canCreateInvites = (perms & 8n) !== 0n; // CreateInvites (1<<3)
+      const canManageRoles = (perms & 256n) !== 0n; // ManageRoles (1<<8)
+      const inviteEl = document.getElementById('invite-people-btn');
+      const editSettingsEl = document.getElementById('edit-ember-settings-btn');
+      const editRolesEl = document.getElementById('edit-ember-roles-btn');
+      const deleteEl = document.getElementById('delete-ember-btn');
+      const sepEl = serverHeaderMenu.querySelector('.server-header-menu-separator');
+      if (inviteEl) inviteEl.style.display = canCreateInvites ? '' : 'none';
+      if (editSettingsEl) editSettingsEl.style.display = canManageEmber ? '' : 'none';
+      if (editRolesEl) editRolesEl.style.display = canManageRoles ? '' : 'none';
+      if (deleteEl) deleteEl.style.display = isOwner ? '' : 'none';
+      if (sepEl) (sepEl as HTMLElement).style.display = isOwner ? '' : 'none';
       serverHeaderMenu.classList.toggle('hidden');
     });
     document.addEventListener('click', (e: Event) => {

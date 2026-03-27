@@ -47,10 +47,19 @@
     // Username
     setText('user-details-username', member?.username ?? username);
 
-    // Avatar (first letter of username, or image if available)
+    // Avatar (image if available, otherwise first letter of username)
     const avatarEl = getEl('user-details-avatar');
     if (avatarEl) {
-      avatarEl.textContent = (member?.username ?? username).charAt(0).toUpperCase();
+      avatarEl.replaceChildren();
+      if (member?.avatar) {
+        const img = document.createElement('img');
+        img.src = member.avatar;
+        img.alt = member.username ?? username;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = (member?.username ?? username).charAt(0).toUpperCase();
+      }
     }
 
     // Status
@@ -61,13 +70,23 @@
       statusEl.dataset['status'] = status;
     }
 
-    // Role
-    const role = member?.role ?? '';
-    if (role) {
-      setText('user-details-role', role.charAt(0).toUpperCase() + role.slice(1));
-      setHidden('user-details-role', false);
-    } else {
-      setHidden('user-details-role', true);
+    // Roles — fetch from permission system API
+    const roleContainer = getEl('user-details-role');
+    if (roleContainer) {
+      roleContainer.replaceChildren();
+      const emberId = window.App.activeEmberId;
+      if (emberId) {
+        fetchMemberRoles(emberId, userId, roleContainer);
+      } else {
+        // Fallback to legacy role string
+        const role = member?.role ?? '';
+        if (role) {
+          roleContainer.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+          roleContainer.style.display = '';
+        } else {
+          roleContainer.style.display = 'none';
+        }
+      }
     }
 
     // Custom status
@@ -170,6 +189,50 @@
   }
 
   wireEvents();
+
+  // ─── Fetch member roles from API ──────────────────────────────────────────
+
+  function fetchMemberRoles(emberId: string, userId: string, container: HTMLElement): void {
+    (async () => {
+      try {
+        const auth = await window.getValidAuth?.();
+        if (!auth?.token || !auth?.hostname) return;
+        const resp = await fetch(
+          `${auth.hostname}/api/v1/embers/${emberId}/members/${userId}/roles`,
+          { headers: { Authorization: `Bearer ${auth.token}` } }
+        );
+        if (!resp.ok) return;
+        const data = (await resp.json()) as {
+          roles: Array<{ name: string; color: string; isEveryone: boolean }>;
+        };
+        const roles = (data.roles ?? []).filter(r => !r.isEveryone);
+        container.replaceChildren();
+        if (roles.length === 0) {
+          container.style.display = 'none';
+          return;
+        }
+        container.style.display = '';
+        for (const role of roles) {
+          const badge = document.createElement('span');
+          badge.textContent = role.name;
+          badge.style.cssText = `
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px 4px 2px 0;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: ${role.color || '#99aab5'}33;
+            color: ${role.color || '#99aab5'};
+            border: 1px solid ${role.color || '#99aab5'}55;
+          `;
+          container.appendChild(badge);
+        }
+      } catch {
+        // Silently fail — legacy role text is already shown as fallback
+      }
+    })();
+  }
 
   // ─── Expose globals ─────────────────────────────────────────────────────────
 
