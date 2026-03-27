@@ -105,6 +105,26 @@
   background: rgba(var(--rgb-highlight), 0.5);
 }
 
+.member-list.hidden-sidebar {
+  width: 0px !important;
+  opacity: 0;
+  margin-right: -1px; /* Prevents border artifacts */
+  pointer-events: none;
+  display: none;
+}
+
+#toggle-members-btn {
+  opacity: 1;
+  transition: opacity 0.2s;
+  padding: 5px;
+}
+
+#toggle-members-btn.inactive {
+  opacity: 0.5; /* Dims the button when list is hidden */
+}
+
+
+
 /* ─── Category Label ───────────────────────────────────────────────────────── */
 
 .member-category {

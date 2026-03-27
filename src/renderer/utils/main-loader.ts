@@ -14,6 +14,7 @@
 
   const SCRIPTS: string[] = [
     '../../dist/renderer/utils/logger.js',
+    '../../dist/renderer/managers/styles-manager.js',
     '../../dist/renderer/managers/theme-manager.js',
     '../../dist/renderer/utils/auth-loader.js',
     '../../dist/renderer/services/totp-service.js',
@@ -49,6 +50,7 @@
     '../../dist/renderer/managers/emoji-picker.js',
     '../../dist/renderer/managers/gif-picker.js',
     '../../dist/renderer/managers/renderer.js',
+
   ];
 
   async function fetchFragment(name: string): Promise<string> {

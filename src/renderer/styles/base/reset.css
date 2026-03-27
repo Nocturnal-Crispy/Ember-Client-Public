@@ -9,12 +9,26 @@
   box-sizing: border-box;
 }
 
+/* The shadow effect - Top and Left only */
+.inset-shadow-active {
+  /* 4px right, 4px down, 10px blur, 0px spread */
+  box-shadow: inset 4px 4px 10px 0px rgba(0, 0, 0, 0.2) !important;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+
 html {
   font-size: 16px;
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: transparent !important;
+  background-color: rgba(0,0,0,0) !important;
+  
+  /* Ensure no weird spacing is causing the bleed */
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -25,7 +39,22 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  padding: var(--main-padding, 4px);
+  border-radius: var(--main-radius, 8px);
+ 
+    /* This forces the browser to mask the background color to the radius */
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org width='100%25' height='100%25' rx='8' ry='8' fill='white'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  
+  /* Alternative simpler mask that works in most Electron versions */
+  mask-image: radial-gradient(white, black);
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  padding: var(--main-padding, 4px);
+  isolation: isolate; 
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Optional: subtle border for visibility */
 }
+
+
 
 /* Remove default button styles */
 button {
@@ -74,12 +103,19 @@ ol {
   outline-offset: 2px;
 }
 
+.app-header {
+  border-top-left-radius: var(--main-radius);
+  border-top-right-radius: var(--main-radius);
+}
+
 /* App Container */
 .app-container {
   display: flex;
   height: calc(100vh - 30px);
   width: 100vw;
   flex: 1;
+  overflow: hidden; 
+  border-radius: calc(var(--main-radius) - var(--main-padding));
 }
 
 /* Scrollbar Styling */
@@ -100,3 +136,6 @@ ol {
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(var(--rgb-highlight), 0.8);
 }
+
+
+
