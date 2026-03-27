@@ -18,13 +18,43 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 // Preload-side logger — sends directly via ipcRenderer (bypasses the contextBridge allowlist)
+const SENSITIVE_LOG_KEYS = new Set([
+  'token',
+  'password',
+  'pin',
+  'secret',
+  'privateKey',
+  'private_key',
+  'recoveryCode',
+  'recovery_code',
+  'apiKey',
+  'api_key',
+  'authorization',
+  'ember_key',
+  'emberKey',
+  'inviteCode',
+  'invite_code',
+]);
+
+function sanitizeLogData(data: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (SENSITIVE_LOG_KEYS.has(key) || SENSITIVE_LOG_KEYS.has(key.toLowerCase())) {
+      sanitized[key] = '[REDACTED]';
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 function preloadLog(level: string, message: string, data?: Record<string, unknown>) {
   try {
     ipcRenderer.send(IPC_CHANNELS.LOG_TO_CONSOLE, {
       level: level.toUpperCase(),
       context: 'Preload',
       message,
-      data: data || null,
+      data: data ? sanitizeLogData(data) : null,
     });
   } catch {
     /* ignore if IPC unavailable */
@@ -52,6 +82,14 @@ try {
       const n = parseInt(part.trim(), 10);
       return !isNaN(n) && n >= 0 && n <= 255;
     });
+  }
+
+  function isValidPreloadCssColor(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+    if (value === '') return false; // empty means no custom color — skip setProperty
+    return /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+      value
+    );
   }
 
   // Enhanced validation with detailed logging
@@ -85,7 +123,7 @@ try {
         .split(',')
         .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
       root.style.setProperty('--rgb-surface-hover', hoverParts.join(', '));
-      if (savedTheme.chatColor) {
+      if (isValidPreloadCssColor(savedTheme.chatColor)) {
         root.style.setProperty('--chat-color', savedTheme.chatColor);
       }
       preloadLog('debug', 'Theme applied synchronously in preload');
@@ -125,7 +163,7 @@ try {
             .map((s: string) => Math.min(255, parseInt(s.trim(), 10) + 10));
           root.style.setProperty('--rgb-surface-hover', hoverParts.join(', '));
         }
-        if (savedTheme.chatColor) {
+        if (isValidPreloadCssColor(savedTheme.chatColor)) {
           root.style.setProperty('--chat-color', savedTheme.chatColor);
         }
         preloadLog('debug', 'Theme applied on DOMContentLoaded');

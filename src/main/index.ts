@@ -46,6 +46,21 @@ import {
 
 const log = createLogger('Main');
 
+// ─── IPC rate limiter ─────────────────────────────────────────────────────────
+
+const ipcRateLimits = new Map<string, { count: number; resetTime: number }>();
+function checkIpcRateLimit(channel: string, maxPerMinute: number): boolean {
+  const now = Date.now();
+  const entry = ipcRateLimits.get(channel);
+  if (!entry || now > entry.resetTime) {
+    ipcRateLimits.set(channel, { count: 1, resetTime: now + 60000 });
+    return true;
+  }
+  if (entry.count >= maxPerMinute) return false;
+  entry.count++;
+  return true;
+}
+
 // ─── Theme defaults and validation ────────────────────────────────────────────
 
 const defaultThemeSettings: ThemeSettings = {
@@ -64,6 +79,14 @@ function isValidRgbString(value: unknown): boolean {
     const n = parseInt(part.trim(), 10);
     return !isNaN(n) && n >= 0 && n <= 255;
   });
+}
+
+function isValidCssColor(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  if (value === '') return true; // empty string means "no custom color"
+  return /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+    value
+  );
 }
 
 function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
@@ -94,9 +117,11 @@ function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
     repairedFields.push('surfaceRgb');
   }
 
-  // chatColor is optional; accept empty string or any non-null string value
-  if (typeof saved.chatColor === 'string') {
-    result.chatColor = saved.chatColor;
+  // chatColor is optional; validate against safe CSS color formats
+  if (isValidCssColor(saved.chatColor)) {
+    result.chatColor = saved.chatColor!;
+  } else if (saved.chatColor !== undefined) {
+    repairedFields.push('chatColor');
   }
 
   if (repairedFields.length > 0) {
@@ -190,6 +215,7 @@ function createWindow(isAuthenticated: boolean) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // TODO: Evaluate enabling sandbox mode for improved process isolation
       sandbox: false,
       preload: path.join(__dirname, '../preload/index.js'),
       devTools: isDev,
@@ -727,7 +753,8 @@ ipcMain.handle(
       !userId ||
       typeof hostname !== 'string' ||
       typeof username !== 'string' ||
-      typeof userId !== 'string'
+      typeof userId !== 'string' ||
+      !/^[a-f0-9-]{36}$/.test(userId)
     ) {
       log.warn('IPC: save-login-hint called with invalid arguments');
       return false;
@@ -765,35 +792,78 @@ ipcMain.handle('save-auth', (_event, authData) => {
 
 // ─── IPC: SafeStorage for ember-shared auth service ─────────────────────────────
 
+const SAFE_STORAGE_ALLOWED_PREFIXES: readonly string[] = [
+  'identity_key_',
+  'registration_id_',
+  'signed_prekey_',
+  'crk_',
+  'sender_key_',
+  'dm_cmk_',
+  'epoch_key_',
+  'device_recovery_code',
+  'appLockPin',
+  'auth_token_',
+  'provisioning_',
+];
+
+function isAllowedSafeStorageKey(key: unknown): key is string {
+  if (typeof key !== 'string' || key.length === 0) return false;
+  return SAFE_STORAGE_ALLOWED_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
 ipcMain.handle('get-safe-storage', async (_event, { key }) => {
-  log.debug('IPC: get-safe-storage', { key });
+  log.debug('IPC: get-safe-storage');
+  if (!checkIpcRateLimit('get-safe-storage', 300)) {
+    log.warn('IPC: get-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: get-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     const value = await electronSafeStorageFunctions.getSafeStorage(key);
     return { success: true, data: { value } };
   } catch (error) {
-    log.error('Failed to get safe storage', { key, error: (error as Error).message });
+    log.error('Failed to get safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle('set-safe-storage', async (_event, { key, value }) => {
-  log.debug('IPC: set-safe-storage', { key });
+  log.debug('IPC: set-safe-storage');
+  if (!checkIpcRateLimit('set-safe-storage', 300)) {
+    log.warn('IPC: set-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: set-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     await electronSafeStorageFunctions.setSafeStorage(key, value);
     return { success: true };
   } catch (error) {
-    log.error('Failed to set safe storage', { key, error: (error as Error).message });
+    log.error('Failed to set safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle('delete-safe-storage', async (_event, { key }) => {
-  log.debug('IPC: delete-safe-storage', { key });
+  log.debug('IPC: delete-safe-storage');
+  if (!checkIpcRateLimit('delete-safe-storage', 300)) {
+    log.warn('IPC: delete-safe-storage rate limited');
+    return { success: false, error: 'Rate limited' };
+  }
+  if (!isAllowedSafeStorageKey(key)) {
+    log.warn('IPC: delete-safe-storage rejected — key not in allowlist');
+    return { success: false, error: 'Key not allowed' };
+  }
   try {
     await electronSafeStorageFunctions.deleteSafeStorage(key);
     return { success: true };
   } catch (error) {
-    log.error('Failed to delete safe storage', { key, error: (error as Error).message });
+    log.error('Failed to delete safe storage', { error: (error as Error).message });
     return { success: false, error: (error as Error).message };
   }
 });
@@ -861,6 +931,15 @@ interface UpdateInfo {
 }
 
 ipcMain.handle('check-for-update', async (): Promise<UpdateInfo> => {
+  if (!checkIpcRateLimit('check-for-update', 5)) {
+    log.warn('IPC: check-for-update rate limited');
+    return {
+      updateAvailable: false,
+      currentVersion: app.getVersion(),
+      latestVersion: null,
+      error: 'Rate limited',
+    };
+  }
   const currentVersion = app.getVersion();
   try {
     const response = await net.fetch(
@@ -1035,7 +1114,7 @@ ipcMain.handle(
         } catch (checksumErr) {
           // Delete the untrusted file and abort the update.
           try {
-            require('fs').unlinkSync(result.filePath);
+            fs.unlinkSync(result.filePath);
           } catch {
             /* best-effort */
           }
@@ -1150,7 +1229,7 @@ ipcMain.handle('has-pin', () => {
 });
 
 ipcMain.handle('set-pin', (_event, pin: unknown) => {
-  if (typeof pin !== 'string' || pin.length < 4) {
+  if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
     log.warn('IPC: set-pin rejected — invalid PIN');
     return false;
   }
@@ -1161,6 +1240,10 @@ ipcMain.handle('set-pin', (_event, pin: unknown) => {
 });
 
 ipcMain.handle('verify-pin', (_event, pin: unknown) => {
+  if (!checkIpcRateLimit('verify-pin', 5)) {
+    log.warn('IPC: verify-pin rate limited');
+    return false;
+  }
   if (typeof pin !== 'string') return false;
   const stored = store.get('appLockPin') as string | undefined;
   if (!stored) return false;
@@ -1223,6 +1306,10 @@ ipcMain.handle('open-video-popout', async (_event, args: unknown) => {
   const token = auth?.token ?? '';
 
   pendingPopoutContext = { channelName: channelName ?? '', token };
+  // Auto-cleanup to avoid lingering token in memory if pop-out never reads it
+  setTimeout(() => {
+    pendingPopoutContext = null;
+  }, 30000);
   log.info('Opening video pop-out window', { channelName });
 
   const popout = new BrowserWindow({
@@ -1235,6 +1322,7 @@ ipcMain.handle('open-video-popout', async (_event, args: unknown) => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // TODO: Evaluate enabling sandbox mode for improved process isolation
       sandbox: false,
       preload: path.join(__dirname, '../preload/video-popout-preload.js'),
       devTools: isDev,
@@ -1258,6 +1346,30 @@ ipcMain.handle('get-popout-voice-context', () => {
 
 // ─── Invite protocol ──────────────────────────────────────────────────────────
 
+function isValidHost(host: string): boolean {
+  if (host.length === 0 || host.length > 253) return false;
+
+  // Check for IPv4: four octets, each 0-255
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    return ipv4Match.slice(1).every(octet => {
+      const n = parseInt(octet, 10);
+      return n >= 0 && n <= 255;
+    });
+  }
+
+  // RFC 1123 hostname: labels separated by dots
+  // Each label: 1-63 chars, starts/ends with alphanumeric, contains only alphanumeric and hyphens
+  const labels = host.split('.');
+  if (labels.length === 0) return false;
+  return labels.every(
+    label =>
+      label.length >= 1 &&
+      label.length <= 63 &&
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)
+  );
+}
+
 function parseInviteUrl(url: string): { code: string; hostname: string } | null {
   // ember://invite/<code>/<scheme>/<host>/<port>
   // e.g. ember://invite/abc123/http/localhost/8080
@@ -1277,16 +1389,23 @@ function parseInviteUrl(url: string): { code: string; hostname: string } | null 
     return null;
   }
 
-  // Validate host: must be a hostname or IP, no special characters
-  if (!/^[a-zA-Z0-9.-]+$/.test(host)) {
+  // Validate host: IPv4 (each octet 0-255) or RFC 1123 hostname
+  if (!isValidHost(host)) {
     log.warn('Rejected invite URL: invalid host');
     return null;
   }
 
   // Validate port if present: must be numeric
-  if (port !== undefined && !/^\d{1,5}$/.test(port)) {
-    log.warn('Rejected invite URL: invalid port');
-    return null;
+  if (port !== undefined) {
+    if (!/^\d{1,5}$/.test(port)) {
+      log.warn('Rejected invite URL: invalid port format');
+      return null;
+    }
+    const portNum = parseInt(port, 10);
+    if (portNum < 1 || portNum > 65535) {
+      log.warn('Rejected invite URL: port out of range');
+      return null;
+    }
   }
 
   const hostname = port ? `${scheme}://${host}:${port}` : `${scheme}://${host}`;

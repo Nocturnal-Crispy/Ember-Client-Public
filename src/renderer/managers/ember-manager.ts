@@ -477,10 +477,36 @@
           });
         } catch (memberErr) {
           const err = memberErr as Error;
-          log.warn('Skipping member for distribution', {
+          log.warn('Distribution failed for member — retrying once', {
             user_id: member.userId,
+            device_id: member.deviceId,
             error: err.message,
           });
+          try {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await ensureSignalSession(auth, member.userId, member.deviceId);
+            const retryAddress = `${member.userId}.${member.deviceId}`;
+            const retryEnc = await window.emberAPI.invoke<{
+              ciphertext: string;
+              messageType: number;
+            }>('Encrypt', {
+              recipientAddress: retryAddress,
+              plaintext: distributionMessage,
+            });
+            if (retryEnc.success && retryEnc.data) {
+              const retryEnvelope = JSON.stringify({
+                ct: retryEnc.data.ciphertext,
+                mt: retryEnc.data.messageType,
+              });
+              distributions.push({
+                recipientUserId: member.userId,
+                recipientDeviceId: member.deviceId,
+                distributionMessage: btoa(retryEnvelope),
+              });
+            }
+          } catch {
+            /* truly skip after retry */
+          }
         }
       }
 
@@ -797,12 +823,6 @@
         saveEmberOrder();
       });
 
-      // Right-click context menu (owners only)
-      serverIcon.addEventListener('contextmenu', (e: MouseEvent) => {
-        e.preventDefault();
-        if (ember.isOwner) showEmberContextMenu(e.clientX, e.clientY, ember);
-      });
-
       if (separator) {
         serverList.insertBefore(serverIcon, separator);
       } else {
@@ -892,7 +912,74 @@
       const historyCrypto = (window as any).historyCryptoService;
       if (historyCrypto) {
         const epoch = await historyCrypto.getCurrentEpoch(emberId);
-        await historyCrypto.getCrk(emberId, epoch);
+        const existingCrk = await historyCrypto.getCrk(emberId, epoch);
+        if (!existingCrk && epoch > 0) {
+          // No CRK for current epoch — nobody was online to handle crk_rotation_required.
+          // Create and distribute one so we can send messages immediately (self-serve).
+          log.info('No CRK for current epoch, creating one', { ember_id: emberId, epoch });
+          try {
+            const deviceMembersResp = await fetch(
+              `${auth.hostname}/api/v1/embers/${emberId}/device-members`,
+              { headers: { Authorization: `Bearer ${auth.token}` } }
+            );
+            if (deviceMembersResp.ok) {
+              const dmData = (await deviceMembersResp.json()) as {
+                members?: Array<{ userId: string; deviceId: string }>;
+              };
+              const deviceMembers = dmData.members ?? [];
+              if (deviceMembers.length > 0) {
+                await historyCrypto.createAndDistributeCrk(emberId, deviceMembers, epoch);
+                // Re-sync from server to handle concurrent creation by another member.
+                // If another member created a different CRK for the same epoch, the server
+                // UPSERT means one wins. Re-syncing ensures our local cache matches.
+                await historyCrypto.syncCrksForEmber(emberId);
+              }
+            }
+          } catch (crkErr) {
+            log.warn('Failed to create CRK for current epoch', {
+              error: (crkErr as Error).message,
+            });
+          }
+        }
+
+        // CRK catch-up: re-wrap for members who joined while we were offline.
+        // Any member with cached CRKs can perform this, not just the owner.
+        const cachedEpochs = historyCrypto.getCachedCrkEpochs(emberId);
+        if (cachedEpochs.length > 0) {
+          try {
+            const missingResp = await fetch(
+              `${auth.hostname}/api/v1/embers/${emberId}/crk/missing-members`,
+              { headers: { Authorization: `Bearer ${auth.token}` } }
+            );
+            if (missingResp.ok) {
+              const missingData = (await missingResp.json()) as {
+                missingMembers?: Array<{ userId: string; deviceId: string; epoch: number }>;
+              };
+              const missingMembers = missingData.missingMembers ?? [];
+              if (missingMembers.length > 0) {
+                const deviceMap = new Map<string, { userId: string; deviceId: string }>();
+                for (const m of missingMembers) {
+                  deviceMap.set(`${m.userId}.${m.deviceId}`, {
+                    userId: m.userId,
+                    deviceId: m.deviceId,
+                  });
+                }
+                const devices = Array.from(deviceMap.values());
+                const count = await historyCrypto.rewrapCrksForNewMember(emberId, devices);
+                if (count > 0) {
+                  log.info('CRK catch-up: re-wrapped for missing members', {
+                    ember_id: emberId,
+                    count,
+                  });
+                }
+              }
+            }
+          } catch (catchupErr) {
+            log.warn('CRK catch-up failed (non-fatal)', {
+              error: (catchupErr as Error).message,
+            });
+          }
+        }
       }
     } catch (skErr) {
       const errorMessage = (skErr as Error).message;
@@ -933,10 +1020,33 @@
     channels = result.channels;
     categories = result.categories;
     window.renderChannels(channels, categories);
+
+    // Fetch roles and own permissions for the active ember
+    try {
+      const permsResp = await fetch(
+        `${auth.hostname}/api/v1/embers/${emberId}/members/@me/permissions`,
+        { headers: { Authorization: `Bearer ${auth.token}` } }
+      );
+      if (permsResp.ok) {
+        const permsData = (await permsResp.json()) as {
+          permissions: number | string;
+          roles: import('../../shared/types/permission').Role[];
+        };
+        App.currentRoles = permsData.roles ?? [];
+        App.myPermissions = BigInt(permsData.permissions);
+      }
+    } catch (permErr) {
+      log.warn('Failed to fetch permissions', { error: (permErr as Error).message });
+    }
+
     // Fetch and display current voice presence for all voice channels in this ember
     await window.fetchAndRenderVoicePresence(emberId);
     const members = await window.fetchMembers(emberId);
     window.renderMemberList(members);
+    // Re-render voice participants now that App.currentMembers has avatars
+    App.voiceChannelPresence.forEach((_: Map<string, string>, channelId: string) => {
+      window.renderVoiceParticipants(channelId);
+    });
     window.wsSubscribeToEmber(emberId);
 
     // Sync crypto state from server
@@ -1297,59 +1407,63 @@
     createServerError?.classList.add('hidden');
   }
 
-  // ─── Ember context menu ────────────────────────────────────────────────────
+  // ─── Server Header Dropdown Actions ──────────────────────────────────────────
 
-  const emberContextMenu = document.getElementById('ember-context-menu');
-  let contextMenuEmber: Ember | null = null;
+  const serverHeaderMenu = document.getElementById('server-header-menu');
 
-  function showEmberContextMenu(x: number, y: number, ember: Ember): void {
-    if (!emberContextMenu) return;
-    contextMenuEmber = ember;
-    emberContextMenu.classList.remove('hidden');
-    // Position off-screen first so getBoundingClientRect returns real dimensions
-    emberContextMenu.style.left = '0px';
-    emberContextMenu.style.top = '0px';
-    const rect = emberContextMenu.getBoundingClientRect();
-    emberContextMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - 5)}px`;
-    emberContextMenu.style.top = `${Math.min(y, window.innerHeight - rect.height - 5)}px`;
+  // "Edit Ember Settings" — opens the edit ember modal
+  const editEmberSettingsBtn = document.getElementById('edit-ember-settings-btn');
+  if (editEmberSettingsBtn) {
+    editEmberSettingsBtn.addEventListener('click', () => {
+      serverHeaderMenu?.classList.add('hidden');
+      const activeEmber = App.currentEmbers.find(e => e.id === App.activeEmberId);
+      if (activeEmber) openEditEmberModal(activeEmber);
+    });
   }
 
-  document.addEventListener('click', () => {
-    emberContextMenu?.classList.add('hidden');
-  });
+  // "Edit Ember Roles" — opens the role management modal
+  const editEmberRolesBtn = document.getElementById('edit-ember-roles-btn');
+  if (editEmberRolesBtn) {
+    editEmberRolesBtn.addEventListener('click', () => {
+      serverHeaderMenu?.classList.add('hidden');
+      const activeEmber = App.currentEmbers.find(e => e.id === App.activeEmberId);
+      if (activeEmber && typeof window.openRoleSettingsModal === 'function') {
+        window.openRoleSettingsModal(activeEmber);
+      }
+    });
+  }
 
-  const deleteEmberBtn = document.getElementById('ctx-ember-delete');
-  if (deleteEmberBtn) {
-    deleteEmberBtn.addEventListener('click', async () => {
-      if (!contextMenuEmber) return;
-      emberContextMenu?.classList.add('hidden');
-      if (!confirm(`Delete "${contextMenuEmber.name}"? This cannot be undone.`)) return;
+  // "Delete Ember" — confirms and deletes
+  const deleteEmberDropdownBtn = document.getElementById('delete-ember-btn');
+  if (deleteEmberDropdownBtn) {
+    deleteEmberDropdownBtn.addEventListener('click', async () => {
+      serverHeaderMenu?.classList.add('hidden');
+      const activeEmber = App.currentEmbers.find(e => e.id === App.activeEmberId);
+      if (!activeEmber) return;
+      if (!confirm(`Delete "${activeEmber.name}"? This cannot be undone.`)) return;
       const auth = await window.getValidAuth();
       if (!auth?.token || !auth?.hostname) return;
-      const res = await fetch(`${auth.hostname}/api/v1/embers/${contextMenuEmber.id}`, {
+      const res = await fetch(`${auth.hostname}/api/v1/embers/${activeEmber.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${auth.token}` },
       });
       if (res.ok) {
-        if (App.activeEmberId === contextMenuEmber.id) App.activeEmberId = null;
+        App.activeEmberId = null;
         const embers = await fetchEmbers();
-        if (embers.length === 0) {
-          renderServerList(embers);
-          window.showWelcomeScreen();
-        } else {
-          renderServerList(embers);
+        renderServerList(embers);
+        if (embers.length > 0) {
+          switchToServer(embers[0].id, embers[0].name);
         }
       } else {
         alert('Failed to delete ember.');
       }
-      contextMenuEmber = null;
     });
   }
 
   // ─── Edit Ember Modal ───────────────────────────────────────────────────────
 
   const editEmberModal = document.getElementById('edit-ember-modal');
-  const editEmberBtn = document.getElementById('ctx-ember-edit');
+  const _editEmberBtn = document.getElementById('ctx-ember-edit');
   const editEmberNameInput = document.getElementById(
     'edit-ember-name-input'
   ) as HTMLInputElement | null;
@@ -1377,13 +1491,7 @@
   let editingEmber: Ember | null = null;
   let editCurrentIconSource: 'upload' | 'url' = 'upload';
 
-  if (editEmberBtn) {
-    editEmberBtn.addEventListener('click', () => {
-      if (!contextMenuEmber) return;
-      emberContextMenu?.classList.add('hidden');
-      openEditEmberModal(contextMenuEmber);
-    });
-  }
+  // Old context menu wiring removed — "Edit Ember Settings" now wired via dropdown above
 
   function openEditEmberModal(ember: Ember): void {
     if (!editEmberModal) return;
@@ -1643,4 +1751,32 @@
   window.setCryptoState = setCryptoState;
   window.shouldUseSenderKey = shouldUseSenderKey;
   window.syncCryptoStateFromServer = syncCryptoStateFromServer;
+
+  // Refresh permissions when role or member-role events arrive
+  window.addEventListener('role-changed', async () => {
+    const emberId = App.activeEmberId;
+    if (!emberId) return;
+    try {
+      const auth = await getValidAuth();
+      if (!auth) return;
+      const resp = await fetch(
+        `${auth.hostname}/api/v1/embers/${emberId}/members/@me/permissions`,
+        { headers: { Authorization: `Bearer ${auth.token}` } }
+      );
+      if (resp.ok) {
+        const data = (await resp.json()) as {
+          permissions: number | string;
+          roles: import('../../shared/types/permission').Role[];
+        };
+        App.currentRoles = data.roles ?? [];
+        App.myPermissions = BigInt(data.permissions);
+      }
+    } catch {
+      // Permission refresh failed — stale perms until next server switch
+    }
+  });
+
+  window.addEventListener('member-role-changed', () => {
+    window.dispatchEvent(new CustomEvent('role-changed'));
+  });
 })();

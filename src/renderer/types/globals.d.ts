@@ -419,6 +419,8 @@ declare global {
     ownedMessageIds: Set<string>;
     currentEmbers: Ember[];
     currentMembers: Member[];
+    currentRoles: import('../../shared/types/permission').Role[];
+    myPermissions: bigint;
     wsConnection: WebSocket | null;
     wsReconnectTimer: ReturnType<typeof setTimeout> | null;
     voiceManager: unknown | null;
@@ -641,6 +643,8 @@ declare global {
     openSettingsModal(page?: string): void;
     closeSettingsModal(): void;
     switchSettingsPage(page: string): void;
+    openRoleSettingsModal(ember: Ember): void;
+    closeRoleSettingsModal(): void;
     playVoiceSound(type: string): void;
     playNotificationSound(type: string): void;
     initNotifSettings(): void;
@@ -655,6 +659,7 @@ declare global {
     unlockApp(pin: string): Promise<boolean>;
     isAppLocked(): boolean;
     updateAppLockSettings(settings: Partial<AppLockSettings>): void;
+    cleanupAppLock(): void;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
     cleanupVoiceOnDisconnect(): void;
@@ -705,7 +710,9 @@ declare global {
     updateChatHeader(name: string, description: string): void;
     hideWelcomeScreen(): void;
     showWelcomeScreen(): void;
+    hideReconnectionOverlay(): void;
     // Globals set by direct-messaging-manager.ts
+    cleanupDirectMessaging(): void;
     initializeDirectMessaging(): Promise<void>;
     startDmConversation(participantId: string, participantUsername: string): Promise<string | null>;
     fetchDMRequests(): Promise<

@@ -41,6 +41,7 @@ class DMPerformanceOptimizer {
   private loadingPromises = new Map<string, Promise<void>>();
   private config: PerformanceConfig;
   private eventListeners = new Map<string, Function[]>();
+  private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(config: Partial<PerformanceConfig> = {}) {
     this.config = {
@@ -53,7 +54,24 @@ class DMPerformanceOptimizer {
     };
 
     // Start cleanup interval
-    setInterval(() => this.cleanupCache(), this.config.cacheExpirationTime);
+    this.cleanupIntervalId = setInterval(
+      () => this.cleanupCache(),
+      this.config.cacheExpirationTime
+    );
+  }
+
+  /**
+   * Stop the cache cleanup interval and release resources.
+   */
+  destroy(): void {
+    if (this.cleanupIntervalId !== null) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    this.conversationCache.clear();
+    this.messageCache.clear();
+    this.loadingPromises.clear();
+    this.eventListeners.clear();
   }
 
   /**

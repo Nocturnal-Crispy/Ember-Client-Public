@@ -661,6 +661,11 @@ async function dispatch(
   args: Record<string, unknown>,
   db: SignalDatabase | null
 ): Promise<unknown> {
+  // Defense in depth: ensure args is a non-null object before dispatching
+  if (!args || typeof args !== 'object') {
+    return { success: false, error: 'Invalid arguments' };
+  }
+
   switch (cmd) {
     // Auth
     case 'GetAuth':

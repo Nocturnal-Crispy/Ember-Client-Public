@@ -236,3 +236,18 @@
   background-color: rgba(var(--rgb-highlight), 0.1);
   color: var(--highlight);
 }
+
+.server-header-menu-item.danger {
+  color: #ed4245;
+}
+
+.server-header-menu-item.danger:hover {
+  background-color: rgba(237, 66, 69, 0.1);
+  color: #ed4245;
+}
+
+.server-header-menu-separator {
+  height: 1px;
+  background: var(--border-color, #2a2a2a);
+  margin: 4px 8px;
+}

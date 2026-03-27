@@ -765,6 +765,32 @@
         clearInterval(App.healthcheckInterval);
         App.healthcheckInterval = null;
       }
+
+      // Destroy Signal session manager to prevent stale sessions on re-login
+      if (App.signalSessionManager) {
+        try {
+          App.signalSessionManager.destroy();
+        } catch (e) {
+          log.warn('Error destroying signalSessionManager', { error: (e as Error).message });
+        }
+        App.signalSessionManager = null;
+      }
+      App.signalSessionReady.clear();
+
+      // Clear history crypto service
+      App.historyCryptoService = null;
+      (window as any).historyCryptoService = null;
+
+      // Clean up DM event listeners to prevent leaks across sessions
+      if (typeof window.cleanupDirectMessaging === 'function') {
+        window.cleanupDirectMessaging();
+      }
+
+      // Stop app lock idle timer and activity listeners to prevent leaks across sessions
+      if (typeof window.cleanupAppLock === 'function') {
+        window.cleanupAppLock();
+      }
+
       log.info('Session cleared, sending auth-logout signal');
       ipcRenderer.send('auth-logout');
     }
@@ -850,6 +876,7 @@
     }
 
     // Track current custom status locally so presence-only changes preserve it
+    let customStatusEscapeHandler: EventListener | null = null;
     let currentCustomStatus = '';
     let currentStatusEmoji = '';
 
@@ -1054,12 +1081,16 @@
         if (e.target === modal) closeCustomStatusModal();
       });
 
-      // Close on Escape
-      document.addEventListener('keydown', e => {
+      // Close on Escape — store handler reference so it can be removed if init is called again
+      if (customStatusEscapeHandler) {
+        document.removeEventListener('keydown', customStatusEscapeHandler);
+      }
+      customStatusEscapeHandler = ((e: KeyboardEvent): void => {
         if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
           closeCustomStatusModal();
         }
-      });
+      }) as EventListener;
+      document.addEventListener('keydown', customStatusEscapeHandler);
     }
 
     initCustomStatusModal();
@@ -1250,6 +1281,16 @@
           nameEl.className = 'member-name';
           nameEl.textContent = member.username ?? 'Unknown';
           nameWrapEl.appendChild(nameEl);
+
+          // Crown icon for ember owner (inline with username)
+          const activeEmber = App.currentEmbers.find((e: Ember) => e.id === App.activeEmberId);
+          if (activeEmber?.ownerId && activeEmber.ownerId === member.userId) {
+            const crown = document.createElement('span');
+            crown.textContent = '\uD83D\uDC51';
+            crown.title = 'Ember Owner';
+            crown.style.cssText = 'margin-left: 4px; font-size: 0.7rem; vertical-align: middle;';
+            nameEl.appendChild(crown);
+          }
           // Make the entire member div clickable to open the user details modal.
           (window as any).makeUsernameClickable?.(memberEl, member.userId, member.username ?? '');
 
@@ -1419,17 +1460,19 @@
           }
         }
 
-        if (avatarData) {
-          const panelAvatar = document.querySelector(
-            '.user-panel .user-avatar'
-          ) as HTMLElement | null;
-          if (panelAvatar) {
+        const panelAvatar = document.querySelector(
+          '.user-panel .user-avatar'
+        ) as HTMLElement | null;
+        if (panelAvatar) {
+          if (avatarData) {
             const img = document.createElement('img');
             img.src = avatarData;
             img.alt = 'avatar';
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:0;';
             panelAvatar.textContent = '';
             panelAvatar.appendChild(img);
+          } else {
+            panelAvatar.textContent = auth.username.charAt(0).toUpperCase();
           }
         }
         log.info('User panel populated', { username: auth.username });
@@ -1487,6 +1530,7 @@
     window.updateChatHeader = updateChatHeader;
     window.hideWelcomeScreen = hideWelcomeScreen;
     window.showWelcomeScreen = showWelcomeScreen;
+    window.hideReconnectionOverlay = hideReconnectionOverlay;
 
     initializeAppWithWS();
   });

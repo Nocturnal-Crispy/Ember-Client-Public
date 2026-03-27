@@ -33,6 +33,7 @@
     '../../dist/renderer/services/message-service.js',
     '../../dist/renderer/managers/channel-manager.js',
     '../../dist/renderer/managers/ember-manager.js',
+    '../../dist/renderer/managers/role-settings.js',
     '../../dist/renderer/managers/invite-manager.js',
     '../../dist/renderer/components/screen-share-modal.js',
     '../../dist/renderer/managers/voice-ui-manager.js',
@@ -120,6 +121,7 @@
         modalAppLock,
         modalScreenShare,
         modalTotpSetup,
+        modalRoleSettings,
       ] = await Promise.all([
         fetchFragment('title-bar.html'),
         fetchFragment('server-list.html'),
@@ -153,6 +155,7 @@
         fetchFragment('modal-app-lock.html'),
         fetchFragment('modal-screen-share.html'),
         fetchFragment('modal-totp-setup.html'),
+        fetchFragment('modal-role-settings.html'),
       ]);
 
       // Title bar (top-level)
@@ -197,6 +200,7 @@
       document.body.appendChild(parseFragment(modalAppLock));
       document.body.appendChild(parseFragment(modalScreenShare));
       document.body.appendChild(parseFragment(modalTotpSetup));
+      document.body.appendChild(parseFragment(modalRoleSettings));
 
       // Load scripts sequentially — order matters for dependencies
       for (const src of SCRIPTS) {

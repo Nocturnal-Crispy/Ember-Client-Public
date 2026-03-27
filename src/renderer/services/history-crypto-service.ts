@@ -340,16 +340,6 @@
         });
 
         const crk = crypto.getRandomValues(new Uint8Array(32));
-        crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk });
-        // Persist to OS safeStorage so CRK survives logout/re-login
-        try {
-          await (window as any).emberAPI.invoke('SetSafeStorage', {
-            key: `crk_${emberId}_${epoch}`,
-            value: btoa(String.fromCharCode(...crk)),
-          });
-        } catch {
-          /* non-critical — CRK still in memory cache */
-        }
 
         const envelopes = [];
         for (const member of deviceMembers) {
@@ -389,8 +379,8 @@
 
         log.debug('createAndDistributeCrk: envelopes', { count: envelopes.length });
         if (envelopes.length === 0) {
-          log.warn('createAndDistributeCrk: no envelopes to upload, CRK cached locally only');
-          return true;
+          log.warn('createAndDistributeCrk: no envelopes to upload, CRK not cached');
+          return false;
         }
 
         const response = await fetch(`${this.getBaseUrl()}/api/v1/embers/${emberId}/crk`, {
@@ -401,6 +391,19 @@
           },
           body: JSON.stringify({ epoch, envelopes }),
         });
+
+        if (response.ok) {
+          crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk });
+          // Persist to OS safeStorage so CRK survives logout/re-login
+          try {
+            await (window as any).emberAPI.invoke('SetSafeStorage', {
+              key: `crk_${emberId}_${epoch}`,
+              value: btoa(String.fromCharCode(...crk)),
+            });
+          } catch {
+            /* non-critical — CRK still in memory cache */
+          }
+        }
 
         return response.ok;
       } catch {
@@ -455,7 +458,6 @@
         if (!signalManager) return false;
 
         const cmk = crypto.getRandomValues(new Uint8Array(32));
-        dmCmkCache.set(`${conversationId}:${epoch}`, cmk);
 
         const envelopes = [];
         for (const member of deviceMembers) {
@@ -485,10 +487,10 @@
             messageType: selfEncrypted.messageType,
           });
         } catch {
-          // Self-encryption may fail if no self-session — CMK is still cached locally
+          // Self-encryption may fail if no self-session
         }
 
-        if (envelopes.length === 0) return true;
+        if (envelopes.length === 0) return false;
 
         const response = await fetch(`${this.getBaseUrl()}/api/v1/dm/${conversationId}/keys`, {
           method: 'POST',
@@ -498,6 +500,10 @@
           },
           body: JSON.stringify({ conversationId, epoch, envelopes }),
         });
+
+        if (response.ok) {
+          dmCmkCache.set(`${conversationId}:${epoch}`, cmk);
+        }
 
         return response.ok;
       } catch {
@@ -687,6 +693,20 @@
       dmKeys: Array<{ conversationId: string; epoch: number; cmk: string }>;
     }): void {
       importProvisioningBundle(bundle);
+    }
+
+    // Import a CRK directly into the cache, bypassing Signal session decryption.
+    // Used by invite-time pre-computation (Strategy B) where the CRK was encrypted
+    // with HKDF(invite_code) instead of a Signal session.
+    importCrk(emberId: string, epoch: number, crk: Uint8Array): void {
+      const key = cacheKey(emberId, epoch);
+      crkCache.set(key, { emberId, epoch, crk });
+      const b64 = btoa(String.fromCharCode(...crk));
+      window.emberAPI
+        .invoke('SetSafeStorage', { key: `crk_${emberId}_${epoch}`, value: b64 })
+        .catch(() => {
+          /* non-critical — in-memory cache is the primary */
+        });
     }
 
     clear(): void {

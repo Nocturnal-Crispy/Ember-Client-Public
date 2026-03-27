@@ -153,11 +153,22 @@
   }
 
   const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'mousedown'] as const;
+  let activityListenersAttached = false;
+
+  function detachActivityListeners(): void {
+    if (!activityListenersAttached) return;
+    for (const evt of ACTIVITY_EVENTS) {
+      document.removeEventListener(evt, resetActivity);
+    }
+    activityListenersAttached = false;
+  }
 
   function attachActivityListeners(): void {
+    detachActivityListeners();
     for (const evt of ACTIVITY_EVENTS) {
       document.addEventListener(evt, resetActivity, { passive: true });
     }
+    activityListenersAttached = true;
   }
 
   // ─── Idle timer ──────────────────────────────────────────────────────────────
@@ -252,11 +263,25 @@
 
   // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
+  /** Clean up all timers and listeners — call on logout to prevent leaks across sessions. */
+  function cleanupAppLock(): void {
+    stopIdleTimer();
+    detachActivityListeners();
+    if (focusLossTimerId !== null) {
+      clearTimeout(focusLossTimerId);
+      focusLossTimerId = null;
+    }
+    locked = false;
+    hideOverlay();
+    log.info('AppLockManager cleaned up');
+  }
+
   window.initAppLock = initAppLock;
   window.lockApp = lockApp;
   window.unlockApp = unlockApp;
   window.isAppLocked = isAppLocked;
   window.updateAppLockSettings = updateAppLockSettings;
+  window.cleanupAppLock = cleanupAppLock;
 
   initAppLock();
 })();

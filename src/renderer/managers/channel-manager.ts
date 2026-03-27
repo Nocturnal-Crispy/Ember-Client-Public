@@ -77,16 +77,14 @@
     unreadChannelIds.clear();
     updateEmberBadge(App.activeEmberId, 0);
 
-    const channelsByCategory: Record<string, Channel[]> = {};
-    const uncategorized: Channel[] = [];
-    channels.forEach(ch => {
-      if (ch.categoryId) {
-        if (!channelsByCategory[ch.categoryId]) channelsByCategory[ch.categoryId] = [];
-        channelsByCategory[ch.categoryId].push(ch);
-      } else {
-        uncategorized.push(ch);
-      }
-    });
+    // Build fresh arrays each render to prevent duplicates on double-render
+    const uncategorized = channels.filter(ch => !ch.categoryId);
+    const channelsByCategory: Record<string, Channel[]> = channels
+      .filter(ch => ch.categoryId)
+      .reduce<Record<string, Channel[]>>((acc, ch) => {
+        const catId = ch.categoryId!;
+        return { ...acc, [catId]: [...(acc[catId] ?? []), ch] };
+      }, {});
 
     interface AutoSelectEntry {
       el: HTMLElement;
@@ -423,7 +421,9 @@
     if (deleteLabel)
       deleteLabel.textContent = target.type === 'category' ? 'Delete Category' : 'Delete Channel';
 
-    const showEditDelete = target.type !== 'empty';
+    // Show edit/delete only if user has ManageChannels (1<<1) or ManageCategories (1<<7)
+    const canManage = (App.myPermissions & 2n) !== 0n || (App.myPermissions & 128n) !== 0n;
+    const showEditDelete = target.type !== 'empty' && canManage;
     const editSep = document.getElementById('ctx-edit-separator');
     const editItem = document.getElementById('ctx-edit-item');
     const deleteSep = document.getElementById('ctx-delete-separator');
@@ -603,7 +603,11 @@
               messagesContainer.removeChild(messagesContainer.firstChild);
         }
         document.getElementById('delete-confirm-modal')?.classList.add('hidden');
-        const { channels, categories: cats } = await fetchChannelsAndCategories(App.activeEmberId!);
+        if (!App.activeEmberId) {
+          log.warn('No active ember after delete');
+          return;
+        }
+        const { channels, categories: cats } = await fetchChannelsAndCategories(App.activeEmberId);
         renderChannels(channels, cats);
       } else {
         const err = (await res.json().catch(() => ({}))) as {
@@ -807,9 +811,13 @@
         name,
       });
       closeChannelNameModal();
+      if (!App.activeEmberId) {
+        log.warn('No active ember after channel/category operation');
+        return;
+      }
       const [channels, cats] = await Promise.all([
-        fetchChannels(App.activeEmberId!),
-        fetchCategories(App.activeEmberId!),
+        fetchChannels(App.activeEmberId),
+        fetchCategories(App.activeEmberId),
       ]);
       renderChannels(channels, cats);
     } catch (error) {

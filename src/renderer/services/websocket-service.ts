@@ -9,6 +9,7 @@
 
   const recentMessageIds = new Set<string>();
   const DEDUP_MAX_SIZE = 50;
+  let isConnecting = false;
 
   /** Refresh the stored token if it is expiring within 1 hour. */
   async function refreshTokenIfNeeded(): Promise<void> {
@@ -47,6 +48,8 @@
 
   async function connectWebSocket(): Promise<void> {
     if (App.wsConnection && App.wsConnection.readyState === WebSocket.OPEN) return;
+    if (isConnecting) return;
+    isConnecting = true;
     log.debug('Connecting WebSocket');
     try {
       await refreshTokenIfNeeded();
@@ -54,15 +57,27 @@
         token?: string;
         hostname?: string;
       } | null;
-      if (!auth || !auth.token || !auth.hostname) return;
+      if (!auth || !auth.token || !auth.hostname) {
+        isConnecting = false;
+        return;
+      }
       const wsUrl = window.electronAPI.wsService.buildWsUrl(auth.hostname, auth.token);
       const wsBaseUrl = wsUrl.split('?')[0];
       log.info('WebSocket connecting', { url: wsBaseUrl });
       App.wsConnection = new WebSocket(wsUrl);
 
       App.wsConnection.onopen = () => {
+        isConnecting = false;
         log.info('WebSocket connected');
         console.log('WebSocket connected');
+        // Clear reconnection timer on successful connect/reconnect
+        if (App.reconnectionTimerInterval) {
+          clearInterval(App.reconnectionTimerInterval);
+          App.reconnectionTimerInterval = null;
+        }
+        if (typeof window.hideReconnectionOverlay === 'function') {
+          window.hideReconnectionOverlay();
+        }
         if (App.activeChannelId) {
           log.debug('Re-subscribing to active channel', {
             channel_id: App.activeChannelId,
@@ -84,6 +99,14 @@
           App.historyCryptoService
             .syncAllCrks()
             .catch((e: unknown) => log.warn('CRK sync on reconnect failed', { error: String(e) }));
+        }
+        // Sync sender key distributions for keys sent while offline
+        if (typeof window.processIncomingDistributions === 'function') {
+          window
+            .processIncomingDistributions()
+            .catch((e: unknown) =>
+              log.warn('Sender key sync on reconnect failed', { error: String(e) })
+            );
         }
       };
 
@@ -217,6 +240,24 @@
             const deviceId = String(data.payload['deviceId'] ?? '');
             log.info('WebSocket: device revoked', { device_id: deviceId });
             window.dispatchEvent(new CustomEvent('device-revoked', { detail: data.payload }));
+
+            // ── Permission system events ──────────────────────────────────
+          } else if (
+            data.type === 'role_created' ||
+            data.type === 'role_updated' ||
+            data.type === 'role_deleted'
+          ) {
+            log.debug('WebSocket: role event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('role-changed', { detail: data }));
+          } else if (data.type === 'member_role_assigned' || data.type === 'member_role_removed') {
+            log.debug('WebSocket: member role event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('member-role-changed', { detail: data }));
+          } else if (
+            data.type === 'channel_overwrite_set' ||
+            data.type === 'channel_overwrite_deleted'
+          ) {
+            log.debug('WebSocket: channel overwrite event', { type: data.type });
+            window.dispatchEvent(new CustomEvent('channel-overwrite-changed', { detail: data }));
           }
         } catch (err) {
           log.error('WebSocket message parse error', { error: String(err) });
@@ -225,6 +266,7 @@
       };
 
       App.wsConnection.onclose = () => {
+        isConnecting = false;
         log.warn('WebSocket disconnected, scheduling reconnect in 3s');
         console.log('WebSocket disconnected');
         App.wsConnection = null;
@@ -238,29 +280,44 @@
           App.wsReconnectTimer = setTimeout(() => {
             App.wsReconnectTimer = null;
             log.debug('Attempting WebSocket reconnect');
-            connectWebSocket().then(() => {
-              if (rejoinChannelId && rejoinChannelName) {
-                // Brief delay lets WS subscriptions (ember/channel) settle before
-                // sending voice_join, which requires an active channel subscription.
-                setTimeout(() => {
-                  if (
-                    App.wsConnection?.readyState === WebSocket.OPEN &&
-                    !App.activeVoiceChannelId
-                  ) {
-                    log.info('Auto-rejoining voice channel after reconnect', {
-                      channel_id: rejoinChannelId,
-                    });
-                    window
-                      .joinVoiceChannel(rejoinChannelId, rejoinChannelName)
-                      .catch((e: unknown) =>
-                        log.error('Voice auto-rejoin failed', {
-                          error: String(e),
-                        })
-                      );
-                  }
-                }, 500);
-              }
-            });
+            connectWebSocket()
+              .then(() => {
+                if (rejoinChannelId && rejoinChannelName) {
+                  // Brief delay lets WS subscriptions (ember/channel) settle before
+                  // sending voice_join, which requires an active channel subscription.
+                  setTimeout(() => {
+                    if (
+                      App.wsConnection?.readyState === WebSocket.OPEN &&
+                      !App.activeVoiceChannelId
+                    ) {
+                      log.info('Auto-rejoining voice channel after reconnect', {
+                        channel_id: rejoinChannelId,
+                      });
+                      window
+                        .joinVoiceChannel(rejoinChannelId, rejoinChannelName)
+                        .catch((e: unknown) =>
+                          log.error('Voice auto-rejoin failed', {
+                            error: String(e),
+                          })
+                        );
+                    }
+                  }, 500);
+                }
+              })
+              .catch((e: unknown) => {
+                log.error('WebSocket reconnection failed, scheduling retry', {
+                  error: String(e),
+                });
+                if (!App.wsReconnectTimer) {
+                  App.wsReconnectTimer = setTimeout(() => {
+                    App.wsReconnectTimer = null;
+                    log.debug('Retrying WebSocket reconnect after failure');
+                    connectWebSocket().catch((retryErr: unknown) =>
+                      log.error('WebSocket retry also failed', { error: String(retryErr) })
+                    );
+                  }, 3000);
+                }
+              });
           }, 3000);
         }
       };
@@ -270,6 +327,7 @@
         console.error('WebSocket error:', err);
       };
     } catch (error) {
+      isConnecting = false;
       const err = error as Error;
       log.error('Failed to connect WebSocket', { error: err.message });
       console.error('Failed to connect WebSocket:', error);
@@ -435,11 +493,16 @@
             if (!auth) return;
             // Don't re-wrap for ourselves joining
             if (userId === auth.userId) return;
-            // Only the ember owner's device performs re-wrapping to avoid
-            // write amplification when many devices are online.
+            // Any member with cached CRKs can re-wrap (not just the owner).
+            // Server uses UPSERT on channel_root_keys so concurrent writes are safe.
             const embers = await window.fetchEmbers();
             const ember = embers.find(e => e.id === emberId);
-            if (!ember || !ember.isOwner) return;
+            if (!ember) return;
+            const cachedEpochs = historyCrypto.getCachedCrkEpochs(emberId);
+            if (cachedEpochs.length === 0) return;
+            // Random jitter (0–3s) to reduce write amplification when multiple
+            // members are online — avoids all members re-wrapping simultaneously.
+            await new Promise(r => setTimeout(r, Math.random() * 3000));
             // Verify the new member is actually in the ember's member list
             // before trusting the WebSocket event payload.
             const members = await window.fetchMembers(emberId);

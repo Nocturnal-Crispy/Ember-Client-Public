@@ -48,7 +48,7 @@
       }
 
       App.activeVoiceChannelId = null;
-      App.voiceParticipants.clear();
+      App.voiceParticipants = new Map<string, string>();
       hideVoiceControls();
       renderVoiceParticipants(null);
       document
@@ -74,9 +74,10 @@
       vm.onParticipantsChanged = (
         participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
-        // Update own-session participant list (used for video grid)
-        App.voiceParticipants.clear();
-        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
+        // Update own-session participant list (used for video grid) — atomic swap
+        const newParticipants = new Map<string, string>();
+        participants.forEach(p => newParticipants.set(p.user_id, p.username));
+        App.voiceParticipants = newParticipants;
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
           participants.filter(p => p.screen_sharing).map(p => p.user_id)
@@ -105,8 +106,10 @@
       vm.onParticipantsChanged = (
         participants: { user_id: string; username: string; screen_sharing?: boolean }[]
       ) => {
-        App.voiceParticipants.clear();
-        participants.forEach(p => App.voiceParticipants.set(p.user_id, p.username));
+        // Atomic swap — build new Map before assigning to avoid empty intermediate state
+        const newParticipants = new Map<string, string>();
+        participants.forEach(p => newParticipants.set(p.user_id, p.username));
+        App.voiceParticipants = newParticipants;
         // Phase 10: reconcile screenShareParticipants from voice_participants.
         const screenSids = new Set<string>(
           participants.filter(p => p.screen_sharing).map(p => p.user_id)
@@ -200,7 +203,7 @@
 
     App.activeVoiceChannelId = null;
     App.activeVoiceChannelName = null;
-    App.voiceParticipants.clear();
+    App.voiceParticipants = new Map<string, string>();
     hideVoiceControls();
     document
       .querySelectorAll('.voice-avatar.speaking')
@@ -253,8 +256,14 @@
   }
 
   function getMemberAvatar(userId: string): string {
+    // Check currentMembers first
     const member = App.currentMembers.find(m => m.userId === userId);
-    return member?.avatar ?? '';
+    if (member?.avatar) return member.avatar;
+    // Fall back to the member list DOM which may have avatar images already rendered
+    const memberEl = document.querySelector(
+      `.member[data-user-id="${userId}"] .member-avatar img`
+    ) as HTMLImageElement | null;
+    return memberEl?.src ?? '';
   }
 
   function renderVoiceParticipants(channelId: string | null): void {
@@ -654,21 +663,12 @@
       _userToVideoStreamId?: Map<string, string>;
       _userToScreenStreamId?: Map<string, string>;
     } | null;
-    const selfId = vm?.auth?.userId;
-    let selfUsername = vm?.auth?.username;
-    let selfAvatar = '';
-    if (!selfUsername) {
-      const auth = (await ipcRenderer.invoke('get-auth')) as
-        | (AuthForVoice & { avatar?: string })
-        | null;
-      selfUsername = auth?.username;
-      selfAvatar = auth?.avatar ?? '';
-    } else {
-      const auth = (await ipcRenderer.invoke('get-auth')) as {
-        avatar?: string;
-      } | null;
-      selfAvatar = auth?.avatar ?? '';
-    }
+    const auth = (await ipcRenderer.invoke('get-auth')) as
+      | (AuthForVoice & { avatar?: string; userId?: string })
+      | null;
+    const selfId = vm?.auth?.userId ?? auth?.userId;
+    const selfUsername = vm?.auth?.username ?? auth?.username;
+    const selfAvatar = auth?.avatar ?? '';
 
     // ── Build desired tile set ────────────────────────────────────────────────
     const desiredTiles = new Set<string>();
@@ -1657,7 +1657,7 @@
     (App.voiceManager as { _cleanup(): void })._cleanup();
     App.activeVoiceChannelId = null;
     App.activeVoiceChannelName = null;
-    App.voiceParticipants.clear();
+    App.voiceParticipants = new Map<string, string>();
     hideVoiceControls();
     document
       .querySelectorAll('.voice-avatar.speaking')

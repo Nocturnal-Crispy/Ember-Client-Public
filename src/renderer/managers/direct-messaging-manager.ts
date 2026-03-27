@@ -746,17 +746,32 @@
     // the user switches to a different conversation.
     // BP-3 fix: set activeChannelId so websocket-service routes live messages
     // to displayMessage (the channel path) rather than dm-channel-message.
-    App.activeChannelId = channelId;
-    window.wsSubscribeToChannel(channelId);
 
-    const entry = dmByTextChannel.get(channelId);
-    if (entry) {
-      App.activeEmberId = entry.emberId;
-      // Prefetch DM CMK for history-based decryption
-      const historyCrypto = (window as any).historyCryptoService;
-      if (historyCrypto) {
-        historyCrypto.getDmCmk(entry.emberId).catch(() => null);
+    // Capture previous state so it can be restored if subscription fails
+    const previousChannelId = App.activeChannelId;
+    const previousEmberId = App.activeEmberId;
+
+    try {
+      window.wsSubscribeToChannel(channelId);
+      // Only set activeChannelId after subscription succeeds
+      App.activeChannelId = channelId;
+
+      const entry = dmByTextChannel.get(channelId);
+      if (entry) {
+        App.activeEmberId = entry.emberId;
+        // Prefetch DM CMK for history-based decryption
+        const historyCrypto = (window as any).historyCryptoService;
+        if (historyCrypto) {
+          historyCrypto.getDmCmk(entry.emberId).catch(() => null);
+        }
       }
+    } catch (err) {
+      log.error('Failed to activate DM conversation, restoring previous state', {
+        channelId,
+        error: String(err),
+      });
+      App.activeChannelId = previousChannelId;
+      App.activeEmberId = previousEmberId;
     }
   }
 
@@ -1001,15 +1016,15 @@
 
   // ─── WS message routing ────────────────────────────────────────────────────
 
-  window.addEventListener('dm-channel-message', ((e: CustomEvent) => {
+  const dmChannelMessageHandler = ((e: CustomEvent) => {
     handleIncomingMessage(e.detail).catch((err: Error) =>
       log.error('Failed to handle incoming DM message', { error: err.message })
     );
-  }) as EventListener);
+  }) as EventListener;
 
   // Handles the server-push event sent to the requester after the recipient
   // accepts the DM request. Fetches the peer-box key and marks the DM as active.
-  window.addEventListener('dm-request-accepted', ((e: CustomEvent) => {
+  const dmRequestAcceptedHandler = ((e: CustomEvent) => {
     const payload = e.detail as { ember_id?: string };
     const emberId = payload?.ember_id ?? '';
     if (!emberId) return;
@@ -1028,13 +1043,26 @@
       }
       log.info('DM request was accepted by recipient', { emberId });
     }
-  }) as EventListener);
+  }) as EventListener;
+
+  window.addEventListener('dm-channel-message', dmChannelMessageHandler);
+  window.addEventListener('dm-request-accepted', dmRequestAcceptedHandler);
+
+  /** Remove DM event listeners and clear state — call on logout to prevent leaks. */
+  function cleanupDirectMessaging(): void {
+    window.removeEventListener('dm-channel-message', dmChannelMessageHandler);
+    window.removeEventListener('dm-request-accepted', dmRequestAcceptedHandler);
+    dmByTextChannel.clear();
+    dmByEmberId.clear();
+    log.info('DM state and event listeners cleaned up');
+  }
 
   // (device-key-fulfilled/device-key-requested handlers removed)
 
   // ─── Expose globals ────────────────────────────────────────────────────────
 
   window.initializeDirectMessaging = initializeDirectMessaging;
+  window.cleanupDirectMessaging = cleanupDirectMessaging;
   window.startDmConversation = startDmConversation;
   window.sendDirectMessage = sendDirectMessage;
   window.setActiveDmConversation = setActiveDmConversation;

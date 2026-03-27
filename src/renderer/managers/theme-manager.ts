@@ -123,15 +123,17 @@
 
   function applyThemeToDom(settings: ThemeSettings): void {
     const root = document.documentElement;
-    root.style.setProperty("--rgb-highlight", settings.accentRgb);
-    root.style.setProperty("--rgb-background", settings.backgroundRgb);
-    root.style.setProperty("--rgb-surface", settings.surfaceRgb);
-    root.style.setProperty(
-      "--rgb-surface-hover",
-      computeSurfaceHover(settings.surfaceRgb)
-    );
-    if (settings.chatColor) {
-      root.style.setProperty("--chat-color", settings.chatColor);
+    root.style.setProperty('--rgb-highlight', settings.accentRgb);
+    root.style.setProperty('--rgb-background', settings.backgroundRgb);
+    root.style.setProperty('--rgb-surface', settings.surfaceRgb);
+    root.style.setProperty('--rgb-surface-hover', computeSurfaceHover(settings.surfaceRgb));
+    if (
+      settings.chatColor &&
+      /^(#[0-9A-Fa-f]{3,8}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|hsl\(\d{1,3},\s*\d{1,3}%?,\s*\d{1,3}%?\)|transparent)$/.test(
+        settings.chatColor
+      )
+    ) {
+      root.style.setProperty('--chat-color', settings.chatColor);
     } else {
       root.style.removeProperty("--chat-color");
     }
@@ -410,10 +412,15 @@ function createNewCustomPreset(): void {
 
   async function initThemeSettings(): Promise<void> {
     try {
-      const saved = (await ipcRenderer.invoke(
-        "get-theme-settings"
-      )) as ThemeSettings;
-      pendingSettings = { ...saved };
+      const saved = (await ipcRenderer.invoke('get-theme-settings')) as ThemeSettings;
+      if (!isValidThemeSettings(saved)) {
+        log.warn('Theme settings failed validation in initThemeSettings; using defaults', {
+          received: JSON.stringify(saved),
+        });
+        pendingSettings = { ...DEFAULT_SETTINGS };
+      } else {
+        pendingSettings = { ...saved };
+      }
     } catch (e) {
       log.error("Failed to load theme settings", { error: String(e) });
     }
