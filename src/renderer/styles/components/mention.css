@@ -1,0 +1,158 @@
+/* ─── Mention Autocomplete Popup ─────────────────────────────────────────── */
+
+.mention-autocomplete {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-accent);
+  border-radius: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  margin-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.mention-autocomplete::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mention-autocomplete::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-accent);
+  border-radius: 3px;
+}
+
+.mention-section-header {
+  padding: 6px 12px 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--header-secondary);
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 0 4px;
+  min-height: 36px;
+}
+
+.mention-item--active {
+  background: var(--background-modifier-hover);
+}
+
+.mention-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mention-item-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-normal);
+  background: var(--background-tertiary);
+}
+
+.mention-item-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.mention-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.mention-item-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-item-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Role mention items */
+.mention-item--role .mention-item-avatar {
+  border-radius: 50%;
+}
+
+/* Everyone/here items */
+.mention-item--everyone .mention-item-avatar {
+  background: var(--background-modifier-accent);
+}
+
+/* ─── Mention Rendering in Messages ─────────────────────────────────────── */
+
+.message-mention--role {
+  padding: 0 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.message-mention--role:hover {
+  filter: brightness(1.2);
+}
+
+.message-mention--everyone {
+  padding: 0 2px;
+  border-radius: 3px;
+  font-weight: 500;
+  background: rgba(250, 200, 60, 0.12);
+  color: #fac83c;
+  cursor: default;
+}
+
+.message-mention--everyone:hover {
+  background: rgba(250, 200, 60, 0.2);
+}
+
+/* ─── Mentioned Message Highlight ───────────────────────────────────────── */
+
+.message-mentioned {
+  background-color: var(--background-mentioned);
+  border-left: 2px solid var(--text-link);
+}
+
+.message-mentioned:hover {
+  background-color: var(--background-mentioned-hover);
+}
+
+/* ─── Live Region for Accessibility ─────────────────────────────────────── */
+
+.mention-sr-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

@@ -181,6 +181,25 @@
           <button class="modal-btn modal-btn-primary" id="notif-save-btn">Save Changes</button>
           <span class="vv-save-status" id="notif-save-status"></span>
         </div>
+
+        <div class="settings-section-divider"></div>
+
+        <h3 class="settings-subsection-title">Notification Privacy</h3>
+        <p class="settings-placeholder-text">Control how much detail is shown in desktop notifications.</p>
+        <div class="sound-row">
+          <span class="sound-label">Preview level</span>
+          <select id="notif-privacy-level" class="settings-select">
+            <option value="full">Full preview</option>
+            <option value="name-only">Name only</option>
+            <option value="minimal">No preview</option>
+          </select>
+        </div>
+
+        <div class="settings-section-divider"></div>
+
+        <h3 class="settings-subsection-title">Per-Ember Notifications</h3>
+        <p class="settings-placeholder-text">Control which notifications you receive from each ember.</p>
+        <div id="notif-per-ember-list"></div>
       </div>
 
       <!-- Themes -->

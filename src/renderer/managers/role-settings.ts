@@ -55,6 +55,13 @@
   const errorEl = document.getElementById('role-settings-error');
   const memberListEl = document.getElementById('role-member-list');
 
+  // Sanitize role name input — only allow alphanumeric, hyphens, underscores
+  if (roleNameInput) {
+    roleNameInput.addEventListener('input', () => {
+      roleNameInput.value = roleNameInput.value.replace(/[^a-zA-Z0-9_-]/g, '');
+    });
+  }
+
   let currentEmberId: string | null = null;
   let roles: RoleData[] = [];
   let editingRole: RoleData | null = null;
@@ -257,7 +264,7 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${auth.token}`,
         },
-        body: JSON.stringify({ name: 'New Role', color: '#99aab5', permissions: '0' }),
+        body: JSON.stringify({ name: 'NewRole', color: '#99aab5', permissions: '0' }),
       });
       if (!resp.ok) throw new Error('Failed to create role');
       await loadRoles();
@@ -280,6 +287,10 @@
     const name = roleNameInput?.value.trim();
     if (!name) {
       showError('Role name is required');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      showError('Role name must contain only letters, numbers, hyphens, and underscores');
       return;
     }
 

@@ -357,7 +357,9 @@
     | { type: 'strike'; children: InlineToken[] }
     | { type: 'code'; value: string }
     | { type: 'spoiler'; children: InlineToken[] }
-    | { type: 'mention'; userId: string };
+    | { type: 'mention'; userId: string }
+    | { type: 'roleMention'; roleId: string }
+    | { type: 'everyoneMention' };
 
   type Block =
     | { type: 'paragraph'; text: string }
@@ -462,7 +464,18 @@
         continue;
       }
 
-      // Mention: <@userId> — userId is a UUID (36 chars)
+      // Role mention: <@&roleId> — roleId is a UUID (36 chars)
+      if (text[i] === '<' && text[i + 1] === '@' && text[i + 2] === '&') {
+        const closingBracket = text.indexOf('>', i + 3);
+        if (closingBracket !== -1 && closingBracket - (i + 3) <= 36) {
+          const roleId = text.slice(i + 3, closingBracket);
+          tokens.push({ type: 'roleMention', roleId });
+          i = closingBracket + 1;
+          continue;
+        }
+      }
+
+      // User mention: <@userId> — userId is a UUID (36 chars)
       if (text[i] === '<' && text[i + 1] === '@') {
         const closingBracket = text.indexOf('>', i + 2);
         if (closingBracket !== -1 && closingBracket - (i + 2) <= 36) {
@@ -473,6 +486,17 @@
         }
       }
 
+      // @everyone mention (literal text at word boundary)
+      if (
+        text[i] === '@' &&
+        text.startsWith('@everyone', i) &&
+        (i === 0 || /\s/.test(text[i - 1]))
+      ) {
+        tokens.push({ type: 'everyoneMention' });
+        i += 9; // length of "@everyone"
+        continue;
+      }
+
       // Plain text — accumulate until next special character
       const start = i;
       while (i < text.length) {
@@ -481,6 +505,12 @@
         if (text[i] === '~' && text[i + 1] === '~') break;
         if (text[i] === '|' && text[i + 1] === '|') break;
         if (text[i] === '<' && text[i + 1] === '@') break;
+        if (
+          text[i] === '@' &&
+          text.startsWith('@everyone', i) &&
+          (i === 0 || /\s/.test(text[i - 1]))
+        )
+          break;
         if (text.startsWith('https://', i) || text.startsWith('http://', i)) break;
         i++;
       }
@@ -579,6 +609,22 @@
         );
         span.textContent = `@${member?.username ?? token.userId.slice(0, 8)}`;
         window.makeUsernameClickable?.(span, token.userId, span.textContent.slice(1));
+        container.appendChild(span);
+      } else if (token.type === 'roleMention') {
+        const span = document.createElement('span');
+        span.className = 'message-mention message-mention--role';
+        span.dataset['roleId'] = token.roleId;
+        const role = App.currentRoles?.find((r: { id: string }) => r.id === token.roleId);
+        span.textContent = `@${role?.name ?? 'unknown-role'}`;
+        if (role?.color) {
+          span.style.color = role.color;
+          span.style.backgroundColor = `${role.color}1a`; // ~10% opacity
+        }
+        container.appendChild(span);
+      } else if (token.type === 'everyoneMention') {
+        const span = document.createElement('span');
+        span.className = 'message-mention message-mention--everyone';
+        span.textContent = '@everyone';
         container.appendChild(span);
       }
     }
@@ -1232,16 +1278,65 @@
       });
     }
 
+    // ─── Highlight if current user is mentioned ──────────────────────────────
+    // Check the raw `text` parameter which contains <@userId> / <@&roleId> wire format
+    if (text && typeof window.detectMentions === 'function') {
+      const cachedAuth = window.getAuthSync?.();
+      const currentUserId = cachedAuth?.userId ?? '';
+      const myRoleIds = (App.currentRoles ?? [])
+        .filter((r: { isEveryone: boolean }) => !r.isEveryone)
+        .map((r: { id: string }) => r.id);
+      if (currentUserId) {
+        const result = window.detectMentions(text, currentUserId, myRoleIds);
+        if (result.isMentioned) {
+          messageDiv.classList.add('message-mentioned');
+        }
+      }
+    }
+
     return messageDiv;
   }
 
   // ─── Mention resolution ────────────────────────────────────────────────────
 
   function resolveMentions(text: string): string {
-    return text.replace(/@(\w{3,20})/g, (match, username) => {
-      const member = App.currentMembers?.find((m: { username: string }) => m.username === username);
-      return member ? `<@${member.userId}>` : match;
+    // First pass: resolve @everyone (only if user has MentionEveryone permission)
+    const MENTION_EVERYONE = 1n << 12n;
+    const ADMINISTRATOR = 1n << 6n;
+    const perms = App.myPermissions ?? 0n;
+    const canMentionEveryone = (perms & MENTION_EVERYONE) !== 0n || (perms & ADMINISTRATOR) !== 0n;
+
+    let resolved = text;
+    // @everyone is kept as literal — no wire format transformation needed
+
+    // Second pass: resolve @roleName → <@&roleId> and @username → <@userId>
+    const MANAGE_ROLES = 1n << 8n;
+    const canMentionAllRoles = (perms & MANAGE_ROLES) !== 0n || (perms & ADMINISTRATOR) !== 0n;
+
+    resolved = resolved.replace(/@(\w{1,32})/g, (match, name) => {
+      // Skip @everyone — it stays as literal
+      if (name === 'everyone') return canMentionEveryone ? match : match;
+
+      // Try role match (case-insensitive, mentionable or admin can mention any)
+      const nameLower = name.toLowerCase();
+      const role = App.currentRoles?.find(
+        (r: { name: string; mentionable: boolean; isEveryone: boolean }) =>
+          r.name.toLowerCase() === nameLower &&
+          !r.isEveryone &&
+          (r.mentionable || canMentionAllRoles)
+      );
+      if (role) return `<@&${role.id}>`;
+
+      // Then try user match (case-insensitive)
+      const member = App.currentMembers?.find(
+        (m: { username: string }) => m.username.toLowerCase() === nameLower
+      );
+      if (member) return `<@${member.userId}>`;
+
+      return match;
     });
+
+    return resolved;
   }
 
   // ─── Expose globals ────────────────────────────────────────────────────────

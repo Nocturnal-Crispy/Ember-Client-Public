@@ -27,6 +27,7 @@
     '../../dist/renderer/services/user-service.js',
     '../../dist/renderer/components/user-details-modal.js',
     '../../dist/renderer/utils/username-click-handler.js',
+    '../../dist/renderer/services/mention-detection-service.js',
     '../../dist/renderer/components/messages-area.js',
     '../../dist/renderer/services/link-preview-service.js',
     '../../dist/renderer/components/format-toolbar.js',
@@ -51,6 +52,7 @@
     '../../dist/renderer/managers/read-all-manager.js',
     '../../dist/renderer/managers/emoji-picker.js',
     '../../dist/renderer/managers/gif-picker.js',
+    '../../dist/renderer/components/mention-autocomplete.js',
     '../../dist/renderer/managers/renderer.js',
   ];
 

@@ -1372,6 +1372,74 @@ ipcMain.handle('get-screen-sources', async () => {
   }));
 });
 
+// ─── IPC: Desktop notifications ──────────────────────────────────────────────
+
+interface DesktopNotifPayload {
+  title: string;
+  body: string;
+  emberId: string;
+  channelId: string;
+}
+
+let pendingNotifs: DesktopNotifPayload[] = [];
+let notifBatchTimer: ReturnType<typeof setTimeout> | null = null;
+const NOTIF_BATCH_MS = 2000;
+
+function flushNotifications(): void {
+  if (pendingNotifs.length === 0) return;
+  const { Notification: ElectronNotification } = require('electron');
+  if (!ElectronNotification.isSupported()) {
+    pendingNotifs = [];
+    return;
+  }
+
+  // Group by channel
+  const byChannel = new Map<string, DesktopNotifPayload[]>();
+  for (const n of pendingNotifs) {
+    const key = `${n.emberId}:${n.channelId}`;
+    const list = byChannel.get(key) ?? [];
+    list.push(n);
+    byChannel.set(key, list);
+  }
+  pendingNotifs = [];
+
+  for (const [, group] of byChannel) {
+    const first = group[0];
+    const title = group.length === 1 ? first.title : `${first.title} (+${group.length - 1} more)`;
+    const body = group.length === 1 ? first.body : `${group.length} new mentions`;
+
+    const notif = new ElectronNotification({ title, body, silent: true });
+    notif.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send('navigate-to-channel', {
+          emberId: first.emberId,
+          channelId: first.channelId,
+        });
+      }
+    });
+    notif.show();
+  }
+}
+
+ipcMain.handle('show-desktop-notification', async (_event, payload: DesktopNotifPayload) => {
+  // Suppress if window is focused
+  if (mainWindow?.isFocused()) return;
+  pendingNotifs.push(payload);
+  if (notifBatchTimer) clearTimeout(notifBatchTimer);
+  notifBatchTimer = setTimeout(flushNotifications, NOTIF_BATCH_MS);
+});
+
+ipcMain.handle('update-badge-count', async (_event, count: number) => {
+  if (!mainWindow) return;
+  if (process.platform === 'darwin') {
+    app.dock?.setBadge(count > 0 ? String(count) : '');
+  }
+  mainWindow.setTitle(count > 0 ? `(${count}) Ember` : 'Ember');
+});
+
 // ─── Video Pop-Out Window ─────────────────────────────────────────────────────
 
 ipcMain.handle('open-video-popout', async (_event, args: unknown) => {

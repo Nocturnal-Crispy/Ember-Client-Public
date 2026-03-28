@@ -842,6 +842,34 @@
       );
       return;
     }
+
+    // ─── Mention detection & notification (live messages only) ───────────────
+    if (!prepend && !skipReplay && typeof window.detectMentions === 'function') {
+      const cachedAuth = window.getAuthSync?.();
+      const myUserId = cachedAuth?.userId ?? '';
+      const senderUserId = (msg as { senderUserId?: string }).senderUserId ?? '';
+      // Don't notify for own messages
+      if (myUserId && senderUserId !== myUserId) {
+        const myRoleIds = (App.currentRoles ?? [])
+          .filter((r: { isEveryone: boolean }) => !r.isEveryone)
+          .map((r: { id: string }) => r.id);
+        // Plaintext already contains <@userId> and <@&roleId> wire format
+        const result = window.detectMentions(plaintext, myUserId, myRoleIds);
+        if (result.isMentioned && typeof window.showMentionNotification === 'function') {
+          const channelName =
+            document.querySelector('.channel.active .channel-name')?.textContent ?? 'channel';
+          window.showMentionNotification({
+            emberId: App.activeEmberId ?? '',
+            channelId: App.activeChannelId ?? '',
+            channelName,
+            senderUsername: msg.username ?? 'Unknown',
+            mentionType: result.mentionType ?? 'user',
+            messagePreview: plaintext.slice(0, 100),
+          });
+        }
+      }
+    }
+
     if (plaintext.startsWith('{"t":"file"')) {
       try {
         const parsed = JSON.parse(plaintext) as {

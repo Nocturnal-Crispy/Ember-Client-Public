@@ -163,6 +163,14 @@ declare global {
     messageSound: boolean;
   }
 
+  type MentionMode = 'all' | 'mentions_only' | 'nothing';
+  type NotifPrivacy = 'full' | 'name-only' | 'minimal';
+
+  interface EmberMentionSettings {
+    mentionMode: MentionMode;
+    privacyLevel: NotifPrivacy;
+  }
+
   // ─── Plugin settings ──────────────────────────────────────────────────────
 
   interface AppLockSettings {
@@ -545,6 +553,16 @@ declare global {
     formatRelativeTimestamp(timestamp?: number): string;
     toChumhandle(username: string): string;
     resolveMentions(text: string): string;
+    // Globals set by mention-autocomplete.ts
+    initMentionAutocomplete(input: HTMLTextAreaElement): void;
+    destroyMentionAutocomplete(): void;
+    isMentionAutocompleteOpen(): boolean;
+    // Globals set by mention-detection-service.ts
+    detectMentions(
+      decryptedText: string,
+      currentUserId: string,
+      currentRoleIds: string[]
+    ): { isMentioned: boolean; mentionType: 'user' | 'role' | 'everyone' | null };
     // Globals set by message-service.ts
     enterEditMode(messageDiv: HTMLElement, messageId: string): void;
     // Globals set by renderer.ts
@@ -673,6 +691,16 @@ declare global {
     cleanupAppLock(): void;
     getNotifSettings(): NotifSettings;
     saveNotifSettings(settings: NotifSettings): void;
+    getEmberMentionSettings(emberId: string): EmberMentionSettings;
+    setEmberMentionSettings(emberId: string, settings: EmberMentionSettings): void;
+    showMentionNotification(payload: {
+      emberId: string;
+      channelId: string;
+      channelName: string;
+      senderUsername: string;
+      mentionType: 'user' | 'role' | 'everyone';
+      messagePreview: string;
+    }): void;
     cleanupVoiceOnDisconnect(): void;
     // Globals set by screen-share-modal.ts
     openScreenShareModal(

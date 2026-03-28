@@ -1403,6 +1403,12 @@ const _soundDefs: Record<string, SoundDef> = {
     dur: [0.04, 0.04, 0.07],
     vol: 0.2,
   },
+  mention: {
+    type: 'sine',
+    freq: [1046, 1318, 1568, 1760],
+    dur: [0.05, 0.05, 0.05, 0.08],
+    vol: 0.25,
+  },
 };
 
 function generateNotificationSound(type: string): void {

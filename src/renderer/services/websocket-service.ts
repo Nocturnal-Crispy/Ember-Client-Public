@@ -674,4 +674,26 @@
   window.handleEmberUpdated = handleEmberUpdated;
   window.handleMembershipUpdated = handleMembershipUpdated;
   window.registerSentMessageId = registerSentMessageId;
+
+  // Listen for desktop notification click → navigate to channel
+  const ipc = window.electronAPI?.ipc;
+  if (typeof ipc?.on === 'function') {
+    ipc.on('navigate-to-channel', (...args: unknown[]) => {
+      const data = (args[0] ?? {}) as { emberId?: string; channelId?: string };
+      log.info('Navigating to channel from notification', {
+        emberId: data.emberId ?? '',
+        channelId: data.channelId ?? '',
+      });
+      if (data.emberId && data.emberId !== App.activeEmberId) {
+        window.loadServerContent?.(data.emberId, '');
+      }
+      if (data.channelId) {
+        // Simulate clicking the channel element to navigate
+        const channelEl = document.querySelector<HTMLElement>(
+          `.channel[data-channel-id="${CSS.escape(data.channelId)}"]`
+        );
+        channelEl?.click();
+      }
+    });
+  }
 })();

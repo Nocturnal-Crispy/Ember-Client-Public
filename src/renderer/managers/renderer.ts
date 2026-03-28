@@ -620,12 +620,22 @@
     // ─── Message input ─────────────────────────────────────────────────────────
 
     if (messageInput) {
+      // Initialize mention autocomplete
+      if (typeof window.initMentionAutocomplete === 'function') {
+        window.initMentionAutocomplete(messageInput);
+      }
+
       messageInput.addEventListener('keydown', async e => {
         if (e.key === 'Enter') {
           if (e.shiftKey) {
             // Allow Shift+Enter to create a new line
             return;
-          } else {
+          }
+          // If mention autocomplete is open, let it handle Enter
+          if (window.isMentionAutocompleteOpen?.()) {
+            return;
+          }
+          {
             // Prevent default newline behavior and send message
             e.preventDefault();
             const rawText = messageInput.value.trim();

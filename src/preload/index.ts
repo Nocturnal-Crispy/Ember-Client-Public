@@ -232,6 +232,8 @@ const ALLOWED_INVOKE: readonly string[] = [
   'audio-capture-teardown',
   'open-video-popout',
   'fetch-link-preview',
+  'show-desktop-notification',
+  'update-badge-count',
   'ember', // Signal Protocol unified IPC channel
 ];
 
@@ -243,6 +245,7 @@ const ALLOWED_ON: readonly string[] = [
   'window-blur',
   'window-focus',
   'signal-db-unavailable',
+  'navigate-to-channel',
 ];
 
 preloadLog('debug', 'Setting up contextBridge API');
