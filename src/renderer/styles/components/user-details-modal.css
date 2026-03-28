@@ -224,3 +224,108 @@
 .username-clickable:hover {
   background: rgba(var(--rgb-highlight, 255, 120, 80), 0.07);
 }
+
+/* ─── Kick member button ───────────────────────────────────────────────── */
+
+.user-details-kick-btn {
+  width: 100%;
+  padding: 7px 12px;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid rgba(237, 66, 69, 0.5);
+  color: #ed4245;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.user-details-kick-btn:hover {
+  background: rgba(237, 66, 69, 0.15);
+  border-color: #ed4245;
+}
+
+.user-details-kick-btn.hidden {
+  display: none;
+}
+
+/* ─── Kick confirmation overlay ────────────────────────────────────────── */
+
+.kick-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  z-index: 10;
+}
+
+.kick-confirm-overlay.hidden {
+  display: none;
+}
+
+.kick-confirm-dialog {
+  background: rgb(var(--rgb-surface, 30, 30, 35));
+  border: 1px solid rgba(237, 66, 69, 0.4);
+  padding: 20px;
+  border-radius: 4px;
+  text-align: center;
+  max-width: 260px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.kick-confirm-dialog > p:first-child {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text, rgb(220, 220, 225));
+}
+
+.kick-confirm-subtitle {
+  margin: 6px 0 0;
+  color: rgba(var(--rgb-text, 220, 220, 225), 0.5);
+  font-size: 11px;
+}
+
+.kick-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.kick-confirm-cancel {
+  padding: 6px 14px;
+  background: rgba(var(--rgb-text, 220, 220, 225), 0.1);
+  border: 1px solid rgba(var(--rgb-text, 220, 220, 225), 0.2);
+  color: var(--text, rgb(220, 220, 225));
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.kick-confirm-cancel:hover {
+  background: rgba(var(--rgb-text, 220, 220, 225), 0.2);
+}
+
+.kick-confirm-yes {
+  padding: 6px 14px;
+  background: #ed4245;
+  border: none;
+  color: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.kick-confirm-yes:hover {
+  background: #d63538;
+}

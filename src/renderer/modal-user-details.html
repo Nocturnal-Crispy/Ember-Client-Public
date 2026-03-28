@@ -30,6 +30,18 @@
 
     <div class="user-details-actions">
       <button class="user-details-dm-btn" id="user-details-dm-btn">Send Message</button>
+      <button class="user-details-kick-btn hidden" id="user-details-kick-btn">Kick Member</button>
+    </div>
+
+    <div class="kick-confirm-overlay hidden" id="kick-confirm-overlay">
+      <div class="kick-confirm-dialog">
+        <p>Are you sure you want to kick <strong id="kick-confirm-username"></strong>?</p>
+        <p class="kick-confirm-subtitle">They will be removed from this ember immediately.</p>
+        <div class="kick-confirm-actions">
+          <button class="kick-confirm-cancel" id="kick-confirm-cancel">Cancel</button>
+          <button class="kick-confirm-yes" id="kick-confirm-yes">Kick</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

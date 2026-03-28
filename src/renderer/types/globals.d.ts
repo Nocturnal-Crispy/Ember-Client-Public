@@ -485,6 +485,7 @@ declare global {
     wsSubscribeToChannel(channelId: string): void;
     wsUnsubscribeFromChannel(channelId: string): void;
     wsSubscribeToEmber(emberId: string): void;
+    wsUnsubscribeFromEmber(emberId: string): void;
     handlePresenceUpdate(payload: PresenceUpdatePayload): void;
     handleIncomingMessage(payload: Message): Promise<void>;
     handleEmberUpdated(payload: {

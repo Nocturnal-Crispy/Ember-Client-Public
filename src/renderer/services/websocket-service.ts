@@ -273,6 +273,18 @@
           ) {
             log.debug('WebSocket: channel overwrite event', { type: data.type });
             window.dispatchEvent(new CustomEvent('channel-overwrite-changed', { detail: data }));
+          } else if (data.type === 'ownership_transferred' && data.payload) {
+            log.info('WebSocket: ownership transferred', {
+              ember_id: String(data.payload['emberId'] ?? ''),
+              new_owner: String(data.payload['newOwnerId'] ?? ''),
+            });
+            handleOwnershipTransferred(
+              data.payload as {
+                emberId: string;
+                newOwnerId: string;
+                oldOwnerId: string;
+              }
+            );
           }
         } catch (err) {
           log.error('WebSocket message parse error', { error: String(err) });
@@ -359,6 +371,12 @@
     if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
     log.debug('Subscribing to ember', { ember_id: emberId });
     App.wsConnection.send(JSON.stringify({ type: 'subscribe_ember', emberId }));
+  }
+
+  function wsUnsubscribeFromEmber(emberId: string): void {
+    if (!App.wsConnection || App.wsConnection.readyState !== WebSocket.OPEN) return;
+    log.debug('Unsubscribing from ember', { ember_id: emberId });
+    App.wsConnection.send(JSON.stringify({ type: 'unsubscribe_ember', emberId }));
   }
 
   function wsUnsubscribeFromChannel(channelId: string): void {
@@ -489,6 +507,7 @@
     action: string;
   }): Promise<void> {
     const { emberId, userId, username, action } = payload;
+    const activeEmberAtReceive = App.activeEmberId;
 
     log.info('Membership updated', {
       ember_id: emberId,
@@ -555,8 +574,35 @@
       }
     }
 
+    // If the current user was kicked/removed, clean up and switch away
+    const auth = await window.getValidAuth?.();
+    if (
+      (action === 'removed' || action === 'kicked' || action === 'left') &&
+      auth &&
+      userId === auth.userId
+    ) {
+      log.warn('Current user was removed from ember', { ember_id: emberId });
+
+      const emberEl = document.querySelector(`[data-ember-id="${emberId}"]`);
+      if (emberEl) emberEl.remove();
+
+      App.currentEmbers = App.currentEmbers.filter(e => e.id !== emberId);
+
+      if (activeEmberAtReceive === emberId) {
+        App.activeEmberId = null;
+        const messagesEl = document.getElementById('messages');
+        if (messagesEl) messagesEl.replaceChildren();
+        const memberListEl = document.getElementById('member-list-content');
+        if (memberListEl) memberListEl.replaceChildren();
+        window.openDMScreen?.();
+      }
+
+      wsUnsubscribeFromEmber(emberId);
+      return;
+    }
+
     // Only refresh UI if this is for the currently active ember
-    if (App.activeEmberId !== emberId) {
+    if (activeEmberAtReceive !== emberId) {
       return;
     }
 
@@ -570,6 +616,38 @@
       window.cryptoRouting.onMemberAdded(emberId, memberCount);
     } else if (action === 'left' || action === 'kicked' || action === 'removed') {
       window.cryptoRouting.onMemberRemoved(emberId, memberCount);
+    }
+  }
+
+  async function handleOwnershipTransferred(payload: {
+    emberId: string;
+    newOwnerId: string;
+    oldOwnerId: string;
+  }): Promise<void> {
+    const { emberId, newOwnerId, oldOwnerId } = payload;
+    const auth = await window.getValidAuth?.();
+    const myUserId = auth?.userId;
+
+    // Update isOwner flag on cached embers
+    for (const ember of App.currentEmbers) {
+      if (ember.id === emberId) {
+        ember.isOwner = myUserId === newOwnerId;
+        break;
+      }
+    }
+
+    // Update member roles in cache
+    for (const member of App.currentMembers) {
+      if (member.userId === newOwnerId) {
+        member.role = 'owner';
+      } else if (member.userId === oldOwnerId) {
+        member.role = 'member';
+      }
+    }
+
+    // Re-render member list if this is the active ember
+    if (App.activeEmberId === emberId) {
+      window.renderMemberList(App.currentMembers);
     }
   }
 
@@ -589,6 +667,7 @@
   window.wsSubscribeToChannel = wsSubscribeToChannel;
   window.wsUnsubscribeFromChannel = wsUnsubscribeFromChannel;
   window.wsSubscribeToEmber = wsSubscribeToEmber;
+  window.wsUnsubscribeFromEmber = wsUnsubscribeFromEmber;
   window.handlePresenceUpdate = handlePresenceUpdate;
   window.handleIncomingMessage =
     handleIncomingMessage as unknown as typeof window.handleIncomingMessage;

@@ -7,6 +7,69 @@
   const App = window.App;
   const log = window.emberLog.createLogger('EmberManager');
 
+  // ─── Custom confirm dialog (avoids native confirm() which steals Electron focus) ─
+
+  function showConfirmDialog(
+    title: string,
+    message: string,
+    confirmLabel = 'Confirm'
+  ): Promise<boolean> {
+    return new Promise(resolve => {
+      document.getElementById('ember-confirm-modal')?.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'ember-confirm-modal';
+      overlay.className = 'modal-overlay';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+
+      const container = document.createElement('div');
+      container.className = 'modal-container';
+
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+      const h3 = document.createElement('h3');
+      h3.textContent = title;
+      header.appendChild(h3);
+
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+      const p = document.createElement('p');
+      p.textContent = message;
+      body.appendChild(p);
+
+      const footer = document.createElement('div');
+      footer.className = 'modal-footer';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'modal-btn modal-btn-secondary';
+      cancelBtn.textContent = 'Cancel';
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'modal-btn modal-btn-danger';
+      confirmBtn.textContent = confirmLabel;
+
+      const close = (result: boolean): void => {
+        overlay.remove();
+        resolve(result);
+      };
+
+      cancelBtn.addEventListener('click', () => close(false));
+      confirmBtn.addEventListener('click', () => close(true));
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) close(false);
+      });
+
+      footer.appendChild(cancelBtn);
+      footer.appendChild(confirmBtn);
+      container.appendChild(header);
+      container.appendChild(body);
+      container.appendChild(footer);
+      overlay.appendChild(container);
+      document.body.appendChild(overlay);
+    });
+  }
+
   async function validateCryptoState(auth: AuthData): Promise<void> {
     try {
       // Test basic crypto operation by loading a distribution ID
@@ -1440,7 +1503,12 @@
       serverHeaderMenu?.classList.add('hidden');
       const activeEmber = App.currentEmbers.find(e => e.id === App.activeEmberId);
       if (!activeEmber) return;
-      if (!confirm(`Delete "${activeEmber.name}"? This cannot be undone.`)) return;
+      const confirmed = await showConfirmDialog(
+        'Delete Ember',
+        `Delete "${activeEmber.name}"? This cannot be undone.`,
+        'Delete'
+      );
+      if (!confirmed) return;
       const auth = await window.getValidAuth();
       if (!auth?.token || !auth?.hostname) return;
       const res = await fetch(`${auth.hostname}/api/v1/embers/${activeEmber.id}`, {
@@ -1453,11 +1521,178 @@
         renderServerList(embers);
         if (embers.length > 0) {
           switchToServer(embers[0].id, embers[0].name);
+        } else {
+          // No servers left — clear stale UI and show welcome screen
+          const messagesEl = document.getElementById('messages');
+          if (messagesEl) messagesEl.replaceChildren();
+          const memberListEl = document.getElementById('member-list-content');
+          if (memberListEl) memberListEl.replaceChildren();
+          window.showWelcomeScreen?.();
         }
       } else {
         alert('Failed to delete ember.');
       }
     });
+  }
+
+  // ─── Leave Ember ───────────────────────────────────────────────────────────
+
+  const leaveEmberBtn = document.getElementById('leave-ember-btn');
+  if (leaveEmberBtn) {
+    leaveEmberBtn.addEventListener('click', async () => {
+      serverHeaderMenu?.classList.add('hidden');
+      const activeEmber = App.currentEmbers.find(e => e.id === App.activeEmberId);
+      if (!activeEmber) return;
+      const leaveConfirmed = await showConfirmDialog(
+        'Leave Ember',
+        `Leave "${activeEmber.name}"? You will lose access to all channels.`,
+        'Leave'
+      );
+      if (!leaveConfirmed) return;
+      const auth = await window.getValidAuth();
+      if (!auth?.token || !auth?.hostname) return;
+      const res = await fetch(`${auth.hostname}/api/v1/embers/${activeEmber.id}/leave`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (res.ok) {
+        App.currentEmbers = App.currentEmbers.filter(e => e.id !== activeEmber.id);
+        App.activeEmberId = null;
+        const emberEl = document.querySelector(`[data-ember-id="${activeEmber.id}"]`);
+        if (emberEl) emberEl.remove();
+        window.openDMScreen?.();
+      } else {
+        const err = (await res.json().catch(() => ({ error: 'Unknown error' }))) as {
+          error?: string;
+        };
+        alert(err.error ?? 'Failed to leave ember.');
+      }
+    });
+  }
+
+  // ─── Transfer Ownership ───────────────────────────────────────────────────
+
+  const transferOwnershipBtn = document.getElementById('transfer-ownership-btn');
+  if (transferOwnershipBtn) {
+    transferOwnershipBtn.addEventListener('click', () => {
+      serverHeaderMenu?.classList.add('hidden');
+      showTransferOwnershipModal();
+    });
+  }
+
+  function showTransferOwnershipModal(): void {
+    // Remove any existing modal
+    document.getElementById('transfer-ownership-modal')?.remove();
+
+    const members = App.currentMembers.filter((m: Member) => m.role !== 'owner');
+    if (members.length === 0) {
+      alert('No other members to transfer ownership to.');
+      return;
+    }
+
+    // Build modal DOM
+    const overlay = document.createElement('div');
+    overlay.id = 'transfer-ownership-modal';
+    overlay.className = 'modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    const container = document.createElement('div');
+    container.className = 'transfer-ownership-container';
+
+    const title = document.createElement('h3');
+    title.textContent = 'Transfer Ownership';
+    title.className = 'transfer-ownership-title';
+    container.appendChild(title);
+
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Select a member to become the new owner:';
+    subtitle.className = 'transfer-ownership-subtitle';
+    container.appendChild(subtitle);
+
+    const list = document.createElement('div');
+    list.className = 'transfer-ownership-list';
+
+    for (const member of members) {
+      const item = document.createElement('div');
+      item.className = 'transfer-ownership-member';
+      item.textContent = member.username;
+      item.dataset['userId'] = member.userId;
+      item.addEventListener('click', () => {
+        list.querySelectorAll('.transfer-ownership-member').forEach(el => {
+          el.classList.remove('selected');
+        });
+        item.classList.add('selected');
+      });
+      list.appendChild(item);
+    }
+    container.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.className = 'transfer-ownership-actions';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.className = 'transfer-ownership-cancel';
+    cancelBtn.addEventListener('click', () => overlay.remove());
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'Transfer';
+    confirmBtn.className = 'transfer-ownership-confirm';
+    confirmBtn.addEventListener('click', async () => {
+      const selected = list.querySelector(
+        '.transfer-ownership-member.selected'
+      ) as HTMLElement | null;
+      if (!selected?.dataset['userId']) return;
+      const targetUserId = selected.dataset['userId'];
+      const targetName = selected.textContent ?? '';
+      const transferConfirmed = await showConfirmDialog(
+        'Transfer Ownership',
+        `Transfer ownership to ${targetName}? You will no longer be the owner.`,
+        'Transfer'
+      );
+      if (!transferConfirmed) return;
+
+      confirmBtn.disabled = true;
+      const auth = await window.getValidAuth();
+      if (!auth?.token || !auth?.hostname || !App.activeEmberId) return;
+      const res = await fetch(
+        `${auth.hostname}/api/v1/embers/${App.activeEmberId}/transfer-ownership`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${auth.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ targetUserId }),
+        }
+      );
+      if (res.ok) {
+        overlay.remove();
+        // Re-fetch embers to update isOwner flag
+        const embers = await fetchEmbers();
+        renderServerList(embers);
+        log.info('Ownership transferred', { target: targetUserId });
+      } else {
+        const err = (await res.json().catch(() => ({ error: 'Unknown error' }))) as {
+          error?: string;
+        };
+        alert(err.error ?? 'Failed to transfer ownership.');
+        confirmBtn.disabled = false;
+      }
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    container.appendChild(actions);
+    overlay.appendChild(container);
+
+    // Close on backdrop click
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
   }
 
   // ─── Edit Ember Modal ───────────────────────────────────────────────────────

@@ -251,3 +251,94 @@
   background: var(--border-color, #2a2a2a);
   margin: 4px 8px;
 }
+
+/* ─── Transfer Ownership Modal ─────────────────────────────────────────────── */
+
+.transfer-ownership-container {
+  background: rgb(var(--rgb-surface, 30, 30, 35));
+  border: 1px solid rgba(var(--rgb-highlight, 255, 120, 80), 0.3);
+  border-radius: 4px;
+  padding: 20px;
+  width: 320px;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--text, rgb(220, 220, 225));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.transfer-ownership-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.transfer-ownership-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: rgba(var(--rgb-text, 220, 220, 225), 0.6);
+}
+
+.transfer-ownership-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(var(--rgb-highlight, 255, 120, 80), 0.2);
+  border-radius: 2px;
+  margin-bottom: 12px;
+}
+
+.transfer-ownership-member {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(var(--rgb-highlight, 255, 120, 80), 0.1);
+  transition: background 0.1s;
+}
+
+.transfer-ownership-member:last-child {
+  border-bottom: none;
+}
+
+.transfer-ownership-member:hover {
+  background: rgba(var(--rgb-highlight, 255, 120, 80), 0.08);
+}
+
+.transfer-ownership-member.selected {
+  background: rgba(var(--rgb-highlight, 255, 120, 80), 0.2);
+  color: var(--highlight, rgb(255, 120, 80));
+}
+
+.transfer-ownership-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.transfer-ownership-cancel {
+  padding: 6px 14px;
+  background: rgba(var(--rgb-text, 220, 220, 225), 0.1);
+  border: 1px solid rgba(var(--rgb-text, 220, 220, 225), 0.2);
+  color: var(--text, rgb(220, 220, 225));
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.transfer-ownership-confirm {
+  padding: 6px 14px;
+  background: rgba(var(--rgb-highlight, 255, 120, 80), 0.2);
+  border: 1px solid rgba(var(--rgb-highlight, 255, 120, 80), 0.4);
+  color: var(--highlight, rgb(255, 120, 80));
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.transfer-ownership-confirm:hover {
+  background: rgba(var(--rgb-highlight, 255, 120, 80), 0.35);
+}
+
+.transfer-ownership-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

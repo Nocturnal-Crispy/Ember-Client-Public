@@ -10,7 +10,13 @@
  * before this script runs.
  */
 (function (): void {
+  const App = window.App;
   const log = window.emberLog.createLogger('UserDetailsModal');
+
+  // ─── Permission bit constants ─────────────────────────────────────────────
+
+  const KICK_MEMBERS = 1n << 4n;
+  const ADMINISTRATOR = 1n << 6n;
 
   // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +44,15 @@
     }
   }
 
+  function isSafeUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }
+
   // ─── Populate modal ─────────────────────────────────────────────────────────
 
   function populateModal(userId: string, username: string): void {
@@ -51,7 +66,7 @@
     const avatarEl = getEl('user-details-avatar');
     if (avatarEl) {
       avatarEl.replaceChildren();
-      if (member?.avatar) {
+      if (member?.avatar && isSafeUrl(member.avatar)) {
         const img = document.createElement('img');
         img.src = member.avatar;
         img.alt = member.username ?? username;
@@ -112,6 +127,17 @@
       setText('user-details-voice', '');
       setHidden('user-details-voice', true);
     }
+
+    // Kick button — show only if caller has KickMembers/Administrator permission,
+    // target is not the ember owner, target is not the current user, and member is loaded.
+    const canKick =
+      (App.myPermissions & KICK_MEMBERS) !== 0n || (App.myPermissions & ADMINISTRATOR) !== 0n;
+    const isOwner = member?.role === 'owner';
+    const auth = window.getAuthSync?.();
+    const isSelf = !!auth && userId === auth.userId;
+    const inEmber = !!App.activeEmberId;
+    const showKick = canKick && !!member && !isOwner && !isSelf && inEmber;
+    setHidden('user-details-kick-btn', !showKick);
   }
 
   // ─── Open / Close ───────────────────────────────────────────────────────────
@@ -141,6 +167,8 @@
     if (modal) {
       modal.classList.add('hidden');
     }
+    getEl('kick-confirm-overlay')?.classList.add('hidden');
+    document.getElementById('kick-confirm-error')?.remove();
     currentUserId = null;
     currentUsername = null;
   }
@@ -186,6 +214,26 @@
         (window as any).openDmWithUser?.(userId, username);
       }
     });
+
+    // Kick button → show confirmation overlay
+    getEl('user-details-kick-btn')?.addEventListener('click', () => {
+      const nameEl = getEl('kick-confirm-username');
+      if (nameEl) nameEl.textContent = currentUsername ?? '';
+      getEl('kick-confirm-overlay')?.classList.remove('hidden');
+    });
+
+    // Kick confirmation — cancel
+    getEl('kick-confirm-cancel')?.addEventListener('click', () => {
+      getEl('kick-confirm-overlay')?.classList.add('hidden');
+    });
+
+    // Kick confirmation — confirm
+    getEl('kick-confirm-yes')?.addEventListener('click', () => {
+      if (!currentUserId || !App.activeEmberId) return;
+      const emberId = App.activeEmberId;
+      const userId = currentUserId;
+      kickMember(emberId, userId);
+    });
   }
 
   wireEvents();
@@ -212,26 +260,81 @@
           return;
         }
         container.style.display = '';
+        const SAFE_HEX = /^#[0-9a-fA-F]{3,8}$/;
         for (const role of roles) {
           const badge = document.createElement('span');
           badge.textContent = role.name;
-          badge.style.cssText = `
-            display: inline-block;
-            padding: 2px 8px;
-            margin: 2px 4px 2px 0;
-            border-radius: 3px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            background: ${role.color || '#99aab5'}33;
-            color: ${role.color || '#99aab5'};
-            border: 1px solid ${role.color || '#99aab5'}55;
-          `;
+          const safeColor = SAFE_HEX.test(role.color ?? '') ? role.color : '#99aab5';
+          badge.style.display = 'inline-block';
+          badge.style.padding = '2px 8px';
+          badge.style.margin = '2px 4px 2px 0';
+          badge.style.borderRadius = '3px';
+          badge.style.fontSize = '0.75rem';
+          badge.style.fontWeight = '500';
+          badge.style.background = `${safeColor}33`;
+          badge.style.color = safeColor;
+          badge.style.border = `1px solid ${safeColor}55`;
           container.appendChild(badge);
         }
       } catch {
         // Silently fail — legacy role text is already shown as fallback
       }
     })();
+  }
+
+  // ─── Kick member API call ───────────────────────────────────────────────────
+
+  async function kickMember(emberId: string, userId: string): Promise<void> {
+    const target = (window as any).getUserDetails?.(userId) as Member | null;
+    if (target?.role === 'owner') {
+      log.warn('Kick attempted on owner, blocked client-side', { userId });
+      return;
+    }
+
+    const confirmBtn = getEl('kick-confirm-yes') as HTMLButtonElement | null;
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    try {
+      const auth = await window.getValidAuth?.();
+      if (!auth?.token || !auth?.hostname) return;
+
+      const resp = await fetch(`${auth.hostname}/api/v1/embers/${emberId}/members/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+
+      if (!resp.ok) {
+        const errData = (await resp.json().catch(() => ({ error: 'Unknown error' }))) as {
+          error?: string;
+        };
+        log.error('Kick failed', { status: resp.status, error: errData.error });
+        showKickError(errData.error ?? 'Failed to kick member');
+        return;
+      }
+
+      log.info('Member kicked', { ember_id: emberId, user_id: userId });
+      closeUserDetailsModal();
+    } catch (e) {
+      log.error('Kick request failed', { error: String(e) });
+      showKickError('Network error — could not reach server');
+    } finally {
+      if (confirmBtn) confirmBtn.disabled = false;
+    }
+  }
+
+  function showKickError(message: string): void {
+    const dialog = document.querySelector('.kick-confirm-dialog');
+    if (!dialog) return;
+
+    let errEl = document.getElementById('kick-confirm-error');
+    if (!errEl) {
+      errEl = document.createElement('p');
+      errEl.id = 'kick-confirm-error';
+      errEl.style.cssText = 'color:#ed4245;font-size:11px;margin-top:8px;font-family:inherit;';
+      dialog.appendChild(errEl);
+    }
+    const capped = message.length > 120 ? `${message.slice(0, 120)}...` : message;
+    errEl.textContent = `Error: ${capped}`;
   }
 
   // ─── Expose globals ─────────────────────────────────────────────────────────

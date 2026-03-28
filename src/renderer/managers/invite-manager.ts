@@ -168,13 +168,17 @@
       const inviteEl = document.getElementById('invite-people-btn');
       const editSettingsEl = document.getElementById('edit-ember-settings-btn');
       const editRolesEl = document.getElementById('edit-ember-roles-btn');
+      const transferEl = document.getElementById('transfer-ownership-btn');
+      const leaveEl = document.getElementById('leave-ember-btn');
       const deleteEl = document.getElementById('delete-ember-btn');
       const sepEl = serverHeaderMenu.querySelector('.server-header-menu-separator');
       if (inviteEl) inviteEl.style.display = canCreateInvites ? '' : 'none';
       if (editSettingsEl) editSettingsEl.style.display = canManageEmber ? '' : 'none';
       if (editRolesEl) editRolesEl.style.display = canManageRoles ? '' : 'none';
+      if (transferEl) transferEl.style.display = isOwner ? '' : 'none';
+      if (leaveEl) leaveEl.style.display = isOwner ? 'none' : '';
       if (deleteEl) deleteEl.style.display = isOwner ? '' : 'none';
-      if (sepEl) (sepEl as HTMLElement).style.display = isOwner ? '' : 'none';
+      if (sepEl) (sepEl as HTMLElement).style.display = '';
       serverHeaderMenu.classList.toggle('hidden');
     });
     document.addEventListener('click', (e: Event) => {

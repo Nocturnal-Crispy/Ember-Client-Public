@@ -401,10 +401,12 @@ describe('createActionToolbar', () => {
     expect(titles).toContain('Delete');
   });
 
-  it('shows no buttons for non-owned messages when isOwn is omitted', () => {
+  it('shows only the reaction button for non-owned messages when isOwn is omitted', () => {
     const toolbar = window.createActionToolbar('msg-not-owned');
     const buttons = toolbar.querySelectorAll('button');
-    expect(buttons.length).toBe(0);
+    // Only the reaction "+" button should be present (no Edit/Delete)
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].title).toBe('React');
   });
 });
 
