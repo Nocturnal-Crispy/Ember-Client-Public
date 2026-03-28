@@ -526,7 +526,14 @@
 
   // ── Insert emoji into the target input at cursor ──────────────────────────
 
+  let activeCallback: ((emoji: string) => void) | null = null;
+
   function insertEmoji(emoji: string): void {
+    if (activeCallback) {
+      activeCallback(emoji);
+      closePanel();
+      return;
+    }
     if (!activeInput) return;
 
     const start = activeInput.selectionStart ?? activeInput.value.length;
@@ -612,6 +619,7 @@
     if (!panel) return;
     panel.classList.add('hidden');
     activeInput = null;
+    activeCallback = null;
 
     if (outsideClickHandler) {
       document.removeEventListener('click', outsideClickHandler);
@@ -631,6 +639,32 @@
   ): void {
     if (!panel) init();
     openPanel(trigger, input);
+  };
+
+  (window as any).openEmojiPickerWithCallback = function (
+    trigger: HTMLElement,
+    callback: (emoji: string) => void
+  ): void {
+    if (!panel) init();
+    if (!panel) return;
+
+    activeCallback = callback;
+    activeInput = null;
+    positionPanel(trigger);
+    panel.classList.remove('hidden');
+    selectCategory(0);
+
+    outsideClickHandler = (e: MouseEvent) => {
+      if (!panel!.contains(e.target as Node) && e.target !== trigger) {
+        closePanel();
+      }
+    };
+    setTimeout(() => document.addEventListener('click', outsideClickHandler!), 0);
+
+    escKeyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePanel();
+    };
+    document.addEventListener('keydown', escKeyHandler);
   };
 
   // Initialise once DOM is ready (fragments already injected by main-loader)

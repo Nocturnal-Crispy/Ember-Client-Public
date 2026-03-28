@@ -971,12 +971,27 @@
     const toolbar = document.createElement('div');
     toolbar.className = 'message-action-bar';
 
+    // Reaction button — always visible for all messages
+    if (messageId) {
+      toolbar.appendChild(
+        createActionButton('+', 'React', () => {
+          const svc = (window as any).reactionService as
+            | { openQuickReactionTray(trigger: HTMLElement, messageId: string): void }
+            | undefined;
+          if (svc) {
+            const btn = toolbar.querySelector('.message-action-btn') as HTMLElement;
+            svc.openQuickReactionTray(btn ?? toolbar, messageId);
+          }
+        })
+      );
+    }
+
     // Prefer explicit isOwn; fall back to App.ownedMessageIds for text channels.
     const owned = isOwn !== undefined ? isOwn : !!messageId && App.ownedMessageIds.has(messageId);
 
     if (owned) {
       toolbar.appendChild(
-        createActionButton('✏', 'Edit', () => {
+        createActionButton('\u{270F}\u{FE0F}', 'Edit', () => {
           const msgDiv = toolbar.closest('.message') as HTMLElement | null;
           if (msgDiv && messageId) {
             const enterEdit = (window as any).enterEditMode as
@@ -988,7 +1003,7 @@
       );
 
       toolbar.appendChild(
-        createActionButton('🗑', 'Delete', () => {
+        createActionButton('\u{1F5D1}\u{FE0F}', 'Delete', () => {
           if (messageId) {
             const channelId = App.activeChannelId ?? '';
             showDeleteMessageModal(messageId, channelId);
@@ -1082,7 +1097,22 @@
       messageDiv.appendChild(createGifCard(gif));
     }
 
+    // Reaction container (populated lazily by reaction-service)
+    const reactionsContainer = document.createElement('div');
+    reactionsContainer.className = 'message-reactions';
+    messageDiv.appendChild(reactionsContainer);
+
     messageDiv.appendChild(createActionToolbar(messageId, isOwn));
+
+    // Register with reaction observer for lazy loading
+    if (messageId) {
+      const svc = (window as any).reactionService as
+        | { observeMessage(el: HTMLElement): void }
+        | undefined;
+      if (svc) {
+        requestAnimationFrame(() => svc.observeMessage(messageDiv));
+      }
+    }
 
     // ── Spoiler persistence ─────────────────────────────────────────────────
     if (messageId) {

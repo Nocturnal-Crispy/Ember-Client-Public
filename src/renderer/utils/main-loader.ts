@@ -31,6 +31,7 @@
     '../../dist/renderer/components/format-toolbar.js',
     '../../dist/renderer/services/crypto-routing-service.js',
     '../../dist/renderer/services/message-service.js',
+    '../../dist/renderer/services/reaction-service.js',
     '../../dist/renderer/managers/channel-manager.js',
     '../../dist/renderer/managers/ember-manager.js',
     '../../dist/renderer/managers/role-settings.js',

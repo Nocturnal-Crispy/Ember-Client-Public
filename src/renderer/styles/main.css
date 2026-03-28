@@ -32,6 +32,7 @@
 @import './components/user-details-modal.css';
 @import './components/screen-share-modal.css';
 @import './components/app-lock.css';
+@import './components/reactions.css';
 
 /* Utility Layer - Helper Classes */
 @import './utilities/spacing.css';

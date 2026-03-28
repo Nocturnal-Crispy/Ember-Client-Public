@@ -1319,64 +1319,30 @@
   }
 
   /**
-   * Add message reactions to a message
+   * Add message reactions to a message — delegates to unified reaction-service.
    */
-  function addMessageReactions(messageId: string, reactions: MessageReaction[]): void {
+  function addMessageReactions(
+    messageId: string,
+    reactions: Array<{ emoji: string; count: number; reacted: boolean }>
+  ): void {
     const messageElement = document.querySelector(
       `[data-message-id="${messageId}"]`
     ) as HTMLElement;
     if (!messageElement) return;
 
-    let reactionsContainer = messageElement.querySelector('.dm-message-reactions') as HTMLElement;
-    if (!reactionsContainer) {
-      reactionsContainer = document.createElement('div');
-      reactionsContainer.className = 'dm-message-reactions';
-      messageElement.appendChild(reactionsContainer);
-    }
-
-    reactionsContainer.replaceChildren(
-      ...reactions.map(reaction => {
-        const div = document.createElement('div');
-        div.className = `dm-reaction${reaction.reacted ? ' reacted' : ''}`;
-        div.dataset.reaction = reaction.emoji;
-        div.textContent = `${reaction.emoji} ${reaction.count}`;
-        return div;
-      })
-    );
-
-    // Add click handlers for reactions
-    reactionsContainer.querySelectorAll('.dm-reaction').forEach(element => {
-      element.addEventListener('click', () => {
-        const emoji = element.getAttribute('data-reaction');
-        if (emoji) {
-          toggleReaction(messageId, emoji);
+    const svc = (window as any).reactionService as
+      | {
+          renderReactions(
+            el: HTMLElement,
+            reactions: Array<{ emoji: string; count: number; reacted: boolean; users: string[] }>
+          ): void;
         }
-      });
-    });
-  }
-
-  interface MessageReaction {
-    emoji: string;
-    count: number;
-    reacted: boolean;
-  }
-
-  /**
-   * Toggle a reaction on a message
-   */
-  function toggleReaction(messageId: string, emoji: string): void {
-    // This would send the reaction to the server
-    log.info('Toggling reaction', { messageId, emoji });
-
-    // Add visual feedback
-    const reactionElement = document.querySelector(
-      `[data-message-id="${messageId}"] .dm-reaction[data-reaction="${emoji}"]`
-    ) as HTMLElement;
-    if (reactionElement) {
-      reactionElement.style.transform = 'scale(1.2)';
-      setTimeout(() => {
-        reactionElement.style.transform = 'scale(1)';
-      }, 200);
+      | undefined;
+    if (svc) {
+      svc.renderReactions(
+        messageElement,
+        reactions.map(r => ({ ...r, users: [] }))
+      );
     }
   }
 

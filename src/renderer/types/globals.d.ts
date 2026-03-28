@@ -876,6 +876,29 @@ declare global {
     getUserVoiceChannel(userId: string): { channelId: string; channelName: string } | null;
     // Globals set by emoji-picker.ts
     openEmojiPicker(trigger: HTMLElement, input: HTMLTextAreaElement | HTMLInputElement): void;
+    openEmojiPickerWithCallback(trigger: HTMLElement, callback: (emoji: string) => void): void;
+    // Globals set by reaction-service.ts
+    reactionService: {
+      addReaction(messageId: string, emoji: string): Promise<void>;
+      removeReaction(messageId: string, emoji: string): Promise<void>;
+      toggleReaction(messageId: string, emoji: string): Promise<void>;
+      handleMessageEvent(payload: unknown): Promise<void>;
+      loadReactionsForMessages(messageIds: string[]): Promise<void>;
+      observeMessage(el: HTMLElement): void;
+      renderReactions(
+        el: HTMLElement,
+        reactions: Array<{
+          emoji: string;
+          count: number;
+          reacted: boolean;
+          users: string[];
+        }>
+      ): void;
+      clearCache(): void;
+      openQuickReactionTray(trigger: HTMLElement, messageId: string): void;
+      closeQuickReactionTray(): void;
+      QUICK_REACTIONS: string[];
+    };
     // Globals set by gif-picker.ts
     openGifPicker(trigger: HTMLElement): void;
     getGifFavorites(): GifFavorite[];

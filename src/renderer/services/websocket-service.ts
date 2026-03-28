@@ -195,6 +195,21 @@
                 data.payload as Parameters<typeof window.handleMemberUpdate>[0]
               );
             }
+          } else if (data.type === 'message_event' && data.payload) {
+            log.debug('WebSocket: message_event received', {
+              target_message_id: String(data.payload['targetMessageId'] ?? ''),
+              event_type: String(data.payload['eventType'] ?? ''),
+            });
+            const svc = (window as any).reactionService as
+              | { handleMessageEvent(p: unknown): Promise<void> }
+              | undefined;
+            if (svc) {
+              svc
+                .handleMessageEvent(data.payload)
+                .catch((err: Error) =>
+                  log.error('Failed to handle message event', { error: err.message })
+                );
+            }
           } else if (data.type === 'dm_request_received') {
             log.info('WebSocket: dm_request_received');
             if (typeof window.loadAndShowDmRequests === 'function') {

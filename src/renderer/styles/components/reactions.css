@@ -1,0 +1,128 @@
+/* ── Message Reactions ─────────────────────────────────────────────────── */
+
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 2px 48px;
+  margin-top: 2px;
+  min-height: 0;
+}
+
+.message-reactions:empty {
+  display: none;
+}
+
+.reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--rgb-highlight, 0, 255, 0), 0.2);
+  border-radius: 3px;
+  background: rgba(var(--rgb-highlight, 0, 255, 0), 0.05);
+  color: rgba(var(--rgb-text, 200, 200, 200), 0.7);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.1s, background-color 0.1s;
+  user-select: none;
+}
+
+.reaction-pill:hover {
+  border-color: rgba(var(--rgb-highlight, 0, 255, 0), 0.4);
+  background: rgba(var(--rgb-highlight, 0, 255, 0), 0.1);
+}
+
+.reaction-pill.reacted {
+  border-color: var(--highlight, #0f0);
+  background: rgba(var(--rgb-highlight, 0, 255, 0), 0.15);
+  color: var(--highlight, #0f0);
+}
+
+.reaction-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.reaction-count {
+  font-size: 11px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.reaction-add-btn {
+  padding: 2px 6px;
+  border: 1px dashed rgba(var(--rgb-highlight, 0, 255, 0), 0.2);
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(var(--rgb-text, 200, 200, 200), 0.3);
+  font-size: 12px;
+  font-family: 'Courier New', Courier, monospace;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.message:hover .reaction-add-btn {
+  opacity: 1;
+}
+
+.message-reactions:not(:empty) .reaction-add-btn {
+  opacity: 1;
+}
+
+.reaction-add-btn:hover {
+  border-color: rgba(var(--rgb-highlight, 0, 255, 0), 0.4);
+  color: rgba(var(--rgb-text, 200, 200, 200), 0.7);
+}
+
+/* ── Quick Reaction Tray ──────────────────────────────────────────────── */
+
+.quick-reaction-tray {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid rgba(var(--rgb-highlight, 0, 255, 0), 0.2);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.quick-reaction-btn {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.quick-reaction-btn:hover {
+  background: rgba(var(--rgb-highlight, 0, 255, 0), 0.1);
+}
+
+.quick-reaction-more {
+  color: rgba(var(--rgb-text, 200, 200, 200), 0.5);
+  font-size: 14px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ── Reaction Tooltip ─────────────────────────────────────────────────── */
+
+.reaction-tooltip {
+  padding: 4px 8px;
+  background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid rgba(var(--rgb-highlight, 0, 255, 0), 0.2);
+  border-radius: 3px;
+  color: rgba(var(--rgb-text, 200, 200, 200), 0.8);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
