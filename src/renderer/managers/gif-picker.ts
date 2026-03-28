@@ -222,7 +222,7 @@
     }
     favorites.forEach(fav => {
       const item = renderFavoriteItem(fav);
-      if (item) favoritesGridEl!.appendChild(item);
+      if (item) favoritesGridEl?.appendChild(item);
     });
   }
 
@@ -400,7 +400,7 @@
         e.preventDefault();
         selectSuggestion(term);
       });
-      autocompleteEl!.appendChild(li);
+      autocompleteEl?.appendChild(li);
     });
     autocompleteEl.classList.remove('hidden');
   }
@@ -536,10 +536,10 @@
     results.forEach(result => {
       if (isAdItem(result)) {
         const adEl = renderAdItem(result);
-        if (adEl) gridEl!.appendChild(adEl);
+        if (adEl) gridEl?.appendChild(adEl);
       } else {
         const gifEl = renderGifItem(result);
-        if (gifEl) gridEl!.appendChild(gifEl);
+        if (gifEl) gridEl?.appendChild(gifEl);
       }
     });
   }
@@ -683,11 +683,14 @@
     }
     startTrending();
     outsideClickHandler = (e: MouseEvent) => {
-      if (!panel!.contains(e.target as Node) && e.target !== trigger) {
+      if (!panel?.contains(e.target as Node) && e.target !== trigger) {
         closePanel();
       }
     };
-    setTimeout(() => document.addEventListener('click', outsideClickHandler!), 0);
+    if (outsideClickHandler) {
+      const handler = outsideClickHandler;
+      setTimeout(() => document.addEventListener('click', handler), 0);
+    }
     escKeyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closePanel();
     };

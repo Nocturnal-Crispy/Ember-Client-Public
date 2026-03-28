@@ -223,11 +223,12 @@
 
         // Try OS safeStorage first (Signal self-session may not survive re-login)
         try {
-          const resp = await (window as any).emberAPI.invoke('GetSafeStorage', {
+          const resp = await window.emberAPI.invoke('GetSafeStorage', {
             key: `crk_${emberId}_${epoch}`,
           });
-          if (resp?.success && resp.data?.value) {
-            const crkBytes = Uint8Array.from(atob(resp.data.value), c => c.charCodeAt(0));
+          const respData = resp?.data as { value?: string } | undefined;
+          if (resp?.success && respData?.value) {
+            const crkBytes = Uint8Array.from(atob(respData.value), c => c.charCodeAt(0));
             if (crkBytes.length === 32) {
               crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk: crkBytes });
               return crkBytes;
@@ -237,7 +238,7 @@
           /* fall through to Signal decrypt */
         }
 
-        const signalManager = (window as any).App?.signalSessionManager;
+        const signalManager = window.App?.signalSessionManager;
         if (!signalManager) return null;
 
         const ct = Uint8Array.from(atob(envelope.encryptedKey), c => c.charCodeAt(0));
@@ -328,7 +329,7 @@
       epoch: number = 0
     ): Promise<boolean> {
       try {
-        const signalManager = (window as any).App?.signalSessionManager;
+        const signalManager = window.App?.signalSessionManager;
         if (!signalManager) {
           log.warn('createAndDistributeCrk: signalSessionManager is null');
           return false;
@@ -396,7 +397,7 @@
           crkCache.set(cacheKey(emberId, epoch), { emberId, epoch, crk });
           // Persist to OS safeStorage so CRK survives logout/re-login
           try {
-            await (window as any).emberAPI.invoke('SetSafeStorage', {
+            await window.emberAPI.invoke('SetSafeStorage', {
               key: `crk_${emberId}_${epoch}`,
               value: btoa(String.fromCharCode(...crk)),
             });
@@ -429,7 +430,7 @@
         const envelope = data.envelopes.find(e => e.epoch === epoch);
         if (!envelope) return null;
 
-        const signalManager = (window as any).App?.signalSessionManager;
+        const signalManager = window.App?.signalSessionManager;
         if (!signalManager) return null;
 
         const ct = Uint8Array.from(atob(envelope.encryptedKey), c => c.charCodeAt(0));
@@ -454,7 +455,7 @@
       epoch: number = 0
     ): Promise<boolean> {
       try {
-        const signalManager = (window as any).App?.signalSessionManager;
+        const signalManager = window.App?.signalSessionManager;
         if (!signalManager) return false;
 
         const cmk = crypto.getRandomValues(new Uint8Array(32));
@@ -565,7 +566,7 @@
         const data = (await response.json()) as { envelopes: CrkEnvelopeFromServer[] };
         if (!data.envelopes || data.envelopes.length === 0) return 0;
 
-        const signalManager = (window as any).App?.signalSessionManager;
+        const signalManager = window.App?.signalSessionManager;
         if (!signalManager) return 0;
 
         let synced = 0;
@@ -639,7 +640,7 @@
       emberId: string,
       newMemberDevices: Array<{ userId: string; deviceId: string }>
     ): Promise<number> {
-      const signalManager = (window as any).App?.signalSessionManager;
+      const signalManager = window.App?.signalSessionManager;
       if (!signalManager) return 0;
 
       // First sync to ensure we have all available epochs
@@ -829,6 +830,6 @@
     }
   }
 
-  (window as any).HistoryCryptoService = HistoryCryptoService;
-  (window as any).replayProtection = { acceptMessage, clearReplayStateForConversation };
+  window.HistoryCryptoService = HistoryCryptoService;
+  window.replayProtection = { acceptMessage, clearReplayStateForConversation };
 })();

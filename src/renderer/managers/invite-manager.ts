@@ -371,7 +371,13 @@
 
       // Pre-compute CRK packages so joiner can decrypt history even when all members are offline.
       // Uses HKDF(inviteCode) as a symmetric key to encrypt each CRK epoch.
-      preComputeCrkPackages(auth.hostname!, auth.token!, emberId, inviteCode, data.inviteId ?? '');
+      preComputeCrkPackages(
+        auth.hostname as string,
+        auth.token as string,
+        emberId,
+        inviteCode,
+        data.inviteId ?? ''
+      );
     } catch (error) {
       const err = error as Error;
       log.error('Failed to create invite', {
@@ -574,7 +580,13 @@
 
       // Fetch pre-computed CRK packages and sender key distributions from the invite.
       if (data.emberId && data.inviteId && info.code) {
-        await fetchPreComputedKeys(hostname!, auth.token!, data.emberId, info.code, data.inviteId);
+        await fetchPreComputedKeys(
+          hostname as string,
+          auth.token as string,
+          data.emberId,
+          info.code,
+          data.inviteId
+        );
       }
 
       closeAcceptInviteModal();
@@ -608,7 +620,7 @@
         log.error('Cannot process invite link: not authenticated');
         return;
       }
-      const targetHostname = hostname ?? auth.hostname!;
+      const targetHostname = hostname ?? (auth.hostname as string);
       log.debug('Making request to:', { targetHostname, has_code: code.length > 0 });
       const response = await fetch(`${targetHostname}/api/v1/invites/${code}`, {
         method: 'GET',

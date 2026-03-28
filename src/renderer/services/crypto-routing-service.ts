@@ -83,9 +83,14 @@
         distResp = { success: true, data: { distributionId: recovered } };
       }
 
+      if (!distResp.data?.distributionId) {
+        log.warn('Missing distributionId for sender key encrypt', { ember_id: emberId });
+        return null;
+      }
+      const distributionId = distResp.data.distributionId;
       const plaintextB64 = textToBase64(plaintext);
       const encResp = await window.emberAPI.invoke<{ ciphertext: string }>('GroupEncrypt', {
-        distributionId: distResp.data!.distributionId!,
+        distributionId,
         plaintext: plaintextB64,
       });
 

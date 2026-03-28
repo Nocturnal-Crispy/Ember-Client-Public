@@ -132,7 +132,7 @@
     const auth = await window.getValidAuth();
     if (!auth) return null;
 
-    const historyCrypto = (window as any).App?.historyCryptoService;
+    const historyCrypto = window.App?.historyCryptoService;
     if (!historyCrypto) return null;
 
     try {
@@ -188,7 +188,7 @@
     if (!auth) return false;
 
     try {
-      const signalManager = (window as any).App?.signalSessionManager;
+      const signalManager = window.App?.signalSessionManager;
       if (!signalManager) return false;
 
       // Build the bundle
@@ -234,7 +234,7 @@
     if (!auth) return false;
 
     try {
-      const signalManager = (window as any).App?.signalSessionManager;
+      const signalManager = window.App?.signalSessionManager;
       if (!signalManager) return false;
 
       const baseUrl = auth.hostname.startsWith('http') ? auth.hostname : `https://${auth.hostname}`;
@@ -265,7 +265,7 @@
       };
 
       // Import CRKs into cache
-      const historyCrypto = (window as any).App?.historyCryptoService;
+      const historyCrypto = window.App?.historyCryptoService;
       if (!historyCrypto) return false;
 
       // Import keys into the HistoryCryptoService caches via its class method.

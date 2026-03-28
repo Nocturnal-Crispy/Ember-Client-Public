@@ -87,6 +87,12 @@ declare global {
   type ContextMenuTarget = import('../../shared').ContextMenuTarget;
 
   type Message = import('../../shared').Message;
+
+  interface FetchResult {
+    messages: Message[];
+    hasMore: boolean;
+  }
+
   type WsMessage = import('../../shared').WsMessage;
   type PresenceUpdatePayload = import('../../shared').PresenceUpdatePayload;
   type LogPayload = import('../../shared').LogPayload;
@@ -384,7 +390,7 @@ declare global {
   interface AudioCaptureAPI {
     checkSupport(): Promise<AudioCaptureSupport>;
     setup(): Promise<{ success: boolean; platform?: string; reason?: string }>;
-    frames(): Promise<null>;
+    frames(): Promise<{ pcm: Float32Array } | null>;
     teardown(): Promise<void>;
   }
 
@@ -866,6 +872,30 @@ declare global {
     openDmWithUser(userId: string, username: string): Promise<void>;
     // Globals set by renderer.ts (external link modal)
     openExternalLinkModal(url: string): void;
+    // Globals set by renderer.ts (image viewer)
+    openImageViewer(src: string, name: string): void;
+    // Globals set by renderer.ts (input error)
+    showInputError(msg: string): void;
+    // Globals set by history-crypto-service.ts (directly on window)
+    historyCryptoService: import('../services/history-crypto-service').HistoryCryptoService | null;
+    HistoryCryptoService: unknown;
+    replayProtection: {
+      acceptMessage(
+        conversationId: string,
+        epoch: number,
+        senderDeviceId: string,
+        messageSequence: number
+      ): boolean;
+      clearReplayStateForConversation(conversationId: string): void;
+    };
+    // Globals set by signal-service.ts (constructor references)
+    SignalService: unknown;
+    IpcSessionStore: unknown;
+    IpcIdentityKeyStore: unknown;
+    IpcPreKeyStore: unknown;
+    IpcSignedPreKeyStore: unknown;
+    IpcKyberPreKeyStore: unknown;
+    EmberIpcError: unknown;
     // Globals set by user-details-modal.ts
     openUserDetailsModal(userId: string, username: string): void;
     closeUserDetailsModal(): void;
@@ -909,5 +939,18 @@ declare global {
     // Globals set by message-service.ts (GIF)
     sendGifMessage(url: string, title: string): Promise<void>;
     sendGif(url: string, title: string): void;
+    // Globals set by messages-area.ts / channel-manager.ts (delete modal state)
+    pendingMessageDelete: { messageId: string; channelId: string } | null;
+    // Globals set by voice-service.ts
+    generateNotificationSound?: (type: string) => void;
+    VoiceManager: unknown;
+    // Globals set by dm-performance-optimizer.ts
+    DMPerformanceOptimizer: unknown;
+    // Globals set by dm-accessibility-enhancer.ts
+    DMAccessibilityEnhancer: unknown;
+    // Globals set by css-hot-reload.ts
+    cssHotReloader: unknown;
+    // Browser vendor prefix
+    webkitAudioContext?: typeof AudioContext;
   }
 }

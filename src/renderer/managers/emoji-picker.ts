@@ -491,7 +491,7 @@
         e.stopPropagation();
         selectCategory(idx);
       });
-      categoriesEl!.appendChild(btn);
+      categoriesEl?.appendChild(btn);
     });
   }
 
@@ -511,7 +511,7 @@
         e.stopPropagation();
         insertEmoji(emoji);
       });
-      gridEl!.appendChild(btn);
+      gridEl?.appendChild(btn);
     });
   }
 
@@ -602,11 +602,14 @@
 
     // Close on outside click
     outsideClickHandler = (e: MouseEvent) => {
-      if (!panel!.contains(e.target as Node) && e.target !== trigger) {
+      if (!panel?.contains(e.target as Node) && e.target !== trigger) {
         closePanel();
       }
     };
-    setTimeout(() => document.addEventListener('click', outsideClickHandler!), 0);
+    if (outsideClickHandler) {
+      const handler = outsideClickHandler;
+      setTimeout(() => document.addEventListener('click', handler), 0);
+    }
 
     // Close on ESC
     escKeyHandler = (e: KeyboardEvent) => {
@@ -633,7 +636,7 @@
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  (window as any).openEmojiPicker = function (
+  window.openEmojiPicker = function (
     trigger: HTMLElement,
     input: HTMLTextAreaElement | HTMLInputElement
   ): void {
@@ -641,7 +644,7 @@
     openPanel(trigger, input);
   };
 
-  (window as any).openEmojiPickerWithCallback = function (
+  window.openEmojiPickerWithCallback = function (
     trigger: HTMLElement,
     callback: (emoji: string) => void
   ): void {
@@ -655,11 +658,14 @@
     selectCategory(0);
 
     outsideClickHandler = (e: MouseEvent) => {
-      if (!panel!.contains(e.target as Node) && e.target !== trigger) {
+      if (!panel?.contains(e.target as Node) && e.target !== trigger) {
         closePanel();
       }
     };
-    setTimeout(() => document.addEventListener('click', outsideClickHandler!), 0);
+    if (outsideClickHandler) {
+      const handler = outsideClickHandler;
+      setTimeout(() => document.addEventListener('click', handler), 0);
+    }
 
     escKeyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closePanel();

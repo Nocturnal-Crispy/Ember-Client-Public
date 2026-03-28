@@ -158,8 +158,8 @@
       applyThemeToDom(pendingSettings);
 
       // ─── Apply Custom UI Style Logic ───
-      if ((window as any).initUIStyleState) {
-        (window as any).initUIStyleState();
+      if (typeof (window as unknown as Record<string, unknown>).initUIStyleState === 'function') {
+        ((window as unknown as Record<string, unknown>).initUIStyleState as () => void)();
       }
 
       log.debug('Theme and UI Style applied on startup', { themeId: pendingSettings.themeId });
@@ -169,8 +169,8 @@
       applyThemeToDom(pendingSettings);
 
       // Ensure it tries to load UI styles even if theme loading fails
-      if ((window as any).initUIStyleState) {
-        (window as any).initUIStyleState();
+      if (typeof (window as unknown as Record<string, unknown>).initUIStyleState === 'function') {
+        ((window as unknown as Record<string, unknown>).initUIStyleState as () => void)();
       }
     }
   }
@@ -419,8 +419,8 @@
     updateSwatches();
 
     // --- STYLE INITIALIZATION ---
-    if (typeof (window as any).initStylesSettings === 'function') {
-      (window as any).initStylesSettings();
+    if (typeof (window as unknown as Record<string, unknown>).initStylesSettings === 'function') {
+      ((window as unknown as Record<string, unknown>).initStylesSettings as () => void)();
     }
     // ------------------------------------------
 
@@ -473,8 +473,8 @@
       // Add them to our live list
       PRESETS.push(...parsed);
     }
-    if ((window as any).initUIStyleState) {
-      (window as any).initUIStyleState();
+    if (typeof (window as unknown as Record<string, unknown>).initUIStyleState === 'function') {
+      ((window as unknown as Record<string, unknown>).initUIStyleState as () => void)();
     }
   }
 
@@ -505,8 +505,8 @@
 
   applyThemeOnStartup();
   loadCustomPresetsFromDisk();
-  if ((window as any).initStylesSettings) {
-    (window as any).initStylesSettings();
+  if (typeof (window as unknown as Record<string, unknown>).initStylesSettings === 'function') {
+    ((window as unknown as Record<string, unknown>).initStylesSettings as () => void)();
   }
 
   window.initThemeSettings = initThemeSettings;

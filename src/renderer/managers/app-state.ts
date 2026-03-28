@@ -63,8 +63,8 @@ window.App = {
 
   // ── Signal Protocol ───────────────────────────────────────────────────────
   signalSessionReady: new Map<string, boolean>(),
-  signalSessionManager: null as any,
-  historyCryptoService: null as any,
+  signalSessionManager: null,
+  historyCryptoService: null,
 
   // ── Signal Session Manager Initialization ───────────────────────────────
   async initializeSignalSessionManager(): Promise<void> {
@@ -80,13 +80,19 @@ window.App = {
         throw new Error('Not authenticated - cannot initialize SignalSessionManager');
       }
 
-      if (typeof (window as any).SignalSessionManager === 'undefined') {
+      if (
+        typeof (window as unknown as { SignalSessionManager?: unknown }).SignalSessionManager ===
+        'undefined'
+      ) {
         ssmLog?.warn('SignalSessionManager class not yet available');
         this.signalSessionManager = null;
         return;
       }
 
-      this.signalSessionManager = new (window as any).SignalSessionManager(auth);
+      type SSMCtor = new (auth: AuthData) => NonNullable<AppState['signalSessionManager']>;
+      this.signalSessionManager = new (
+        window as unknown as { SignalSessionManager: SSMCtor }
+      ).SignalSessionManager(auth);
       ssmLog?.info('SignalSessionManager initialized successfully');
 
       // Upload signed prekey + one-time prekeys if not already on server
@@ -97,7 +103,15 @@ window.App = {
         const countData = countResp.ok ? await countResp.json() : { count: 0 };
         if (countData.count === 0) {
           ssmLog?.debug('No prekeys on server, uploading...');
-          const identity = (await window.electronAPI.ipc.invoke('get-device-identity')) as any;
+          const identity = (await window.electronAPI.ipc.invoke('get-device-identity')) as {
+            signedPreKey?: {
+              id: number;
+              keyPair: { publicKey: ArrayBuffer };
+              signature: ArrayBuffer;
+              timestamp: number;
+            };
+            oneTimePreKeys?: Array<{ id: number; keyPair: { publicKey: ArrayBuffer } }>;
+          } | null;
           if (identity?.signedPreKey) {
             const spk = identity.signedPreKey;
             await fetch(`${auth.hostname}/api/v1/prekeys/signed`, {
@@ -115,11 +129,13 @@ window.App = {
             });
             ssmLog?.info('Signed prekey uploaded');
           }
-          if (identity?.oneTimePreKeys?.length > 0) {
-            const otpks = identity.oneTimePreKeys.map((pk: any) => ({
-              id: pk.id,
-              publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
-            }));
+          if (identity != null && (identity.oneTimePreKeys?.length ?? 0) > 0) {
+            const otpks = (identity.oneTimePreKeys ?? []).map(
+              (pk: { id: number; keyPair: { publicKey: ArrayBuffer } }) => ({
+                id: pk.id,
+                publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
+              })
+            );
             await fetch(`${auth.hostname}/api/v1/prekeys/one-time`, {
               method: 'POST',
               headers: {
@@ -145,14 +161,22 @@ window.App = {
 
     try {
       const auth = await window.getValidAuth?.();
-      if (auth && typeof (window as any).HistoryCryptoService !== 'undefined') {
-        this.historyCryptoService = new (window as any).HistoryCryptoService(auth);
-        (window as any).historyCryptoService = this.historyCryptoService;
+      if (
+        auth &&
+        typeof (window as unknown as { HistoryCryptoService?: unknown }).HistoryCryptoService !==
+          'undefined'
+      ) {
+        type HCSCtor = new (auth: AuthData) => NonNullable<AppState['historyCryptoService']>;
+        this.historyCryptoService = new (
+          window as unknown as { HistoryCryptoService: HCSCtor }
+        ).HistoryCryptoService(auth);
+        window.historyCryptoService = this.historyCryptoService;
         ssmLog?.info('HistoryCryptoService initialized successfully');
       } else {
         ssmLog?.warn('HistoryCryptoService not initialized', {
           hasAuth: !!auth,
-          hasClass: typeof (window as any).HistoryCryptoService,
+          hasClass: typeof (window as unknown as { HistoryCryptoService?: unknown })
+            .HistoryCryptoService,
         });
       }
     } catch (historyError) {

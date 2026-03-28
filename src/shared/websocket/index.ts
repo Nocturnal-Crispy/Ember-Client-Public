@@ -5,7 +5,7 @@
 
 export interface WebSocketMessage {
   type: string;
-  payload?: any;
+  payload?: unknown;
   channelId?: string;
   emberId?: string;
 }
@@ -33,7 +33,7 @@ export class EmberWebSocket {
   private isManualClose = false;
 
   // Event handlers
-  private onMessageHandlers: Map<string, ((payload: any) => void)[]> = new Map();
+  private onMessageHandlers: Map<string, ((payload: unknown) => void)[]> = new Map();
   private onConnectionChangeHandlers: ((connected: boolean) => void)[] = [];
   private onErrorHandlers: ((error: Error) => void)[] = [];
 
@@ -147,7 +147,7 @@ export class EmberWebSocket {
    * Register handler for presence updates
    */
   public onPresenceUpdate(handler: (presence: PresenceUpdate) => void): void {
-    this.addHandler('presence_update', handler);
+    this.addHandler('presence_update', handler as (payload: unknown) => void);
   }
 
   /**
@@ -203,11 +203,14 @@ export class EmberWebSocket {
   /**
    * Register a handler for a specific message type
    */
-  private addHandler(type: string, handler: (payload: any) => void): void {
+  private addHandler(type: string, handler: (payload: unknown) => void): void {
     if (!this.onMessageHandlers.has(type)) {
       this.onMessageHandlers.set(type, []);
     }
-    this.onMessageHandlers.get(type)!.push(handler);
+    const handlers = this.onMessageHandlers.get(type);
+    if (handlers) {
+      handlers.push(handler);
+    }
   }
 
   /**

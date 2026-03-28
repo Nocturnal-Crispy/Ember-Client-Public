@@ -66,7 +66,7 @@
     ) => Record<string, unknown>;
 
     if (!App.voiceManager) {
-      App.voiceManager = new VoiceManagerClass(App.wsConnection!, auth);
+      App.voiceManager = new VoiceManagerClass(App.wsConnection as WebSocket, auth);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
       vm.onSpeakingChanged = (userId: string, isSpeaking: boolean) =>
@@ -100,7 +100,7 @@
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
-      vm.ws = App.wsConnection!;
+      vm.ws = App.wsConnection as WebSocket;
       vm.auth = auth;
       // Re-capture channelId in the participants callback for the new channel
       vm.onParticipantsChanged = (
@@ -309,7 +309,7 @@
       nameEl.textContent = username;
       item.appendChild(avatarEl);
       item.appendChild(nameEl);
-      (window as any).makeUsernameClickable?.(item, userId, username);
+      window.makeUsernameClickable?.(item, userId, username);
       list.appendChild(item);
     });
   }
@@ -1245,8 +1245,7 @@
 
   function playVoiceSound(type: string): void {
     if (App._vvSounds && App._vvSounds[type] === false) return;
-    const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
-      .generateNotificationSound;
+    const gen = window.generateNotificationSound;
     if (typeof gen === 'function') gen(type);
   }
 
@@ -1306,7 +1305,8 @@
     const btn = document.getElementById('vv-mic-test-btn') as HTMLButtonElement | null;
     const canvas = document.getElementById('mic-visualizer') as HTMLCanvasElement | null;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     if (App._micTestStream) {
       stopMicTest();
       return;
@@ -1322,10 +1322,7 @@
       .then(stream => {
         App._micTestStream = stream;
         if (btn) btn.textContent = 'Stop Test';
-        const audioCtx = new (
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        )();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;

@@ -533,7 +533,8 @@ export function openSignalDatabase(
     if (needsLocalPrivate && !localIdentityPrivateKey) {
       throw new Error('signal-db: local identity private key not initialised');
     }
-    const privatePlaintext = needsLocalPrivate ? localIdentityPrivateKey! : new Uint8Array(0);
+    const privatePlaintext =
+      needsLocalPrivate && localIdentityPrivateKey ? localIdentityPrivateKey : new Uint8Array(0);
     const encryptedPrivate = encryptBlob(
       encryptionKey,
       privatePlaintext,

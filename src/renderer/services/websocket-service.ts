@@ -200,7 +200,7 @@
               target_message_id: String(data.payload['targetMessageId'] ?? ''),
               event_type: String(data.payload['eventType'] ?? ''),
             });
-            const svc = (window as any).reactionService as
+            const svc = window.reactionService as
               | { handleMessageEvent(p: unknown): Promise<void> }
               | undefined;
             if (svc) {

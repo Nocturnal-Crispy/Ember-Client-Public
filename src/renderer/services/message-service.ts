@@ -57,15 +57,16 @@
         distResp = { success: true, data: { distributionId: recovered } };
       }
 
+      const distributionId = distResp.data?.distributionId ?? '';
       const plaintextB64 = textToBase64(plaintext);
       const encResp = await window.emberAPI.invoke<{ ciphertext: string }>('GroupEncrypt', {
-        distributionId: distResp.data!.distributionId!,
+        distributionId,
         plaintext: plaintextB64,
       });
       if (!encResp.success || !encResp.data?.ciphertext) {
         log.warn('GroupEncrypt failed', {
           ember_id: emberId,
-          distribution_id: distResp.data!.distributionId,
+          distribution_id: distributionId,
           error: encResp.error ?? 'unknown',
         });
         return null;
@@ -113,7 +114,7 @@
         ciphertext: envelope.ct,
       });
       if (!decResp.success || !decResp.data?.plaintext) {
-        const errorMsg = (decResp as any).error ?? '';
+        const errorMsg = decResp.error ?? '';
         const permanent = isOldCounterError(errorMsg);
         log.warn('GroupDecrypt returned failure', {
           success: decResp.success,
@@ -180,7 +181,7 @@
     auth: AuthData,
     channelId: string
   ): Promise<string> {
-    const attachment = App.pendingAttachment!;
+    const attachment = App.pendingAttachment as NonNullable<typeof App.pendingAttachment>;
     const { file, name, size, type } = attachment;
     const arrayBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(arrayBuffer);
@@ -269,7 +270,7 @@
       if (!auth || !auth.token || !auth.hostname) return '';
       let messageText = plaintext;
       if (hasPendingAttachment) {
-        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId!);
+        messageText = await buildFileMessageText(plaintext, auth, App.activeChannelId ?? '');
         window.clearPendingAttachment();
       }
       log.debug('Attempting message encrypt', {
@@ -278,7 +279,7 @@
       });
 
       // Try history key encryption first (Layer 2), fall back to sender key (Layer 1)
-      const historyCrypto = (window as any).historyCryptoService as
+      const historyCrypto = window.historyCryptoService as unknown as
         | {
             encrypt(
               emberId: string,
@@ -310,7 +311,7 @@
         if (!groupCiphertext) {
           const errMsg =
             'Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.';
-          (window as any).showInputError?.(errMsg);
+          (window as { showInputError?: (msg: string) => void }).showInputError?.(errMsg);
           throw new Error(errMsg);
         }
         requestBody = {
@@ -322,7 +323,7 @@
       }
 
       const response = await fetch(
-        `${auth.hostname}/api/v1/channels/${App.activeChannelId!}/messages`,
+        `${auth.hostname}/api/v1/channels/${App.activeChannelId ?? ''}/messages`,
         {
           method: 'POST',
           headers: {
@@ -352,7 +353,7 @@
       const showMsg = err.message.includes('Encryption unavailable')
         ? err.message
         : `Failed to send: ${err.message}`;
-      (window as any).showInputError?.(showMsg);
+      (window as { showInputError?: (msg: string) => void }).showInputError?.(showMsg);
       throw err;
     }
   }
@@ -376,7 +377,7 @@
     const auth = (await ipcRenderer.invoke('get-auth')) as AuthData | null;
     if (!auth || !auth.token || !auth.hostname) throw new Error('Not authenticated');
     // Try history key encryption first, fall back to sender key
-    const historyCrypto = (window as any).historyCryptoService as
+    const historyCrypto = window.historyCryptoService as unknown as
       | {
           encrypt(
             emberId: string,
@@ -431,7 +432,7 @@
     } else {
       const errMsg =
         'Encryption unavailable — sender key not established for this ember. Please rejoin or restart the application.';
-      (window as any).showInputError?.(errMsg);
+      (window as { showInputError?: (msg: string) => void }).showInputError?.(errMsg);
       throw new Error(errMsg);
     }
     textEl.textContent = newText;
@@ -624,7 +625,14 @@
     if (!App.activeEmberId) return;
     let plaintext: string | null = null;
     const envelopeType = msg.envelopeType;
-    const msgAny = msg as any;
+    const msgAny = msg as Message & {
+      messageSequence?: number;
+      epoch?: number;
+      senderDeviceId?: string;
+      nonce?: string;
+      epochCiphertext?: string;
+      senderUserId?: string;
+    };
 
     // Replay protection for history envelope types — only for live WS messages
     if (
@@ -632,16 +640,18 @@
       !skipReplay &&
       !prepend
     ) {
-      const replayGuard = (window as any).replayProtection as
-        | {
+      const replayGuard = (
+        window as {
+          replayProtection?: {
             acceptMessage(
               conversationId: string,
               epoch: number,
               senderDeviceId: string,
               messageSequence: number
             ): boolean;
-          }
-        | undefined;
+          };
+        }
+      ).replayProtection;
       if (replayGuard) {
         const seq = Number(msgAny.messageSequence ?? 0);
         const epoch = Number(msgAny.epoch ?? 0);
@@ -731,7 +741,7 @@
         }
       }
     } else if (envelopeType === 'history_channel') {
-      const historyCrypto = (window as any).historyCryptoService as
+      const historyCrypto = window.historyCryptoService as unknown as
         | {
             decrypt(
               emberId: string,
@@ -771,7 +781,7 @@
         return;
       }
     } else if (envelopeType === 'history_dm') {
-      const historyCrypto = (window as any).historyCryptoService as
+      const historyCrypto = window.historyCryptoService as unknown as
         | {
             decryptDm(
               conversationId: string,
@@ -1404,7 +1414,9 @@
             await displayDecryptedMessage(messages[i], true);
           }
           // Restore scroll position so the viewport doesn't jump
-          messagesContainer!.scrollTop = messagesContainer!.scrollHeight - prevScrollHeight;
+          if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight - prevScrollHeight;
+          }
         }
 
         log.debug('Older messages loaded', {

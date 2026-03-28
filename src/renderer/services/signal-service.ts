@@ -341,10 +341,10 @@ class SignalService {
 }
 
 // Export globally for script loading compatibility
-(window as any).SignalService = SignalService;
-(window as any).IpcSessionStore = IpcSessionStore;
-(window as any).IpcIdentityKeyStore = IpcIdentityKeyStore;
-(window as any).IpcPreKeyStore = IpcPreKeyStore;
-(window as any).IpcSignedPreKeyStore = IpcSignedPreKeyStore;
-(window as any).IpcKyberPreKeyStore = IpcKyberPreKeyStore;
-(window as any).EmberIpcError = EmberIpcError;
+window.SignalService = SignalService;
+window.IpcSessionStore = IpcSessionStore;
+window.IpcIdentityKeyStore = IpcIdentityKeyStore;
+window.IpcPreKeyStore = IpcPreKeyStore;
+window.IpcSignedPreKeyStore = IpcSignedPreKeyStore;
+window.IpcKyberPreKeyStore = IpcKyberPreKeyStore;
+window.EmberIpcError = EmberIpcError;

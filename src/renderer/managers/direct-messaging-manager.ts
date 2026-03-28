@@ -439,7 +439,7 @@
     // This is the single creation point — startDmConversation does NOT create CMK
     // because the recipient isn't a member yet at that stage.
     try {
-      const historyCrypto = (window as any).historyCryptoService;
+      const historyCrypto = window.App.historyCryptoService;
       if (historyCrypto) {
         const membersResp = await fetch(
           `${auth.hostname}/api/v1/embers/${emberId}/device-members`,
@@ -583,7 +583,7 @@
 
           // Try history_dm envelope decryption via dmCmk
           if (envelopeType === 'history_dm') {
-            const historyCrypto = (window as any).historyCryptoService;
+            const historyCrypto = window.App.historyCryptoService;
             if (historyCrypto && entry) {
               try {
                 const msgAny = msg as Record<string, unknown>;
@@ -654,7 +654,7 @@
     const deviceId = fullAuth?.deviceId ?? '';
 
     // Try Layer 2 (dmCmk) encryption first for persistent history
-    const historyCrypto = (window as any).historyCryptoService;
+    const historyCrypto = window.App.historyCryptoService;
     if (historyCrypto) {
       try {
         const historyResult = await historyCrypto.encryptDm(entry.emberId, plaintext);
@@ -734,7 +734,7 @@
 
     const errMsg =
       'Encryption unavailable — session not established. Please restart the application.';
-    (window as any).showInputError?.(errMsg);
+    window.showInputError?.(errMsg);
     throw new Error(errMsg);
   }
 
@@ -760,7 +760,7 @@
       if (entry) {
         App.activeEmberId = entry.emberId;
         // Prefetch DM CMK for history-based decryption
-        const historyCrypto = (window as any).historyCryptoService;
+        const historyCrypto = window.App.historyCryptoService;
         if (historyCrypto) {
           historyCrypto.getDmCmk(entry.emberId).catch(() => null);
         }
@@ -851,7 +851,7 @@
 
     // Try history_dm envelope decryption
     if (envelopeType === 'history_dm') {
-      const historyCrypto = (window as any).historyCryptoService;
+      const historyCrypto = window.App.historyCryptoService;
       if (historyCrypto && entry) {
         try {
           const nonceB64 = String(payload['nonce'] ?? '');
@@ -1037,7 +1037,7 @@
         window.hideDmPendingBanner(entry.textChannelId);
       }
       // Fetch the DM CMK created by the accepter so requester can use history encryption
-      const historyCrypto = (window as any).historyCryptoService;
+      const historyCrypto = window.App.historyCryptoService;
       if (historyCrypto) {
         historyCrypto.getDmCmk(emberId).catch(() => null);
       }

@@ -266,7 +266,7 @@
 
     img.onload = () => {
       img.addEventListener('click', () => {
-        (window as any).openImageViewer?.(url, url);
+        window.openImageViewer?.(url, url);
       });
       const scrollContainer = img.closest('.messages-container, #messages') as HTMLElement | null;
       if (scrollContainer) {
@@ -449,7 +449,7 @@
           link.href = '#';
           link.addEventListener('click', e => {
             e.preventDefault();
-            (window as any).openExternalLinkModal?.(token.value);
+            window.openExternalLinkModal?.(token.value);
           });
           container.appendChild(link);
         }
@@ -488,7 +488,7 @@
           (m: { userId: string }) => m.userId === token.userId
         );
         span.textContent = `@${member?.username ?? token.userId.slice(0, 8)}`;
-        (window as any).makeUsernameClickable?.(span, token.userId, span.textContent.slice(1));
+        window.makeUsernameClickable?.(span, token.userId, span.textContent.slice(1));
         container.appendChild(span);
       }
     }
@@ -663,7 +663,7 @@
     img.alt = gifData.title || 'GIF';
     img.loading = 'lazy';
     img.addEventListener('click', () => {
-      (window as any).openImageViewer?.(gifData.url, gifData.title || 'GIF');
+      window.openImageViewer?.(gifData.url, gifData.title || 'GIF');
     });
     card.appendChild(img);
     return card;
@@ -686,7 +686,7 @@
     img.onload = () => {
       wrapper.className = 'image-card-wrapper image-card-state-loaded';
       img.addEventListener('click', () => {
-        (window as any).openImageViewer?.(url, attachment.name);
+        window.openImageViewer?.(url, attachment.name);
       });
       const scrollContainer = img.closest('.messages-container, #messages') as HTMLElement | null;
       if (scrollContainer) {
@@ -951,7 +951,7 @@
    * Configure and show the delete-confirm modal for a message deletion.
    */
   function showDeleteMessageModal(messageId: string, channelId: string): void {
-    (window as any).pendingMessageDelete = { messageId, channelId };
+    window.pendingMessageDelete = { messageId, channelId };
     const titleEl = document.getElementById('delete-modal-title');
     const msgEl = document.getElementById('delete-modal-message');
     if (titleEl) titleEl.textContent = 'Delete Message';
@@ -975,9 +975,7 @@
     if (messageId) {
       toolbar.appendChild(
         createActionButton('+', 'React', () => {
-          const svc = (window as any).reactionService as
-            | { openQuickReactionTray(trigger: HTMLElement, messageId: string): void }
-            | undefined;
+          const svc = window.reactionService;
           if (svc) {
             const btn = toolbar.querySelector('.message-action-btn') as HTMLElement;
             svc.openQuickReactionTray(btn ?? toolbar, messageId);
@@ -994,10 +992,7 @@
         createActionButton('\u{270F}\u{FE0F}', 'Edit', () => {
           const msgDiv = toolbar.closest('.message') as HTMLElement | null;
           if (msgDiv && messageId) {
-            const enterEdit = (window as any).enterEditMode as
-              | ((div: HTMLElement, id: string) => void)
-              | undefined;
-            enterEdit?.(msgDiv, messageId);
+            window.enterEditMode?.(msgDiv, messageId);
           }
         })
       );
@@ -1060,7 +1055,7 @@
     const chumhandleEl = document.createElement('span');
     chumhandleEl.className = 'message-chumhandle';
     chumhandleEl.textContent = `[${toChumhandle(author)}]: `;
-    (window as any).makeUsernameClickable?.(chumhandleEl, '', author);
+    window.makeUsernameClickable?.(chumhandleEl, '', author);
 
     const contentEl = document.createElement('div');
     contentEl.className = 'message-content';
@@ -1106,9 +1101,7 @@
 
     // Register with reaction observer for lazy loading
     if (messageId) {
-      const svc = (window as any).reactionService as
-        | { observeMessage(el: HTMLElement): void }
-        | undefined;
+      const svc = window.reactionService;
       if (svc) {
         requestAnimationFrame(() => svc.observeMessage(messageDiv));
       }
@@ -1168,5 +1161,5 @@
   window.formatTimestamp = formatTimestamp;
   window.formatRelativeTimestamp = formatRelativeTimestamp;
   window.toChumhandle = toChumhandle;
-  (window as any).resolveMentions = resolveMentions;
+  window.resolveMentions = resolveMentions;
 })();

@@ -181,4 +181,4 @@ class CssHotReloader {
 const cssHotReloader = new CssHotReloader();
 
 // Make available globally for other scripts
-(window as any).cssHotReloader = cssHotReloader;
+window.cssHotReloader = cssHotReloader;

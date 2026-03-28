@@ -268,7 +268,7 @@
       return response.data.distributionId;
     }
     // Fail fast: if the DB itself is unavailable, no point trying StoreDistributionId
-    if (!response.success && (response as any).error?.includes('Signal database not available')) {
+    if (!response.success && response.error?.includes('Signal database not available')) {
       throw new Error('Signal database not available');
     }
     // DB is available but no ID stored yet — create a fresh one
@@ -721,7 +721,7 @@
    * and distribute envelopes to all current member devices.
    */
   async function handleCrkRotation(emberId: string, epochNumber: number): Promise<void> {
-    const historyCrypto = (window as any).historyCryptoService;
+    const historyCrypto = window.App?.historyCryptoService;
     if (!historyCrypto) return;
 
     try {
@@ -882,7 +882,7 @@
         const draggedEl = list?.querySelector<HTMLElement>(
           `.server-icon[data-ember-id="${draggedId}"]`
         );
-        if (draggedEl) list!.insertBefore(draggedEl, serverIcon);
+        if (draggedEl && list) list.insertBefore(draggedEl, serverIcon);
         saveEmberOrder();
       });
 
@@ -972,7 +972,7 @@
       await distributeSenderKeyToMembers(emberId, auth);
 
       // Prefetch CRK for Layer 2 history key decryption
-      const historyCrypto = (window as any).historyCryptoService;
+      const historyCrypto = window.App?.historyCryptoService;
       if (historyCrypto) {
         const epoch = await historyCrypto.getCurrentEpoch(emberId);
         const existingCrk = await historyCrypto.getCrk(emberId, epoch);
@@ -1313,7 +1313,11 @@
           }
           canvas.width = maxWidth;
           canvas.height = maxHeight;
-          const ctx = canvas.getContext('2d')!;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get 2d canvas context'));
+            return;
+          }
           ctx.fillStyle = '#2f3136';
           ctx.fillRect(0, 0, maxWidth, maxHeight);
           ctx.drawImage(img, (maxWidth - width) / 2, (maxHeight - height) / 2, width, height);
@@ -1397,7 +1401,7 @@
 
         // Initialize Layer 2 CRK (epoch 0) for history key encryption
         try {
-          const historyCrypto = (window as any).historyCryptoService;
+          const historyCrypto = window.App?.historyCryptoService;
           log.debug('CRK init check', { hasHistoryCrypto: !!historyCrypto, emberId: newEmber.id });
           if (historyCrypto) {
             const auth = await window.getValidAuth?.();
@@ -1912,9 +1916,9 @@
       }
 
       // Build update request with only changed fields
-      const updates: any = {};
+      const updates: { name?: string; iconData?: string } = {};
       if (nameChanged) updates.name = emberName;
-      if (iconChanged) updates.iconData = App.currentIconData;
+      if (iconChanged) updates.iconData = App.currentIconData ?? undefined;
 
       const updatedEmber = await window.electronAPI.emberService.updateEmber(
         auth,

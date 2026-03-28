@@ -303,7 +303,8 @@ class DMPerformanceOptimizer {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
     }
-    this.eventListeners.get(event)!.push(callback);
+    const listeners = this.eventListeners.get(event);
+    if (listeners) listeners.push(callback);
   }
 
   /**
@@ -322,7 +323,7 @@ class DMPerformanceOptimizer {
   /**
    * Emit event
    */
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: unknown): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.forEach(callback => {
@@ -414,13 +415,20 @@ class DMPerformanceOptimizer {
       // Create a Set for efficient duplicate checking
       const existingMessageIds = new Set(conversation.messages.map(m => m.id));
 
-      const messages: DMMessageCache[] = data.messages.map((msg: any) => ({
+      interface ServerMessage {
+        id: string;
+        conversationId: string;
+        senderId: string;
+        ciphertext: string;
+        createdAt: string;
+      }
+      const messages: DMMessageCache[] = (data.messages as ServerMessage[]).map(msg => ({
         id: msg.id,
-        conversationId: msg.conversation_id,
-        senderId: msg.sender_id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
         content: msg.ciphertext,
-        timestamp: new Date(msg.created_at).getTime(),
-        isOwn: msg.sender_id === currentUserId,
+        timestamp: new Date(msg.createdAt).getTime(),
+        isOwn: msg.senderId === currentUserId,
         isLoading: true,
       }));
 
@@ -628,4 +636,4 @@ class DMPerformanceOptimizer {
 }
 
 // Export for use in the DM manager
-(window as any).DMPerformanceOptimizer = DMPerformanceOptimizer;
+window.DMPerformanceOptimizer = DMPerformanceOptimizer;

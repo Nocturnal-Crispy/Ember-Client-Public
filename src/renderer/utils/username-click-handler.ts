@@ -24,7 +24,7 @@
     el.addEventListener('click', e => {
       e.stopPropagation();
       log.debug('Username clicked', { userId, username });
-      (window as any).openUserDetailsModal?.(userId, username);
+      window.openUserDetailsModal?.(userId, username);
     });
   }
 

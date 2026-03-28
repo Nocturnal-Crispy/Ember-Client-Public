@@ -33,7 +33,7 @@ interface SignalSessionManagerInterface {
 
 class SignalSessionManager implements SignalSessionManagerInterface {
   private readonly auth: AuthData;
-  private signalService: any;
+  private signalService: SignalSessionManagerInterface | null = null;
   private isInitialized = false;
 
   constructor(auth: AuthData) {
@@ -41,10 +41,13 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     this.auth = auth;
 
     // Use global references to work with script loading system
-    if (!(window as any).SignalService) {
+    if (!(window as unknown as Record<string, unknown>)['SignalService']) {
       throw new Error('SignalService not available - check script loading order');
     }
-    this.signalService = new (window as any).SignalService(auth);
+    const SignalServiceCtor = (
+      window as unknown as { SignalService: new (auth: AuthData) => SignalSessionManagerInterface }
+    ).SignalService;
+    this.signalService = new SignalServiceCtor(auth);
     this.isInitialized = true;
   }
 
@@ -81,6 +84,16 @@ class SignalSessionManager implements SignalSessionManagerInterface {
   }
 
   /**
+   * Return the SignalService instance, throwing if not initialized
+   */
+  private getService(): SignalSessionManagerInterface {
+    if (!this.signalService) {
+      throw new Error('SignalSessionManager is not initialized');
+    }
+    return this.signalService;
+  }
+
+  /**
    * Validate address format (userId.deviceId)
    */
   private validateAddressFormat(address: string): void {
@@ -92,7 +105,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
   /**
    * Validate required parameters for operations
    */
-  private validateRequiredParams(params: Record<string, any>, required: string[]): void {
+  private validateRequiredParams(params: Record<string, unknown>, required: string[]): void {
     for (const param of required) {
       if (!params[param]) {
         throw new Error(`${param} is required`);
@@ -124,7 +137,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     }
 
     try {
-      return await this.signalService.hasSession(userId, deviceId);
+      return await this.getService().hasSession(userId, deviceId);
     } catch (error) {
       throw new Error(
         `Failed to check session existence: ${error instanceof Error ? error.message : String(error)}`
@@ -144,7 +157,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     }
 
     try {
-      await this.signalService.ensureSession(userId, deviceId);
+      await this.getService().ensureSession(userId, deviceId);
     } catch (error) {
       throw new Error(
         `Failed to ensure session: ${error instanceof Error ? error.message : String(error)}`
@@ -165,7 +178,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     this.validateAddressFormat(recipientAddress);
 
     return this.wrapSignalServiceCall('encrypt message', () =>
-      this.signalService.encrypt(recipientAddress, plaintext)
+      this.getService().encrypt(recipientAddress, plaintext)
     );
   }
 
@@ -193,7 +206,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     }
 
     try {
-      return await this.signalService.decrypt(senderAddress, ciphertext, messageType);
+      return await this.getService().decrypt(senderAddress, ciphertext, messageType);
     } catch (error) {
       throw new Error(
         `Failed to decrypt message: ${error instanceof Error ? error.message : String(error)}`
@@ -210,7 +223,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     this.validateRequiredParams({ distributionId, plaintext }, ['distributionId', 'plaintext']);
 
     return this.wrapSignalServiceCall('encrypt group message', async () => {
-      const result = await this.signalService.groupEncrypt(distributionId, plaintext);
+      const result = await this.getService().groupEncrypt(distributionId, plaintext);
 
       // Handle null/undefined result as encryption not ready
       if (!result) {
@@ -239,7 +252,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     }
 
     try {
-      return await this.signalService.groupDecrypt(senderAddress, ciphertext);
+      return await this.getService().groupDecrypt(senderAddress, ciphertext);
     } catch (error) {
       throw new Error(
         `Failed to decrypt group message: ${error instanceof Error ? error.message : String(error)}`
@@ -258,7 +271,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     }
 
     try {
-      return await this.signalService.createSenderKeyDistribution(distributionId);
+      return await this.getService().createSenderKeyDistribution(distributionId);
     } catch (error) {
       throw new Error(
         `Failed to create sender key distribution: ${error instanceof Error ? error.message : String(error)}`
@@ -282,7 +295,7 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     this.validateAddressFormat(senderAddress);
 
     return this.wrapSignalServiceCall('process sender key distribution', () =>
-      this.signalService.processSenderKeyDistribution(senderAddress, distributionMessage)
+      this.getService().processSenderKeyDistribution(senderAddress, distributionMessage)
     );
   }
 
@@ -307,13 +320,14 @@ class SignalSessionManager implements SignalSessionManagerInterface {
     this.isInitialized = false;
 
     // Clean up signal service if it has cleanup method
-    if (this.signalService && typeof (this.signalService as any).destroy === 'function') {
-      (this.signalService as any).destroy();
+    const svc = this.signalService as unknown as Record<string, unknown>;
+    if (svc && typeof svc['destroy'] === 'function') {
+      (svc['destroy'] as () => void)();
     }
 
-    this.signalService = null as any;
+    this.signalService = null;
   }
 }
 
 // Export SignalSessionManager globally for compatibility with script loading
-(window as any).SignalSessionManager = SignalSessionManager;
+(window as unknown as Record<string, unknown>).SignalSessionManager = SignalSessionManager;

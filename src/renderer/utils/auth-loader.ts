@@ -23,8 +23,8 @@ async function getValidAuth(): Promise<AuthData | null> {
     resp.success && resp.data
       ? {
           token: resp.data.token,
-          userId: (resp.data as any).userId ?? (resp.data as any).user_id,
-          deviceId: (resp.data as any).deviceId ?? (resp.data as any).device_id,
+          userId: resp.data.userId,
+          deviceId: resp.data.deviceId,
           hostname: resp.data.hostname,
           username: resp.data.username,
         }

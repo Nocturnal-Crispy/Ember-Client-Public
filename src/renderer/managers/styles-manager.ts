@@ -121,7 +121,7 @@
   }
 
   // Load Style
-  (window as any).initUIStyleState = function (): void {
+  (window as unknown as Record<string, unknown>).initUIStyleState = function (): void {
     const savedStyle = localStorage.getItem('ember_ui_style_pref') || 'modern';
     console.log('Global initUIStyleState loading:', savedStyle);
     applyUIStyle(savedStyle);
@@ -193,5 +193,5 @@ document.addEventListener("mousedown", (e) => {
   applyShadows();
   /*  applyMemberListState(); */
 
-  (window as any).initStylesSettings = initStylesSettings;
+  (window as unknown as Record<string, unknown>).initStylesSettings = initStylesSettings;
 })();

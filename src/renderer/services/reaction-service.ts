@@ -76,7 +76,7 @@
     ): Promise<{ ciphertext: string; nonce: string; epoch: number } | null>;
     decrypt(emberId: string, ct: string, nonce: string, epoch: number): Promise<string | null>;
   } | null {
-    return (window as any).historyCryptoService ?? null;
+    return window.historyCryptoService ?? null;
   }
 
   async function encryptReaction(
@@ -183,7 +183,7 @@
       const key = ev.emoji;
       if (ev.action === 'add') {
         if (!userReactions.has(key)) userReactions.set(key, new Set());
-        userReactions.get(key)!.add(ev.senderUserId);
+        userReactions.get(key)?.add(ev.senderUserId);
       } else if (ev.action === 'remove') {
         userReactions.get(key)?.delete(ev.senderUserId);
       }
@@ -316,9 +316,9 @@
     moreBtn.addEventListener('click', e => {
       e.stopPropagation();
       closeQuickReactionTray();
-      const openPickerWithCallback = (window as any).openEmojiPickerWithCallback as
+      const openPickerWithCallback:
         | ((trigger: HTMLElement, callback: (emoji: string) => void) => void)
-        | undefined;
+        | undefined = window.openEmojiPickerWithCallback;
       if (openPickerWithCallback) {
         openPickerWithCallback(trigger, (emoji: string) => {
           toggleReaction(messageId, emoji);
@@ -638,7 +638,7 @@
 
   // ── Public API ───────────────────────────────────────────────────────────
 
-  (window as any).reactionService = {
+  window.reactionService = {
     addReaction,
     removeReaction,
     toggleReaction,

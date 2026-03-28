@@ -34,7 +34,13 @@ import {
 } from './update-downloader';
 import { isDev } from './dev';
 import { KLIPPY_API_KEY } from './api-key';
-import { VoiceVideoSettings, ThemeSettings, StoreSchema, GifFavorite } from '../shared/types';
+import {
+  VoiceVideoSettings,
+  ThemeSettings,
+  StoreSchema,
+  GifFavorite,
+  AuthData,
+} from '../shared/types';
 import { openSignalDatabase, ensureSignalDatabaseFile, getSignalDbFilename } from './signal-db';
 import type { SignalDatabase } from './signal-db';
 import { registerEmberIpcHandlers, updateSignalDatabase } from './ipc/ember-ipc';
@@ -100,26 +106,26 @@ function sanitizeThemeSettings(saved: Partial<ThemeSettings>): ThemeSettings {
   }
 
   if (isValidRgbString(saved.accentRgb)) {
-    result.accentRgb = saved.accentRgb!;
+    result.accentRgb = saved.accentRgb as string;
   } else if (saved.accentRgb !== undefined) {
     repairedFields.push('accentRgb');
   }
 
   if (isValidRgbString(saved.backgroundRgb)) {
-    result.backgroundRgb = saved.backgroundRgb!;
+    result.backgroundRgb = saved.backgroundRgb as string;
   } else if (saved.backgroundRgb !== undefined) {
     repairedFields.push('backgroundRgb');
   }
 
   if (isValidRgbString(saved.surfaceRgb)) {
-    result.surfaceRgb = saved.surfaceRgb!;
+    result.surfaceRgb = saved.surfaceRgb as string;
   } else if (saved.surfaceRgb !== undefined) {
     repairedFields.push('surfaceRgb');
   }
 
   // chatColor is optional; validate against safe CSS color formats
   if (isValidCssColor(saved.chatColor)) {
-    result.chatColor = saved.chatColor!;
+    result.chatColor = saved.chatColor as string;
   } else if (saved.chatColor !== undefined) {
     repairedFields.push('chatColor');
   }
@@ -406,7 +412,7 @@ async function reinitializeSignalDatabase(): Promise<boolean> {
   }
 
   // Get current auth data
-  const authData = store.get('auth') as any;
+  const authData = store.get('auth') as AuthData | undefined;
   let privateKeyBytes: Buffer | null = null;
   let localIdentityPrivateKeyBytes: Buffer | null = null;
   let localRegistrationId: number | null = null;
@@ -550,7 +556,7 @@ function checkSafeStorageAtStartup(): void {
   const hasStoredKey = !!store.get('device');
 
   // Check for Signal identity keys in safeStorage
-  const authData = store.get('auth') as any;
+  const authData = store.get('auth') as AuthData | undefined;
   let hasSignalKeys = false;
   if (authData && authData.userId && authData.deviceId) {
     // We can't check async functions here, but we'll assume there might be keys
@@ -1482,7 +1488,7 @@ if (!gotTheLock) {
     // ── Early Signal database check ──────────────────────────────────────────
     // Verify that better-sqlite3 loads correctly. If we have auth data, check
     // the user-scoped DB file; otherwise just check the native module works.
-    const startupAuth = store.get('auth') as any;
+    const startupAuth = store.get('auth') as AuthData | undefined;
     try {
       if (startupAuth?.userId && startupAuth?.deviceId) {
         const startupDbFilename = getSignalDbFilename(startupAuth.userId, startupAuth.deviceId);

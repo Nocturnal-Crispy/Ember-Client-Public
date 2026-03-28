@@ -244,9 +244,9 @@ class VoiceManager {
         // for remote participants at the end rather than reordering existing ones.
         // addTrack (sendrecv) causes ion-SFU renegotiation offers to reorder
         // m-lines, which Chrome rejects with an InvalidAccessError.
-        this.peerConnection!.addTransceiver(track, {
+        this.peerConnection?.addTransceiver(track, {
           direction: 'sendonly',
-          streams: [this.localStream!],
+          streams: this.localStream ? [this.localStream] : [],
         });
         _voiceLog.debug('Local track added to peer connection', {
           kind: track.kind,
@@ -558,10 +558,12 @@ class VoiceManager {
     // Remove mappings for users who are no longer sharing.
     for (const [userId] of this._userToScreenStreamId) {
       if (!activeScreenSids.has(userId)) {
-        const streamId = this._userToScreenStreamId.get(userId)!;
-        this._screenStreamIdToUser.delete(streamId);
+        const streamId = this._userToScreenStreamId.get(userId);
+        if (streamId) {
+          this._screenStreamIdToUser.delete(streamId);
+          this.remoteScreenStreams.delete(streamId);
+        }
         this._userToScreenStreamId.delete(userId);
-        this.remoteScreenStreams.delete(streamId);
       }
     }
     if (this.onParticipantsChanged) this.onParticipantsChanged(participants);
@@ -643,10 +645,7 @@ class VoiceManager {
     }
 
     try {
-      const ctx = new (
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      )();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const source = ctx.createMediaStreamSource(this.localStream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
@@ -1364,10 +1363,7 @@ function generateNotificationSound(type: string): void {
   if (!def) return;
 
   try {
-    const ctx = new (
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    )();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const freqs = def.freq;
     const durs = def.dur;
     let t = ctx.currentTime + 0.01;
@@ -1399,9 +1395,5 @@ function generateNotificationSound(type: string): void {
 }
 
 // Export to window for use by voice-ui-manager and renderer
-(window as unknown as { VoiceManager: typeof VoiceManager }).VoiceManager = VoiceManager;
-(
-  window as unknown as {
-    generateNotificationSound: typeof generateNotificationSound;
-  }
-).generateNotificationSound = generateNotificationSound;
+window.VoiceManager = VoiceManager;
+window.generateNotificationSound = generateNotificationSound;

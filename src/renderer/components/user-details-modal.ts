@@ -57,7 +57,7 @@
 
   function populateModal(userId: string, username: string): void {
     // Look up member details from cache
-    const member = (window as any).getUserDetails?.(userId) as Member | null;
+    const member = window.getUserDetails?.(userId) ?? null;
 
     // Username
     setText('user-details-username', member?.username ?? username);
@@ -115,10 +115,7 @@
     }
 
     // Voice channel
-    const voiceInfo = (window as any).getUserVoiceChannel?.(userId) as {
-      channelId: string;
-      channelName: string;
-    } | null;
+    const voiceInfo = window.getUserVoiceChannel?.(userId) ?? null;
 
     if (voiceInfo) {
       setText('user-details-voice', `In voice: ${voiceInfo.channelName}`);
@@ -145,10 +142,7 @@
   function openUserDetailsModal(userId: string, username: string): void {
     // If userId was not available at click-wiring time (e.g. chumhandles wired before
     // currentMembers loaded), resolve it now via username lookup.
-    const resolvedId =
-      userId ||
-      ((window as any).getUserDetailsByUsername?.(username) as Member | null)?.userId ||
-      '';
+    const resolvedId = userId || window.getUserDetailsByUsername?.(username)?.userId || '';
     log.debug('Opening user details modal', { userId: resolvedId, username });
     currentUserId = resolvedId;
     currentUsername = username;
@@ -210,8 +204,8 @@
         const username = currentUsername;
         log.info('Opening DM from user details modal', { userId });
         closeUserDetailsModal();
-        (window as any).openDMScreen?.();
-        (window as any).openDmWithUser?.(userId, username);
+        window.openDMScreen?.();
+        window.openDmWithUser?.(userId, username);
       }
     });
 
@@ -285,7 +279,7 @@
   // ─── Kick member API call ───────────────────────────────────────────────────
 
   async function kickMember(emberId: string, userId: string): Promise<void> {
-    const target = (window as any).getUserDetails?.(userId) as Member | null;
+    const target = window.getUserDetails?.(userId) ?? null;
     if (target?.role === 'owner') {
       log.warn('Kick attempted on owner, blocked client-side', { userId });
       return;

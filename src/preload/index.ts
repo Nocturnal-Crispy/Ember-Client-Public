@@ -1,4 +1,10 @@
-import type { AuthData, SignalDeviceCredentials, EmberCmd, EmberIpcResponse } from '../shared';
+import type {
+  AuthData,
+  SignalDeviceCredentials,
+  EmberCmd,
+  EmberIpcResponse,
+  UpdateEmberRequest,
+} from '../shared';
 import { contextBridge, ipcRenderer } from 'electron';
 import * as emberServices from '../shared';
 import * as nodeCrypto from 'crypto';
@@ -435,7 +441,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emberService: {
     fetchEmbers: (auth: unknown) => emberServices.fetchEmbers(auth as AuthData),
     updateEmber: (auth: unknown, emberId: string, updates: unknown) =>
-      emberServices.updateEmber(auth as AuthData, emberId, updates as any),
+      emberServices.updateEmber(auth as AuthData, emberId, updates as UpdateEmberRequest),
   },
 
   channelService: {

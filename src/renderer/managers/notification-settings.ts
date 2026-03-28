@@ -31,8 +31,7 @@
   function playNotificationSound(type: string): void {
     const settings = loadSettings();
     if (!settings.messageSound) return;
-    const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
-      .generateNotificationSound;
+    const gen = window.generateNotificationSound;
     if (typeof gen === 'function') {
       gen(type);
     }
@@ -49,8 +48,7 @@
     if (messageToggle) messageToggle.checked = settings.messageSound;
 
     previewBtn?.addEventListener('click', () => {
-      const gen = (window as unknown as { generateNotificationSound?: (t: string) => void })
-        .generateNotificationSound;
+      const gen = window.generateNotificationSound;
       if (typeof gen === 'function') gen('dmMessage');
     });
 

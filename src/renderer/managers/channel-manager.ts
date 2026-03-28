@@ -82,7 +82,7 @@
     const channelsByCategory: Record<string, Channel[]> = channels
       .filter(ch => ch.categoryId)
       .reduce<Record<string, Channel[]>>((acc, ch) => {
-        const catId = ch.categoryId!;
+        const catId = ch.categoryId as string;
         return { ...acc, [catId]: [...(acc[catId] ?? []), ch] };
       }, {});
 
@@ -513,17 +513,14 @@
   document.getElementById('delete-modal-cancel-btn')?.addEventListener('click', () => {
     document.getElementById('delete-confirm-modal')?.classList.add('hidden');
     App.contextMenuTarget = null;
-    (window as any).pendingMessageDelete = null;
+    window.pendingMessageDelete = null;
   });
 
   document.getElementById('delete-modal-confirm-btn')?.addEventListener('click', async () => {
     // Handle message deletion (set by createActionToolbar delete button)
-    const pendingMsgDelete = (window as any).pendingMessageDelete as {
-      messageId: string;
-      channelId: string;
-    } | null;
+    const pendingMsgDelete = window.pendingMessageDelete;
     if (pendingMsgDelete) {
-      (window as any).pendingMessageDelete = null;
+      window.pendingMessageDelete = null;
       const msgDeleteBtn = document.getElementById(
         'delete-modal-confirm-btn'
       ) as HTMLButtonElement | null;

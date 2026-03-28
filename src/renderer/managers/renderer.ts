@@ -8,13 +8,13 @@
   // Wait for electronAPI to be available
   function waitForElectronAPI(): Promise<void> {
     return new Promise(resolve => {
-      if ((window as any).electronAPI) {
+      if (window.electronAPI) {
         resolve();
         return;
       }
 
       const checkInterval = setInterval(() => {
-        if ((window as any).electronAPI) {
+        if (window.electronAPI) {
           clearInterval(checkInterval);
           resolve();
         }
@@ -33,12 +33,12 @@
   waitForElectronAPI().then(() => {
     console.log('[renderer] electronAPI available, initializing...');
 
-    const ipcRenderer = (window as any).electronAPI.ipc;
-    const log = (window as any).emberLog.createLogger('Renderer');
-    const App = (window as any).App;
+    const ipcRenderer = window.electronAPI.ipc;
+    const log = window.emberLog.createLogger('Renderer');
+    const App = window.App;
 
-    console.log('[renderer] window.electronAPI:', (window as any).electronAPI);
-    console.log('[renderer] window.emberLog:', (window as any).emberLog);
+    console.log('[renderer] window.electronAPI:', window.electronAPI);
+    console.log('[renderer] window.emberLog:', window.emberLog);
 
     const messageInput = document.getElementById('messageInput') as HTMLTextAreaElement | null;
 
@@ -92,7 +92,8 @@
     }
 
     function toggleDMScreen() {
-      if (dmScreen!.classList.contains('active')) {
+      if (!dmScreen) return;
+      if (dmScreen.classList.contains('active')) {
         closeDMScreen();
       } else {
         openDMScreen();
@@ -100,8 +101,9 @@
     }
 
     function openDMScreen() {
-      dmScreen!.classList.add('active');
-      dmIcon!.classList.add('active');
+      if (!dmScreen || !dmIcon) return;
+      dmScreen.classList.add('active');
+      dmIcon.classList.add('active');
 
       // Add class to body for CSS targeting
       document.body.classList.add('dm-screen-open');
@@ -154,8 +156,9 @@
     }
 
     function closeDMScreen() {
-      dmScreen!.classList.remove('active');
-      dmIcon!.classList.remove('active');
+      if (!dmScreen || !dmIcon) return;
+      dmScreen.classList.remove('active');
+      dmIcon.classList.remove('active');
 
       // Remove class from body
       document.body.classList.remove('dm-screen-open');
@@ -208,7 +211,7 @@
 
     // Function to close DM screen when switching to server
     function closeDMScreenOnServerSwitch() {
-      if (dmScreen!.classList.contains('active')) {
+      if (dmScreen?.classList.contains('active')) {
         closeDMScreen();
       }
     }
@@ -283,8 +286,8 @@
       const spoilerToggle = document.createElement('button');
       spoilerToggle.className = 'attachment-spoiler-toggle';
       spoilerToggle.title = 'Mark as spoiler';
-      spoilerToggle.textContent = App.pendingAttachment!.spoiler ? '🔒 spoiler' : '🔓 spoiler';
-      if (App.pendingAttachment!.spoiler)
+      spoilerToggle.textContent = App.pendingAttachment?.spoiler ? '🔒 spoiler' : '🔓 spoiler';
+      if (App.pendingAttachment?.spoiler)
         spoilerToggle.classList.add('attachment-spoiler-toggle--active');
       spoilerToggle.addEventListener('click', () => {
         if (!App.pendingAttachment) return;
@@ -342,7 +345,7 @@
     }
 
     window.clearPendingAttachment = clearPendingAttachment;
-    (window as any).showInputError = showAttachmentError;
+    window.showInputError = showAttachmentError;
 
     // ─── Image viewer lightbox ───────────────────────────────────────────────────
 
@@ -367,7 +370,7 @@
       const ZOOM_STEP = 0.25;
 
       function applyTransform(): void {
-        img!.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        if (img) img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
         if (zoomLbl) zoomLbl.textContent = `${Math.round(scale * 100)}%`;
       }
 
@@ -464,8 +467,8 @@
 
       // Close handlers
       function closeViewer(): void {
-        overlay!.classList.add('hidden');
-        img!.src = '';
+        if (overlay) overlay.classList.add('hidden');
+        if (img) img.src = '';
       }
 
       btnClose?.addEventListener('click', closeViewer);
@@ -479,7 +482,7 @@
       });
 
       // Public API
-      (window as any).openImageViewer = function (src: string, name: string): void {
+      window.openImageViewer = function (src: string, name: string): void {
         if (!img) return;
         img.src = src;
         img.alt = name;
@@ -506,7 +509,7 @@
 
       let pendingUrl = '';
 
-      (window as any).openExternalLinkModal = function (url: string): void {
+      window.openExternalLinkModal = function (url: string): void {
         pendingUrl = url;
         if (urlEl) urlEl.textContent = url;
         if (openBtn) {
@@ -546,7 +549,7 @@
     if (emojiBtn && messageInput) {
       emojiBtn.addEventListener('click', e => {
         e.stopPropagation();
-        (window as any).openEmojiPicker(emojiBtn, messageInput);
+        window.openEmojiPicker(emojiBtn, messageInput);
       });
     }
 
@@ -627,10 +630,10 @@
             e.preventDefault();
             const rawText = messageInput.value.trim();
             const plaintext =
-              typeof (window as any).resolveMentions === 'function'
-                ? (window as any).resolveMentions(rawText)
+              typeof window.resolveMentions === 'function'
+                ? window.resolveMentions(rawText)
                 : rawText;
-            if (plaintext || App.pendingAttachment) {
+            if ((plaintext || App.pendingAttachment) && App.activeChannelId) {
               messageInput.value = '';
               await window.sendEncryptedMessage(App.activeChannelId, plaintext);
             }
@@ -645,10 +648,10 @@
           if (!messageInput) return;
           const rawText = messageInput.value.trim();
           const plaintext =
-            typeof (window as any).resolveMentions === 'function'
-              ? (window as any).resolveMentions(rawText)
+            typeof window.resolveMentions === 'function'
+              ? window.resolveMentions(rawText)
               : rawText;
-          if (plaintext || App.pendingAttachment) {
+          if ((plaintext || App.pendingAttachment) && App.activeChannelId) {
             messageInput.value = '';
             await window.sendEncryptedMessage(App.activeChannelId, plaintext);
           }
@@ -750,7 +753,7 @@
       const remaining = Math.max(0, 60 - Math.floor(elapsed / 1000));
       reconnectionTimer.textContent = `Time remaining: ${remaining}s`;
       if (remaining === 0) {
-        clearInterval(App.reconnectionTimerInterval!);
+        if (App.reconnectionTimerInterval) clearInterval(App.reconnectionTimerInterval);
         App.reconnectionTimerInterval = null;
       }
     }
@@ -779,7 +782,7 @@
 
       // Clear history crypto service
       App.historyCryptoService = null;
-      (window as any).historyCryptoService = null;
+      window.historyCryptoService = null;
 
       // Clean up DM event listeners to prevent leaks across sessions
       if (typeof window.cleanupDirectMessaging === 'function') {
@@ -1013,7 +1016,7 @@
         e.stopPropagation();
         if (!emojiInput) return;
         emojiInput.value = '';
-        (window as any).openEmojiPicker(emojiBtn, emojiInput);
+        window.openEmojiPicker(emojiBtn, emojiInput);
       });
 
       // When emoji picker inserts into the hidden input, mirror to button face
@@ -1195,12 +1198,12 @@
           return [];
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as { members?: Member[] };
         log.debug('Members API response data', {
           memberCount: data.members?.length || 0,
           members:
-            data.members?.map((m: any) => ({
-              user_id: m.user_id,
+            data.members?.map((m: Member) => ({
+              userId: m.userId,
               username: m.username,
               status: m.status,
             })) || [],
@@ -1292,7 +1295,7 @@
             nameEl.appendChild(crown);
           }
           // Make the entire member div clickable to open the user details modal.
-          (window as any).makeUsernameClickable?.(memberEl, member.userId, member.username ?? '');
+          window.makeUsernameClickable?.(memberEl, member.userId, member.username ?? '');
 
           if (member.customStatus) {
             const customStatusEl = document.createElement('span');

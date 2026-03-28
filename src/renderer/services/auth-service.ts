@@ -136,14 +136,18 @@
     }
 
     if (elements.passwordToggle && elements.password) {
-      elements.passwordToggle.addEventListener('click', () => {
-        togglePasswordVisibility(elements.password!, elements.passwordToggle!);
+      const pwInput = elements.password;
+      const pwToggle = elements.passwordToggle;
+      pwToggle.addEventListener('click', () => {
+        togglePasswordVisibility(pwInput, pwToggle);
       });
     }
 
     if (elements.confirmPasswordToggle && elements.confirmPassword) {
-      elements.confirmPasswordToggle.addEventListener('click', () => {
-        togglePasswordVisibility(elements.confirmPassword!, elements.confirmPasswordToggle!);
+      const confirmInput = elements.confirmPassword;
+      const confirmToggle = elements.confirmPasswordToggle;
+      confirmToggle.addEventListener('click', () => {
+        togglePasswordVisibility(confirmInput, confirmToggle);
       });
     }
 
@@ -290,7 +294,8 @@
 
     let signalIdentity;
     try {
-      signalIdentity = (await window.electronAPI.authService.generateDeviceIdentity()) as any;
+      signalIdentity =
+        (await window.electronAPI.authService.generateDeviceIdentity()) as unknown as SignalDeviceCredentials;
     } catch (error) {
       log.error('Failed to generate device identity', { error: (error as Error).message });
       throw new Error(`Failed to generate device identity: ${(error as Error).message}`);
@@ -353,20 +358,23 @@
         return;
       }
 
-      modal.classList.remove('hidden');
-      codeInput.value = '';
-      codeInput.focus();
+      const verifiedLoginModal = modal;
+      const verifiedLoginCodeInput = codeInput;
+
+      verifiedLoginModal.classList.remove('hidden');
+      verifiedLoginCodeInput.value = '';
+      verifiedLoginCodeInput.focus();
       if (errorEl) errorEl.classList.add('hidden');
 
       function cleanup(): void {
-        modal!.classList.add('hidden');
+        verifiedLoginModal.classList.add('hidden');
         if (submitBtn) submitBtn.removeEventListener('click', onSubmit);
         if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
-        if (codeInput) codeInput.removeEventListener('keydown', onKeydown);
+        verifiedLoginCodeInput.removeEventListener('keydown', onKeydown);
       }
 
       function onSubmit(): void {
-        const code = codeInput!.value.trim();
+        const code = verifiedLoginCodeInput.value.trim();
         if (!code) {
           if (errorEl) {
             errorEl.textContent = 'Please enter your 2FA code';
@@ -390,7 +398,7 @@
 
       if (submitBtn) submitBtn.addEventListener('click', onSubmit);
       if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
-      codeInput.addEventListener('keydown', onKeydown);
+      verifiedLoginCodeInput.addEventListener('keydown', onKeydown);
     });
   }
 
@@ -415,15 +423,18 @@
         return;
       }
 
+      const verifiedSetupModal = modal;
+      const verifiedSetupCodeInput = codeInput;
+
       let backupCodes: string[] = [];
 
       function cleanup(): void {
-        modal!.classList.add('hidden');
+        verifiedSetupModal.classList.add('hidden');
         if (verifyBtn) verifyBtn.removeEventListener('click', onVerify);
         if (closeBtn) closeBtn.removeEventListener('click', onClose);
         if (doneBtn) doneBtn.removeEventListener('click', onDone);
         if (copyBtn) copyBtn.removeEventListener('click', onCopy);
-        if (codeInput) codeInput.removeEventListener('keydown', onKeydown);
+        verifiedSetupCodeInput.removeEventListener('keydown', onKeydown);
       }
 
       function onClose(): void {
@@ -449,7 +460,7 @@
       }
 
       async function onVerify(): Promise<void> {
-        const code = codeInput!.value.trim();
+        const code = verifiedSetupCodeInput.value.trim();
         if (!code || code.length !== 6) {
           if (errorEl) {
             errorEl.textContent = 'Please enter a 6-digit code';
@@ -576,6 +587,8 @@
 
     if (!modal || !recoveryLink) return;
 
+    const verifiedRecoveryModal = modal;
+
     function showMode(mode: 'select' | 'device' | 'password'): void {
       if (modeSelect) modeSelect.style.display = mode === 'select' ? 'block' : 'none';
       if (deviceForm) deviceForm.style.display = mode === 'device' ? 'block' : 'none';
@@ -585,18 +598,18 @@
     function openModal(): void {
       // Pre-fill hostname from login form
       const hostname = elements.hostname?.value.trim() ?? '';
-      const hostnameInputs = modal!.querySelectorAll<HTMLInputElement>(
+      const hostnameInputs = verifiedRecoveryModal.querySelectorAll<HTMLInputElement>(
         '#recovery-device-hostname, #recovery-password-hostname'
       );
       hostnameInputs.forEach(input => {
         input.value = hostname;
       });
       showMode('select');
-      modal!.style.display = 'flex';
+      verifiedRecoveryModal.style.display = 'flex';
     }
 
     function closeModal(): void {
-      modal!.style.display = 'none';
+      verifiedRecoveryModal.style.display = 'none';
     }
 
     recoveryLink.addEventListener('click', openModal);
@@ -881,7 +894,7 @@
 
         // Generate a single Signal identity for everything
         const signalIdentity =
-          (await window.electronAPI.authService.generateDeviceIdentity()) as any;
+          (await window.electronAPI.authService.generateDeviceIdentity()) as unknown as SignalDeviceCredentials;
 
         if (
           !signalIdentity ||
@@ -938,10 +951,12 @@
           });
           log.info('Signed prekey uploaded');
 
-          const otpks = signalIdentity.oneTimePreKeys.map((pk: any) => ({
-            id: pk.id,
-            publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
-          }));
+          const otpks = signalIdentity.oneTimePreKeys.map(
+            (pk: { id: number; keyPair: { publicKey: Uint8Array } }) => ({
+              id: pk.id,
+              publicKey: btoa(String.fromCharCode(...new Uint8Array(pk.keyPair.publicKey))),
+            })
+          );
           await fetch(`${hostname}/api/v1/prekeys/one-time`, {
             method: 'POST',
             headers: {

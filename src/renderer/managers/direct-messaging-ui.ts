@@ -104,7 +104,7 @@
         if (!activeConversationId) return;
         const conv = conversations.get(activeConversationId);
         if (conv) {
-          (window as any).openUserDetailsModal?.(conv.participantId, conv.participantUsername);
+          window.openUserDetailsModal?.(conv.participantId, conv.participantUsername);
         }
       });
     }
@@ -209,7 +209,7 @@
             log.error('Failed to send DM GIF', { error: err.message });
           });
         };
-        (window as any).openGifPicker(gifButton);
+        window.openGifPicker(gifButton);
       });
     }
 
@@ -218,7 +218,7 @@
     if (emojiButton && messageInput) {
       emojiButton.addEventListener('click', e => {
         e.stopPropagation();
-        (window as any).openEmojiPicker(emojiButton, messageInput);
+        window.openEmojiPicker(emojiButton, messageInput);
       });
     }
 
@@ -966,8 +966,8 @@
 
     const rawContent = messageInput.value.trim();
     let content =
-      typeof (window as any).resolveMentions === 'function'
-        ? (window as any).resolveMentions(rawContent)
+      typeof window.resolveMentions === 'function'
+        ? window.resolveMentions(rawContent)
         : rawContent;
     if (!content && !dmPendingAttachment) return;
 
@@ -988,8 +988,8 @@
           _authResp.success && _authResp.data
             ? {
                 token: _authResp.data.token,
-                userId: (_authResp.data as any).userId ?? (_authResp.data as any).user_id,
-                deviceId: (_authResp.data as any).deviceId ?? (_authResp.data as any).device_id,
+                userId: _authResp.data.userId,
+                deviceId: _authResp.data.deviceId,
                 hostname: _authResp.data.hostname,
                 username: _authResp.data.username,
               }
@@ -1171,7 +1171,7 @@
     }
 
     const getEmberKey = (cid: string): Promise<Uint8Array | null> =>
-      (window as any).fetchAndCacheEmberKeyForChannel(cid) as Promise<Uint8Array | null>;
+      window.fetchAndCacheEmberKeyForChannel(cid);
 
     const messageElement = window.createBasicMessageElement(
       senderName,
@@ -1330,14 +1330,7 @@
     ) as HTMLElement;
     if (!messageElement) return;
 
-    const svc = (window as any).reactionService as
-      | {
-          renderReactions(
-            el: HTMLElement,
-            reactions: Array<{ emoji: string; count: number; reacted: boolean; users: string[] }>
-          ): void;
-        }
-      | undefined;
+    const svc = window.reactionService;
     if (svc) {
       svc.renderReactions(
         messageElement,

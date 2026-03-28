@@ -751,4 +751,4 @@ class DMAccessibilityEnhancer {
 }
 
 // Export for use in the DM manager
-(window as any).DMAccessibilityEnhancer = DMAccessibilityEnhancer;
+window.DMAccessibilityEnhancer = DMAccessibilityEnhancer;
