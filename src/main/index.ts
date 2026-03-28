@@ -1227,6 +1227,76 @@ ipcMain.handle('open-external-url', async (_event, url: unknown) => {
   await shell.openExternal(url);
 });
 
+// ─── IPC: Link preview ──────────────────────────────────────────────────────
+
+ipcMain.handle('fetch-link-preview', async (_event, url: unknown) => {
+  if (typeof url !== 'string') return null;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return null;
+
+  try {
+    const response = await net.fetch(url, {
+      headers: { 'User-Agent': 'EmberBot/1.0 (+https://ember.chat)' },
+      redirect: 'follow',
+    });
+
+    const ct = response.headers.get('content-type') || '';
+    if (!ct.includes('text/html')) return null;
+
+    const html = await response.text();
+    // Only parse the <head> section (limit how much we scan)
+    const headEnd = html.indexOf('</head>');
+    const headHtml = headEnd > 0 ? html.slice(0, headEnd) : html.slice(0, 512 * 1024);
+
+    const meta = (tag: string): string => {
+      // Match <meta property="og:X" content="Y"> or <meta name="X" content="Y">
+      const re = new RegExp(
+        `<meta[^>]*(?:property|name)=["']${tag}["'][^>]*content=["']([^"']*)["']` +
+          `|<meta[^>]*content=["']([^"']*)["'][^>]*(?:property|name)=["']${tag}["']`,
+        'i'
+      );
+      const m = headHtml.match(re);
+      return m ? m[1] || m[2] || '' : '';
+    };
+
+    const title =
+      meta('og:title') ||
+      meta('twitter:title') ||
+      (headHtml.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] || '').trim();
+    const description = meta('og:description') || meta('twitter:description');
+    const imageUrl = meta('og:image') || meta('twitter:image');
+    const siteName = meta('og:site_name');
+
+    // Resolve favicon
+    const faviconMatch = headHtml.match(
+      /<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["']([^"']*)["']/i
+    );
+    const faviconUrl = faviconMatch?.[1] || '';
+
+    if (!title && !description && !imageUrl) return null;
+
+    // Resolve protocol-relative and relative URLs
+    const resolve = (ref: string): string => {
+      if (!ref) return ref;
+      try {
+        return new URL(ref, url).href;
+      } catch {
+        return ref;
+      }
+    };
+
+    return {
+      url,
+      title,
+      description,
+      imageUrl: resolve(imageUrl),
+      siteName,
+      faviconUrl: resolve(faviconUrl),
+    };
+  } catch {
+    return null;
+  }
+});
+
 // ─── IPC: App lock PIN ────────────────────────────────────────────────────────
 
 ipcMain.handle('has-pin', () => {

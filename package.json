@@ -5,7 +5,7 @@
   "type": "commonjs",
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "npm run inject-key && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && cp -r src/renderer/*.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/ && mkdir -p dist/renderer/assets/icons && cp -r assets/icons/* dist/renderer/assets/icons/",
+    "build": "npm run inject-key && tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && cp -r src/renderer/*.html dist/renderer/ && cp -r src/renderer/styles dist/renderer/ && mkdir -p dist/renderer/assets/icons && cp -r assets/icons/* dist/renderer/assets/icons/ && cp -f assets/Luffy.jpg dist/renderer/assets/Luffy.jpg",
     "inject-key": "./scripts/secure-build.sh --inject-only",
     "secure-build": "./scripts/secure-build.sh",
     "prestart": "electron-rebuild -f -w better-sqlite3",

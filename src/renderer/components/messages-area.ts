@@ -284,6 +284,69 @@
     return wrapper;
   }
 
+  // ─── Link preview card ─────────────────────────────────────────────────────
+
+  function createLinkPreviewCard(data: LinkPreviewData): HTMLElement {
+    const card = document.createElement('div');
+    card.className = 'link-preview-card';
+
+    if (data.siteName || data.faviconUrl) {
+      const siteRow = document.createElement('div');
+      siteRow.className = 'link-preview-site';
+      if (data.faviconUrl) {
+        const favicon = document.createElement('img');
+        favicon.className = 'link-preview-favicon';
+        favicon.src = data.faviconUrl;
+        favicon.width = 16;
+        favicon.height = 16;
+        favicon.alt = '';
+        favicon.addEventListener('error', () => favicon.remove());
+        siteRow.appendChild(favicon);
+      }
+      if (data.siteName) {
+        const name = document.createElement('span');
+        name.textContent = data.siteName;
+        siteRow.appendChild(name);
+      }
+      card.appendChild(siteRow);
+    }
+
+    if (data.title) {
+      const titleEl = document.createElement('a');
+      titleEl.className = 'link-preview-title';
+      titleEl.textContent = data.title.length > 60 ? `${data.title.slice(0, 57)}...` : data.title;
+      titleEl.href = '#';
+      titleEl.addEventListener('click', e => {
+        e.preventDefault();
+        window.openExternalLinkModal?.(data.url);
+      });
+      card.appendChild(titleEl);
+    }
+
+    if (data.description) {
+      const descEl = document.createElement('div');
+      descEl.className = 'link-preview-description';
+      descEl.textContent =
+        data.description.length > 160 ? `${data.description.slice(0, 157)}...` : data.description;
+      card.appendChild(descEl);
+    }
+
+    if (data.imageUrl) {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'link-preview-image';
+      imgEl.src = data.imageUrl;
+      imgEl.loading = 'lazy';
+      imgEl.alt = data.title || '';
+      imgEl.addEventListener('error', () => imgEl.remove());
+      imgEl.addEventListener('click', () => {
+        window.openImageViewer?.(data.imageUrl!, data.title || 'Preview');
+      });
+      card.appendChild(imgEl);
+    }
+
+    return card;
+  }
+
   // ─── Markdown types ──────────────────────────────────────────────────────────
 
   type InlineToken =
@@ -452,6 +515,33 @@
             window.openExternalLinkModal?.(token.value);
           });
           container.appendChild(link);
+
+          // Fetch and render link preview (first URL per message only).
+          // Deferred via queueMicrotask because during createBasicMessageElement
+          // the .message-text div is not yet attached to the .message wrapper,
+          // so closest('.message') would return null synchronously.
+          const previewUrl = token.value;
+          const previewLink = link;
+          queueMicrotask(() => {
+            const msgEl = previewLink.closest('.message');
+            if (!msgEl || msgEl.hasAttribute('data-preview-loaded')) return;
+            msgEl.setAttribute('data-preview-loaded', 'true');
+            window.fetchLinkPreview?.(previewUrl)?.then(preview => {
+              if (!preview) return;
+              const card = createLinkPreviewCard(preview);
+              const reactionsEl = msgEl.querySelector('.message-reactions');
+              if (reactionsEl) {
+                msgEl.insertBefore(card, reactionsEl);
+              } else {
+                msgEl.appendChild(card);
+              }
+              const scrollEl = document.getElementById('messages');
+              if (scrollEl) {
+                const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+                if (gap < 100) scrollEl.scrollTop = scrollEl.scrollHeight;
+              }
+            });
+          });
         }
       } else if (token.type === 'bold') {
         const el = document.createElement('strong');

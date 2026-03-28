@@ -231,6 +231,7 @@ const ALLOWED_INVOKE: readonly string[] = [
   'audio-capture-frames',
   'audio-capture-teardown',
   'open-video-popout',
+  'fetch-link-preview',
   'ember', // Signal Protocol unified IPC channel
 ];
 

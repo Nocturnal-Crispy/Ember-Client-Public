@@ -41,11 +41,21 @@
     const settings = loadSettings();
 
     const messageToggle = document.getElementById('notif-message-sound') as HTMLInputElement | null;
+    const linkPreviewToggle = document.getElementById(
+      'notif-link-preview'
+    ) as HTMLInputElement | null;
     const previewBtn = document.getElementById('notif-message-preview');
     const saveBtn = document.getElementById('notif-save-btn');
     const saveStatus = document.getElementById('notif-save-status');
 
     if (messageToggle) messageToggle.checked = settings.messageSound;
+
+    if (linkPreviewToggle) {
+      linkPreviewToggle.checked = window.isLinkPreviewEnabled?.() ?? true;
+      linkPreviewToggle.addEventListener('change', () => {
+        window.setLinkPreviewEnabled?.(linkPreviewToggle.checked);
+      });
+    }
 
     previewBtn?.addEventListener('click', () => {
       const gen = window.generateNotificationSound;

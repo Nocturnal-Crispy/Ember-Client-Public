@@ -734,6 +734,68 @@
   color: rgba(var(--rgb-text), 0.35);
 }
 
+/* ─── Link preview cards ───────────────────────────────────────────────── */
+
+.link-preview-card {
+  display: block;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--highlight);
+  background: rgba(var(--rgb-highlight), 0.04);
+  border-radius: 0 4px 4px 0;
+  max-width: 400px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.link-preview-site {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(var(--rgb-text), 0.5);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.link-preview-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.link-preview-title {
+  display: block;
+  color: var(--highlight);
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+
+.link-preview-title:hover {
+  text-decoration: underline;
+}
+
+.link-preview-description {
+  color: rgba(var(--rgb-text), 0.7);
+  margin-bottom: 4px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.link-preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 4px;
+  margin-top: 4px;
+  cursor: pointer;
+  object-fit: cover;
+}
+
 /* ─── Markdown rendering in messages ──────────────────────────────────────── */
 
 /* Switch to block layout when a message contains block-level markdown */

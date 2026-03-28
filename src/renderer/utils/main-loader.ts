@@ -28,6 +28,7 @@
     '../../dist/renderer/components/user-details-modal.js',
     '../../dist/renderer/utils/username-click-handler.js',
     '../../dist/renderer/components/messages-area.js',
+    '../../dist/renderer/services/link-preview-service.js',
     '../../dist/renderer/components/format-toolbar.js',
     '../../dist/renderer/services/crypto-routing-service.js',
     '../../dist/renderer/services/message-service.js',

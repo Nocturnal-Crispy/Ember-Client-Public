@@ -950,7 +950,20 @@ declare global {
     DMAccessibilityEnhancer: unknown;
     // Globals set by css-hot-reload.ts
     cssHotReloader: unknown;
+    // Globals set by link-preview-service.ts
+    fetchLinkPreview(url: string): Promise<LinkPreviewData | null>;
+    isLinkPreviewEnabled(): boolean;
+    setLinkPreviewEnabled(enabled: boolean): void;
     // Browser vendor prefix
     webkitAudioContext?: typeof AudioContext;
+  }
+
+  interface LinkPreviewData {
+    url: string;
+    title?: string;
+    description?: string;
+    imageUrl?: string;
+    siteName?: string;
+    faviconUrl?: string;
   }
 }
