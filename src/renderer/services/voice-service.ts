@@ -53,6 +53,11 @@ class VoiceManager {
   _pttKeydownHandler: ((e: KeyboardEvent) => void) | null;
   _pttKeyupHandler: ((e: KeyboardEvent) => void) | null;
 
+  // ─── Ping measurement ────────────────────────────────────────────────────
+  _pingInterval: ReturnType<typeof setInterval> | null;
+  currentRtt: number | null;
+  onPingUpdated: ((rttMs: number | null) => void) | null;
+
   // ─── Screen share ───────────────────────────────────────────────────────────
   localScreenStream: MediaStream | null;
   isScreenSharing: boolean;
@@ -111,6 +116,11 @@ class VoiceManager {
     this._pttKeydownHandler = null;
     this._pttKeyupHandler = null;
 
+    // Ping measurement
+    this._pingInterval = null;
+    this.currentRtt = null;
+    this.onPingUpdated = null;
+
     // Screen share
     this.localScreenStream = null;
     this.isScreenSharing = false;
@@ -129,6 +139,39 @@ class VoiceManager {
     this._audioCaptureDestination = null;
     this._nativeAudioCaptureActive = false;
     this._screenAudioCtx = null;
+  }
+
+  startPingMeasurement(): void {
+    this.stopPingMeasurement();
+    this._pingInterval = setInterval(async () => {
+      if (!this.peerConnection) return;
+      try {
+        const stats = await this.peerConnection.getStats();
+        let found = false;
+        stats.forEach(report => {
+          if (found) return;
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            const rttSeconds = report.currentRoundTripTime;
+            if (rttSeconds !== undefined) {
+              this.currentRtt = Math.round(rttSeconds * 1000);
+              this.onPingUpdated?.(this.currentRtt);
+              found = true;
+            }
+          }
+        });
+      } catch {
+        // Connection may have closed
+      }
+    }, 2000);
+  }
+
+  stopPingMeasurement(): void {
+    if (this._pingInterval) {
+      clearInterval(this._pingInterval);
+      this._pingInterval = null;
+    }
+    this.currentRtt = null;
+    this.onPingUpdated?.(null);
   }
 
   async fetchICEServers(): Promise<void> {
@@ -280,10 +323,13 @@ class VoiceManager {
         state: state ?? 'unknown',
       });
       console.log('[Voice] Connection state:', state);
-      if (state === 'connected' && this.onConnected) {
-        const cb = this.onConnected;
-        this.onConnected = null;
-        cb();
+      if (state === 'connected') {
+        this.startPingMeasurement();
+        if (this.onConnected) {
+          const cb = this.onConnected;
+          this.onConnected = null;
+          cb();
+        }
       }
     };
 
@@ -323,6 +369,7 @@ class VoiceManager {
   }
 
   _cleanup(): void {
+    this.stopPingMeasurement();
     this.channelId = null;
     this._remoteDescSet = false;
     this._iceQueue = [];

@@ -97,6 +97,7 @@
         handleRemoteVideoStream(streamId, stream);
       vm.onScreenShareStarted = (userId: string) => handleVoiceScreenShareStarted(userId);
       vm.onScreenShareStopped = (userId: string) => handleVoiceScreenShareStopped(userId);
+      vm.onPingUpdated = (rttMs: number | null) => updatePingDisplay(rttMs);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vm = App.voiceManager as any;
@@ -122,6 +123,7 @@
         renderVoiceParticipants(App.activeVoiceChannelId);
         renderVideoGrid();
       };
+      vm.onPingUpdated = (rttMs: number | null) => updatePingDisplay(rttMs);
     }
 
     // Register the SFU-connected callback before joining so UI and sound fire only
@@ -355,17 +357,61 @@
     });
   }
 
+  // ─── Ping Display ────────────────────────────────────────────────────────
+
+  const SIGNAL_TIERS = [
+    { maxRtt: 80, bars: 4, color: '#43b581', label: 'Excellent' },
+    { maxRtt: 150, bars: 3, color: '#faa61a', label: 'Good' },
+    { maxRtt: 250, bars: 2, color: '#f47b67', label: 'Fair' },
+    { maxRtt: Infinity, bars: 1, color: '#ed4245', label: 'Poor' },
+  ];
+
+  function updatePingDisplay(rttMs: number | null): void {
+    const icon = document.getElementById('voice-signal-icon');
+    const tooltipValue = document.getElementById('voice-ping-tooltip-value');
+    const tooltipStatus = document.querySelector(
+      '.voice-ping-tooltip-status'
+    ) as HTMLElement | null;
+    const connectionInfo = document.getElementById('voice-connection-info');
+    if (!icon) return;
+
+    const bars = icon.querySelectorAll('.signal-bar');
+
+    if (rttMs === null) {
+      bars.forEach(bar => bar.classList.remove('active'));
+      if (tooltipValue) tooltipValue.textContent = '-- ms';
+      if (tooltipStatus) tooltipStatus.textContent = 'Connecting...';
+      connectionInfo?.style.removeProperty('--voice-signal-color');
+      return;
+    }
+
+    const tier = SIGNAL_TIERS.find(t => rttMs < t.maxRtt) ?? SIGNAL_TIERS[SIGNAL_TIERS.length - 1];
+    connectionInfo?.style.setProperty('--voice-signal-color', tier.color);
+
+    bars.forEach((bar, i) => {
+      bar.classList.toggle('active', i < tier.bars);
+    });
+
+    if (tooltipValue) tooltipValue.textContent = `${rttMs} ms`;
+    if (tooltipStatus) tooltipStatus.textContent = 'Voice Connected';
+  }
+
+  function resetPingDisplay(): void {
+    updatePingDisplay(null);
+  }
+
   function showVoiceControls(channelName: string): void {
     const panel = document.getElementById('voice-controls');
     if (panel) {
       panel.classList.remove('hidden');
       const nameEl = panel.querySelector('.voice-channel-name');
-      if (nameEl) nameEl.textContent = `\uD83D\uDD0A ${channelName}`;
+      if (nameEl) nameEl.textContent = `🔊 ${channelName}`;
     }
   }
 
   function hideVoiceControls(): void {
     document.getElementById('voice-controls')?.classList.add('hidden');
+    resetPingDisplay();
   }
 
   function openVideoPopout(): void {

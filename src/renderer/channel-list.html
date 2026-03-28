@@ -30,7 +30,19 @@
 
   <!-- Voice indicator (compact, shown when connected to a voice channel) -->
   <div class="voice-controls hidden" id="voice-controls">
-    <span class="voice-channel-name"></span>
+    <div class="voice-connection-info" id="voice-connection-info">
+      <svg class="voice-signal-icon" id="voice-signal-icon" width="16" height="14" viewBox="0 0 16 14">
+        <rect class="signal-bar" x="0" y="10" width="3" height="4" rx="0.5" />
+        <rect class="signal-bar" x="4.5" y="7" width="3" height="7" rx="0.5" />
+        <rect class="signal-bar" x="9" y="4" width="3" height="10" rx="0.5" />
+        <rect class="signal-bar" x="13.5" y="0" width="3" height="14" rx="0.5" />
+      </svg>
+      <span class="voice-channel-name"></span>
+      <div class="voice-ping-tooltip" id="voice-ping-tooltip">
+        <div class="voice-ping-tooltip-status">Voice Connected</div>
+        <div class="voice-ping-tooltip-value" id="voice-ping-tooltip-value">-- ms</div>
+      </div>
+    </div>
     <div class="voice-buttons">
       <button class="voice-btn voice-mute-btn" id="voice-mute-btn" title="Mute">🎤</button>
       <button class="voice-btn voice-deafen-btn" id="voice-deafen-btn" title="Deafen">🎧</button>
