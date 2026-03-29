@@ -79,7 +79,7 @@ fi
 # Build the application (only if not inject-only)
 if [ "$INJECT_ONLY" = false ]; then
     echo -e "${GREEN}🏗️  Building application...${NC}"
-    npm run build:shared
+    npm run build
     tsc -p tsconfig.main.json
     tsc -p tsconfig.renderer.json
     cp -r src/renderer/*.html dist/renderer/ 2>/dev/null || true
